@@ -5,12 +5,12 @@
 
 | 항목 | 상태 | 완료일 | 비고 |
 |------|------|--------|------|
-| CodeMirror 6 에디터 세팅 | ⬜ | | |
-| Markdown + LaTeX 구문 하이라이팅 | ⬜ | | |
-| Split View 레이아웃 | ⬜ | | |
-| KaTeX 실시간 미리보기 | ⬜ | | |
-| 수식 편집기 툴바 (기본 6개) | ⬜ | | 분수, 루트, 첨자, 적분, 합, 극한 |
-| Tab placeholder 이동 | ⬜ | | CodeMirror snippet |
+| CodeMirror 6 에디터 세팅 | ✅ | | |
+| Markdown + LaTeX 구문 하이라이팅 | ✅ | | |
+| Split View 레이아웃 | ✅ | | |
+| KaTeX 실시간 미리보기 | ✅ | | |
+| 수식 편집기 툴바 (기본 6개) | ✅ | | 분수, 루트, 첨자, 적분, 합, 극한 |
+| Tab placeholder 이동 | ✅ | | CodeMirror snippet |
 
 ## Phase 2: 데이터 연동
 > 목표: Firebase 연결, 문제 저장/불러오기
