@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import MarkdownEditor from '../../components/editor/MarkdownEditor';
+import EditorPreview from '../../components/editor/EditorPreview';
 
 const SAMPLE_TEXT = `# 2025 수능 수학 21번
 
@@ -23,41 +24,30 @@ export default function EditorTestPage() {
   const [content, setContent] = useState(SAMPLE_TEXT);
 
   return (
-    <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
+    <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
-        Mathory Editor Test
+        Mathory Editor — Split View
       </h1>
 
       <div style={{ display: 'flex', gap: '16px', height: '600px' }}>
-        {/* 에디터 */}
-        <div style={{ flex: 1 }}>
+        {/* 왼쪽: 에디터 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-            Editor (CodeMirror 6)
+            Editor (Markdown + LaTeX)
           </h2>
-          <MarkdownEditor initialValue={SAMPLE_TEXT} onChange={setContent} />
+          <div style={{ flex: 1 }}>
+            <MarkdownEditor initialValue={SAMPLE_TEXT} onChange={setContent} />
+          </div>
         </div>
 
-        {/* raw text 확인용 */}
-        <div style={{ flex: 1 }}>
+        {/* 오른쪽: 미리보기 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           <h2 style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
-            Raw Text (DB에 저장될 내용)
+            Preview (KaTeX 렌더링)
           </h2>
-          <pre
-            style={{
-              height: '100%',
-              padding: '16px',
-              backgroundColor: '#f8f9fa',
-              border: '1px solid #ddd',
-              borderRadius: '8px',
-              overflow: 'auto',
-              fontSize: '13px',
-              fontFamily: "'Menlo', monospace",
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-            }}
-          >
-            {content}
-          </pre>
+          <div style={{ flex: 1 }}>
+            <EditorPreview content={content} />
+          </div>
         </div>
       </div>
     </div>
