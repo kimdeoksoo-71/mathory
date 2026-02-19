@@ -17,12 +17,12 @@
 
 | 항목 | 상태 | 완료일 | 비고 |
 |------|------|--------|------|
-| Firebase 프로젝트 세팅 | ⬜ | | |
-| Firebase Auth (Google 로그인) | ⬜ | | |
-| Firestore 스키마 구현 | ⬜ | | data-model.md 참고 |
-| 문제 CRUD API (lib/firestore.ts) | ⬜ | | |
-| 블록 저장/불러오기 | ⬜ | | |
-| 환경변수 관리 (.env.local) | ⬜ | | |
+| Firebase 프로젝트 세팅 | ✅ | | |
+| Firebase Auth (Google 로그인) | ✅ | | |
+| Firestore 스키마 구현 | ✅ | | data-model.md 참고 |
+| 문제 CRUD API (lib/firestore.ts) | ✅ | | |
+| 블록 저장/불러오기 | ✅ | | |
+| 환경변수 관리 (.env.local) | ✅ | | |
 
 ## Phase 3: 문제 관리
 > 목표: 문제 목록, 검색, 보기 페이지
