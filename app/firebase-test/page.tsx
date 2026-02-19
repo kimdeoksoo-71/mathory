@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import useAuth from '../../hooks/useAuth';
+import LoginButton from '../../components/auth/LoginButton';
 import {
   createProblem,
   listProblems,
@@ -12,6 +14,7 @@ import {
 import { ProblemWithBlocks } from '../../types/problem';
 
 export default function FirebaseTestPage() {
+  const { user, loading } = useAuth();
   const [status, setStatus] = useState('');
   const [problems, setProblems] = useState<ProblemWithBlocks[]>([]);
 
@@ -19,7 +22,6 @@ export default function FirebaseTestPage() {
     try {
       setStatus('문제 생성 중...');
 
-      // 1. 문제 생성
       const problemId = await createProblem({
         title: '2025 수능 수학 21번',
         year: 2025,
@@ -30,7 +32,6 @@ export default function FirebaseTestPage() {
         answer: '16',
       });
 
-      // 2. 문제 블록 저장
       await saveQuestionBlock(problemId, {
         order: 0,
         type: 'text',
@@ -43,7 +44,6 @@ export default function FirebaseTestPage() {
         raw_text: '① $12$\n② $14$\n③ $16$\n④ $18$\n⑤ $20$',
       });
 
-      // 3. 풀이 블록 저장
       await saveSolutionBlock(problemId, {
         order: 0,
         type: 'text',
@@ -85,115 +85,128 @@ export default function FirebaseTestPage() {
     }
   };
 
+  if (loading) {
+    return <div style={{ padding: '24px' }}>로딩 중...</div>;
+  }
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
-        Firebase 연동 테스트
-      </h1>
-
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
-        <button
-          onClick={handleCreate}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#4285f4',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          샘플 문제 생성
-        </button>
-        <button
-          onClick={handleLoad}
-          style={{
-            padding: '10px 20px',
-            backgroundColor: '#34a853',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
-            cursor: 'pointer',
-            fontSize: '14px',
-          }}
-        >
-          문제 목록 불러오기
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>
+          Firebase 연동 테스트
+        </h1>
+        <LoginButton user={user} />
       </div>
 
-      <p style={{ color: '#666', marginBottom: '24px' }}>{status}</p>
-
-      {problems.map((p) => (
-        <div
-          key={p.id}
-          style={{
-            border: '1px solid #ddd',
-            borderRadius: '8px',
-            padding: '16px',
-            marginBottom: '12px',
-          }}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>{p.title}</h2>
+      {!user ? (
+        <p style={{ color: '#888' }}>로그인하면 문제를 생성하고 관리할 수 있어요.</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', gap: '12px', marginBottom: '16px' }}>
             <button
-              onClick={() => handleDelete(p.id)}
+              onClick={handleCreate}
               style={{
-                padding: '4px 12px',
-                backgroundColor: '#ea4335',
+                padding: '10px 20px',
+                backgroundColor: '#4285f4',
                 color: '#fff',
                 border: 'none',
-                borderRadius: '4px',
+                borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '12px',
+                fontSize: '14px',
               }}
             >
-              삭제
+              샘플 문제 생성
+            </button>
+            <button
+              onClick={handleLoad}
+              style={{
+                padding: '10px 20px',
+                backgroundColor: '#34a853',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              문제 목록 불러오기
             </button>
           </div>
-          <p style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
-            {p.year} {p.exam_type} | {p.category} | 난이도 {p.difficulty} | 정답: {p.answer}
-          </p>
 
-          <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
-            문제 블록 ({p.question_blocks.length}개)
-          </h3>
-          {p.question_blocks.map((b) => (
-            <pre
-              key={b.id}
+          <p style={{ color: '#666', marginBottom: '24px' }}>{status}</p>
+
+          {problems.map((p) => (
+            <div
+              key={p.id}
               style={{
-                backgroundColor: '#f8f9fa',
-                padding: '8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                marginTop: '4px',
-                whiteSpace: 'pre-wrap',
+                border: '1px solid #ddd',
+                borderRadius: '8px',
+                padding: '16px',
+                marginBottom: '12px',
               }}
             >
-              [{b.type}] {b.raw_text}
-            </pre>
-          ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>{p.title}</h2>
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  style={{
+                    padding: '4px 12px',
+                    backgroundColor: '#ea4335',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                  }}
+                >
+                  삭제
+                </button>
+              </div>
+              <p style={{ color: '#888', fontSize: '13px', marginTop: '4px' }}>
+                {p.year} {p.exam_type} | {p.category} | 난이도 {p.difficulty} | 정답: {p.answer}
+              </p>
 
-          <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
-            풀이 블록 ({p.solution_blocks.length}개)
-          </h3>
-          {p.solution_blocks.map((b) => (
-            <pre
-              key={b.id}
-              style={{
-                backgroundColor: '#f0f8ff',
-                padding: '8px',
-                borderRadius: '4px',
-                fontSize: '12px',
-                marginTop: '4px',
-                whiteSpace: 'pre-wrap',
-              }}
-            >
-              [{b.step_label || b.type}] {b.raw_text}
-            </pre>
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
+                문제 블록 ({p.question_blocks.length}개)
+              </h3>
+              {p.question_blocks.map((b) => (
+                <pre
+                  key={b.id}
+                  style={{
+                    backgroundColor: '#f8f9fa',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    marginTop: '4px',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  [{b.type}] {b.raw_text}
+                </pre>
+              ))}
+
+              <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
+                풀이 블록 ({p.solution_blocks.length}개)
+              </h3>
+              {p.solution_blocks.map((b) => (
+                <pre
+                  key={b.id}
+                  style={{
+                    backgroundColor: '#f0f8ff',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    marginTop: '4px',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  [{b.step_label || b.type}] {b.raw_text}
+                </pre>
+              ))}
+            </div>
           ))}
-        </div>
-      ))}
+        </>
+      )}
     </div>
   );
 }
