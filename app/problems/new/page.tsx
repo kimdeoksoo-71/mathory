@@ -1,19 +1,15 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '../../../hooks/useAuth';
 import LoginButton from '../../../components/auth/LoginButton';
-import MarkdownEditor, { MarkdownEditorHandle } from '../../../components/editor/MarkdownEditor';
-import EditorPreview from '../../../components/editor/EditorPreview';
-import MathToolbar from '../../../components/editor/MathToolbar';
+import BlockEditor, { BlockData } from '../../../components/editor/BlockEditor';
 import { createProblem, saveQuestionBlock, saveSolutionBlock } from '../../../lib/firestore';
 
 export default function NewProblemPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const questionEditorRef = useRef<MarkdownEditorHandle>(null);
-  const solutionEditorRef = useRef<MarkdownEditorHandle>(null);
 
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(2025);
@@ -21,37 +17,23 @@ export default function NewProblemPage() {
   const [category, setCategory] = useState('미적분');
   const [difficulty, setDifficulty] = useState(3);
   const [answer, setAnswer] = useState('');
-  const [questionText, setQuestionText] = useState('');
-  const [solutionText, setSolutionText] = useState('');
-  const [activeEditor, setActiveEditor] = useState<'question' | 'solution'>('question');
-  const [previewContent, setPreviewContent] = useState('');
+  const [activeTab, setActiveTab] = useState<'question' | 'solution'>('question');
+  const [questionBlocks, setQuestionBlocks] = useState<BlockData[]>([
+    { id: 'q-1', type: 'text', raw_text: '' },
+  ]);
+  const [solutionBlocks, setSolutionBlocks] = useState<BlockData[]>([
+    { id: 's-1', type: 'text', raw_text: '' },
+  ]);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
-
-  const handleQuestionChange = (value: string) => {
-    setQuestionText(value);
-    if (activeEditor === 'question') setPreviewContent(value);
-  };
-
-  const handleSolutionChange = (value: string) => {
-    setSolutionText(value);
-    if (activeEditor === 'solution') setPreviewContent(value);
-  };
-
-  const handleInsert = (template: string, cursorOffset: number) => {
-    if (activeEditor === 'question') {
-      questionEditorRef.current?.insertText(template, cursorOffset);
-    } else {
-      solutionEditorRef.current?.insertText(template, cursorOffset);
-    }
-  };
 
   const handleSave = async () => {
     if (!title.trim()) {
       setStatus('제목을 입력해주세요.');
       return;
     }
-    if (!questionText.trim()) {
+    const hasContent = questionBlocks.some((b) => b.raw_text.trim());
+    if (!hasContent) {
       setStatus('문제 내용을 입력해주세요.');
       return;
     }
@@ -70,19 +52,27 @@ export default function NewProblemPage() {
         answer,
       });
 
-      await saveQuestionBlock(problemId, {
-        order: 0,
-        type: 'text',
-        raw_text: questionText,
-      });
+      for (let i = 0; i < questionBlocks.length; i++) {
+        const b = questionBlocks[i];
+        if (b.raw_text.trim()) {
+          await saveQuestionBlock(problemId, {
+            order: i,
+            type: b.type,
+            raw_text: b.raw_text,
+          });
+        }
+      }
 
-      if (solutionText.trim()) {
-        await saveSolutionBlock(problemId, {
-          order: 0,
-          type: 'text',
-          raw_text: solutionText,
-          step_label: '풀이 1',
-        });
+      for (let i = 0; i < solutionBlocks.length; i++) {
+        const b = solutionBlocks[i];
+        if (b.raw_text.trim()) {
+          await saveSolutionBlock(problemId, {
+            order: i,
+            type: b.type,
+            raw_text: b.raw_text,
+            step_label: `풀이 ${i + 1}`,
+          });
+        }
       }
 
       setStatus('저장 완료!');
@@ -115,59 +105,37 @@ export default function NewProblemPage() {
         <LoginButton user={user} />
       </div>
 
-      {/* 문제 메타 정보 */}
+      {/* 메타 정보 */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="문제 제목 (예: 2025 수능 수학 21번)"
-          style={{
-            flex: 2,
-            minWidth: '250px',
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px',
-          }}
+          style={{ flex: 2, minWidth: '250px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
         />
         <input
           type="number"
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
-          style={{
-            width: '80px',
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px',
-          }}
+          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
         />
-        <select
-          value={examType}
-          onChange={(e) => setExamType(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <select value={examType} onChange={(e) => setExamType(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value="수능">수능</option>
           <option value="모의고사">모의고사</option>
           <option value="사관학교">사관학교</option>
           <option value="경찰대">경찰대</option>
         </select>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <select value={category} onChange={(e) => setCategory(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value="미적분">미적분</option>
           <option value="확률과통계">확률과통계</option>
           <option value="기하">기하</option>
           <option value="수학Ⅰ">수학Ⅰ</option>
           <option value="수학Ⅱ">수학Ⅱ</option>
         </select>
-        <select
-          value={difficulty}
-          onChange={(e) => setDifficulty(Number(e.target.value))}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value={1}>난이도 1</option>
           <option value={2}>난이도 2</option>
           <option value={3}>난이도 3</option>
@@ -178,67 +146,53 @@ export default function NewProblemPage() {
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
           placeholder="정답"
-          style={{
-            width: '80px',
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px',
-          }}
+          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
         />
       </div>
 
-      {/* 에디터 탭 */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '0' }}>
+      {/* 탭 */}
+      <div style={{ display: 'flex', gap: '4px' }}>
         <button
-          onClick={() => { setActiveEditor('question'); setPreviewContent(questionText); }}
+          onClick={() => setActiveTab('question')}
           style={{
             padding: '8px 20px',
-            backgroundColor: activeEditor === 'question' ? '#fff' : '#e8e8e8',
+            backgroundColor: activeTab === 'question' ? '#fff' : '#e8e8e8',
             border: '1px solid #ddd',
-            borderBottom: activeEditor === 'question' ? '1px solid #fff' : '1px solid #ddd',
+            borderBottom: activeTab === 'question' ? '1px solid #fff' : '1px solid #ddd',
             borderRadius: '6px 6px 0 0',
             cursor: 'pointer',
             fontSize: '14px',
-            fontWeight: activeEditor === 'question' ? 'bold' : 'normal',
+            fontWeight: activeTab === 'question' ? 'bold' : 'normal',
           }}
         >
-          문제
+          문제 ({questionBlocks.length}블록)
         </button>
         <button
-          onClick={() => { setActiveEditor('solution'); setPreviewContent(solutionText); }}
+          onClick={() => setActiveTab('solution')}
           style={{
             padding: '8px 20px',
-            backgroundColor: activeEditor === 'solution' ? '#fff' : '#e8e8e8',
+            backgroundColor: activeTab === 'solution' ? '#fff' : '#e8e8e8',
             border: '1px solid #ddd',
-            borderBottom: activeEditor === 'solution' ? '1px solid #fff' : '1px solid #ddd',
+            borderBottom: activeTab === 'solution' ? '1px solid #fff' : '1px solid #ddd',
             borderRadius: '6px 6px 0 0',
             cursor: 'pointer',
             fontSize: '14px',
-            fontWeight: activeEditor === 'solution' ? 'bold' : 'normal',
+            fontWeight: activeTab === 'solution' ? 'bold' : 'normal',
           }}
         >
-          풀이
+          풀이 ({solutionBlocks.length}블록)
         </button>
       </div>
 
-      {/* 수식 툴바 + Split View */}
-      <MathToolbar onInsert={handleInsert} />
-      <div style={{ display: 'flex', gap: '16px', height: '500px', minWidth: 0 }}>
-        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <div style={{ height: '100%', display: activeEditor === 'question' ? 'block' : 'none' }}>
-            <MarkdownEditor ref={questionEditorRef} initialValue="" onChange={handleQuestionChange} />
-          </div>
-          <div style={{ height: '100%', display: activeEditor === 'solution' ? 'block' : 'none' }}>
-            <MarkdownEditor ref={solutionEditorRef} initialValue="" onChange={handleSolutionChange} />
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <EditorPreview content={previewContent} />
-        </div>
+      {/* 블록 에디터 */}
+      <div style={{ display: activeTab === 'question' ? 'block' : 'none' }}>
+        <BlockEditor blocks={questionBlocks} onChange={setQuestionBlocks} />
+      </div>
+      <div style={{ display: activeTab === 'solution' ? 'block' : 'none' }}>
+        <BlockEditor blocks={solutionBlocks} onChange={setSolutionBlocks} />
       </div>
 
-      {/* 저장 버튼 */}
+      {/* 저장 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
         <button
           onClick={handleSave}

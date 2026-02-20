@@ -1,26 +1,22 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import useAuth from '../../../../hooks/useAuth';
 import LoginButton from '../../../../components/auth/LoginButton';
-import MarkdownEditor, { MarkdownEditorHandle } from '../../../../components/editor/MarkdownEditor';
-import EditorPreview from '../../../../components/editor/EditorPreview';
-import MathToolbar from '../../../../components/editor/MathToolbar';
+import BlockEditor, { BlockData } from '../../../../components/editor/BlockEditor';
 import {
   getProblemWithBlocks,
   updateProblem,
-  updateBlock,
   saveQuestionBlock,
   saveSolutionBlock,
+  deleteBlock,
 } from '../../../../lib/firestore';
 
 export default function EditProblemPage() {
   const { id } = useParams();
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const questionEditorRef = useRef<MarkdownEditorHandle>(null);
-  const solutionEditorRef = useRef<MarkdownEditorHandle>(null);
 
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(2025);
@@ -28,22 +24,17 @@ export default function EditProblemPage() {
   const [category, setCategory] = useState('미적분');
   const [difficulty, setDifficulty] = useState(3);
   const [answer, setAnswer] = useState('');
-  const [questionText, setQuestionText] = useState('');
-  const [solutionText, setSolutionText] = useState('');
-  const [activeEditor, setActiveEditor] = useState<'question' | 'solution'>('question');
-  const [previewContent, setPreviewContent] = useState('');
+  const [activeTab, setActiveTab] = useState<'question' | 'solution'>('question');
+  const [questionBlocks, setQuestionBlocks] = useState<BlockData[]>([]);
+  const [solutionBlocks, setSolutionBlocks] = useState<BlockData[]>([]);
   const [status, setStatus] = useState('');
   const [saving, setSaving] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // 기존 블록 ID 저장 (업데이트 시 사용)
-  const [questionBlockId, setQuestionBlockId] = useState<string | null>(null);
-  const [solutionBlockId, setSolutionBlockId] = useState<string | null>(null);
+  // 기존 블록 ID 추적 (삭제된 블록 감지용)
+  const [originalQuestionIds, setOriginalQuestionIds] = useState<string[]>([]);
+  const [originalSolutionIds, setOriginalSolutionIds] = useState<string[]>([]);
 
-  // 에디터 준비 상태
-  const [editorsReady, setEditorsReady] = useState(false);
-
-  // 문제 데이터 불러오기
   useEffect(() => {
     if (!id) return;
     const load = async () => {
@@ -61,51 +52,22 @@ export default function EditProblemPage() {
       setDifficulty(problem.difficulty);
       setAnswer(problem.answer || '');
 
-      const qText = problem.question_blocks.map((b) => b.raw_text).join('\n\n');
-      const sText = problem.solution_blocks.map((b) => b.raw_text).join('\n\n');
+      const qBlocks: BlockData[] = problem.question_blocks.length > 0
+        ? problem.question_blocks.map((b) => ({ id: b.id, type: b.type as BlockData['type'], raw_text: b.raw_text }))
+        : [{ id: 'q-new-1', type: 'text', raw_text: '' }];
 
-      setQuestionText(qText);
-      setSolutionText(sText);
-      setPreviewContent(qText);
+      const sBlocks: BlockData[] = problem.solution_blocks.length > 0
+        ? problem.solution_blocks.map((b) => ({ id: b.id, type: b.type as BlockData['type'], raw_text: b.raw_text }))
+        : [{ id: 's-new-1', type: 'text', raw_text: '' }];
 
-      if (problem.question_blocks.length > 0) {
-        setQuestionBlockId(problem.question_blocks[0].id);
-      }
-      if (problem.solution_blocks.length > 0) {
-        setSolutionBlockId(problem.solution_blocks[0].id);
-      }
-
+      setQuestionBlocks(qBlocks);
+      setSolutionBlocks(sBlocks);
+      setOriginalQuestionIds(problem.question_blocks.map((b) => b.id));
+      setOriginalSolutionIds(problem.solution_blocks.map((b) => b.id));
       setDataLoading(false);
     };
     load();
   }, [id]);
-
-  // 데이터 로드 후 에디터 준비되면 내용 세팅
-  useEffect(() => {
-    if (!dataLoading && editorsReady) {
-      // 에디터에 초기값을 넣기 위해 insertText 활용
-      // CodeMirror는 initialValue가 마운트 시점에만 적용되므로
-      // 데이터 로드 후에는 직접 세팅 필요
-    }
-  }, [dataLoading, editorsReady]);
-
-  const handleQuestionChange = (value: string) => {
-    setQuestionText(value);
-    if (activeEditor === 'question') setPreviewContent(value);
-  };
-
-  const handleSolutionChange = (value: string) => {
-    setSolutionText(value);
-    if (activeEditor === 'solution') setPreviewContent(value);
-  };
-
-  const handleInsert = (template: string, cursorOffset: number) => {
-    if (activeEditor === 'question') {
-      questionEditorRef.current?.insertText(template, cursorOffset);
-    } else {
-      solutionEditorRef.current?.insertText(template, cursorOffset);
-    }
-  };
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -117,41 +79,56 @@ export default function EditProblemPage() {
       setSaving(true);
       setStatus('저장 중...');
 
-      // 문제 메타 정보 업데이트
+      // 메타 정보 업데이트
       await updateProblem(id as string, {
-        title,
-        year,
-        exam_type: examType,
-        category,
-        difficulty,
-        answer,
+        title, year, exam_type: examType, category, difficulty, answer,
       });
 
-      // 문제 블록 업데이트 또는 새로 생성
-      if (questionBlockId) {
-        await updateBlock(id as string, 'question_blocks', questionBlockId, {
-          raw_text: questionText,
-        });
-      } else if (questionText.trim()) {
-        await saveQuestionBlock(id as string, {
-          order: 0,
-          type: 'text',
-          raw_text: questionText,
-        });
+      // 삭제된 문제 블록 처리
+      const currentQIds = questionBlocks.map((b) => b.id);
+      for (const oldId of originalQuestionIds) {
+        if (!currentQIds.includes(oldId)) {
+          await deleteBlock(id as string, 'question_blocks', oldId);
+        }
       }
 
-      // 풀이 블록 업데이트 또는 새로 생성
-      if (solutionBlockId) {
-        await updateBlock(id as string, 'solution_blocks', solutionBlockId, {
-          raw_text: solutionText,
-        });
-      } else if (solutionText.trim()) {
-        await saveSolutionBlock(id as string, {
-          order: 0,
-          type: 'text',
-          raw_text: solutionText,
-          step_label: '풀이 1',
-        });
+      // 삭제된 풀이 블록 처리
+      const currentSIds = solutionBlocks.map((b) => b.id);
+      for (const oldId of originalSolutionIds) {
+        if (!currentSIds.includes(oldId)) {
+          await deleteBlock(id as string, 'solution_blocks', oldId);
+        }
+      }
+
+      // 문제 블록: 기존 블록 삭제 후 새로 저장 (순서 보장)
+      for (const oldId of originalQuestionIds) {
+        if (currentQIds.includes(oldId)) {
+          await deleteBlock(id as string, 'question_blocks', oldId);
+        }
+      }
+      for (let i = 0; i < questionBlocks.length; i++) {
+        const b = questionBlocks[i];
+        if (b.raw_text.trim()) {
+          await saveQuestionBlock(id as string, {
+            order: i, type: b.type, raw_text: b.raw_text,
+          });
+        }
+      }
+
+      // 풀이 블록: 기존 블록 삭제 후 새로 저장
+      for (const oldId of originalSolutionIds) {
+        if (currentSIds.includes(oldId)) {
+          await deleteBlock(id as string, 'solution_blocks', oldId);
+        }
+      }
+      for (let i = 0; i < solutionBlocks.length; i++) {
+        const b = solutionBlocks[i];
+        if (b.raw_text.trim()) {
+          await saveSolutionBlock(id as string, {
+            order: i, type: b.type, raw_text: b.raw_text,
+            step_label: `풀이 ${i + 1}`,
+          });
+        }
       }
 
       setStatus('저장 완료!');
@@ -183,14 +160,7 @@ export default function EditProblemPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={() => router.push(`/problems/${id}`)}
-            style={{
-              padding: '6px 14px',
-              backgroundColor: '#f5f5f5',
-              border: '1px solid #ddd',
-              borderRadius: '6px',
-              cursor: 'pointer',
-              fontSize: '13px',
-            }}
+            style={{ padding: '6px 14px', backgroundColor: '#f5f5f5', border: '1px solid #ddd', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
           >
             ← 돌아가기
           </button>
@@ -199,141 +169,83 @@ export default function EditProblemPage() {
         <LoginButton user={user} />
       </div>
 
-      {/* 문제 메타 정보 */}
+      {/* 메타 정보 */}
       <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="문제 제목"
-          style={{
-            flex: 2,
-            minWidth: '250px',
-            padding: '8px 12px',
-            border: '1px solid #ddd',
-            borderRadius: '6px',
-            fontSize: '14px',
-          }}
-        />
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        />
-        <select
-          value={examType}
-          onChange={(e) => setExamType(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="문제 제목"
+          style={{ flex: 2, minWidth: '250px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
+        <input type="number" value={year} onChange={(e) => setYear(Number(e.target.value))}
+          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
+        <select value={examType} onChange={(e) => setExamType(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value="수능">수능</option>
           <option value="모의고사">모의고사</option>
           <option value="사관학교">사관학교</option>
           <option value="경찰대">경찰대</option>
         </select>
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <select value={category} onChange={(e) => setCategory(e.target.value)}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value="미적분">미적분</option>
           <option value="확률과통계">확률과통계</option>
           <option value="기하">기하</option>
           <option value="수학Ⅰ">수학Ⅰ</option>
           <option value="수학Ⅱ">수학Ⅱ</option>
         </select>
-        <select
-          value={difficulty}
-          onChange={(e) => setDifficulty(Number(e.target.value))}
-          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        >
+        <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}
+          style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
           <option value={1}>난이도 1</option>
           <option value={2}>난이도 2</option>
           <option value={3}>난이도 3</option>
           <option value={4}>난이도 4</option>
           <option value={5}>난이도 5</option>
         </select>
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="정답"
-          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}
-        />
+        <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="정답"
+          style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
       </div>
 
-      {/* 에디터 탭 */}
+      {/* 탭 */}
       <div style={{ display: 'flex', gap: '4px' }}>
-        <button
-          onClick={() => { setActiveEditor('question'); setPreviewContent(questionText); }}
+        <button onClick={() => setActiveTab('question')}
           style={{
             padding: '8px 20px',
-            backgroundColor: activeEditor === 'question' ? '#fff' : '#e8e8e8',
+            backgroundColor: activeTab === 'question' ? '#fff' : '#e8e8e8',
             border: '1px solid #ddd',
-            borderBottom: activeEditor === 'question' ? '1px solid #fff' : '1px solid #ddd',
-            borderRadius: '6px 6px 0 0',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: activeEditor === 'question' ? 'bold' : 'normal',
-          }}
-        >
-          문제
+            borderBottom: activeTab === 'question' ? '1px solid #fff' : '1px solid #ddd',
+            borderRadius: '6px 6px 0 0', cursor: 'pointer', fontSize: '14px',
+            fontWeight: activeTab === 'question' ? 'bold' : 'normal',
+          }}>
+          문제 ({questionBlocks.length}블록)
         </button>
-        <button
-          onClick={() => { setActiveEditor('solution'); setPreviewContent(solutionText); }}
+        <button onClick={() => setActiveTab('solution')}
           style={{
             padding: '8px 20px',
-            backgroundColor: activeEditor === 'solution' ? '#fff' : '#e8e8e8',
+            backgroundColor: activeTab === 'solution' ? '#fff' : '#e8e8e8',
             border: '1px solid #ddd',
-            borderBottom: activeEditor === 'solution' ? '1px solid #fff' : '1px solid #ddd',
-            borderRadius: '6px 6px 0 0',
-            cursor: 'pointer',
-            fontSize: '14px',
-            fontWeight: activeEditor === 'solution' ? 'bold' : 'normal',
-          }}
-        >
-          풀이
+            borderBottom: activeTab === 'solution' ? '1px solid #fff' : '1px solid #ddd',
+            borderRadius: '6px 6px 0 0', cursor: 'pointer', fontSize: '14px',
+            fontWeight: activeTab === 'solution' ? 'bold' : 'normal',
+          }}>
+          풀이 ({solutionBlocks.length}블록)
         </button>
       </div>
 
-      {/* 수식 툴바 + Split View */}
-      <MathToolbar onInsert={handleInsert} />
-      <div style={{ display: 'flex', gap: '16px', height: '500px', minWidth: 0 }}>
-        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-          <div style={{ height: '100%', display: activeEditor === 'question' ? 'block' : 'none' }}>
-            <MarkdownEditor
-              ref={questionEditorRef}
-              initialValue={questionText}
-              onChange={handleQuestionChange}
-            />
-          </div>
-          <div style={{ height: '100%', display: activeEditor === 'solution' ? 'block' : 'none' }}>
-            <MarkdownEditor
-              ref={solutionEditorRef}
-              initialValue={solutionText}
-              onChange={handleSolutionChange}
-            />
-          </div>
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <EditorPreview content={previewContent} />
-        </div>
+      {/* 블록 에디터 */}
+      <div style={{ display: activeTab === 'question' ? 'block' : 'none' }}>
+        <BlockEditor blocks={questionBlocks} onChange={setQuestionBlocks} />
+      </div>
+      <div style={{ display: activeTab === 'solution' ? 'block' : 'none' }}>
+        <BlockEditor blocks={solutionBlocks} onChange={setSolutionBlocks} />
       </div>
 
-      {/* 저장 버튼 */}
+      {/* 저장 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
-        <button
-          onClick={handleSave}
-          disabled={saving}
+        <button onClick={handleSave} disabled={saving}
           style={{
             padding: '10px 32px',
             backgroundColor: saving ? '#ccc' : '#4285f4',
-            color: '#fff',
-            border: 'none',
-            borderRadius: '6px',
+            color: '#fff', border: 'none', borderRadius: '6px',
             cursor: saving ? 'not-allowed' : 'pointer',
-            fontSize: '15px',
-            fontWeight: 'bold',
-          }}
-        >
+            fontSize: '15px', fontWeight: 'bold',
+          }}>
           {saving ? '저장 중...' : '저장'}
         </button>
         {status && <span style={{ color: status.includes('에러') ? '#ea4335' : '#34a853', fontSize: '14px' }}>{status}</span>}
