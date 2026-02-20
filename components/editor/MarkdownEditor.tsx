@@ -6,6 +6,7 @@ import { keymap } from '@codemirror/view';
 import { EditorState } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
+import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 
 interface MarkdownEditorProps {
   initialValue?: string;
@@ -107,6 +108,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           basicSetup,
           markdown(),
           EditorView.lineWrapping,
+          latexHighlightPlugin,
+          latexHighlightTheme,
           EditorView.updateListener.of((update) => {
             if (update.docChanged && onChange) {
               onChange(update.state.doc.toString());
