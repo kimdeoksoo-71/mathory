@@ -19,7 +19,9 @@ import {
 import SortableBlock from './SortableBlock';
 import MathToolbar from './MathToolbar';
 import EditorPreview from './EditorPreview';
+import ImageUploadButton from './ImageUploadButton';
 import { MarkdownEditorHandle } from './MarkdownEditor';
+import { uploadImage } from '../../lib/storage';
 
 export interface BlockData {
   id: string;
@@ -30,9 +32,10 @@ export interface BlockData {
 interface BlockEditorProps {
   blocks: BlockData[];
   onChange: (blocks: BlockData[]) => void;
+  problemId?: string;
 }
 
-export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
+export default function BlockEditor({ blocks, onChange, problemId }: BlockEditorProps) {
   const [activeBlockId, setActiveBlockId] = useState<string | null>(
     blocks.length > 0 ? blocks[0].id : null
   );
@@ -87,13 +90,28 @@ export default function BlockEditor({ blocks, onChange }: BlockEditorProps) {
     }
   };
 
+  const handleImageUpload = async (file: File) => {
+    // problemId가 없으면 임시 ID 사용
+    const pid = problemId || `temp-${Date.now()}`;
+    const url = await uploadImage(file, pid);
+    const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
+
+    if (activeBlockId && editorRefs.current[activeBlockId]) {
+      editorRefs.current[activeBlockId]!.insertText(markdownImage, markdownImage.length);
+    }
+  };
+
   const setEditorRef = (blockId: string, ref: MarkdownEditorHandle | null) => {
     editorRefs.current[blockId] = ref;
   };
 
   return (
     <div>
-      <MathToolbar onInsert={handleInsert} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '8px 8px 0 0', border: '1px solid #ddd', borderBottom: 'none' }}>
+        <MathToolbar onInsert={handleInsert} />
+        <div style={{ width: '1px', height: '24px', backgroundColor: '#ddd', margin: '0 4px' }} />
+        <ImageUploadButton onUpload={handleImageUpload} />
+      </div>
       <div style={{ display: 'flex', gap: '16px', height: '500px', minWidth: 0 }}>
         {/* 왼쪽: 블록 목록 */}
         <div style={{ flex: 1, minWidth: 0, overflow: 'auto', border: '1px solid #ddd', borderRadius: '0 0 8px 8px' }}>

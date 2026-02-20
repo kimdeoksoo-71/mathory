@@ -25,18 +25,7 @@ const MATH_BUTTONS = [
 
 export default function MathToolbar({ onInsert }: MathToolbarProps) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexWrap: 'wrap',
-        gap: '4px',
-        padding: '8px',
-        backgroundColor: '#f5f5f5',
-        borderRadius: '8px 8px 0 0',
-        border: '1px solid #ddd',
-        borderBottom: 'none',
-      }}
-    >
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
       {MATH_BUTTONS.map((btn) => (
         <button
           key={btn.template}
