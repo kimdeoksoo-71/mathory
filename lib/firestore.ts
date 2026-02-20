@@ -7,6 +7,7 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   serverTimestamp,
   Timestamp,
@@ -59,11 +60,28 @@ export async function deleteProblem(problemId: string): Promise<void> {
   await deleteDoc(doc(db, 'problems', problemId));
 }
 
-export async function listProblems(): Promise<Problem[]> {
-  const q = query(collection(db, 'problems'), orderBy('created_at', 'desc'));
+export interface ProblemFilter {
+  year?: number;
+  exam_type?: string;
+  category?: string;
+  difficulty?: number;
+  searchText?: string;
+}
+
+export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
+  let q = query(collection(db, 'problems'), orderBy('created_at', 'desc'));
+
+  // Firestore where 필터 적용
+  const constraints = [orderBy('created_at', 'desc')];
+  if (filter?.year) constraints.unshift(where('year', '==', filter.year));
+  if (filter?.exam_type) constraints.unshift(where('exam_type', '==', filter.exam_type));
+  if (filter?.category) constraints.unshift(where('category', '==', filter.category));
+  if (filter?.difficulty) constraints.unshift(where('difficulty', '==', filter.difficulty));
+
+  q = query(collection(db, 'problems'), ...constraints);
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map((docSnap) => {
+  let results = snapshot.docs.map((docSnap) => {
     const data = docSnap.data();
     return {
       id: docSnap.id,
@@ -72,6 +90,18 @@ export async function listProblems(): Promise<Problem[]> {
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
     } as Problem;
   });
+
+  // 텍스트 검색 (클라이언트 필터링 - 제목, 태그)
+  if (filter?.searchText) {
+    const search = filter.searchText.toLowerCase();
+    results = results.filter(
+      (p) =>
+        p.title.toLowerCase().includes(search) ||
+        p.tags.some((tag) => tag.toLowerCase().includes(search))
+    );
+  }
+
+  return results;
 }
 
 // ===== Block CRUD =====
