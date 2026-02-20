@@ -10,7 +10,29 @@ interface EditorPreviewProps {
   content: string;
 }
 
+// \[...\] → $$...$$ 변환, \(...\) → $...$ 변환, 인라인 수식에 \displaystyle 적용
+function preprocessMath(text: string): string {
+  // \[...\] → $$...$$
+  let result = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
+
+  // \(...\) → $...$
+  result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
+
+  // $...$ 인라인 수식에 \displaystyle 추가 ($$...$$는 제외)
+  result = result.replace(
+    /(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g,
+    (match, inner) => {
+      if (inner.trim().startsWith('\\displaystyle')) return match;
+      return `$\\displaystyle ${inner}$`;
+    }
+  );
+
+  return result;
+}
+
 export default function EditorPreview({ content }: EditorPreviewProps) {
+  const processed = preprocessMath(content);
+
   return (
     <div
       style={{
@@ -21,12 +43,15 @@ export default function EditorPreview({ content }: EditorPreviewProps) {
         borderRadius: '8px',
         overflow: 'auto',
         fontSize: '15px',
-        lineHeight: '1.8',
+        lineHeight: '2.5',
       }}
     >
       <ReactMarkdown
         remarkPlugins={[remarkMath]}
-        rehypePlugins={[rehypeRaw, rehypeKatex]}
+        rehypePlugins={[
+          rehypeRaw,
+          [rehypeKatex, { strict: false, trust: true }],
+        ]}
         components={{
           img: ({ src, alt, ...props }) => (
             <img
@@ -38,7 +63,7 @@ export default function EditorPreview({ content }: EditorPreviewProps) {
           ),
         }}
       >
-        {content}
+        {processed}
       </ReactMarkdown>
     </div>
   );
