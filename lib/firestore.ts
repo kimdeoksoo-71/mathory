@@ -11,6 +11,7 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
+  QueryConstraint,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Problem, Block, ProblemWithBlocks } from '../types/problem';
@@ -72,7 +73,8 @@ export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
   let q = query(collection(db, 'problems'), orderBy('created_at', 'desc'));
 
   // Firestore where 필터 적용
-  const constraints = [orderBy('created_at', 'desc')];
+  import { QueryConstraint } from 'firebase/firestore';
+  const constraints: QueryConstraint[] = [orderBy('created_at', 'desc')];
   if (filter?.year) constraints.unshift(where('year', '==', filter.year));
   if (filter?.exam_type) constraints.unshift(where('exam_type', '==', filter.exam_type));
   if (filter?.category) constraints.unshift(where('category', '==', filter.category));
