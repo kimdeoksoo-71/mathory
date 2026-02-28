@@ -11,10 +11,10 @@ import {
   orderBy,
   serverTimestamp,
   Timestamp,
-  QueryConstraint,
+  limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Problem, Block, ProblemWithBlocks } from '../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder } from '../types/problem';
 
 // ===== Problem CRUD =====
 
@@ -49,7 +49,6 @@ export async function updateProblem(problemId: string, data: Partial<Problem>): 
 }
 
 export async function deleteProblem(problemId: string): Promise<void> {
-  // 블록들도 함께 삭제
   const qBlocks = await getDocs(collection(db, 'problems', problemId, 'question_blocks'));
   const sBlocks = await getDocs(collection(db, 'problems', problemId, 'solution_blocks'));
 
@@ -67,75 +66,83 @@ export interface ProblemFilter {
   category?: string;
   difficulty?: number;
   searchText?: string;
+  folder_id?: string;
 }
 
 export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
-  let q = query(collection(db, 'problems'), orderBy('created_at', 'desc'));
+  let q = query(collection(db, 'problems'), orderBy('updated_at', 'desc'));
 
-  // Firestore where 필터 적용
-  const constraints: QueryConstraint[] = [orderBy('created_at', 'desc')];
-  if (filter?.year) constraints.unshift(where('year', '==', filter.year));
-  if (filter?.exam_type) constraints.unshift(where('exam_type', '==', filter.exam_type));
-  if (filter?.category) constraints.unshift(where('category', '==', filter.category));
-  if (filter?.difficulty) constraints.unshift(where('difficulty', '==', filter.difficulty));
+  if (filter?.year) q = query(q, where('year', '==', filter.year));
+  if (filter?.exam_type) q = query(q, where('exam_type', '==', filter.exam_type));
+  if (filter?.category) q = query(q, where('category', '==', filter.category));
+  if (filter?.difficulty) q = query(q, where('difficulty', '==', filter.difficulty));
+  if (filter?.folder_id) q = query(q, where('folder_id', '==', filter.folder_id));
 
-  q = query(collection(db, 'problems'), ...constraints);
   const snapshot = await getDocs(q);
-
-  let results = snapshot.docs.map((docSnap) => {
-    const data = docSnap.data();
+  let results = snapshot.docs.map((d) => {
+    const data = d.data();
     return {
-      id: docSnap.id,
+      id: d.id,
       ...data,
       created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
     } as Problem;
   });
 
-  // 텍스트 검색 (클라이언트 필터링 - 제목, 태그)
   if (filter?.searchText) {
-    const search = filter.searchText.toLowerCase();
+    const text = filter.searchText.toLowerCase();
     results = results.filter(
       (p) =>
-        p.title.toLowerCase().includes(search) ||
-        p.tags.some((tag) => tag.toLowerCase().includes(search))
+        p.title.toLowerCase().includes(text) ||
+        p.tags?.some((t) => t.toLowerCase().includes(text))
     );
   }
 
   return results;
 }
 
-// ===== Block CRUD =====
-
-async function getBlocks(problemId: string, subcollection: string): Promise<Block[]> {
+// Phase 6: 최근 문항 조회
+export async function listRecentProblems(maxCount: number = 10): Promise<Problem[]> {
   const q = query(
-    collection(db, 'problems', problemId, subcollection),
-    orderBy('order', 'asc')
+    collection(db, 'problems'),
+    orderBy('updated_at', 'desc'),
+    limit(maxCount)
   );
   const snapshot = await getDocs(q);
-
-  return snapshot.docs.map((docSnap) => ({
-    id: docSnap.id,
-    ...docSnap.data(),
-  })) as Block[];
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
+      updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
+    } as Problem;
+  });
 }
 
-export async function getQuestionBlocks(problemId: string): Promise<Block[]> {
-  return getBlocks(problemId, 'question_blocks');
+// Phase 6: 문항의 폴더 변경
+export async function moveProblemToFolder(problemId: string, folderId: string | null): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    folder_id: folderId,
+    updated_at: serverTimestamp(),
+  });
 }
 
-export async function getSolutionBlocks(problemId: string): Promise<Block[]> {
-  return getBlocks(problemId, 'solution_blocks');
-}
+// ===== Block CRUD =====
 
 export async function getProblemWithBlocks(problemId: string): Promise<ProblemWithBlocks | null> {
   const problem = await getProblem(problemId);
   if (!problem) return null;
 
-  const [question_blocks, solution_blocks] = await Promise.all([
-    getQuestionBlocks(problemId),
-    getSolutionBlocks(problemId),
-  ]);
+  const qSnap = await getDocs(
+    query(collection(db, 'problems', problemId, 'question_blocks'), orderBy('order'))
+  );
+  const sSnap = await getDocs(
+    query(collection(db, 'problems', problemId, 'solution_blocks'), orderBy('order'))
+  );
+
+  const question_blocks = qSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+  const solution_blocks = sSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
 
   return { ...problem, question_blocks, solution_blocks };
 }
@@ -176,4 +183,60 @@ export async function deleteBlock(
   blockId: string
 ): Promise<void> {
   await deleteDoc(doc(db, 'problems', problemId, subcollection, blockId));
+}
+
+// ===== Folder CRUD (Phase 6) =====
+
+export async function createFolder(data: { name: string; user_id: string; order?: number }): Promise<string> {
+  const docRef = await addDoc(collection(db, 'folders'), {
+    name: data.name,
+    user_id: data.user_id,
+    order: data.order ?? 0,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function listFolders(userId: string): Promise<Folder[]> {
+  const q = query(
+    collection(db, 'folders'),
+    where('user_id', '==', userId),
+    orderBy('order', 'asc')
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
+      updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
+    } as Folder;
+  });
+}
+
+export async function updateFolder(folderId: string, data: { name?: string; order?: number }): Promise<void> {
+  await updateDoc(doc(db, 'folders', folderId), {
+    ...data,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function deleteFolder(folderId: string): Promise<void> {
+  // 폴더 삭제 시 해당 폴더의 문항들은 미분류로 변경
+  const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));
+  const snapshot = await getDocs(q);
+  const updates = snapshot.docs.map((d) =>
+    updateDoc(d.ref, { folder_id: null, updated_at: serverTimestamp() })
+  );
+  await Promise.all(updates);
+  await deleteDoc(doc(db, 'folders', folderId));
+}
+
+// 폴더별 문항 수 조회
+export async function getFolderProblemCount(folderId: string): Promise<number> {
+  const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));
+  const snapshot = await getDocs(q);
+  return snapshot.size;
 }

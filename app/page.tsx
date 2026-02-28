@@ -1,5 +1,7 @@
-import { redirect } from 'next/navigation';
+'use client';
 
-export default function Home() {
-  redirect('/problems');
+import AppShell from '../components/layout/AppShell';
+
+export default function HomePage() {
+  return <AppShell />;
 }

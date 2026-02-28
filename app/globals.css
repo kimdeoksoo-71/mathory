@@ -1,0 +1,109 @@
+/* ═══════════════════════════════════════════════
+   Mathory Design System — Phase 6 Clay Theme
+   Claude-inspired warm, earthy color palette
+   ═══════════════════════════════════════════════ */
+
+:root {
+  /* Background */
+  --bg-primary: #FAF9F7;
+  --bg-secondary: #F5F2ED;
+  --bg-sidebar: #F0EDE8;
+  --bg-hover: #F0EBE3;
+  --bg-active: #E8E2D9;
+  --bg-card: #FEFDFB;
+  --bg-input: #FFFFFF;
+
+  /* Border */
+  --border-primary: #E0DCD6;
+  --border-light: #E8E4DF;
+  --border-dashed: rgba(184, 175, 164, 0.3);
+
+  /* Text */
+  --text-primary: #2D2A23;
+  --text-secondary: #5D5647;
+  --text-muted: #9C9585;
+  --text-faint: #B8AFA4;
+  --text-placeholder: #C8C1B6;
+
+  /* Accent */
+  --accent-primary: #B8845C;
+  --accent-hover: #A67548;
+  --accent-danger: #C0392B;
+  --accent-danger-bg: #FEF2F2;
+
+  /* Badge colors */
+  --badge-bg: #E8E4DF;
+
+  /* Fonts */
+  --font-logo: 'Noto Serif KR', 'Georgia', serif;
+  --font-ui: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Courier New', 'Consolas', monospace;
+
+  /* Sizing */
+  --sidebar-expanded: 260px;
+  --sidebar-collapsed: 56px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+}
+
+/* ═══ Base Reset ═══ */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-ui);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══ Scrollbar ═══ */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--text-placeholder);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* ═══ Animations ═══ */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideInLeft {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* ═══ Focus styles ═══ */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ═══ Google Fonts ═══ */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
