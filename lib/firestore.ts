@@ -73,7 +73,6 @@ export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
   let q = query(collection(db, 'problems'), orderBy('created_at', 'desc'));
 
   // Firestore where 필터 적용
-  import { QueryConstraint } from 'firebase/firestore';
   const constraints: QueryConstraint[] = [orderBy('created_at', 'desc')];
   if (filter?.year) constraints.unshift(where('year', '==', filter.year));
   if (filter?.exam_type) constraints.unshift(where('exam_type', '==', filter.exam_type));
