@@ -107,3 +107,14 @@ textarea:focus-visible {
 
 /* ═══ Google Fonts ═══ */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
+
+/* Display math: 왼쪽 정렬 + 들여쓰기 */
+.katex-display,
+.katex-display > .katex {
+  text-align: left !important;
+}
+
+.katex-display {
+  padding-left: 3em;
+}

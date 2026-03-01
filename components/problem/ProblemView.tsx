@@ -69,37 +69,27 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
 
   // 블록별 렌더링: text/image/choices는 합쳐서 하나로, box만 테두리 박스
   const renderBlocks = (blocks: typeof problem.question_blocks) => {
-    const elements: React.ReactNode[] = [];
-    let textBuffer = '';
-
-    const flushText = () => {
-      if (textBuffer.trim()) {
-        elements.push(
-          <EditorPreview key={`text-${elements.length}`} content={textBuffer.trim()} borderless />
-        );
-      }
-      textBuffer = '';
-    };
-
-    blocks.forEach((block, i) => {
-      if (block.type === 'box') {
-        flushText();
-        elements.push(
-          <div key={block.id || `box-${i}`} style={{
-            border: '1.5px solid var(--text-muted, #888)',
-            borderRadius: 8, padding: '12px 16px', margin: '8px 0',
-          }}>
-            <EditorPreview content={block.raw_text} borderless />
-          </div>
-        );
-      } else {
-        textBuffer += (textBuffer ? '\n\n' : '') + blockToText(block);
-      }
-    });
-
-    flushText();
-    return elements;
-  };
+  return blocks.map((block, i) => {
+    if (block.type === 'box') {
+      return (
+        <div key={block.id || `box-${i}`} style={{
+          border: '1.5px solid var(--text-muted, #888)',
+          borderRadius: 8, padding: '12px 16px',
+          marginBottom: i < blocks.length - 1 ? '1.5em' : 0,
+        }}>
+          <EditorPreview content={block.raw_text} borderless />
+        </div>
+      );
+    }
+    return (
+      <div key={block.id || `text-${i}`} style={{
+        marginBottom: i < blocks.length - 1 ? '1.5em' : 0,
+      }}>
+        <EditorPreview content={blockToText(block)} borderless />
+      </div>
+    );
+  });
+};
 
   const menuItems = [
     { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },

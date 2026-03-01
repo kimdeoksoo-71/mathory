@@ -35,9 +35,6 @@ export default function ProblemDetailPage() {
   if (loading) return <div style={{ padding: '24px' }}>로딩 중...</div>;
   if (!problem) return <div style={{ padding: '24px' }}>문제를 찾을 수 없습니다.</div>;
 
-  const questionContent = problem.question_blocks.map((b) => b.raw_text).join('\n\n');
-  const solutionContent = problem.solution_blocks.map((b) => b.raw_text).join('\n\n');
-
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -67,7 +64,11 @@ export default function ProblemDetailPage() {
       {/* 문제 내용 */}
       <div style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '20px', marginBottom: '16px' }}>
         <h2 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '12px' }}>문제</h2>
-        <EditorPreview content={questionContent} />
+        {problem.question_blocks.map((block, i) => (
+          <div key={block.id} style={{ marginBottom: i < problem.question_blocks.length - 1 ? '3em' : 0 }}>
+            <EditorPreview content={block.raw_text} />
+          </div>
+        ))}
       </div>
 
       {/* 풀이 토글 */}
@@ -90,7 +91,11 @@ export default function ProblemDetailPage() {
           </button>
           {showSolution && (
             <div style={{ padding: '20px' }}>
-              <EditorPreview content={solutionContent} />
+              {problem.solution_blocks.map((block, i) => (
+               <div key={block.id} style={{ marginBottom: i < problem.solution_blocks.length - 1 ? '3em' : 0 }}>
+                 <EditorPreview content={block.raw_text} />
+               </div>
+              ))}
             </div>
           )}
         </div>

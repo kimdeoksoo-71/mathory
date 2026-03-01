@@ -19,6 +19,22 @@ function preprocessMath(text: string): string {
   // \(...\) → $...$
   result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
 
+  // array 환경 각 셀에 \displaystyle 자동 삽입
+  result = result.replace(
+    /\\begin\{array\}\{([lcr|]+)\}([\s\S]*?)\\end\{array\}/g,
+    (match, cols, body) => {
+      const newBody = body
+        .split('\\\\')
+        .map(row =>
+          row.split('&')
+            .map(cell => ' \\displaystyle ' + cell.trim())
+            .join(' & ')
+        )
+        .join(' \\\\[1em] ');
+      return `\\begin{array}{${cols}}${newBody}\\end{array}`;
+    }
+  );
+
   // $...$ 인라인 수식에 \displaystyle 추가 ($$...$$는 제외)
   result = result.replace(
     /(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g,
