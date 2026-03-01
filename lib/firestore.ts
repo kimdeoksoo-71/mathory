@@ -212,7 +212,7 @@ export async function listFolders(userId: string): Promise<Folder[]> {
       ...data,
       created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
-    } as Folder;
+    } as unknown as Folder;
   });
 }
 
