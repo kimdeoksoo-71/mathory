@@ -40,7 +40,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     blocks.length > 0 ? blocks[0].id : null
   );
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
-  
+
   const [editorHeight, setEditorHeight] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
 
@@ -48,7 +48,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
-  
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -115,7 +115,6 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
   };
 
   const handleImageUpload = async (file: File) => {
-    // problemId가 없으면 임시 ID 사용
     const pid = problemId || `temp-${Date.now()}`;
     const url = await uploadImage(file, pid);
     const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
@@ -131,41 +130,70 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '8px 8px 0 0', border: '1px solid #ddd', borderBottom: 'none' }}>
+      {/* 툴바 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '10px 8px',
+          backgroundColor: '#f5f5f5',
+          borderRadius: '8px 8px 0 0',
+          border: '1px solid #ddd',
+        }}
+      >
         <MathToolbar onInsert={handleInsert} />
         <div style={{ width: '1px', height: '24px', backgroundColor: '#ddd', margin: '0 4px' }} />
         <ImageUploadButton onUpload={handleImageUpload} />
       </div>
+
+      {/* Split View */}
       <div style={{ display: 'flex', gap: '16px', height: `${editorHeight}px`, minWidth: 0 }}>
         {/* 왼쪽: 블록 목록 */}
-        <div style={{ flex: 1, minWidth: 0, overflow: 'auto', border: '1px solid #ddd', borderRadius: '0 0 8px 8px' }}>
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-              {blocks.map((block, index) => (
-                <SortableBlock
-                  key={block.id}
-                  block={block}
-                  index={index}
-                  isActive={activeBlockId === block.id}
-                  canDelete={blocks.length > 1}
-                  onFocus={() => setActiveBlockId(block.id)}
-                  onChange={(value) => handleBlockChange(block.id, value)}
-                  onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
-                  onDelete={() => handleDeleteBlock(block.id)}
-                  setEditorRef={(ref) => setEditorRef(block.id, ref)}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+        <div
+          style={{
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            border: '1px solid #ddd',
+            borderTop: 'none',
+            borderRadius: '0 0 8px 8px',
+            overflow: 'hidden',
+          }}
+        >
+          {/* 블록 리스트 스크롤 영역 */}
+          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
+                {blocks.map((block, index) => (
+                  <SortableBlock
+                    key={block.id}
+                    block={block}
+                    index={index}
+                    isActive={activeBlockId === block.id}
+                    canDelete={blocks.length > 1}
+                    onFocus={() => setActiveBlockId(block.id)}
+                    onChange={(value) => handleBlockChange(block.id, value)}
+                    onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
+                    onDelete={() => handleDeleteBlock(block.id)}
+                    setEditorRef={(ref) => setEditorRef(block.id, ref)}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          </div>
 
+          {/* 블록 추가 버튼: 하단 고정 */}
           <button
             onClick={handleAddBlock}
             style={{
+              flexShrink: 0,
               width: '100%',
               padding: '12px',
               backgroundColor: '#f8f9fa',
               border: 'none',
-              borderTop: '1px solid #eee',
+              borderTop: '1px solid #ddd',
               cursor: 'pointer',
               fontSize: '14px',
               color: '#666',
@@ -199,8 +227,6 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
       >
         <div style={{ width: '40px', height: '3px', backgroundColor: '#bbb', borderRadius: '2px' }} />
       </div>
-
-
     </div>
   );
 }
