@@ -25,7 +25,7 @@ import { uploadImage } from '../../lib/storage';
 
 export interface BlockData {
   id: string;
-  type: 'text' | 'choices' | 'hint';
+  type: 'text' | 'image' | 'choices' | 'box';
   raw_text: string;
 }
 

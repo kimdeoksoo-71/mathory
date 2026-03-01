@@ -310,7 +310,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     fontSize: 10, textTransform: 'uppercase' as const, color: 'var(--text-muted)',
                     fontWeight: 600, letterSpacing: 0.5, fontFamily: 'var(--font-ui)',
                   }}>
-                    {block.type === 'text' ? '텍스트' : block.type === 'choices' ? '선택지' : block.type === 'hint' ? '힌트' : block.type}
+                    {block.type === 'text' ? '텍스트' : block.type === 'choices' ? '선택지' : block.type === 'image' ? '그림' : block.type === 'box' ? '글상자' : block.type}
                   </span>
                   <span style={{ fontSize: 10, color: 'var(--text-placeholder)' }}>블록 {i + 1}</span>
                 </div>

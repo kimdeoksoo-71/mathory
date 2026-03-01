@@ -101,7 +101,8 @@ export default function SortableBlock({
         >
           <option value="text">텍스트</option>
           <option value="choices">선택지</option>
-          <option value="hint">힌트</option>
+          <option value="image">그림</option>
+          <option value="box">글상자</option>
         </select>
 
         <div style={{ flex: 1 }} />
