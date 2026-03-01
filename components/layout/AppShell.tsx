@@ -144,11 +144,7 @@ export default function AppShell() {
   };
 
   const handleEditorBack = () => {
-    if (view.type === 'editor') {
-      setView({ type: 'problem', problemId: view.problemId });
-    } else {
-      setView({ type: 'home' });
-    }
+    setView({ type: 'home' });
     setCollapsed(false);
     loadData();
   };
@@ -191,15 +187,7 @@ export default function AppShell() {
           <FolderView folder={view.folder} problems={allProblems}
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction} />
         )}
-        {view.type === 'problem' && (
-          <ProblemView
-            problemId={view.problemId}
-            onRename={(p) => handleProblemAction('rename', p)}
-            onEdit={(p) => handleEditProblem(p)}
-            onMoveFolder={(p) => handleProblemAction('move', p)}
-            onDelete={(p) => handleProblemAction('delete', p)}
-          />
-        )}
+        {view.type === 'problem' && <ProblemView problemId={view.problemId} />}
         {view.type === 'editor' && (
           <EditorView problemId={view.problemId} folders={folders} onBack={handleEditorBack} />
         )}
