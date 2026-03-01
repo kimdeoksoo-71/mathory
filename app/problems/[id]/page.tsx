@@ -34,7 +34,7 @@ export default function ProblemDetailPage() {
 
   if (loading) return <div style={{ padding: '24px' }}>로딩 중...</div>;
   if (!problem) return <div style={{ padding: '24px' }}>문제를 찾을 수 없습니다.</div>;
-
+  const solutionContent = problem.solution_blocks.map((b) => b.raw_text).join('\n\n');
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
