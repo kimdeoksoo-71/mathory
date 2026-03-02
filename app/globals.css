@@ -119,6 +119,17 @@ textarea:focus-visible {
   padding-left: 3em;
 }
 
+/* KaTeX \text{} 폰트를 본문과 동일하게 */
+.katex .text {
+  font-family: var(--font-ui) !important;
+}
+
+/* KaTeX \text{} 폰트를 본문과 동일하게 */
+.katex .text {
+  font-family: var(--font-ui) !important;
+  font-size: 15px !important;
+}
+
 /* ═══ List Styles — Ordered & Unordered ═══ */
 
 /* Unordered list: 점 내어쓰기 */

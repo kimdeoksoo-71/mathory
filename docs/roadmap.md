@@ -42,15 +42,39 @@
 | ProblemView ►문제/►풀이 라벨 통일 | fontSize, color 동일 |
 | 블록 에디터 autoHeight | 내용에 맞춰 세로 크기 변동 |
 
-## Phase 8: 수식 렌더링 개선 ✅
-> 목표: 수식 표시 품질 향상, 블록 간 레이아웃 개선
+## Phase 8: 수식 렌더링 및 레이아웃 개선 ✅
+> 목표: 수식 표시 품질 향상, 리스트 기능, 레이아웃 통일
+
+### 1. 수식 렌더링 개선
 
 | 항목 | 상태 | 완료일 | 비고 |
 |------|------|--------|------|
 | 블록 수식($$) 왼쪽 정렬 + 들여쓰기 | ✅ | 2026-03-02 | globals.css .katex-display 오버라이드 |
 | array 환경 displaystyle 자동 적용 | ✅ | 2026-03-02 | preprocessMath에서 각 셀에 \displaystyle 삽입 |
 | array 환경 행간 확대 | ✅ | 2026-03-02 | \\\\[1em] 간격 옵션 자동 추가 |
+| \text{} 폰트 본문과 통일 | ✅ | 2026-03-02 | .katex .text font-family + font-size |
+
+### 2. 리스트 스타일
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| ul (순서 없는 리스트) 내어쓰기 스타일 | ✅ | 2026-03-02 | globals.css disc + padding-left |
+| ol 레벨1: (i), (ii), (iii)... | ✅ | 2026-03-02 | CSS counter + lower-roman |
+| ol 레벨2: (i-1), (i-2)... | ✅ | 2026-03-02 | 중첩 counter로 부모 번호 연동 |
+
+### 3. 레이아웃 개선
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
 | ProblemView 블록 간 간격 | ✅ | 2026-03-02 | renderBlocks 개별 렌더링 + marginBottom |
+| ProblemView/EditorPreview 가로폭 고정 | ✅ | 2026-03-02 | maxWidth: 600px |
+
+### 미해결 (다음 Phase에서 처리)
+
+| 항목 | 비고 |
+|------|------|
+| 블록 활성화 시 스크롤 맨 위로 이동 | activateBlock + scrollTop 미작동, 원인 추적 필요 |
+| Tab/Shift-Tab 리스트 들여쓰기 | dnd-kit 포커스 관리와 CodeMirror Tab 충돌, 해결 필요 |
 
 ---
 

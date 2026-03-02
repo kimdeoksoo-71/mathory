@@ -100,7 +100,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
   ];
 
   return (
-    <div style={{ padding: 32, maxWidth: 800, margin: '0 auto' }}>
+    <div style={{ padding: 32, maxWidth: 600, margin: '0 auto' }}>
       {/* Meta */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
