@@ -118,3 +118,52 @@ textarea:focus-visible {
 .katex-display {
   padding-left: 3em;
 }
+
+/* ═══ List Styles — Ordered & Unordered ═══ */
+
+/* Unordered list: 점 내어쓰기 */
+ul {
+  list-style: disc;
+  padding-left: 2em;
+  margin: 0.4em 0;
+}
+
+ul ul {
+  list-style: circle;
+}
+
+/* Ordered list — Level 1: (i), (ii), (iii)... */
+ol {
+  list-style: none;
+  counter-reset: roman;
+  padding-left: 3em;
+  margin: 0.4em 0;
+}
+
+ol > li {
+  counter-increment: roman;
+  position: relative;
+}
+
+ol > li::before {
+  content: "(" counter(roman, lower-roman) ")";
+  position: absolute;
+  left: -3em;
+  width: 3em;
+}
+
+/* Ordered list — Level 2: (i-1), (i-2)... */
+ol ol {
+  counter-reset: sub;
+  padding-left: 3.5em;
+}
+
+ol ol > li {
+  counter-increment: sub;
+}
+
+ol ol > li::before {
+  content: "(" counter(roman, lower-roman) "-" counter(sub) ")";
+  left: -3.5em;
+  width: 3.5em;
+}

@@ -42,6 +42,16 @@
 | ProblemView ►문제/►풀이 라벨 통일 | fontSize, color 동일 |
 | 블록 에디터 autoHeight | 내용에 맞춰 세로 크기 변동 |
 
+## Phase 8: 수식 렌더링 개선 ✅
+> 목표: 수식 표시 품질 향상, 블록 간 레이아웃 개선
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 블록 수식($$) 왼쪽 정렬 + 들여쓰기 | ✅ | 2026-03-02 | globals.css .katex-display 오버라이드 |
+| array 환경 displaystyle 자동 적용 | ✅ | 2026-03-02 | preprocessMath에서 각 셀에 \displaystyle 삽입 |
+| array 환경 행간 확대 | ✅ | 2026-03-02 | \\\\[1em] 간격 옵션 자동 추가 |
+| ProblemView 블록 간 간격 | ✅ | 2026-03-02 | renderBlocks 개별 렌더링 + marginBottom |
+
 ---
 
 상태: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ❌ 보류

@@ -52,6 +52,7 @@ export default function SortableBlock({
   return (
     <div
       ref={setNodeRef}
+      data-block-id={block.id}
       style={{
         ...style,
         borderBottom: '1px solid #eee',
@@ -75,6 +76,7 @@ export default function SortableBlock({
         <span
           {...attributes}
           {...listeners}
+          tabIndex={-1}
           style={{
             cursor: 'grab',
             fontSize: '16px',

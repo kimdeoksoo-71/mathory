@@ -3,7 +3,7 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
@@ -33,7 +33,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
         const { from, to } = view.state.selection.main;
 
-        // {} 가 2개 이상이면 tab stop 모드 활성화
         const braceCount = (text.match(/\{\}/g) || []).length;
         tabStopsRef.current = braceCount >= 2;
 
@@ -41,7 +40,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           changes: { from, to, insert: text },
         });
 
-        // 첫 번째 {} 안으로 커서 이동
         const firstBrace = text.indexOf('{}');
         if (firstBrace !== -1) {
           view.dispatch({
@@ -72,48 +70,99 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     useEffect(() => {
       if (!editorRef.current) return;
 
-      const tabHandler = keymap.of([
-        {
-          key: 'Tab',
-          run: (view) => {
-            if (!tabStopsRef.current) return false;
+      const tabHandler = Prec.highest(
+        keymap.of([
+          {
+            key: 'Tab',
+            preventDefault: true,
+            run: (view) => {
+              // 1. LaTeX 탭스톱 모드
+              if (tabStopsRef.current) {
+                const doc = view.state.doc.toString();
+                const cursor = view.state.selection.main.head;
 
-            const doc = view.state.doc.toString();
-            const cursor = view.state.selection.main.head;
+                const closeBrace = doc.indexOf('}', cursor);
+                if (closeBrace === -1) {
+                  tabStopsRef.current = false;
+                  return true;
+                }
 
-            // 현재 커서 위치에서 가장 가까운 } 를 찾아 넘어감
-            const closeBrace = doc.indexOf('}', cursor);
-            if (closeBrace === -1) {
-              tabStopsRef.current = false;
-              return false;
-            }
+                const afterClose = doc.indexOf('{', closeBrace + 1);
+                const nextClose = doc.indexOf('}', closeBrace + 1);
 
-            const afterClose = doc.indexOf('{', closeBrace + 1);
-            const nextClose = doc.indexOf('}', closeBrace + 1);
+                if (afterClose !== -1 && (nextClose === -1 || afterClose < nextClose)) {
+                  const gap = doc.substring(closeBrace + 1, afterClose);
+                  if (gap.length <= 3) {
+                    view.dispatch({
+                      selection: { anchor: afterClose + 1 },
+                    });
+                    return true;
+                  }
+                }
 
-            if (afterClose !== -1 && (nextClose === -1 || afterClose < nextClose)) {
-              const gap = doc.substring(closeBrace + 1, afterClose);
-              if (gap.length <= 3) {
+                tabStopsRef.current = false;
                 view.dispatch({
-                  selection: { anchor: afterClose + 1 },
+                  selection: { anchor: closeBrace + 1 },
                 });
                 return true;
               }
-            }
 
-            tabStopsRef.current = false;
-            view.dispatch({
-              selection: { anchor: closeBrace + 1 },
-            });
-            return true;
+              // 2. 리스트 줄이면 들여쓰기
+              const { head } = view.state.selection.main;
+              const line = view.state.doc.lineAt(head);
+              const lineText = line.text;
+
+              if (/^(\s*)([-*]|\d+\.)\s/.test(lineText)) {
+                view.dispatch({
+                  changes: { from: line.from, to: line.from, insert: '  ' },
+                });
+                return true;
+              }
+
+              // 3. 일반: 스페이스 2칸 삽입
+              view.dispatch({
+                changes: { from: head, to: head, insert: '  ' },
+              });
+              return true;
+            },
           },
-        },
-      ]);
+          {
+            key: 'Shift-Tab',
+            preventDefault: true,
+            run: (view) => {
+              const { head } = view.state.selection.main;
+              const line = view.state.doc.lineAt(head);
+              const lineText = line.text;
+
+              // 리스트 줄이면 내어쓰기
+              if (/^(\s+)([-*]|\d+\.)\s/.test(lineText)) {
+                const spaces = lineText.match(/^(\s+)/)?.[1] || '';
+                const remove = Math.min(2, spaces.length);
+                if (remove > 0) {
+                  view.dispatch({
+                    changes: { from: line.from, to: line.from + remove },
+                  });
+                }
+                return true;
+              }
+
+              return true;
+            },
+          },
+        ])
+      );
 
       const state = EditorState.create({
         doc: initialValue,
         extensions: [
           tabHandler,
+          EditorView.domEventHandlers({
+            keydown: (event) => {
+             if (event.key === 'Tab') {
+               event.preventDefault();
+              }
+            },
+          }),
           basicSetup,
           markdown(),
           EditorView.lineWrapping,

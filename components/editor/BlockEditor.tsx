@@ -40,6 +40,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     blocks.length > 0 ? blocks[0].id : null
   );
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const [editorHeight, setEditorHeight] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
@@ -48,6 +49,18 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // 블록 활성화 + 스크롤 맨 위로
+  const activateBlock = (blockId: string) => {
+    setActiveBlockId(blockId);
+    setTimeout(() => {
+      const container = scrollContainerRef.current;
+      const blockEl = container?.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement;
+      if (container && blockEl) {
+        container.scrollTop = blockEl.offsetTop;
+      }
+    }, 50);
+  };
 
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -96,7 +109,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
       raw_text: '',
     };
     onChange([...blocks, newBlock]);
-    setActiveBlockId(newBlock.id);
+    activateBlock(newBlock.id);
   };
 
   const handleDeleteBlock = (blockId: string) => {
@@ -163,7 +176,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
           }}
         >
           {/* 블록 리스트 스크롤 영역 */}
-          <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+          <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={blocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {blocks.map((block, index) => (
@@ -173,7 +186,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
                     index={index}
                     isActive={activeBlockId === block.id}
                     canDelete={blocks.length > 1}
-                    onFocus={() => setActiveBlockId(block.id)}
+                    onFocus={() => activateBlock(block.id)}
                     onChange={(value) => handleBlockChange(block.id, value)}
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                     onDelete={() => handleDeleteBlock(block.id)}
