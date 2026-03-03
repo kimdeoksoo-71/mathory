@@ -41,7 +41,7 @@ export default function EditorPreview({ content, borderless = false }: EditorPre
       style={{
         height: '100%',
         padding: '16px',
-        backgroundColor: '#ffffff',
+        backgroundColor: 'transparent',   // ← '#ffffff' → 'transparent'
         border: borderless ? 'none' : '1px solid #ddd',
         borderRadius: borderless ? '0' : '8px',
         overflow: 'auto',
