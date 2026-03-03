@@ -16,6 +16,8 @@ interface MarkdownEditorProps {
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
+  getCursorPosition: () => number;
+  getContent: () => string;
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
@@ -52,6 +54,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         }
 
         view.focus();
+      },
+      getCursorPosition() {
+        const view = viewRef.current;
+        if (!view) return 0;
+        return view.state.selection.main.head;
+      },
+      getContent() {
+        const view = viewRef.current;
+        if (!view) return '';
+        return view.state.doc.toString();
       },
     }));
 
@@ -189,9 +201,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               minHeight: autoHeight ? '60px' : undefined,
               fontSize: '15px',
             },
-             '.cm-scroller': {
-               overflow: autoHeight ? 'visible' : 'auto',
-               fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+            '.cm-scroller': {
+              overflow: autoHeight ? 'visible' : 'auto',
+              fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
             },
             '.cm-content': {
               padding: '16px',
@@ -226,7 +238,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       <div
         ref={editorRef}
         style={{
-          height: '100%',
+          height: autoHeight ? 'auto' : '100%',
+          minHeight: autoHeight ? '60px' : undefined,
           border: '1px solid #ddd',
           borderRadius: '0 0 8px 8px',
           overflow: 'hidden',
