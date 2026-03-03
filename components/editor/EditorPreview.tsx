@@ -9,6 +9,7 @@ import 'katex/dist/katex.min.css';
 
 interface EditorPreviewProps {
   content: string;
+  borderless?: boolean;
 }
 
 // \[...\] → $$...$$ 변환, \(...\) → $...$ 변환, 인라인 수식에 \displaystyle 적용
@@ -31,7 +32,8 @@ function preprocessMath(text: string): string {
   return result;
 }
 
-export default function EditorPreview({ content }: EditorPreviewProps) {
+export default function EditorPreview({ content, borderless = false }: EditorPreviewProps) {
+
   const processed = preprocessMath(content);
 
   return (
@@ -40,8 +42,8 @@ export default function EditorPreview({ content }: EditorPreviewProps) {
         height: '100%',
         padding: '16px',
         backgroundColor: '#ffffff',
-        border: '1px solid #ddd',
-        borderRadius: '8px',
+        border: borderless ? 'none' : '1px solid #ddd',
+        borderRadius: borderless ? '0' : '8px',
         overflow: 'auto',
         fontSize: '15px',
         lineHeight: '2.5',
