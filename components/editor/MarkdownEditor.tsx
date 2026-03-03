@@ -11,6 +11,7 @@ import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highl
 interface MarkdownEditorProps {
   initialValue?: string;
   onChange?: (value: string) => void;
+  autoHeight?: boolean;
 }
 
 export interface MarkdownEditorHandle {
@@ -18,7 +19,7 @@ export interface MarkdownEditorHandle {
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const tabStopsRef = useRef<boolean>(false);
@@ -184,12 +185,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           }),
           EditorView.theme({
             '&': {
-              height: '100%',
+              height: autoHeight ? 'auto' : '100%',
+              minHeight: autoHeight ? '60px' : undefined,
               fontSize: '15px',
             },
-            '.cm-scroller': {
-              overflow: 'auto',
-              fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+             '.cm-scroller': {
+               overflow: autoHeight ? 'visible' : 'auto',
+               fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
             },
             '.cm-content': {
               padding: '16px',
