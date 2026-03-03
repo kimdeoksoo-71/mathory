@@ -12,13 +12,36 @@ interface EditorPreviewProps {
   borderless?: boolean;
 }
 
-// \[...\] → $$...$$ 변환, \(...\) → $...$ 변환, 인라인 수식에 \displaystyle 적용
+// 다중행 환경 목록
+const ARRAY_ENVS = '(cases|aligned|array|pmatrix|bmatrix|vmatrix|Vmatrix|matrix|gather|gathered|split)';
+
 function preprocessMath(text: string): string {
   // \[...\] → $$...$$
   let result = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
 
   // \(...\) → $...$
   result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
+
+  // $$...$$ 블록 수식 내부의 다중행 환경에 \displaystyle 자동 삽입
+  const arrayEnvRegex = new RegExp(`\\\\begin\\{${ARRAY_ENVS}\\}`, 'g');
+  result = result.replace(/\$\$([\s\S]*?)\$\$/g, (match, inner) => {
+    // 다중행 환경이 없으면 그대로 반환
+    if (!arrayEnvRegex.test(inner)) return match;
+    arrayEnvRegex.lastIndex = 0;
+
+    let processed = inner;
+    // \begin{env} 직후에 \displaystyle 삽입
+    processed = processed.replace(
+      new RegExp(`\\\\begin\\{${ARRAY_ENVS}\\}(\\{[^}]*\\})?`, 'g'),
+      (m) => `${m} \\displaystyle `
+    );
+    // \\ (행 구분) 뒤에 \displaystyle 삽입
+    processed = processed.replace(/\\\\(?!\s*\\end)/g, '\\\\ \\displaystyle ');
+    // & (열 구분) 뒤에 \displaystyle 삽입
+    processed = processed.replace(/&/g, '& \\displaystyle ');
+
+    return `$$${processed}$$`;
+  });
 
   // $...$ 인라인 수식에 \displaystyle 추가 ($$...$$는 제외)
   result = result.replace(
@@ -33,7 +56,6 @@ function preprocessMath(text: string): string {
 }
 
 export default function EditorPreview({ content, borderless = false }: EditorPreviewProps) {
-
   const processed = preprocessMath(content);
 
   return (
@@ -41,7 +63,7 @@ export default function EditorPreview({ content, borderless = false }: EditorPre
       style={{
         height: '100%',
         padding: '16px',
-        backgroundColor: 'transparent',   // ← '#ffffff' → 'transparent'
+        backgroundColor: 'transparent',
         border: borderless ? 'none' : '1px solid #ddd',
         borderRadius: borderless ? '0' : '8px',
         overflow: 'auto',
@@ -53,7 +75,13 @@ export default function EditorPreview({ content, borderless = false }: EditorPre
         remarkPlugins={[remarkMath, remarkGfm]}
         rehypePlugins={[
           rehypeRaw,
-          [rehypeKatex, { strict: false, trust: true }],
+          [rehypeKatex, {
+            strict: false,
+            trust: true,
+            macros: {
+              "\\arraystretch": "1.8",
+            },
+          }],
         ]}
         components={{
           img: ({ src, alt, ...props }) => (
@@ -98,20 +126,21 @@ export default function EditorPreview({ content, borderless = false }: EditorPre
                 fontSize: '13px',
                 color: '#495057',
                 whiteSpace: 'nowrap',
-                ...style,                 // ← GFM 정렬 정보 병합 (textAlign 덮어씌움)
+                ...style,
               }}
               {...props}
             >
               {children}
             </th>
           ),
-          td: ({ children, ...props }) => (
+          td: ({ children, style, ...props }) => (
             <td
               style={{
                 padding: '9px 14px',
                 borderBottom: '1px solid #e9ecef',
                 borderRight: '1px solid #f1f3f5',
                 color: '#212529',
+                ...style,
               }}
               {...props}
             >
@@ -138,13 +167,11 @@ export default function EditorPreview({ content, borderless = false }: EditorPre
               {children}
             </tr>
           ),
-          // GFM 취소선 스타일
           del: ({ children, ...props }) => (
             <del style={{ color: '#868e96' }} {...props}>
               {children}
             </del>
           ),
-          // GFM 체크리스트 스타일
           input: ({ ...props }) => (
             <input
               {...props}
