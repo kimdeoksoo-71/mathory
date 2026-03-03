@@ -35,6 +35,17 @@ function preprocessMath(text: string): string {
     }
   );
 
+  // === 독립행 수식 내부 행간 보정 ===
+  // $$...$$ 블록 안에서 \\(줄바꿈)에 명시적 간격이 없는 경우 \\[1.2em]으로 교체
+  // (array 환경은 위에서 이미 \\[1em]으로 처리됨, 여기서는 나머지 환경만 처리)
+  result = result.replace(
+    /\$\$([\s\S]*?)\$\$/g,
+    (_, inner: string) => {
+      const enhanced = inner.replace(/\\\\(?!\s*\[)/g, '\\\\[1.2em]');
+      return '$$' + enhanced + '$$';
+    }
+  );
+
   // $...$ 인라인 수식에 \displaystyle 추가 ($$...$$는 제외)
   result = result.replace(
     /(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g,
