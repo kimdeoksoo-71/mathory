@@ -93,6 +93,88 @@
 | $$$$ + Space 자동 확장 | ✅ | 2026-03-03 | EditorView.inputHandler로 블록 수식 템플릿 생성 |
 | ol/ul 내 독립행 수식 들여쓰기 | ❌ | | remark-math 파서 한계로 보류. 인라인 $~$ 우회 사용 |
 
+
+# Phase 10: GFM 테이블 및 확장 문법 지원
+
+> 목표: Markdown 표(table), 취소선, 체크리스트 등 GFM 확장 문법 렌더링 지원
+
+## 변경 사항
+
+### 1. remark-gfm 패키지 추가
+```bash
+npm install remark-gfm
+```
+
+### 2. EditorPreview.tsx 수정
+
+**변경 내용:**
+- `remark-gfm` 플러그인 추가 → GFM 확장 문법 파싱 활성화
+- `components` props에 table/thead/th/td/tr 커스텀 렌더러 추가 → 테이블 스타일링
+- `del`, `input` 커스텀 렌더러 추가 → 취소선, 체크리스트 스타일링
+
+**지원되는 GFM 문법:**
+
+| 문법 | 예시 | 설명 |
+|------|------|------|
+| 표 (table) | `\| a \| b \|` | 완전한 테이블 렌더링 + 스타일링 |
+| 취소선 | `~~text~~` | 흐린 색상의 취소선 |
+| 체크리스트 | `- [x] done` | 체크박스 UI |
+| 자동 링크 | `https://...` | URL 자동 링크 변환 |
+
+### 3. 테이블 스타일링 상세
+
+- 헤더: 밝은 회색 배경(`#f8f9fa`), 굵은 하단 보더(`2px solid #dee2e6`)
+- 셀: 적절한 패딩(`10px 14px`), 은은한 구분선
+- 행 호버: 마우스 오버 시 배경색 변경 (인터랙티브)
+- 반응형: `overflowX: auto` 래퍼로 가로 스크롤 지원
+- 테이블 내 line-height를 1.6으로 별도 설정 (본문 2.5와 분리)
+- 테이블 내 수식: KaTeX 인라인 수식 정상 렌더링
+
+## 적용 범위
+
+EditorPreview 컴포넌트를 공유하므로 아래 페이지 모두 자동 적용:
+- 문제 작성 페이지 (`/problems/new`)
+- 문제 편집 페이지 (`/problems/[id]/edit`)
+- 문제 보기 페이지 (`/problems/[id]`)
+- 에디터 테스트 페이지 (`/editor-test`)
+
+## 적용 절차
+
+```bash
+# 1. 패키지 설치
+npm install remark-gfm
+
+# 2. 파일 교체
+# EditorPreview.tsx → components/editor/EditorPreview.tsx
+
+# 3. 로컬 테스트
+npm run dev
+# /editor-test 에서 표 문법 테스트:
+# | 제목 | 내용 |
+# |------|------|
+# | $x^2$ | 수식 테스트 |
+
+# 4. 커밋 & 배포
+git add -A
+git commit -m "Phase 10: GFM 테이블 및 확장 문법 지원 (remark-gfm)"
+git push
+```
+
+## roadmap.md 추가 내용
+
+```markdown
+## Phase 10: GFM 테이블 및 확장 문법 지원
+> 목표: Markdown 표(table), 취소선, 체크리스트 등 GFM 확장 문법 렌더링 지원
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| remark-gfm 패키지 추가 | ⬜ | | GFM 파싱 플러그인 |
+| EditorPreview 테이블 렌더링 | ⬜ | | 커스텀 table/th/td 컴포넌트 |
+| 테이블 스타일링 (호버, 보더) | ⬜ | | 인라인 스타일 적용 |
+| 취소선/체크리스트 지원 | ⬜ | | del, input 컴포넌트 |
+| 테이블 + KaTeX 수식 조합 확인 | ⬜ | | |
+| Vercel 배포 확인 | ⬜ | | |
+```
 ---
 
 상태: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ❌ 보류
