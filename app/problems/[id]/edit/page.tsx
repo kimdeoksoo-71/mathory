@@ -12,6 +12,7 @@ import {
   saveSolutionBlock,
   deleteBlock,
 } from '../../../../lib/firestore';
+import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../../../lib/constants';
 
 export default function EditProblemPage() {
   const { id } = useParams();
@@ -21,8 +22,8 @@ export default function EditProblemPage() {
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(2025);
   const [examType, setExamType] = useState('수능');
-  const [category, setCategory] = useState('미적분');
-  const [difficulty, setDifficulty] = useState(3);
+  const [category, setCategory] = useState('');
+  const [difficulty, setDifficulty] = useState(DEFAULT_DIFFICULTY);
   const [answer, setAnswer] = useState('');
   const [activeTab, setActiveTab] = useState<'question' | 'solution'>('question');
   const [questionBlocks, setQuestionBlocks] = useState<BlockData[]>([]);
@@ -31,7 +32,6 @@ export default function EditProblemPage() {
   const [saving, setSaving] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
 
-  // 기존 블록 ID 추적 (삭제된 블록 감지용)
   const [originalQuestionIds, setOriginalQuestionIds] = useState<string[]>([]);
   const [originalSolutionIds, setOriginalSolutionIds] = useState<string[]>([]);
 
@@ -79,12 +79,10 @@ export default function EditProblemPage() {
       setSaving(true);
       setStatus('저장 중...');
 
-      // 메타 정보 업데이트
       await updateProblem(id as string, {
         title, year, exam_type: examType, category, difficulty, answer,
       });
 
-      // 삭제된 문제 블록 처리
       const currentQIds = questionBlocks.map((b) => b.id);
       for (const oldId of originalQuestionIds) {
         if (!currentQIds.includes(oldId)) {
@@ -92,7 +90,6 @@ export default function EditProblemPage() {
         }
       }
 
-      // 삭제된 풀이 블록 처리
       const currentSIds = solutionBlocks.map((b) => b.id);
       for (const oldId of originalSolutionIds) {
         if (!currentSIds.includes(oldId)) {
@@ -100,7 +97,6 @@ export default function EditProblemPage() {
         }
       }
 
-      // 문제 블록: 기존 블록 삭제 후 새로 저장 (순서 보장)
       for (const oldId of originalQuestionIds) {
         if (currentQIds.includes(oldId)) {
           await deleteBlock(id as string, 'question_blocks', oldId);
@@ -115,7 +111,6 @@ export default function EditProblemPage() {
         }
       }
 
-      // 풀이 블록: 기존 블록 삭제 후 새로 저장
       for (const oldId of originalSolutionIds) {
         if (currentSIds.includes(oldId)) {
           await deleteBlock(id as string, 'solution_blocks', oldId);
@@ -182,22 +177,24 @@ export default function EditProblemPage() {
           <option value="사관학교">사관학교</option>
           <option value="경찰대">경찰대</option>
         </select>
+
+        {/* Phase 10: 대단원 분류 */}
         <select value={category} onChange={(e) => setCategory(e.target.value)}
           style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
-          <option value="미적분">미적분</option>
-          <option value="확률과통계">확률과통계</option>
-          <option value="기하">기하</option>
-          <option value="수학Ⅰ">수학Ⅰ</option>
-          <option value="수학Ⅱ">수학Ⅱ</option>
+          <option value="">대단원 선택</option>
+          {CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
         </select>
+
+        {/* Phase 10: 난이도 2점/3점/4점 */}
         <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}
           style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
-          <option value={1}>난이도 1</option>
-          <option value={2}>난이도 2</option>
-          <option value={3}>난이도 3</option>
-          <option value={4}>난이도 4</option>
-          <option value={5}>난이도 5</option>
+          {DIFFICULTIES.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
         </select>
+
         <input value={answer} onChange={(e) => setAnswer(e.target.value)} placeholder="정답"
           style={{ width: '80px', padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }} />
       </div>

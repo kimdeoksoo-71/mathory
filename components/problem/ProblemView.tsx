@@ -4,8 +4,10 @@ import { useState, useEffect, useRef } from 'react';
 import { ProblemWithBlocks } from '../../types/problem';
 import { getProblemWithBlocks } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
-import DifficultyBadge from '../ui/DifficultyBadge';
 import { IconDots, IconRename, IconEdit, IconFolderMove, IconTrash } from '../ui/Icons';
+
+const FONT_SIZE_KEY = 'mathory-content-font-size';
+const FONT_SIZE_DEFAULT = 15;
 
 interface ProblemViewProps {
   problemId: string;
@@ -20,6 +22,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
   const [loading, setLoading] = useState(true);
   const [showSolution, setShowSolution] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -31,6 +34,24 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
     };
     load();
   }, [problemId]);
+
+  // localStorage에서 글꼴 크기 읽기
+  useEffect(() => {
+    const stored = localStorage.getItem(FONT_SIZE_KEY);
+    if (stored) {
+      const n = parseInt(stored, 10);
+      if (!isNaN(n) && n >= 11 && n <= 24) setContentFontSize(n);
+    }
+    // CSS 변수 변경 감지 (EditorView에서 변경 시)
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === FONT_SIZE_KEY && e.newValue) {
+        const n = parseInt(e.newValue, 10);
+        if (!isNaN(n)) setContentFontSize(n);
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
 
   // 메뉴 외부 클릭 시 닫기
   useEffect(() => {
@@ -61,35 +82,30 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
     );
   }
 
-  // 선택지 블록은 \n → \n\n 변환 (마크다운에서 줄바꿈 보장)
   const blockToText = (b: typeof problem.question_blocks[0]) =>
     b.type === 'choices' ? b.raw_text.replace(/\n/g, '\n\n') : b.raw_text;
 
   const solutionContent = problem.solution_blocks.map(blockToText).join('\n\n');
 
-  // 블록별 렌더링: text/image/choices는 합쳐서 하나로, box만 테두리 박스
   const renderBlocks = (blocks: typeof problem.question_blocks) => {
-  return blocks.map((block, i) => {
-    if (block.type === 'box') {
+    return blocks.map((block, i) => {
+      if (block.type === 'box') {
+        return (
+          <div key={block.id || `box-${i}`} style={{
+            border: '1.5px solid var(--text-muted, #888)',
+            borderRadius: 8, padding: '12px 16px',
+          }}>
+            <EditorPreview content={block.raw_text} borderless />
+          </div>
+        );
+      }
       return (
-        <div key={block.id || `box-${i}`} style={{
-          border: '1.5px solid var(--text-muted, #888)',
-          borderRadius: 8, padding: '12px 16px',
-          marginBottom: i < blocks.length - 1 ? '1.5em' : 0,
-        }}>
-          <EditorPreview content={block.raw_text} borderless />
+        <div key={block.id || `text-${i}`}>
+          <EditorPreview content={blockToText(block)} borderless />
         </div>
       );
-    }
-    return (
-      <div key={block.id || `text-${i}`} style={{
-        marginBottom: i < blocks.length - 1 ? '1.5em' : 0,
-      }}>
-        <EditorPreview content={blockToText(block)} borderless />
-      </div>
-    );
-  });
-};
+    });
+  };
 
   const menuItems = [
     { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },
@@ -101,6 +117,11 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
 
   return (
     <div style={{ padding: 32, maxWidth: 600, margin: '0 auto' }}>
+      {/* CSS 오버라이드: EditorPreview의 inline fontSize를 동적으로 덮어씀 */}
+      <style>{`
+        .problem-content-scaled > div { font-size: ${contentFontSize}px !important; }
+      `}</style>
+
       {/* Meta */}
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
@@ -116,7 +137,12 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
           }}>
             {problem.subject || problem.category}
           </span>
-          <DifficultyBadge level={problem.difficulty} />
+          <span style={{
+            fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
+            padding: '2px 8px', borderRadius: 6,
+          }}>
+            {problem.difficulty}점
+          </span>
           {problem.answer && (
             <span style={{
               fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
@@ -136,7 +162,6 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
             {problem.title}
           </h2>
 
-          {/* 점 3개 메뉴 버튼 */}
           <div ref={menuRef} style={{ position: 'relative' }}>
             <button
               onClick={() => setMenuOpen(!menuOpen)}
@@ -154,7 +179,6 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
               <IconDots size={16} />
             </button>
 
-            {/* 드롭다운 메뉴 — ContextMenu와 동일 스타일 */}
             {menuOpen && (
               <div style={{
                 position: 'absolute', top: '100%', right: 0, marginTop: 4,
@@ -201,7 +225,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
       </div>
 
       {/* Question */}
-      <div>
+      <div className="problem-content-scaled">
         <div style={{
           fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12,
           letterSpacing: 0.5, fontFamily: 'var(--font-ui)',
@@ -213,7 +237,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
 
       {/* Solution Toggle */}
       {solutionContent && (
-        <div style={{ marginTop: 16 }}>
+        <div className="problem-content-scaled" style={{ marginTop: 16 }}>
           <button
             onClick={() => setShowSolution(!showSolution)}
             style={{

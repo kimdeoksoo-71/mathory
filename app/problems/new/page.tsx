@@ -6,6 +6,7 @@ import useAuth from '../../../hooks/useAuth';
 import LoginButton from '../../../components/auth/LoginButton';
 import BlockEditor, { BlockData } from '../../../components/editor/BlockEditor';
 import { createProblem, saveQuestionBlock, saveSolutionBlock } from '../../../lib/firestore';
+import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../../lib/constants';
 
 export default function NewProblemPage() {
   const { user, loading } = useAuth();
@@ -14,8 +15,8 @@ export default function NewProblemPage() {
   const [title, setTitle] = useState('');
   const [year, setYear] = useState(2025);
   const [examType, setExamType] = useState('수능');
-  const [category, setCategory] = useState('미적분');
-  const [difficulty, setDifficulty] = useState(3);
+  const [category, setCategory] = useState('');
+  const [difficulty, setDifficulty] = useState(DEFAULT_DIFFICULTY);
   const [answer, setAnswer] = useState('');
   const [activeTab, setActiveTab] = useState<'question' | 'solution'>('question');
   const [questionBlocks, setQuestionBlocks] = useState<BlockData[]>([
@@ -126,22 +127,24 @@ export default function NewProblemPage() {
           <option value="사관학교">사관학교</option>
           <option value="경찰대">경찰대</option>
         </select>
+
+        {/* Phase 10: 대단원 분류 */}
         <select value={category} onChange={(e) => setCategory(e.target.value)}
           style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
-          <option value="미적분">미적분</option>
-          <option value="확률과통계">확률과통계</option>
-          <option value="기하">기하</option>
-          <option value="수학Ⅰ">수학Ⅰ</option>
-          <option value="수학Ⅱ">수학Ⅱ</option>
+          <option value="">대단원 선택</option>
+          {CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
         </select>
+
+        {/* Phase 10: 난이도 2점/3점/4점 */}
         <select value={difficulty} onChange={(e) => setDifficulty(Number(e.target.value))}
           style={{ padding: '8px 12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px' }}>
-          <option value={1}>난이도 1</option>
-          <option value={2}>난이도 2</option>
-          <option value={3}>난이도 3</option>
-          <option value={4}>난이도 4</option>
-          <option value={5}>난이도 5</option>
+          {DIFFICULTIES.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
         </select>
+
         <input
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}

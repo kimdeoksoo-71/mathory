@@ -234,6 +234,17 @@ export async function deleteFolder(folderId: string): Promise<void> {
   await deleteDoc(doc(db, 'folders', folderId));
 }
 
+// Phase 10: 폴더 순서 일괄 업데이트
+export async function updateFolderOrders(folderOrders: { id: string; order: number }[]): Promise<void> {
+  const updates = folderOrders.map((f) =>
+    updateDoc(doc(db, 'folders', f.id), {
+      order: f.order,
+      updated_at: serverTimestamp(),
+    })
+  );
+  await Promise.all(updates);
+}
+
 // 폴더별 문항 수 조회
 export async function getFolderProblemCount(folderId: string): Promise<number> {
   const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));

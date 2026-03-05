@@ -5,7 +5,12 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase';
 import useAuth from '../../hooks/useAuth';
 import { Problem, Folder } from '../../types/problem';
-import { listProblems, listRecentProblems, listFolders, createFolder, getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock } from '../../lib/firestore';
+import {
+  listProblems, listRecentProblems, listFolders,
+  createFolder, updateFolder, deleteFolder, updateFolderOrders,
+  moveProblemToFolder,
+  getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
+} from '../../lib/firestore';
 
 import Sidebar from '../layout/Sidebar';
 import SearchOverlay from '../layout/SearchOverlay';
@@ -107,6 +112,63 @@ export default function AppShell() {
     } catch (error) { console.error('폴더 생성 에러:', error); }
   };
 
+  // Phase 10: 폴더 이름 변경 / 삭제
+  const handleFolderAction = async (action: 'rename' | 'delete', folder: Folder) => {
+    switch (action) {
+      case 'rename': {
+        const newName = prompt('새 폴더 이름:', folder.name);
+        if (newName?.trim() && newName.trim() !== folder.name) {
+          try {
+            await updateFolder(folder.id, { name: newName.trim() });
+            await loadData();
+            if (view.type === 'folder' && view.folder.id === folder.id) {
+              setView({ type: 'folder', folder: { ...folder, name: newName.trim() } });
+            }
+          } catch (error) { console.error('폴더 이름 변경 에러:', error); }
+        }
+        break;
+      }
+      case 'delete': {
+        const count = folderCounts[folder.id] ?? 0;
+        const msg = count > 0
+          ? `"${folder.name}" 폴더를 삭제하시겠습니까?\n(폴더 안의 ${count}개 문항은 미분류로 이동됩니다)`
+          : `"${folder.name}" 폴더를 삭제하시겠습니까?`;
+        if (confirm(msg)) {
+          try {
+            await deleteFolder(folder.id);
+            if (view.type === 'folder' && view.folder.id === folder.id) {
+              setView({ type: 'home' });
+            }
+            await loadData();
+          } catch (error) { console.error('폴더 삭제 에러:', error); }
+        }
+        break;
+      }
+    }
+  };
+
+  // Phase 10: 폴더 순서 변경 (드래그)
+  const handleFolderReorder = async (reorderedFolders: Folder[]) => {
+    setFolders(reorderedFolders);
+    try {
+      const orders = reorderedFolders.map((f, i) => ({ id: f.id, order: i }));
+      await updateFolderOrders(orders);
+    } catch (error) {
+      console.error('폴더 순서 변경 에러:', error);
+      await loadData();
+    }
+  };
+
+  // Phase 10: 문항을 폴더로 드래그 이동
+  const handleMoveProblemToFolder = async (problem: Problem, folder: Folder) => {
+    try {
+      await moveProblemToFolder(problem.id, folder.id);
+      await loadData();
+    } catch (error) {
+      console.error('문항 이동 에러:', error);
+    }
+  };
+
   const handleProblemAction = async (action: string, problem: Problem) => {
     switch (action) {
       case 'rename': {
@@ -133,7 +195,6 @@ export default function AppShell() {
         if (target) {
           const folder = folders.find((f) => f.name === target.trim());
           if (folder) {
-            const { moveProblemToFolder } = await import('../../lib/firestore');
             await moveProblemToFolder(problem.id, folder.id);
             await loadData();
           }
@@ -170,6 +231,9 @@ export default function AppShell() {
         onSearch={() => setShowSearch(true)}
         onSelectFolder={handleSelectFolder}
         onNewFolder={handleNewFolder}
+        onFolderAction={handleFolderAction}
+        onFolderReorder={handleFolderReorder}
+        onMoveProblemToFolder={handleMoveProblemToFolder}
         onViewProblem={handleViewProblem}
         onEditProblem={handleEditProblem}
         onProblemAction={handleProblemAction}
@@ -177,14 +241,13 @@ export default function AppShell() {
         onLogout={handleLogout}
       />
 
-      {/* ═══ Main — [수정] editor일 때 overflow:hidden + position:relative ═══ */}
       <main style={{
         flex: 1,
-        position: 'relative',  /* EditorView의 position:absolute 기준점 */
+        position: 'relative',
         overflow: isEditorMode ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
-        minHeight: 0,  /* flex 자식으로서 줄어들 수 있도록 */
+        minHeight: 0,
       }}>
         {view.type === 'home' && <HomeView />}
         {view.type === 'folder' && (

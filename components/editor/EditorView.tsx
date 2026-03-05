@@ -7,6 +7,7 @@ import {
   saveQuestionBlock, saveSolutionBlock,
   updateBlock, deleteBlock,
 } from '../../lib/firestore';
+import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
@@ -44,6 +45,30 @@ const BLOCK_TYPES = ['text', 'image', 'choices', 'box'] as const;
 const CHOICES_LABELS = ['①', '②', '③', '④', '⑤'];
 
 const DEFAULT_CHOICES = CHOICES_LABELS.map((c) => `${c} `).join('\n');
+
+const FONT_SIZE_KEY = 'mathory-content-font-size';
+const FONT_SIZE_DEFAULT = 15;
+const FONT_SIZE_MIN = 11;
+const FONT_SIZE_MAX = 24;
+const FONT_SIZE_STEP = 1;
+
+/* ═══ Font Size 유틸 ═══ */
+
+function getStoredFontSize(): number {
+  if (typeof window === 'undefined') return FONT_SIZE_DEFAULT;
+  const stored = localStorage.getItem(FONT_SIZE_KEY);
+  if (stored) {
+    const n = parseInt(stored, 10);
+    if (!isNaN(n) && n >= FONT_SIZE_MIN && n <= FONT_SIZE_MAX) return n;
+  }
+  return FONT_SIZE_DEFAULT;
+}
+
+function setStoredFontSize(size: number) {
+  localStorage.setItem(FONT_SIZE_KEY, String(size));
+  // CSS 변수도 설정 (ProblemView에서 사용)
+  document.documentElement.style.setProperty('--content-font-size', size + 'px');
+}
 
 /* ═══ Props ═══ */
 
@@ -87,7 +112,6 @@ function SortableEditorBlock({
     zIndex: isDragging ? 10 : undefined,
   };
 
-  // ─── 블록 헤더 배경색 차별화 ───
   const headerBg = isActive ? 'var(--accent-primary, #5b6abf)' : 'var(--bg-hover, #f0ece8)';
   const headerColor = isActive ? '#fff' : 'var(--text-muted)';
 
@@ -97,7 +121,6 @@ function SortableEditorBlock({
       style={{ ...style, marginBottom: 8 }}
       onClick={onFocus}
     >
-      {/* ─── 블록 헤더 ─── */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
         padding: '5px 10px',
@@ -106,7 +129,6 @@ function SortableEditorBlock({
         fontSize: 12, color: headerColor,
         transition: 'background 0.15s',
       }}>
-        {/* 드래그 핸들 */}
         <span
           {...attributes}
           {...listeners}
@@ -116,7 +138,6 @@ function SortableEditorBlock({
           <IconGrip size={13} />
         </span>
 
-        {/* 블록 타입 */}
         <select
           value={block.type}
           onChange={(e) => onTypeChange(e.target.value as Block['type'])}
@@ -134,12 +155,10 @@ function SortableEditorBlock({
           ))}
         </select>
 
-        {/* 블록 번호 */}
         <span style={{ fontSize: 11, opacity: 0.8, flexShrink: 0 }}>
           {index + 1}
         </span>
 
-        {/* 블록 제목 입력 */}
         <input
           value={block.title || ''}
           onChange={(e) => onTitleChange(e.target.value)}
@@ -155,7 +174,6 @@ function SortableEditorBlock({
           }}
         />
 
-        {/* 삭제 버튼 */}
         {canDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -170,7 +188,6 @@ function SortableEditorBlock({
           </button>
         )}
 
-        {/* 접기/펼치기 */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
           style={{
@@ -186,7 +203,6 @@ function SortableEditorBlock({
         </button>
       </div>
 
-      {/* ─── 블록 본문 (접히면 숨김) ─── */}
       {!block.collapsed && (
         <div style={{
           border: isActive
@@ -197,7 +213,6 @@ function SortableEditorBlock({
           overflow: 'hidden',
           transition: 'border-color 0.15s',
         }}>
-          {/* 텍스트 / 글상자 블록 */}
           {(block.type === 'text' || block.type === 'box') && (
             <MarkdownEditor
               ref={(el) => { editorRefs.current[block.id] = el; }}
@@ -207,7 +222,6 @@ function SortableEditorBlock({
             />
           )}
 
-          {/* 그림 블록 */}
           {block.type === 'image' && (
             <ImageBlockContent
               rawText={block.raw_text}
@@ -215,7 +229,6 @@ function SortableEditorBlock({
             />
           )}
 
-          {/* 선택지 블록 */}
           {block.type === 'choices' && (
             <ChoicesBlockContent
               rawText={block.raw_text}
@@ -289,13 +302,11 @@ function ChoicesBlockContent({
   rawText: string;
   onChange: (value: string) => void;
 }) {
-  // raw_text에서 5개 선택지 파싱
   const parseChoices = (text: string): string[] => {
     const lines = text.split('\n');
     const choices: string[] = ['', '', '', '', ''];
     lines.forEach((line, i) => {
       if (i < 5) {
-        // ① 뒤의 텍스트 추출
         const match = line.match(/^[①②③④⑤]\s?(.*)/);
         choices[i] = match ? match[1] : line.replace(/^[①②③④⑤]\s?/, '');
       }
@@ -356,28 +367,45 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 메타 편집
   const [editTitle, setEditTitle] = useState('');
   const [editSource, setEditSource] = useState('');
-  const [editSubject, setEditSubject] = useState('');
-  const [editDifficulty, setEditDifficulty] = useState(3);
+  const [editCategory, setEditCategory] = useState('');
+  const [editDifficulty, setEditDifficulty] = useState(DEFAULT_DIFFICULTY);
   const [editAnswer, setEditAnswer] = useState('');
   const [editFolderId, setEditFolderId] = useState<string>('');
 
-  // 블록 상태 — 로컬에서 편집, 저장 시 Firestore 동기화
+  // 글꼴 크기
+  const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
+
+  // 블록 상태
   const [questionBlocks, setQuestionBlocks] = useState<LocalBlock[]>([]);
   const [solutionBlocks, setSolutionBlocks] = useState<LocalBlock[]>([]);
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
 
-  // 원본 블록 ID 추적 (삭제 감지용)
+  // 원본 블록 ID 추적
   const [origQuestionIds, setOrigQuestionIds] = useState<string[]>([]);
   const [origSolutionIds, setOrigSolutionIds] = useState<string[]>([]);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
 
-  // DnD 센서
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
+
+  /* ─── 글꼴 크기 초기화 ─── */
+  useEffect(() => {
+    const size = getStoredFontSize();
+    setContentFontSize(size);
+    document.documentElement.style.setProperty('--content-font-size', size + 'px');
+  }, []);
+
+  const handleFontSizeChange = (delta: number) => {
+    setContentFontSize((prev) => {
+      const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, prev + delta));
+      setStoredFontSize(next);
+      return next;
+    });
+  };
 
   /* ─── 데이터 로드 ─── */
   useEffect(() => {
@@ -388,7 +416,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setProblem(data);
         setEditTitle(data.title);
         setEditSource(data.source || data.exam_type || '');
-        setEditSubject(data.subject || data.category || '');
+        setEditCategory(data.category || '');
         setEditDifficulty(data.difficulty);
         setEditAnswer(data.answer || '');
         setEditFolderId(data.folder_id || '');
@@ -425,11 +453,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       prev.map((b) => {
         if (b.id !== blockId) return b;
         let raw_text = b.raw_text;
-        // 선택지로 전환 시 기본 템플릿 적용
         if (type === 'choices' && b.type !== 'choices') {
           raw_text = DEFAULT_CHOICES;
         }
-        // 그림으로 전환 시 비우기
         if (type === 'image' && b.type !== 'image') {
           raw_text = '';
         }
@@ -472,7 +498,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       isNew: true,
     };
     setCurrentBlocks((prev) => {
-      // 활성 블록이 있으면 그 바로 아래에, 없으면 맨 끝에 삽입
       const activeIdx = activeBlockId ? prev.findIndex((b) => b.id === activeBlockId) : -1;
       const insertIdx = activeIdx !== -1 ? activeIdx + 1 : prev.length;
       const updated = [...prev];
@@ -518,7 +543,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setActiveBlockId(newBlock.id);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
 
-  /* ─── 이미지 업로드 (이미지 블록용) ─── */
+  /* ─── 이미지 업로드 ─── */
   const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
     const pid = problemId || `temp-${Date.now()}`;
     const url = await uploadImage(file, pid);
@@ -528,7 +553,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
   }, [problemId, setCurrentBlocks]);
 
-  /* ─── DnD 핸들러 ─── */
+  /* ─── DnD ─── */
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -539,7 +564,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, [setCurrentBlocks]);
 
-  /* ─── MathToolbar 삽입 ─── */
+  /* ─── MathToolbar ─── */
   const handleInsert = (template: string, cursorOffset: number) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
       editorRefs.current[activeBlockId]?.insertText(template, cursorOffset);
@@ -559,7 +584,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const container = previewRef.current;
     const el = container.querySelector(`[data-block-id="${activeBlockId}"]`) as HTMLElement;
     if (el) {
-      // 미리보기 컨테이너만 스크롤 (전체 페이지 영향 없음)
       const containerRect = container.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
       const offset = elRect.top - containerRect.top + container.scrollTop;
@@ -581,24 +605,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setSaving(true);
     setStatus('');
     try {
-      // 메타 저장
       const updateData: Record<string, any> = {
-        title: editTitle, source: editSource, subject: editSubject,
-        exam_type: editSource, category: editSubject,
-        difficulty: editDifficulty, answer: editAnswer,
+        title: editTitle,
+        source: editSource,
+        exam_type: editSource,
+        category: editCategory,
+        subject: editCategory,
+        difficulty: editDifficulty,
+        answer: editAnswer,
         folder_id: editFolderId || null,
       };
       await updateProblem(problem.id, updateData);
 
-      // ─── 문제 블록 저장 ───
-      // 삭제된 블록
       const curQIds = questionBlocks.map((b) => b.id);
       for (const oldId of origQuestionIds) {
         if (!curQIds.includes(oldId)) {
           await deleteBlock(problem.id, 'question_blocks', oldId);
         }
       }
-      // 기존 블록 삭제 후 새로 저장 (순서 보장)
       for (const oldId of origQuestionIds) {
         if (curQIds.includes(oldId)) {
           await deleteBlock(problem.id, 'question_blocks', oldId);
@@ -612,7 +636,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         });
       }
 
-      // ─── 풀이 블록 저장 ───
       const curSIds = solutionBlocks.map((b) => b.id);
       for (const oldId of origSolutionIds) {
         if (!curSIds.includes(oldId)) {
@@ -632,7 +655,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         });
       }
 
-      // 원본 ID 갱신 — 다음 저장을 위해 다시 로드
       const refreshed = await getProblemWithBlocks(problem.id);
       if (refreshed) {
         setProblem(refreshed);
@@ -666,7 +688,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>문제를 찾을 수 없습니다.</div>;
   }
 
-  /* ─── 활성 블록의 타입 확인 ─── */
   const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
   const showToolbar = activeBlock && (activeBlock.type === 'text' || activeBlock.type === 'box');
 
@@ -684,12 +705,33 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     e.target.style.background = 'transparent';
   };
 
+  /* ─── 글꼴 크기 버튼 스타일 ─── */
+  const fontBtnStyle: React.CSSProperties = {
+    border: '1px solid var(--border-light, #ddd)',
+    background: 'var(--bg-hover, #f5f5f5)',
+    cursor: 'pointer',
+    borderRadius: 4,
+    width: 24, height: 24,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 14, fontWeight: 700,
+    color: 'var(--text-secondary)',
+    fontFamily: 'var(--font-ui)',
+    padding: 0,
+    lineHeight: 1,
+  };
+
   return (
-    /* ═══ 최외곽 ═══ */
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
       display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)',
     }}>
+      {/* CSS 오버라이드: EditorPreview의 inline fontSize를 동적으로 덮어씀 */}
+      <style>{`
+        .scaled-editor .cm-editor { font-size: ${contentFontSize}px !important; }
+        .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
+        .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
+      `}</style>
+
       {/* ═══ Row 1: 메타 정보 ═══ */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
@@ -702,6 +744,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }} title="뒤로">
           <IconChevronLeft />
         </button>
+
         <select value={editFolderId} onChange={(e) => setEditFolderId(e.target.value)} style={{
           ...metaInputStyle, fontSize: 12, color: 'var(--text-muted)',
           background: 'var(--bg-hover)', cursor: 'pointer',
@@ -709,26 +752,79 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <option value="">미분류</option>
           {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
+
         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
           placeholder="문제 제목" onFocus={focusHandler} onBlur={blurHandler}
           style={{ ...metaInputStyle, flex: 1, minWidth: 120, fontSize: 15, fontWeight: 600 }}
         />
+
         <input value={editSource} onChange={(e) => setEditSource(e.target.value)}
           placeholder="출처" onFocus={focusHandler} onBlur={blurHandler}
           style={{ ...metaInputStyle, width: 120, fontSize: 12 }}
         />
-        <input value={editSubject} onChange={(e) => setEditSubject(e.target.value)}
-          placeholder="과목" onFocus={focusHandler} onBlur={blurHandler}
-          style={{ ...metaInputStyle, width: 90, fontSize: 12 }}
-        />
-        <select value={editDifficulty} onChange={(e) => setEditDifficulty(Number(e.target.value))}
-          style={{ ...metaInputStyle, fontSize: 12, cursor: 'pointer' }}>
-          {[1, 2, 3, 4, 5].map((d) => <option key={d} value={d}>{'★'.repeat(d)} 난이도 {d}</option>)}
+
+        <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} style={{
+          ...metaInputStyle, fontSize: 12, cursor: 'pointer',
+          background: 'var(--bg-hover)', minWidth: 160,
+        }}>
+          <option value="">대단원 선택</option>
+          {CATEGORY_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
         </select>
+
+        <select value={editDifficulty} onChange={(e) => setEditDifficulty(Number(e.target.value))} style={{
+          ...metaInputStyle, fontSize: 12, cursor: 'pointer',
+          background: 'var(--bg-hover)',
+        }}>
+          {DIFFICULTIES.map((d) => (
+            <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+        </select>
+
         <input value={editAnswer} onChange={(e) => setEditAnswer(e.target.value)}
           placeholder="정답" onFocus={focusHandler} onBlur={blurHandler}
           style={{ ...metaInputStyle, width: 70, fontSize: 12 }}
         />
+
+        {/* ─── 글꼴 크기 조절 ─── */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          marginLeft: 4,
+          borderLeft: '1px solid var(--border-light, #ddd)',
+          paddingLeft: 8,
+        }}>
+          <button
+            onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
+            disabled={contentFontSize <= FONT_SIZE_MIN}
+            style={{
+              ...fontBtnStyle,
+              opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
+              cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
+            }}
+            title="글꼴 축소"
+          >
+            A-
+          </button>
+          <span style={{
+            fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+            minWidth: 28, textAlign: 'center',
+          }}>
+            {contentFontSize}
+          </span>
+          <button
+            onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
+            disabled={contentFontSize >= FONT_SIZE_MAX}
+            style={{
+              ...fontBtnStyle,
+              opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
+              cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
+            }}
+            title="글꼴 확대"
+          >
+            A+
+          </button>
+        </div>
       </div>
 
       {/* ═══ Row 2: Tabs + Save ═══ */}
@@ -764,7 +860,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </button>
       </div>
 
-      {/* ═══ Row 3: Math Toolbar (텍스트/글상자 블록일 때만) ═══ */}
+      {/* ═══ Row 3: Math Toolbar ═══ */}
       {showToolbar && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
@@ -791,8 +887,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             편집
           </div>
 
-          {/* 블록 리스트 (스크롤 영역 + DnD) */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
+          <div className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => (
@@ -817,7 +912,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             </DndContext>
           </div>
 
-          {/* ─── 하단 고정: 블록 추가 + 블록 분할 ─── */}
           <div style={{
             flexShrink: 0, display: 'flex',
             borderTop: '1px solid var(--border-light)', background: 'var(--bg-card)',
@@ -866,10 +960,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} style={{ flex: 1, overflowY: 'auto', padding: 20, background: 'var(--bg-card)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: 20, background: 'var(--bg-card)', minHeight: 0 }}>
             {currentBlocks.map((block, i) => (
               <div key={block.id} data-block-id={block.id}>
-                {/* 글상자(box) 블록은 테두리 박스로 렌더 */}
                 {block.type === 'box' ? (
                   <div style={{
                     border: '1.5px solid var(--text-muted, #888)',
