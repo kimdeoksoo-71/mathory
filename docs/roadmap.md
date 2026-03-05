@@ -174,6 +174,67 @@ git push
 | 취소선/체크리스트 지원 | ⬜ | | del, input 컴포넌트 |
 | 테이블 + KaTeX 수식 조합 확인 | ⬜ | | |
 | Vercel 배포 확인 | ⬜ | | |
+
+## Phase 11: 폴더 관리 강화 + 메타 정보 개편 + 글꼴 크기 조절 ✅
+> 목표: 폴더 관리 UX 개선, 대단원 분류 체계 도입, 콘텐츠 글꼴 크기 사용자 조절
+
+### 11-1. 폴더 관리
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 폴더 hover 시 3-dot 메뉴 (이름 변경 / 삭제) | ✅ | FolderMenu 컴포넌트, Sidebar 내부 |
+| 폴더 삭제 시 소속 문항 미분류로 이동 | ✅ | Firestore에서 folder_id → null 일괄 처리 |
+| 폴더 드래그로 순서 변경 | ✅ | SortableFolderItem + dnd-kit, Firestore order 필드 영속 |
+| 새 폴더는 리스트 맨 아래에 추가 | ✅ | order = folders.length |
+| 폴더 순서 일괄 업데이트 (updateFolderOrders) | ✅ | Firestore batch update, optimistic UI |
+| 문항 드래그하여 폴더로 이동 | ✅ | DraggableProblemItem + 폴더 drop target 하이라이트 |
+| DragOverlay 플로팅 라벨 | ✅ | 드래그 중 "📄 문제 제목" 표시 |
+
+### 11-2. 메타 정보 개편
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 대단원 분류 드롭다운 (15개) | ✅ | "코드 + 단원명" 형식 (예: "11 지수함수와 로그함수") |
+| 난이도 → 배점 (2점/3점/4점) | ✅ | 별표(★) 제거, 단순 텍스트 |
+| 상수 파일 분리 (lib/constants.ts) | ✅ | CATEGORIES, CATEGORY_OPTIONS, DIFFICULTIES |
+| EditorView 메타바 반영 | ✅ | category, difficulty 드롭다운 교체 |
+| ProblemView 난이도 표시 변경 | ✅ | DifficultyBadge → "{N}점" 텍스트 태그 |
+| app/problems/new/page.tsx 반영 | ✅ | 동일 드롭다운 적용 |
+| app/problems/[id]/edit/page.tsx 반영 | ✅ | 동일 드롭다운 적용 |
+
+**대단원 목록:**
+```
+11 지수함수와 로그함수    21 함수의 극한과 연속    31 경우의 수
+12 삼각함수              22 미분                 32 확률
+13 수열                  23 적분                 33 통계
+41 수열의 극한            42 미분법               43 적분법
+51 이차곡선              52 평면벡터              53 공간도형과 공간좌표
+```
+
+### 11-3. 글꼴 크기 조절
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| EditorView 메타바에 A-/A+ 버튼 | ✅ | 정답란 오른쪽, 구분선 후 배치 |
+| 편집창(CodeMirror) 글꼴 크기 조절 | ✅ | .scaled-editor CSS override |
+| 미리보기(EditorPreview) 글꼴 크기 조절 | ✅ | .scaled-preview CSS override |
+| ProblemView 문제/풀이 글꼴 크기 연동 | ✅ | .problem-content-scaled CSS override |
+| localStorage 영속 저장 | ✅ | 키: mathory-content-font-size |
+| 범위: 11px ~ 24px, 기본값 15px | ✅ | 1px 단위 조절 |
+| UI 요소(메타바, 탭, 버튼 등)는 영향 없음 | ✅ | 콘텐츠 영역만 적용 |
+
+### 변경 파일 목록
+
+| 파일 | 변경 유형 |
+|------|----------|
+| `lib/constants.ts` | 신규 |
+| `lib/firestore.ts` | 수정 (updateFolderOrders 추가) |
+| `components/layout/Sidebar.tsx` | 수정 (폴더 DnD, 문항→폴더 드래그, 3-dot 메뉴) |
+| `components/shell/AppShell.tsx` | 수정 (폴더 rename/delete/reorder, 문항 이동 핸들러) |
+| `components/editor/EditorView.tsx` | 수정 (메타 드롭다운, 글꼴 크기 조절) |
+| `components/problem/ProblemView.tsx` | 수정 (난이도 표시, 글꼴 크기 연동) |
+| `app/problems/new/page.tsx` | 수정 (메타 드롭다운) |
+| `app/problems/[id]/edit/page.tsx` | 수정 (메타 드롭다운) |
 ```
 ---
 
