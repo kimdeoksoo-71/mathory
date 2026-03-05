@@ -2,8 +2,8 @@
 
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
-import { keymap } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { keymap, ViewPlugin } from '@codemirror/view';
+import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
@@ -11,20 +11,82 @@ import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highl
 interface MarkdownEditorProps {
   initialValue?: string;
   onChange?: (value: string) => void;
-  autoHeight?: boolean;
 }
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
-  getCursorPosition: () => number;
-  getContent: () => string;
+}
+
+// ── 수식 모드 감지 헬퍼 ──────────────────────────────────
+// 커서가 $...$ 또는 $$...$$ 안에 있으면 닫는 구분자의 끝 위치를 반환
+// 아니면 -1 반환
+function findMathExit(doc: string, cursor: number): number {
+  // ── 1) $$ 블록 수식 검사 (먼저 검사해야 $ 인라인과 혼동 방지) ──
+  let searchStart = 0;
+  while (searchStart < doc.length) {
+    const openIdx = doc.indexOf('$$', searchStart);
+    if (openIdx === -1) break;
+    const innerStart = openIdx + 2;
+    const closeIdx = doc.indexOf('$$', innerStart);
+    if (closeIdx === -1) break;
+    const innerEnd = closeIdx;
+    const closeEnd = closeIdx + 2;
+
+    if (cursor >= innerStart && cursor <= innerEnd) {
+      return closeEnd; // $$ 닫는 구분자 뒤
+    }
+    searchStart = closeEnd;
+  }
+
+  // ── 2) $ 인라인 수식 검사 ──
+  let i = 0;
+  while (i < doc.length) {
+    // $$ 는 건너뛰기
+    if (doc[i] === '$' && doc[i + 1] === '$') {
+      const closeIdx = doc.indexOf('$$', i + 2);
+      if (closeIdx === -1) break;
+      i = closeIdx + 2;
+      continue;
+    }
+
+    if (doc[i] === '$') {
+      const openIdx = i;
+      const innerStart = i + 1;
+      // 닫는 $ 찾기 (같은 줄에서)
+      let closeIdx = -1;
+      for (let j = innerStart; j < doc.length; j++) {
+        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
+          closeIdx = j;
+          break;
+        }
+        if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
+      }
+
+      if (closeIdx !== -1 && cursor >= innerStart && cursor <= closeIdx) {
+        return closeIdx + 1; // $ 닫는 구분자 뒤
+      }
+
+      if (closeIdx !== -1) {
+        i = closeIdx + 1;
+      } else {
+        i++;
+      }
+      continue;
+    }
+
+    i++;
+  }
+
+  return -1;
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false }, ref) => {
+  ({ initialValue = '', onChange }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const tabStopsRef = useRef<boolean>(false);
+    const chordPendingRef = useRef<boolean>(false);
+    const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useImperativeHandle(ref, () => ({
       insertText(text: string, cursorOffset: number) {
@@ -55,21 +117,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
         view.focus();
       },
-      getCursorPosition() {
-        const view = viewRef.current;
-        if (!view) return 0;
-        return view.state.selection.main.head;
-      },
-      getContent() {
-        const view = viewRef.current;
-        if (!view) return '';
-        return view.state.doc.toString();
-      },
     }));
 
     useEffect(() => {
       if (!editorRef.current) return;
 
+      // ── Tab stop 핸들러 ──
       const tabHandler = keymap.of([
         {
           key: 'Tab',
@@ -79,24 +132,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             const doc = view.state.doc.toString();
             const cursor = view.state.selection.main.head;
 
-            // 현재 커서 위치에서 가장 가까운 } 를 찾아 넘어감
             const closeBrace = doc.indexOf('}', cursor);
             if (closeBrace === -1) {
               tabStopsRef.current = false;
               return false;
             }
 
-            // } 다음에 바로 { 가 오면 → 다음 {} 안으로 이동
-            // } 다음에 { 가 없으면 → 템플릿 끝, 모드 종료
             const afterClose = doc.indexOf('{', closeBrace + 1);
             const nextClose = doc.indexOf('}', closeBrace + 1);
 
-            // 바로 인접한 {} 쌍인지 확인 (사이에 다른 } 가 없어야 함)
             if (afterClose !== -1 && (nextClose === -1 || afterClose < nextClose)) {
-              // 다음 { 와 현재 } 사이에 줄바꿈 없는 가까운 거리인지 확인
               const gap = doc.substring(closeBrace + 1, afterClose);
               if (gap.length <= 3) {
-                // 다음 {} 안으로 커서 이동
                 view.dispatch({
                   selection: { anchor: afterClose + 1 },
                 });
@@ -104,7 +151,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               }
             }
 
-            // 더 이상 다음 {} 없음 → } 바로 뒤로 이동, 모드 종료
             tabStopsRef.current = false;
             view.dispatch({
               selection: { anchor: closeBrace + 1 },
@@ -114,80 +160,106 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         },
       ]);
 
-      // === 2.2. $$$$ + Space 자동 확장 ===
-      // $$$$를 타이핑한 후 Space를 누르면:
-      //   (빈줄)
-      //   $$
-      //   (커서)
-      //   $$
-      //   (빈줄)
-      // 로 자동 변환
-      const dollarAutoExpand = EditorView.inputHandler.of(
-        (view, from, to, text) => {
-          // Space가 입력될 때만 처리
-          if (text !== ' ') return false;
+      // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc ──
+      const mathShortcuts = Prec.highest(keymap.of([
+        {
+          // Ctrl+N: chord 대기 모드 진입 (이미 대기 중이면 Ctrl+N,N 실행)
+          key: 'Ctrl-n',
+          run: (view) => {
+            if (chordPendingRef.current) {
+              // 이미 chord 대기 중 → Ctrl+N, N (블록 수식)
+              chordPendingRef.current = false;
+              if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
 
-          const doc = view.state.doc.toString();
-          const cursor = from; // Space 입력 직전 커서 위치
+              const { from, to } = view.state.selection.main;
+              const insertText = '\n$$\n\n$$\n';
+              view.dispatch({
+                changes: { from, to, insert: insertText },
+                selection: { anchor: from + 4 }, // 두 $$ 사이 빈 줄
+              });
+              return true;
+            }
 
-          // 커서 앞 4글자가 $$$$인지 확인
-          if (cursor < 4) return false;
-          const before = doc.slice(cursor - 4, cursor);
-          if (before !== '$$$$') return false;
+            chordPendingRef.current = true;
+            // 1초 안에 두 번째 키 안 누르면 자동 해제
+            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
+            chordTimerRef.current = setTimeout(() => {
+              chordPendingRef.current = false;
+            }, 1000);
+            return true; // 기본 동작(새 파일 등) 차단
+          },
+        },
+        {
+          // Shift+Escape: 수식 밖으로 탈출
+          key: 'Shift-Escape',
+          run: (view) => {
+            const doc = view.state.doc.toString();
+            const cursor = view.state.selection.main.head;
+            const exitPos = findMathExit(doc, cursor);
 
-          // 현재 줄의 시작 위치를 찾아서, $$$$ 앞에 다른 내용이 없는지 확인
-          // (줄 중간에 있는 $$$$도 처리하되, 더 안전한 동작을 위해)
-          const lineStart = doc.lastIndexOf('\n', cursor - 5) + 1;
-          const beforeDollars = doc.slice(lineStart, cursor - 4).trim();
+            if (exitPos !== -1) {
+              view.dispatch({
+                selection: { anchor: exitPos },
+              });
+              return true;
+            }
+            return false;
+          },
+        },
+      ]));
 
-          // $$$$ 앞에 내용이 있으면 무시 (의도하지 않은 변환 방지)
-          if (beforeDollars.length > 0) return false;
+      // ── Chord 두 번째 키를 DOM 이벤트로 처리 ──
+      const chordListener = EditorView.domEventHandlers({
+        keydown(event, view) {
+          if (!chordPendingRef.current) return false;
 
-          // 현재 줄의 앞부분 공백(들여쓰기) 보존
-          const linePrefix = doc.slice(lineStart, cursor - 4);
+          // chord 대기 중 → 두 번째 키 확인
+          if (event.code === 'KeyM') {
+            // Ctrl+N, M → 인라인 수식 $  $ 삽입
+            event.preventDefault();
+            chordPendingRef.current = false;
+            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
 
-          // $$$$ 를 삭제하고 포맷된 블록으로 교체
-          // 결과: \n$$\n커서\n$$\n
-          const replacement = '\n$$\n\n$$\n';
-          const replaceFrom = cursor - 4; // $$$$ 시작 위치
-          // linePrefix도 함께 교체 (줄 시작부터)
-          const actualFrom = lineStart;
-          const actualReplacement = linePrefix.length > 0
-            ? linePrefix + replacement
-            : replacement;
-
-          // 앞에 이미 빈 줄이 있는지 확인
-          const textBeforeLine = doc.slice(0, lineStart);
-          const needLeadingNewline = textBeforeLine.length > 0 && !textBeforeLine.endsWith('\n\n');
-          
-          let finalReplacement = '';
-          let cursorInReplacement = 0;
-
-          if (needLeadingNewline) {
-            finalReplacement = '\n$$\n\n$$\n';
-            cursorInReplacement = actualFrom + 4; // '\n$$\n' = 4글자 뒤가 커서 위치
-          } else {
-            finalReplacement = '$$\n\n$$\n';
-            cursorInReplacement = actualFrom + 3; // '$$\n' = 3글자 뒤가 커서 위치
+            const { from, to } = view.state.selection.main;
+            const insertText = '$  $';
+            view.dispatch({
+              changes: { from, to, insert: insertText },
+              selection: { anchor: from + 2 }, // 두 $ 사이 중앙
+            });
+            return true;
           }
 
-          view.dispatch({
-            changes: { from: actualFrom, to: cursor, insert: finalReplacement },
-            selection: { anchor: cursorInReplacement },
-          });
+          if (event.code === 'KeyN') {
+            // Ctrl+N, N → 블록 수식 $$\n\n$$ 삽입 (위아래 빈 줄 포함)
+            event.preventDefault();
+            chordPendingRef.current = false;
+            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
 
-          return true; // 이벤트 소비 (Space 문자는 삽입하지 않음)
-        }
-      );
+            const { from, to } = view.state.selection.main;
+            const insertText = '\n$$\n\n$$\n';
+            view.dispatch({
+              changes: { from, to, insert: insertText },
+              selection: { anchor: from + 4 }, // 두 $$ 사이 빈 줄
+            });
+            return true;
+          }
+
+          // 다른 키가 눌리면 chord 취소
+          chordPendingRef.current = false;
+          if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
+          return false;
+        },
+      });
 
       const state = EditorState.create({
         doc: initialValue,
         extensions: [
+          mathShortcuts,
+          chordListener,
           tabHandler,
           basicSetup,
           markdown(),
           EditorView.lineWrapping,
-          dollarAutoExpand, // $$$$ + Space 자동 확장
           latexHighlightPlugin,
           latexHighlightTheme,
           EditorView.updateListener.of((update) => {
@@ -197,22 +269,17 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           }),
           EditorView.theme({
             '&': {
-              height: autoHeight ? 'auto' : '100%',
-              minHeight: autoHeight ? '60px' : undefined,
+              height: '100%',
               fontSize: '15px',
             },
             '.cm-scroller': {
-              overflow: autoHeight ? 'visible' : 'auto',
+              overflow: 'auto',
               fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
             },
             '.cm-content': {
               padding: '16px',
               wordBreak: 'break-all',
               whiteSpace: 'pre-wrap',
-            },
-            // === 2.1. 편집창 행간을 한 행의 세로폭 100%로 늘림 ===
-            '.cm-line': {
-              lineHeight: '2.0',
             },
             '.cm-gutters': {
               backgroundColor: '#f8f9fa',
@@ -231,6 +298,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
       return () => {
         view.destroy();
+        if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -238,8 +306,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       <div
         ref={editorRef}
         style={{
-          height: autoHeight ? 'auto' : '100%',
-          minHeight: autoHeight ? '60px' : undefined,
+          height: '100%',
           border: '1px solid #ddd',
           borderRadius: '0 0 8px 8px',
           overflow: 'hidden',
