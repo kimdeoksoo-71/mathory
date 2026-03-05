@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
-import { keymap, ViewPlugin } from '@codemirror/view';
+import { keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
@@ -11,10 +11,13 @@ import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highl
 interface MarkdownEditorProps {
   initialValue?: string;
   onChange?: (value: string) => void;
+  autoHeight?: boolean;
 }
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
+  getCursorPosition: () => number;
+  getContent: () => string;
 }
 
 // ── 수식 모드 감지 헬퍼 ──────────────────────────────────
@@ -81,7 +84,7 @@ function findMathExit(doc: string, cursor: number): number {
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const tabStopsRef = useRef<boolean>(false);
@@ -116,6 +119,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         }
 
         view.focus();
+      },
+      getCursorPosition() {
+        const view = viewRef.current;
+        if (!view) return 0;
+        return view.state.selection.main.head;
+      },
+      getContent() {
+        const view = viewRef.current;
+        if (!view) return '';
+        return view.state.doc.toString();
       },
     }));
 
@@ -269,11 +282,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           }),
           EditorView.theme({
             '&': {
-              height: '100%',
+              height: autoHeight ? 'auto' : '100%',
+              minHeight: autoHeight ? '60px' : undefined,
               fontSize: '15px',
             },
             '.cm-scroller': {
-              overflow: 'auto',
+              overflow: autoHeight ? 'visible' : 'auto',
               fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
             },
             '.cm-content': {
@@ -306,7 +320,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       <div
         ref={editorRef}
         style={{
-          height: '100%',
+          height: autoHeight ? 'auto' : '100%',
+          minHeight: autoHeight ? '60px' : undefined,
           border: '1px solid #ddd',
           borderRadius: '0 0 8px 8px',
           overflow: 'hidden',
