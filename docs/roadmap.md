@@ -160,9 +160,6 @@ git commit -m "Phase 10: GFM 테이블 및 확장 문법 지원 (remark-gfm)"
 git push
 ```
 
-## roadmap.md 추가 내용
-
-```markdown
 ## Phase 10: GFM 테이블 및 확장 문법 지원
 > 목표: Markdown 표(table), 취소선, 체크리스트 등 GFM 확장 문법 렌더링 지원
 
@@ -235,7 +232,6 @@ git push
 | `components/problem/ProblemView.tsx` | 수정 (난이도 표시, 글꼴 크기 연동) |
 | `app/problems/new/page.tsx` | 수정 (메타 드롭다운) |
 | `app/problems/[id]/edit/page.tsx` | 수정 (메타 드롭다운) |
-```
----
+
 
 상태: ⬜ 대기 / 🔄 진행중 / ✅ 완료 / ❌ 보류
