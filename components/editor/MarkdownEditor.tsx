@@ -234,11 +234,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
 
             const { from, to } = view.state.selection.main;
-            const insertText = '$  $';
-            view.dispatch({
-              changes: { from, to, insert: insertText },
-              selection: { anchor: from + 2 }, // 두 $ 사이 중앙
-            });
+            const insertText = '$$';
+              view.dispatch({
+                changes: { from, to, insert: insertText },
+              });
+              view.dispatch({
+                selection: { anchor: from + 1 },
+              });
             return true;
           }
 
@@ -282,18 +284,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           }),
           EditorView.theme({
             '&': {
-              height: autoHeight ? 'auto' : '100%',
-              minHeight: autoHeight ? '60px' : undefined,
+              height: '100%',
               fontSize: '15px',
             },
             '.cm-scroller': {
-              overflow: autoHeight ? 'visible' : 'auto',
+              overflow: 'auto',
               fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
             },
             '.cm-content': {
               padding: '16px',
               wordBreak: 'break-all',
               whiteSpace: 'pre-wrap',
+              lineHeight: '2.5',       // ← 추가
             },
             '.cm-gutters': {
               backgroundColor: '#f8f9fa',

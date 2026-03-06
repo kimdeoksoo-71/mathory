@@ -3,11 +3,17 @@
 import { useState, useEffect, useRef } from 'react';
 import { ProblemWithBlocks } from '../../types/problem';
 import { getProblemWithBlocks } from '../../lib/firestore';
+import { DIFFICULTIES } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import { IconDots, IconRename, IconEdit, IconFolderMove, IconTrash } from '../ui/Icons';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
+
+function getDifficultyLabel(value: number): string {
+  const found = DIFFICULTIES.find((d) => d.value === value);
+  return found ? found.label : `${value}`;
+}
 
 interface ProblemViewProps {
   problemId: string;
@@ -141,7 +147,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
             fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
             padding: '2px 8px', borderRadius: 6,
           }}>
-            {problem.difficulty}점
+            {getDifficultyLabel(problem.difficulty)}
           </span>
           {problem.answer && (
             <span style={{
