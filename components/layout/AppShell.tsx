@@ -5,11 +5,13 @@ import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase';
 import useAuth from '../../hooks/useAuth';
 import { Problem, Folder } from '../../types/problem';
+import { DIFFICULTIES } from '../../lib/constants';
 import {
   listProblems, listRecentProblems, listFolders,
   createFolder, updateFolder, deleteFolder, updateFolderOrders,
   moveProblemToFolder,
   getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
+  getProblemWithBlocks,
 } from '../../lib/firestore';
 
 import Sidebar from '../layout/Sidebar';
@@ -24,6 +26,42 @@ type ViewState =
   | { type: 'problem'; problemId: string }
   | { type: 'editor'; problemId: string }
   | { type: 'new' };
+
+function getDifficultyLabel(value: number): string {
+  const found = DIFFICULTIES.find((d) => d.value === value);
+  return found ? found.label : `${value}`;
+}
+
+function downloadMarkdown(problem: { title: string; source?: string; exam_type: string; subject?: string; category: string; difficulty: number; answer?: string; question_blocks: { raw_text: string }[]; solution_blocks: { raw_text: string }[] }) {
+  const questionContent = problem.question_blocks
+    .map((b) => b.raw_text)
+    .join('\n\n');
+  const solutionContent = problem.solution_blocks
+    .map((b) => b.raw_text)
+    .join('\n\n');
+
+  let md = `# ${problem.title}\n\n`;
+  md += `> ${problem.source || problem.exam_type} | ${problem.subject || problem.category} | ${getDifficultyLabel(problem.difficulty)}`;
+  if (problem.answer) md += ` | 정답: ${problem.answer}`;
+  md += '\n\n';
+  md += `## 문제\n\n${questionContent}\n\n`;
+  if (solutionContent.trim()) {
+    md += `## 풀이\n\n${solutionContent}\n`;
+  }
+
+  const safeTitle = problem.title.replace(/[/\\:*?"<>|]/g, '_');
+  const filename = `${safeTitle}.md`;
+
+  const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export default function AppShell() {
   const { user, loading: authLoading } = useAuth();
@@ -198,6 +236,20 @@ export default function AppShell() {
             await moveProblemToFolder(problem.id, folder.id);
             await loadData();
           }
+        }
+        break;
+      }
+      case 'download_md': {
+        try {
+          const full = await getProblemWithBlocks(problem.id);
+          if (full) {
+            downloadMarkdown(full);
+          } else {
+            alert('문제 데이터를 불러올 수 없습니다.');
+          }
+        } catch (error) {
+          console.error('MD 다운로드 에러:', error);
+          alert('다운로드에 실패했습니다.');
         }
         break;
       }

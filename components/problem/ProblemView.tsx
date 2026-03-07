@@ -15,6 +15,17 @@ function getDifficultyLabel(value: number): string {
   return found ? found.label : `${value}`;
 }
 
+// 간단한 다운로드 아이콘
+function IconDownload({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 interface ProblemViewProps {
   problemId: string;
   onRename?: (problem: ProblemWithBlocks) => void;
@@ -72,6 +83,43 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
+  // Markdown 다운로드
+  const handleDownloadMarkdown = () => {
+    if (!problem) return;
+
+    const questionContent = problem.question_blocks
+      .map((b) => b.raw_text)
+      .join('\n\n');
+    const solutionContent = problem.solution_blocks
+      .map((b) => b.raw_text)
+      .join('\n\n');
+
+    let md = `# ${problem.title}\n\n`;
+    md += `> ${problem.source || problem.exam_type} | ${problem.subject || problem.category} | ${getDifficultyLabel(problem.difficulty)}`;
+    if (problem.answer) md += ` | 정답: ${problem.answer}`;
+    md += '\n\n';
+    md += `## 문제\n\n${questionContent}\n\n`;
+    if (solutionContent.trim()) {
+      md += `## 풀이\n\n${solutionContent}\n`;
+    }
+
+    // 파일명에서 사용 불가 문자 제거
+    const safeTitle = problem.title.replace(/[/\\:*?"<>|]/g, '_');
+    const filename = `${safeTitle}.md`;
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    setMenuOpen(false);
+  };
+
   if (loading) {
     return (
       <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -114,9 +162,10 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
   };
 
   const menuItems = [
-    { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },
     { label: '편집', icon: <IconEdit />, action: () => { setMenuOpen(false); onEdit?.(problem); } },
+    { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },
     { label: '폴더 변경', icon: <IconFolderMove />, action: () => { setMenuOpen(false); onMoveFolder?.(problem); } },
+    { label: 'MD 다운로드', icon: <IconDownload />, action: handleDownloadMarkdown },
     { label: 'divider' },
     { label: '삭제', icon: <IconTrash />, action: () => { setMenuOpen(false); onDelete?.(problem); }, danger: true },
   ];
@@ -161,10 +210,18 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
 
         {/* 제목 + ⋯ 메뉴 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2 style={{
-            fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
-            fontFamily: 'var(--font-ui)', flex: 1,
-          }}>
+          <h2
+            onClick={() => onEdit?.(problem)}
+            style={{
+              fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
+              fontFamily: 'var(--font-ui)', flex: 1,
+              cursor: 'pointer',
+              transition: 'color var(--transition-fast)',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary, #5b6abf)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+            title="클릭하여 편집"
+          >
             {problem.title}
           </h2>
 

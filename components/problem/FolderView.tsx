@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { Problem, Folder } from '../../types/problem';
+import { DIFFICULTIES } from '../../lib/constants';
 import { IconFolder, IconDots } from '../ui/Icons';
-import DifficultyBadge from '../ui/DifficultyBadge';
 import ContextMenu from '../ui/ContextMenu';
 import { formatTimeAgo } from '../../lib/utils';
+
+function getDifficultyLabel(value: number): string {
+  const found = DIFFICULTIES.find((d) => d.value === value);
+  return found ? found.label : `${value}`;
+}
 
 interface FolderViewProps {
   folder: Folder;
@@ -58,7 +63,9 @@ function ProblemCard({
               {problem.subject || problem.category}
             </span>
             <span style={{ fontSize: 12, color: 'var(--text-placeholder)' }}>·</span>
-            <DifficultyBadge level={problem.difficulty} />
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {getDifficultyLabel(problem.difficulty)}
+            </span>
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
