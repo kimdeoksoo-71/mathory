@@ -1,9 +1,17 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { MathSnippet } from '../../types/snippet';
+import MathSnippetMenu from './MathSnippetMenu';
 
 interface MathToolbarProps {
   onInsert: (template: string, cursorOffset: number) => void;
+  // 상용구 관련 props (optional — 없으면 상용구 버튼 숨김)
+  snippets?: MathSnippet[];
+  onSnippetInsert?: (content: string) => void;
+  onSnippetAdd?: (data: { name: string; shortcutIndex: number; content: string }) => void;
+  onSnippetEdit?: (snippetId: string, data: Partial<{ name: string; shortcutIndex: number; content: string }>) => void;
+  onSnippetDelete?: (snippetId: string) => void;
 }
 
 interface ToolbarItem {
@@ -98,7 +106,6 @@ const CATEGORIES: ToolbarCategory[] = [
     name: '원문자',
     icon: '①',
     items: [
-      // 숫자 원문자
       { label: '①', title: '원문자 1', template: '①', cursorOffset: 1 },
       { label: '②', title: '원문자 2', template: '②', cursorOffset: 1 },
       { label: '③', title: '원문자 3', template: '③', cursorOffset: 1 },
@@ -109,16 +116,13 @@ const CATEGORIES: ToolbarCategory[] = [
       { label: '⑧', title: '원문자 8', template: '⑧', cursorOffset: 1 },
       { label: '⑨', title: '원문자 9', template: '⑨', cursorOffset: 1 },
       { label: '⑩', title: '원문자 10', template: '⑩', cursorOffset: 1 },
-      // 구분선 역할 — 빈 항목
       { label: '---', title: '', template: '', cursorOffset: 0 },
-      // 검정 원문자
       { label: '❶', title: '검정 1', template: '❶', cursorOffset: 1 },
       { label: '❷', title: '검정 2', template: '❷', cursorOffset: 1 },
       { label: '❸', title: '검정 3', template: '❸', cursorOffset: 1 },
       { label: '❹', title: '검정 4', template: '❹', cursorOffset: 1 },
       { label: '❺', title: '검정 5', template: '❺', cursorOffset: 1 },
       { label: '---', title: '', template: '', cursorOffset: 0 },
-      // 한글 원문자
       { label: '㉠', title: '한글 ㄱ', template: '㉠', cursorOffset: 1 },
       { label: '㉡', title: '한글 ㄴ', template: '㉡', cursorOffset: 1 },
       { label: '㉢', title: '한글 ㄷ', template: '㉢', cursorOffset: 1 },
@@ -160,7 +164,6 @@ function DropdownCategory({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // 외부 클릭 시 닫기
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
@@ -221,7 +224,6 @@ function DropdownCategory({
             animation: 'fadeIn 0.1s ease',
           }}
         >
-          {/* 카테고리 헤더 */}
           <div
             style={{
               padding: '4px 12px 6px',
@@ -236,10 +238,8 @@ function DropdownCategory({
           </div>
 
           {isGrid ? (
-            // 원문자: 그리드 배치
             <div style={{ padding: '0 8px 8px' }}>
               {(() => {
-                // 구분선(---)으로 그룹 분리
                 const groups: ToolbarItem[][] = [];
                 let current: ToolbarItem[] = [];
                 category.items.forEach((item) => {
@@ -298,7 +298,6 @@ function DropdownCategory({
               })()}
             </div>
           ) : (
-            // 일반: 세로 리스트
             category.items.map((item, idx) =>
               item.label === '---' ? (
                 <div
@@ -363,7 +362,24 @@ function DropdownCategory({
 }
 
 // ═══ 메인 툴바 ═══
-export default function MathToolbar({ onInsert }: MathToolbarProps) {
+export default function MathToolbar({
+  onInsert,
+  snippets,
+  onSnippetInsert,
+  onSnippetAdd,
+  onSnippetEdit,
+  onSnippetDelete,
+}: MathToolbarProps) {
+  const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
+  const snippetBtnRef = useRef<HTMLButtonElement>(null);
+
+  const hasSnippetSupport =
+    snippets !== undefined &&
+    onSnippetInsert !== undefined &&
+    onSnippetAdd !== undefined &&
+    onSnippetEdit !== undefined &&
+    onSnippetDelete !== undefined;
+
   return (
     <div
       style={{
@@ -419,6 +435,67 @@ export default function MathToolbar({ onInsert }: MathToolbarProps) {
           {btn.label}
         </button>
       ))}
+
+      {/* ─── 수식 상용구 버튼 (맨 마지막) ─── */}
+      {hasSnippetSupport && (
+        <>
+          <div style={{ width: 1, height: 24, backgroundColor: '#ddd', margin: '0 4px' }} />
+          <button
+            ref={snippetBtnRef}
+            title="수식 상용구"
+            onClick={() => setSnippetMenuOpen((prev) => !prev)}
+            style={{
+              padding: '4px 8px',
+              fontSize: '13px',
+              fontFamily: 'var(--font-ui, sans-serif)',
+              backgroundColor: snippetMenuOpen ? '#e0e0e0' : '#fff',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              lineHeight: '1.4',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              whiteSpace: 'nowrap',
+            }}
+            onMouseEnter={(e) => {
+              if (!snippetMenuOpen) e.currentTarget.style.backgroundColor = '#f0f0f0';
+            }}
+            onMouseLeave={(e) => {
+              if (!snippetMenuOpen) e.currentTarget.style.backgroundColor = '#fff';
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="16" y1="13" x2="8" y2="13" />
+              <line x1="16" y1="17" x2="8" y2="17" />
+            </svg>
+            상용구
+          </button>
+
+          {snippetMenuOpen && (
+            <MathSnippetMenu
+              snippets={snippets}
+              onInsert={onSnippetInsert}
+              onAdd={onSnippetAdd}
+              onEdit={onSnippetEdit}
+              onDelete={onSnippetDelete}
+              anchorRef={snippetBtnRef}
+              onClose={() => setSnippetMenuOpen(false)}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

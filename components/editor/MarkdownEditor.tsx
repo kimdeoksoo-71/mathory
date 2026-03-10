@@ -14,6 +14,7 @@ interface MarkdownEditorProps {
   initialValue?: string;
   onChange?: (value: string) => void;
   autoHeight?: boolean;
+  onSnippetShortcut?: (index: number) => void;
 }
 
 export interface MarkdownEditorHandle {
@@ -82,14 +83,10 @@ function findMathExit(doc: string, cursor: number): number {
 
 // ── LaTeX 자동완성 소스 ──────────────────────────────────
 function latexCompletionSource(context: CompletionContext) {
-  // \ 로 시작하는 입력 매칭
   const word = context.matchBefore(/\\[a-zA-Z{]*/);
   if (!word || word.from === word.to) return null;
-
-  // 최소 2글자 (\와 알파벳 1자) 이상이어야 드롭다운 표시
   if (word.text.length < 2) return null;
 
-  // 수식 모드 내부인지 확인
   const doc = context.state.doc.toString();
   if (!isInsideMath(doc, context.pos)) return null;
 
@@ -103,24 +100,19 @@ function latexCompletionSource(context: CompletionContext) {
       apply: (view: EditorView, completion: Completion, from: number, to: number) => {
         const template = item.template;
 
-        // 템플릿 삽입
         view.dispatch({
           changes: { from, to, insert: template },
         });
 
-        // {} 가 있으면 첫 번째 {} 안으로 커서 이동
         const firstBrace = template.indexOf('{}');
         if (firstBrace !== -1) {
           view.dispatch({
             selection: { anchor: from + firstBrace + 1 },
           });
-          // Tab stop 모드 활성화 (2개 이상의 {} 가 있을 때)
           if (item.braceCount >= 2) {
-            // tabStopsRef에 직접 접근할 수 없으므로 커스텀 이벤트로 전달
             (view as any).__tabStopsActive = true;
           }
         } else {
-          // {} 가 없으면 템플릿 끝으로 커서 이동
           view.dispatch({
             selection: { anchor: from + template.length },
           });
@@ -138,12 +130,18 @@ function latexCompletionSource(context: CompletionContext) {
 }
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const tabStopsRef = useRef<boolean>(false);
     const chordPendingRef = useRef<boolean>(false);
     const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // 최신 콜백을 ref로 유지 (CodeMirror 초기화 이후에도 최신값 참조)
+    const snippetCallbackRef = useRef(onSnippetShortcut);
+    useEffect(() => {
+      snippetCallbackRef.current = onSnippetShortcut;
+    }, [onSnippetShortcut]);
 
     useImperativeHandle(ref, () => ({
       insertText(text: string, cursorOffset: number) {
@@ -192,7 +190,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         {
           key: 'Tab',
           run: (view) => {
-            // 자동완성에서 삽입된 경우도 처리
             if ((view as any).__tabStopsActive) {
               tabStopsRef.current = true;
               (view as any).__tabStopsActive = false;
@@ -231,7 +228,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         },
       ]);
 
-      // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc ──
+      // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc + Ctrl+Alt+1~9 ──
       const mathShortcuts = Prec.highest(keymap.of([
         {
           key: 'Ctrl-n',
@@ -273,6 +270,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             return false;
           },
         },
+        // ── Ctrl+Alt+1 ~ Ctrl+Alt+9 (수식 상용구 단축키) ──
+        ...Array.from({ length: 9 }, (_, i) => ({
+          key: `Ctrl-Alt-${i + 1}`,
+          mac: `Ctrl-Alt-${i + 1}`,
+          run: () => {
+            if (snippetCallbackRef.current) {
+              snippetCallbackRef.current(i + 1);
+              return true;
+            }
+            return false;
+          },
+        })),
       ]));
 
       // ── Chord DOM 이벤트 핸들러 ──

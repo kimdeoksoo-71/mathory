@@ -13,6 +13,7 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import ImageUploadButton from '../editor/ImageUploadButton';
 import { uploadImage } from '../../lib/storage';
+import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
@@ -66,7 +67,6 @@ function getStoredFontSize(): number {
 
 function setStoredFontSize(size: number) {
   localStorage.setItem(FONT_SIZE_KEY, String(size));
-  // CSS 변수도 설정 (ProblemView에서 사용)
   document.documentElement.style.setProperty('--content-font-size', size + 'px');
 }
 
@@ -85,6 +85,7 @@ function SortableEditorBlock({
   onFocus, onChange, onTypeChange, onTitleChange,
   onDelete, onToggleCollapse,
   onImageUpload, problemId,
+  onSnippetShortcut,
 }: {
   block: LocalBlock;
   index: number;
@@ -99,6 +100,7 @@ function SortableEditorBlock({
   onToggleCollapse: () => void;
   onImageUpload: (file: File, blockId: string) => void;
   problemId: string;
+  onSnippetShortcut?: (index: number) => void;
 }) {
   const {
     attributes, listeners, setNodeRef,
@@ -219,6 +221,7 @@ function SortableEditorBlock({
               initialValue={block.raw_text}
               onChange={onChange}
               autoHeight
+              onSnippetShortcut={onSnippetShortcut}
             />
           )}
 
@@ -391,6 +394,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor)
   );
+
+  // ── 수식 상용구 ──
+  const { snippets, addSnippet, editSnippet, removeSnippet, getByShortcut } = useSnippets();
 
   /* ─── 글꼴 크기 초기화 ─── */
   useEffect(() => {
@@ -576,6 +582,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const url = await uploadImage(file, pid);
     const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
     handleInsert(markdownImage, markdownImage.length);
+  };
+
+  /* ─── 수식 상용구 ─── */
+  const handleSnippetInsert = (content: string) => {
+    if (activeBlockId && editorRefs.current[activeBlockId]) {
+      editorRefs.current[activeBlockId]?.insertText(content, content.length);
+    }
+  };
+
+  const handleSnippetShortcut = (index: number) => {
+    const snippet = getByShortcut(index);
+    if (snippet) {
+      handleSnippetInsert(snippet.content);
+    }
   };
 
   /* ─── 미리보기 스크롤 동기화 ─── */
@@ -866,7 +886,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
           borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
         }}>
-          <MathToolbar onInsert={handleInsert} />
+          <MathToolbar
+            onInsert={handleInsert}
+            snippets={snippets}
+            onSnippetInsert={handleSnippetInsert}
+            onSnippetAdd={addSnippet}
+            onSnippetEdit={editSnippet}
+            onSnippetDelete={removeSnippet}
+          />
           <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
           <ImageUploadButton onUpload={handleToolbarImageUpload} />
         </div>
@@ -906,6 +933,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onToggleCollapse={() => handleToggleCollapse(block.id)}
                     onImageUpload={handleBlockImageUpload}
                     problemId={problemId}
+                    onSnippetShortcut={handleSnippetShortcut}
                   />
                 ))}
               </SortableContext>

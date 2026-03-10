@@ -16,6 +16,7 @@ interface SortableBlockProps {
   onTypeChange: (type: BlockData['type']) => void;
   onDelete: () => void;
   setEditorRef: (ref: MarkdownEditorHandle | null) => void;
+  onSnippetShortcut?: (index: number) => void;
 }
 
 export default function SortableBlock({
@@ -28,6 +29,7 @@ export default function SortableBlock({
   onTypeChange,
   onDelete,
   setEditorRef,
+  onSnippetShortcut,
 }: SortableBlockProps) {
   const editorRef = useRef<MarkdownEditorHandle>(null);
   const {
@@ -144,6 +146,7 @@ export default function SortableBlock({
           ref={editorRef}
           initialValue={block.raw_text}
           onChange={onChange}
+          onSnippetShortcut={onSnippetShortcut}
         />
       </div>
     </div>

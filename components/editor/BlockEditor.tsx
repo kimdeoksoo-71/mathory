@@ -22,6 +22,7 @@ import EditorPreview from './EditorPreview';
 import ImageUploadButton from './ImageUploadButton';
 import { MarkdownEditorHandle } from './MarkdownEditor';
 import { uploadImage } from '../../lib/storage';
+import useSnippets from '../../hooks/useSnippets';
 
 export interface BlockData {
   id: string;
@@ -44,6 +45,9 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
 
   const [editorHeight, setEditorHeight] = useState(500);
   const [isResizing, setIsResizing] = useState(false);
+
+  // ── 수식 상용구 ──
+  const { snippets, addSnippet, editSnippet, removeSnippet, getByShortcut } = useSnippets();
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -127,6 +131,21 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     }
   };
 
+  // ── 상용구 삽입 (메뉴에서 클릭) ──
+  const handleSnippetInsert = (content: string) => {
+    if (activeBlockId && editorRefs.current[activeBlockId]) {
+      editorRefs.current[activeBlockId]!.insertText(content, content.length);
+    }
+  };
+
+  // ── 상용구 단축키 콜백 (Ctrl+Alt+1~9) ──
+  const handleSnippetShortcut = (index: number) => {
+    const snippet = getByShortcut(index);
+    if (snippet) {
+      handleSnippetInsert(snippet.content);
+    }
+  };
+
   const handleImageUpload = async (file: File) => {
     const pid = problemId || `temp-${Date.now()}`;
     const url = await uploadImage(file, pid);
@@ -155,7 +174,14 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
           border: '1px solid #ddd',
         }}
       >
-        <MathToolbar onInsert={handleInsert} />
+        <MathToolbar
+          onInsert={handleInsert}
+          snippets={snippets}
+          onSnippetInsert={handleSnippetInsert}
+          onSnippetAdd={addSnippet}
+          onSnippetEdit={editSnippet}
+          onSnippetDelete={removeSnippet}
+        />
         <div style={{ width: '1px', height: '24px', backgroundColor: '#ddd', margin: '0 4px' }} />
         <ImageUploadButton onUpload={handleImageUpload} />
       </div>
@@ -191,6 +217,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                     onDelete={() => handleDeleteBlock(block.id)}
                     setEditorRef={(ref) => setEditorRef(block.id, ref)}
+                    onSnippetShortcut={handleSnippetShortcut}
                   />
                 ))}
               </SortableContext>
