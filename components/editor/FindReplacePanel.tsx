@@ -393,7 +393,7 @@ export default function FindReplacePanel({
             onBlur={blurHandler}
           />
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 130, justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 160, flexShrink: 0, justifyContent: 'flex-end' }}>
           <span style={{
             fontSize: 12, color: 'var(--text-muted)',
             minWidth: 50, textAlign: 'center', whiteSpace: 'nowrap',
@@ -422,7 +422,7 @@ export default function FindReplacePanel({
               onBlur={blurHandler}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 130, justifyContent: 'flex-end' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 160, flexShrink: 0, justifyContent: 'flex-end' }}>
             <button onClick={doReplace} style={btnStyle} disabled={currentIdx < 0} title="현재 항목 바꾸기">
               바꾸기
             </button>
