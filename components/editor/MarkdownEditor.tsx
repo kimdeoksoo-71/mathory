@@ -7,8 +7,12 @@ import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
+import { linter, lintGutter } from '@codemirror/lint';
+import { search } from '@codemirror/search';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
+import { lintLaTeX } from '../../lib/latex-linter';
+import { checkSpelling } from '../../lib/spellcheck';
 
 interface MarkdownEditorProps {
   initialValue?: string;
@@ -128,6 +132,22 @@ function latexCompletionSource(context: CompletionContext) {
     validFor: /^\\[a-zA-Z{]*$/,
   };
 }
+
+// ── LaTeX 린터 (동기) ──────────────────────────────────
+const latexLinter = linter((view) => {
+  const doc = view.state.doc.toString();
+  return lintLaTeX(doc);
+}, {
+  delay: 500,
+});
+
+// ── 맞춤법 린터 (비동기) ──────────────────────────────────
+const spellLinter = linter(async (view) => {
+  const doc = view.state.doc.toString();
+  return checkSpelling(doc);
+}, {
+  delay: 2000,
+});
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
   ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut }, ref) => {
@@ -334,6 +354,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         icons: false,
       });
 
+      // ── 검색 패널 설정 (상단 표시) ──
+      const searchExtension = search({
+        top: true,
+      });
+
       const state = EditorState.create({
         doc: initialValue,
         extensions: [
@@ -343,6 +368,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           basicSetup,
           markdown(),
           latexAutocompletion,
+          // ── 린트 (LaTeX 오류 + 맞춤법) ──
+          latexLinter,
+          spellLinter,
+          lintGutter(),
+          // ── 검색 패널 (커스텀 설정) ──
+          searchExtension,
           EditorView.lineWrapping,
           latexHighlightPlugin,
           latexHighlightTheme,
@@ -370,7 +401,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               backgroundColor: '#f8f9fa',
               borderRight: '1px solid #e0e0e0',
             },
-            // ── 자동완성 드롭다운 스타일 ──
+
+            // ═══ 자동완성 드롭다운 스타일 ═══
             '.cm-tooltip.cm-tooltip-autocomplete': {
               border: '1px solid #ddd',
               borderRadius: '8px',
@@ -401,6 +433,115 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               opacity: '0.7',
               fontStyle: 'normal',
               fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
+            },
+
+            // ═══ Lint 밑줄 스타일 ═══
+            // LaTeX 오류 (중괄호/begin-end 불일치, 닫힘 누락): 빨간색 물결 밑줄
+            '.cm-lintRange-error': {
+              backgroundImage: 'none !important',
+              textDecoration: 'wavy underline #e53935',
+              textDecorationSkipInk: 'none',
+              textUnderlineOffset: '3px',
+            },
+            // LaTeX 경고 (미등록 명령어): 주황색 물결 밑줄
+            '.cm-lintRange-warning': {
+              backgroundImage: 'none !important',
+              textDecoration: 'wavy underline #f57c00',
+              textDecorationSkipInk: 'none',
+              textUnderlineOffset: '3px',
+            },
+            // 맞춤법 오류: 파란색 점선 밑줄
+            '.cm-lintRange-info': {
+              backgroundImage: 'none !important',
+              textDecoration: 'dotted underline #1976d2',
+              textDecorationSkipInk: 'none',
+              textUnderlineOffset: '3px',
+            },
+
+            // ═══ Lint 거터 마커 ═══
+            '.cm-lint-marker-error::after': {
+              content: '"●"',
+              color: '#e53935',
+              fontSize: '10px',
+            },
+            '.cm-lint-marker-warning::after': {
+              content: '"●"',
+              color: '#f57c00',
+              fontSize: '10px',
+            },
+            '.cm-lint-marker-info::after': {
+              content: '"●"',
+              color: '#1976d2',
+              fontSize: '10px',
+            },
+
+            // ═══ Lint 툴팁 ═══
+            '.cm-tooltip.cm-tooltip-lint': {
+              borderRadius: '6px',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.15)',
+              fontSize: '13px',
+              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
+              maxWidth: '400px',
+            },
+            '.cm-diagnosticText': {
+              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
+            },
+
+            // ═══ 검색 패널 스타일 ═══
+            '.cm-panels': {
+              borderBottom: '1px solid var(--border-light, #E8E4DF)',
+            },
+            '.cm-search.cm-panel': {
+              padding: '8px 12px',
+              backgroundColor: 'var(--bg-card, #FEFDFB)',
+              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
+              fontSize: '13px',
+            },
+            '.cm-search.cm-panel input, .cm-search.cm-panel button': {
+              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
+              fontSize: '13px',
+            },
+            '.cm-search.cm-panel input[type="text"]': {
+              border: '1px solid var(--border-primary, #E0DCD6)',
+              borderRadius: '4px',
+              padding: '4px 8px',
+              outline: 'none',
+              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
+            },
+            '.cm-search.cm-panel input[type="text"]:focus': {
+              borderColor: 'var(--accent-primary, #B8845C)',
+              boxShadow: '0 0 0 2px rgba(184, 132, 92, 0.15)',
+            },
+            '.cm-search.cm-panel button': {
+              border: '1px solid var(--border-primary, #E0DCD6)',
+              borderRadius: '4px',
+              padding: '4px 10px',
+              backgroundColor: 'var(--bg-primary, #FAF9F7)',
+              color: 'var(--text-secondary, #5D5647)',
+              cursor: 'pointer',
+              transition: 'background-color 0.15s ease',
+            },
+            '.cm-search.cm-panel button:hover': {
+              backgroundColor: 'var(--bg-hover, #F0EBE3)',
+            },
+            '.cm-search.cm-panel label': {
+              fontSize: '12px',
+              color: 'var(--text-secondary, #5D5647)',
+            },
+            '.cm-search.cm-panel [name="close"]': {
+              cursor: 'pointer',
+              color: 'var(--text-muted, #9C9585)',
+              fontSize: '16px',
+            },
+            // 검색 매치 하이라이트: 연한 노란색 배경
+            '.cm-searchMatch': {
+              backgroundColor: 'rgba(255, 235, 59, 0.35)',
+              borderRadius: '2px',
+            },
+            // 현재 검색 매치: 진한 노란색 (채도 높임)
+            '.cm-searchMatch.cm-searchMatch-selected': {
+              backgroundColor: 'rgba(255, 193, 7, 0.55)',
+              borderRadius: '2px',
             },
           }),
         ],
