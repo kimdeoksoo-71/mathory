@@ -8,7 +8,7 @@ import { basicSetup } from 'codemirror';
 import { markdown } from '@codemirror/lang-markdown';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
 import { linter, lintGutter } from '@codemirror/lint';
-import { search } from '@codemirror/search';
+// search는 커스텀 FindReplacePanel에서 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
@@ -25,6 +25,9 @@ export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
   getCursorPosition: () => number;
   getContent: () => string;
+  setSelection: (from: number, to: number) => void;
+  replaceRange: (from: number, to: number, text: string) => void;
+  focus: () => void;
 }
 
 // ── 수식 모드 감지 헬퍼 ──────────────────────────────────
@@ -200,6 +203,23 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (!view) return '';
         return view.state.doc.toString();
       },
+      setSelection(from: number, to: number) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({ selection: { anchor: from, head: to } });
+        // 선택 영역이 보이도록 스크롤
+        view.dispatch({
+          effects: EditorView.scrollIntoView(from, { y: 'center' }),
+        });
+      },
+      replaceRange(from: number, to: number, text: string) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({ changes: { from, to, insert: text } });
+      },
+      focus() {
+        viewRef.current?.focus();
+      },
     }));
 
     useEffect(() => {
@@ -354,11 +374,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         icons: false,
       });
 
-      // ── 검색 패널 설정 (상단 표시) ──
-      const searchExtension = search({
-        top: true,
-      });
-
       const state = EditorState.create({
         doc: initialValue,
         extensions: [
@@ -372,8 +387,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           latexLinter,
           spellLinter,
           lintGutter(),
-          // ── 검색 패널 (커스텀 설정) ──
-          searchExtension,
+          // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
           EditorView.lineWrapping,
           latexHighlightPlugin,
           latexHighlightTheme,
@@ -487,62 +501,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
             },
 
-            // ═══ 검색 패널 스타일 ═══
-            '.cm-panels': {
-              borderBottom: '1px solid var(--border-light, #E8E4DF)',
-            },
-            '.cm-search.cm-panel': {
-              padding: '8px 12px',
-              backgroundColor: 'var(--bg-card, #FEFDFB)',
-              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
-              fontSize: '13px',
-            },
-            '.cm-search.cm-panel input, .cm-search.cm-panel button': {
-              fontFamily: "var(--font-ui, '맑은 고딕', sans-serif)",
-              fontSize: '13px',
-            },
-            '.cm-search.cm-panel input[type="text"]': {
-              border: '1px solid var(--border-primary, #E0DCD6)',
-              borderRadius: '4px',
-              padding: '4px 8px',
-              outline: 'none',
-              transition: 'border-color 0.15s ease, box-shadow 0.15s ease',
-            },
-            '.cm-search.cm-panel input[type="text"]:focus': {
-              borderColor: 'var(--accent-primary, #B8845C)',
-              boxShadow: '0 0 0 2px rgba(184, 132, 92, 0.15)',
-            },
-            '.cm-search.cm-panel button': {
-              border: '1px solid var(--border-primary, #E0DCD6)',
-              borderRadius: '4px',
-              padding: '4px 10px',
-              backgroundColor: 'var(--bg-primary, #FAF9F7)',
-              color: 'var(--text-secondary, #5D5647)',
-              cursor: 'pointer',
-              transition: 'background-color 0.15s ease',
-            },
-            '.cm-search.cm-panel button:hover': {
-              backgroundColor: 'var(--bg-hover, #F0EBE3)',
-            },
-            '.cm-search.cm-panel label': {
-              fontSize: '12px',
-              color: 'var(--text-secondary, #5D5647)',
-            },
-            '.cm-search.cm-panel [name="close"]': {
-              cursor: 'pointer',
-              color: 'var(--text-muted, #9C9585)',
-              fontSize: '16px',
-            },
-            // 검색 매치 하이라이트: 연한 노란색 배경
-            '.cm-searchMatch': {
-              backgroundColor: 'rgba(255, 235, 59, 0.35)',
-              borderRadius: '2px',
-            },
-            // 현재 검색 매치: 진한 노란색 (채도 높임)
-            '.cm-searchMatch.cm-searchMatch-selected': {
-              backgroundColor: 'rgba(255, 193, 7, 0.55)',
-              borderRadius: '2px',
-            },
           }),
         ],
       });

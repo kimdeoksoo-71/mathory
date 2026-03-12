@@ -11,6 +11,7 @@ import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../lib/co
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
+import FindReplacePanel from '../editor/FindReplacePanel';
 import ImageUploadButton from '../editor/ImageUploadButton';
 import { uploadImage } from '../../lib/storage';
 import useSnippets from '../../hooks/useSnippets';
@@ -122,6 +123,7 @@ function SortableEditorBlock({
       ref={setNodeRef}
       style={{ ...style, marginBottom: 8 }}
       onClick={onFocus}
+      data-block-id={block.id}
     >
       <div style={{
         display: 'flex', alignItems: 'center', gap: 6,
@@ -387,6 +389,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [origQuestionIds, setOrigQuestionIds] = useState<string[]>([]);
   const [origSolutionIds, setOrigSolutionIds] = useState<string[]>([]);
 
+  // 찾기/바꾸기 패널
+  const [searchOpen, setSearchOpen] = useState(false);
+
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -618,6 +623,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       setActiveBlockId(blocks[0].id);
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Ctrl+F 단축키: 찾기/바꾸기 열기 ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   /* ─── 저장 ─── */
   const handleSave = async () => {
@@ -896,6 +913,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           />
           <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
           <ImageUploadButton onUpload={handleToolbarImageUpload} />
+          <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+          <button
+            onClick={() => setSearchOpen(!searchOpen)}
+            title="찾기 / 바꾸기 (Ctrl+F)"
+            style={{
+              width: 28, height: 28,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)',
+              borderRadius: 6,
+              background: searchOpen ? 'var(--bg-active)' : 'var(--bg-card)',
+              cursor: 'pointer',
+              fontSize: 15,
+              color: 'var(--text-secondary)',
+              transition: 'all 0.15s',
+            }}
+          >
+            🔍
+          </button>
         </div>
       )}
 
@@ -913,6 +948,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             편집
           </div>
+
+          {/* ── 찾기/바꾸기 패널 ── */}
+          <FindReplacePanel
+            open={searchOpen}
+            onClose={() => setSearchOpen(false)}
+            editorRefs={editorRefs}
+            blockIds={currentBlocks.map((b) => b.id)}
+          />
 
           <div className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
