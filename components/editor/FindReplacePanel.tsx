@@ -10,7 +10,7 @@
  * - 바꾸기, 모두 바꾸기
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MarkdownEditorHandle } from './MarkdownEditor';
 
 interface Match {
@@ -23,7 +23,7 @@ interface FindReplacePanelProps {
   open: boolean;
   onClose: () => void;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
-  blockIds: string[]; // 현재 탭의 블록 ID 순서
+  blockIds: string[];
 }
 
 export default function FindReplacePanel({
@@ -33,87 +33,118 @@ export default function FindReplacePanel({
   blockIds,
 }: FindReplacePanelProps) {
   const [query, setQuery] = useState('');
-  const [replace, setReplace] = useState('');
+  const [replaceText, setReplaceText] = useState('');
   const [matches, setMatches] = useState<Match[]>([]);
   const [currentIdx, setCurrentIdx] = useState(-1);
   const [showReplace, setShowReplace] = useState(false);
-
-  // 검색 옵션
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
 
   const findInputRef = useRef<HTMLInputElement>(null);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // blockIds를 ref로 보관 (배열 비교 문제 방지)
+  const blockIdsRef = useRef(blockIds);
+  blockIdsRef.current = blockIds;
 
   // ── 패널 열릴 때 포커스 ──
   useEffect(() => {
     if (open && findInputRef.current) {
-      findInputRef.current.focus();
-      findInputRef.current.select();
+      setTimeout(() => {
+        findInputRef.current?.focus();
+        findInputRef.current?.select();
+      }, 50);
+    }
+    if (!open) {
+      setMatches([]);
+      setCurrentIdx(-1);
     }
   }, [open]);
 
-  // ── 검색 실행 ──
-  const doSearch = useCallback(() => {
-    if (!query) {
-      setMatches([]);
-      setCurrentIdx(-1);
-      return;
-    }
+  // ── 핵심: 검색 함수 (ref 기반, 부작용 없음) ──
+  function runSearch(searchQuery: string): Match[] {
+    if (!searchQuery) return [];
 
+    const ids = blockIdsRef.current;
     const results: Match[] = [];
 
-    for (const blockId of blockIds) {
+    for (const blockId of ids) {
       const handle = editorRefs.current[blockId];
       if (!handle) continue;
 
-      const content = handle.getContent();
+      let content: string;
+      try {
+        content = handle.getContent();
+      } catch {
+        continue;
+      }
       if (!content) continue;
 
       if (useRegex) {
         try {
           const flags = caseSensitive ? 'g' : 'gi';
-          const regex = new RegExp(query, flags);
+          const regex = new RegExp(searchQuery, flags);
           let m: RegExpExecArray | null;
           while ((m = regex.exec(content)) !== null) {
+            if (m[0].length === 0) break;
             if (wholeWord && !isWholeWord(content, m.index, m[0].length)) continue;
             results.push({ blockId, from: m.index, to: m.index + m[0].length });
-            if (m[0].length === 0) break; // 무한 루프 방지
           }
         } catch {
-          // 잘못된 정규식 — 무시
+          // 잘못된 정규식
         }
       } else {
-        const searchIn = caseSensitive ? content : content.toLowerCase();
-        const searchFor = caseSensitive ? query : query.toLowerCase();
+        const haystack = caseSensitive ? content : content.toLowerCase();
+        const needle = caseSensitive ? searchQuery : searchQuery.toLowerCase();
         let pos = 0;
 
-        while (pos < searchIn.length) {
-          const idx = searchIn.indexOf(searchFor, pos);
+        while (pos < haystack.length) {
+          const idx = haystack.indexOf(needle, pos);
           if (idx === -1) break;
-          if (wholeWord && !isWholeWord(content, idx, searchFor.length)) {
+          if (wholeWord && !isWholeWord(content, idx, needle.length)) {
             pos = idx + 1;
             continue;
           }
-          results.push({ blockId, from: idx, to: idx + searchFor.length });
+          results.push({ blockId, from: idx, to: idx + needle.length });
           pos = idx + 1;
         }
       }
     }
 
-    setMatches(results);
-    setCurrentIdx(results.length > 0 ? 0 : -1);
+    return results;
+  }
 
-    // 첫 번째 결과로 이동
-    if (results.length > 0) {
-      goToMatch(results[0]);
+  // ── 검색 트리거 (디바운스) ──
+  function triggerSearch(immediate?: boolean) {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+
+    const doIt = () => {
+      const results = runSearch(query);
+      setMatches(results);
+      if (results.length > 0) {
+        setCurrentIdx(0);
+        navigateToMatch(results[0]);
+      } else {
+        setCurrentIdx(-1);
+      }
+    };
+
+    if (immediate) {
+      doIt();
+    } else {
+      searchTimerRef.current = setTimeout(doIt, 150);
     }
-  }, [query, blockIds, editorRefs, caseSensitive, wholeWord, useRegex]);
+  }
 
-  // ── query나 옵션 변경 시 자동 검색 ──
+  // ── query 변경 시 검색 ──
   useEffect(() => {
-    doSearch();
-  }, [doSearch]);
+    if (!open) return;
+    triggerSearch();
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, [query, caseSensitive, wholeWord, useRegex]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 전체 단어 일치 검사 ──
   function isWholeWord(text: string, pos: number, len: number): boolean {
@@ -123,14 +154,18 @@ export default function FindReplacePanel({
     return !wordChar.test(before) && !wordChar.test(after);
   }
 
-  // ── 특정 매치로 이동 ──
-  function goToMatch(match: Match) {
+  // ── 매치로 이동 ──
+  function navigateToMatch(match: Match) {
     const handle = editorRefs.current[match.blockId];
     if (!handle) return;
-    handle.focus();
-    handle.setSelection(match.from, match.to);
 
-    // 해당 블록 요소를 뷰포트에 스크롤
+    try {
+      handle.focus();
+      handle.setSelection(match.from, match.to);
+    } catch {
+      // 에디터가 마운트 해제된 경우
+    }
+
     const blockEl = document.querySelector(`[data-block-id="${match.blockId}"]`);
     if (blockEl) {
       blockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -142,67 +177,67 @@ export default function FindReplacePanel({
     if (matches.length === 0) return;
     const next = (currentIdx + 1) % matches.length;
     setCurrentIdx(next);
-    goToMatch(matches[next]);
+    navigateToMatch(matches[next]);
   }
 
   function goPrev() {
     if (matches.length === 0) return;
     const prev = (currentIdx - 1 + matches.length) % matches.length;
     setCurrentIdx(prev);
-    goToMatch(matches[prev]);
+    navigateToMatch(matches[prev]);
   }
 
-  // ── 바꾸기 (현재 항목) ──
+  // ── 바꾸기 ──
   function doReplace() {
     if (currentIdx < 0 || currentIdx >= matches.length) return;
-
     const match = matches[currentIdx];
     const handle = editorRefs.current[match.blockId];
     if (!handle) return;
 
-    handle.replaceRange(match.from, match.to, replace);
+    try {
+      handle.replaceRange(match.from, match.to, replaceText);
+    } catch {
+      return;
+    }
 
-    // 매치 목록 갱신 후 다음으로 이동
-    // 짧은 딜레이로 에디터 상태 반영 대기
-    setTimeout(() => {
-      doSearch();
-    }, 50);
+    // 바꾼 후 재검색
+    setTimeout(() => triggerSearch(true), 80);
   }
 
   // ── 모두 바꾸기 ──
   function doReplaceAll() {
     if (matches.length === 0) return;
 
-    // 역순으로 바꿔야 위치가 안 꼬임 (같은 블록 내)
+    // 블록별로 그룹핑 후 역순으로 바꾸기 (위치 꼬임 방지)
     const grouped: Record<string, Match[]> = {};
     for (const m of matches) {
       if (!grouped[m.blockId]) grouped[m.blockId] = [];
       grouped[m.blockId].push(m);
     }
 
-    let totalReplaced = 0;
     for (const blockId of Object.keys(grouped)) {
       const handle = editorRefs.current[blockId];
       if (!handle) continue;
 
-      // 역순 정렬
       const sorted = grouped[blockId].sort((a, b) => b.from - a.from);
       for (const m of sorted) {
-        handle.replaceRange(m.from, m.to, replace);
-        totalReplaced++;
+        try {
+          handle.replaceRange(m.from, m.to, replaceText);
+        } catch {
+          // skip
+        }
       }
     }
 
-    setTimeout(() => {
-      doSearch();
-    }, 50);
+    setTimeout(() => triggerSearch(true), 80);
   }
 
-  // ── 키보드 단축키 ──
+  // ── 키보드 ──
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') {
       onClose();
     } else if (e.key === 'Enter') {
+      e.preventDefault();
       if (e.shiftKey) {
         goPrev();
       } else {
@@ -212,6 +247,8 @@ export default function FindReplacePanel({
   }
 
   if (!open) return null;
+
+  /* ── 스타일 ── */
 
   const btnStyle: React.CSSProperties = {
     border: '1px solid var(--border-primary, #E0DCD6)',
@@ -223,7 +260,7 @@ export default function FindReplacePanel({
     fontSize: 12,
     fontFamily: 'var(--font-ui)',
     transition: 'background 0.15s',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap' as const,
   };
 
   const inputStyle: React.CSSProperties = {
@@ -239,7 +276,7 @@ export default function FindReplacePanel({
     background: 'var(--bg-input, #fff)',
   };
 
-  const checkLabelStyle: React.CSSProperties = {
+  const checkStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
     gap: 3,
@@ -247,7 +284,7 @@ export default function FindReplacePanel({
     color: 'var(--text-secondary)',
     cursor: 'pointer',
     fontFamily: 'var(--font-ui)',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap' as const,
   };
 
   const navBtnStyle: React.CSSProperties = {
@@ -255,11 +292,20 @@ export default function FindReplacePanel({
     background: 'none',
     cursor: matches.length > 0 ? 'pointer' : 'default',
     padding: '2px 6px',
-    fontSize: 16,
+    fontSize: 18,
     color: matches.length > 0 ? 'var(--text-secondary)' : 'var(--text-faint)',
     fontFamily: 'var(--font-ui)',
     borderRadius: 4,
     lineHeight: 1,
+  };
+
+  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.borderColor = 'var(--accent-primary)';
+    e.target.style.boxShadow = '0 0 0 2px rgba(184,132,92,0.15)';
+  };
+  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
+    e.target.style.borderColor = 'var(--border-primary, #E0DCD6)';
+    e.target.style.boxShadow = 'none';
   };
 
   return (
@@ -270,18 +316,16 @@ export default function FindReplacePanel({
         background: 'var(--bg-card)',
         fontFamily: 'var(--font-ui)',
         fontSize: 13,
+        flexShrink: 0,
       }}
       onKeyDown={handleKeyDown}
     >
-      {/* ── 제목 줄 ── */}
+      {/* ── 제목 ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         marginBottom: 8,
       }}>
-        <span style={{
-          fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)',
-          letterSpacing: 0.3,
-        }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: 0.3 }}>
           {showReplace ? '찾기 및 바꾸기' : '찾기'}
         </span>
         <div style={{ display: 'flex', gap: 4 }}>
@@ -298,8 +342,7 @@ export default function FindReplacePanel({
             onClick={onClose}
             style={{
               border: 'none', background: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)', fontSize: 16, padding: '0 4px',
-              lineHeight: 1,
+              color: 'var(--text-muted)', fontSize: 16, padding: '0 4px', lineHeight: 1,
             }}
             title="닫기 (Esc)"
           >
@@ -317,32 +360,20 @@ export default function FindReplacePanel({
           onChange={(e) => setQuery(e.target.value)}
           placeholder="찾기..."
           style={inputStyle}
-          onFocus={(e) => {
-            e.target.style.borderColor = 'var(--accent-primary)';
-            e.target.style.boxShadow = '0 0 0 2px rgba(184,132,92,0.15)';
-          }}
-          onBlur={(e) => {
-            e.target.style.borderColor = 'var(--border-primary)';
-            e.target.style.boxShadow = 'none';
-          }}
+          onFocus={focusHandler}
+          onBlur={blurHandler}
         />
-
-        {/* 현재/전체 카운트 */}
         <span style={{
           fontSize: 12, color: 'var(--text-muted)',
           minWidth: 50, textAlign: 'center', whiteSpace: 'nowrap',
           fontFamily: 'var(--font-ui)',
         }}>
-          {matches.length > 0 ? `${currentIdx + 1} / ${matches.length}` : query ? '0 / 0' : ''}
+          {matches.length > 0
+            ? `${currentIdx + 1} / ${matches.length}`
+            : query ? '0 / 0' : ''}
         </span>
-
-        {/* 이전/다음 */}
-        <button onClick={goPrev} style={navBtnStyle} title="이전 (Shift+Enter)">
-          ‹
-        </button>
-        <button onClick={goNext} style={navBtnStyle} title="다음 (Enter)">
-          ›
-        </button>
+        <button onClick={goPrev} style={navBtnStyle} title="이전 (Shift+Enter)">‹</button>
+        <button onClick={goNext} style={navBtnStyle} title="다음 (Enter)">›</button>
       </div>
 
       {/* ── 바꾸기 행 ── */}
@@ -350,33 +381,17 @@ export default function FindReplacePanel({
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <input
             type="text"
-            value={replace}
-            onChange={(e) => setReplace(e.target.value)}
+            value={replaceText}
+            onChange={(e) => setReplaceText(e.target.value)}
             placeholder="바꾸기..."
             style={inputStyle}
-            onFocus={(e) => {
-              e.target.style.borderColor = 'var(--accent-primary)';
-              e.target.style.boxShadow = '0 0 0 2px rgba(184,132,92,0.15)';
-            }}
-            onBlur={(e) => {
-              e.target.style.borderColor = 'var(--border-primary)';
-              e.target.style.boxShadow = 'none';
-            }}
+            onFocus={focusHandler}
+            onBlur={blurHandler}
           />
-          <button
-            onClick={doReplace}
-            style={btnStyle}
-            disabled={currentIdx < 0}
-            title="현재 항목 바꾸기"
-          >
+          <button onClick={doReplace} style={btnStyle} disabled={currentIdx < 0} title="현재 항목 바꾸기">
             바꾸기
           </button>
-          <button
-            onClick={doReplaceAll}
-            style={btnStyle}
-            disabled={matches.length === 0}
-            title="모두 바꾸기"
-          >
+          <button onClick={doReplaceAll} style={btnStyle} disabled={matches.length === 0} title="모두 바꾸기">
             모두 바꾸기
           </button>
         </div>
@@ -384,31 +399,16 @@ export default function FindReplacePanel({
 
       {/* ── 옵션 행 ── */}
       <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-        <label style={checkLabelStyle}>
-          <input
-            type="checkbox"
-            checked={caseSensitive}
-            onChange={(e) => setCaseSensitive(e.target.checked)}
-            style={{ width: 13, height: 13, margin: 0 }}
-          />
+        <label style={checkStyle}>
+          <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
           대소문자 일치
         </label>
-        <label style={checkLabelStyle}>
-          <input
-            type="checkbox"
-            checked={wholeWord}
-            onChange={(e) => setWholeWord(e.target.checked)}
-            style={{ width: 13, height: 13, margin: 0 }}
-          />
+        <label style={checkStyle}>
+          <input type="checkbox" checked={wholeWord} onChange={(e) => setWholeWord(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
           전체 일치
         </label>
-        <label style={checkLabelStyle}>
-          <input
-            type="checkbox"
-            checked={useRegex}
-            onChange={(e) => setUseRegex(e.target.checked)}
-            style={{ width: 13, height: 13, margin: 0 }}
-          />
+        <label style={checkStyle}>
+          <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
           정규식
         </label>
       </div>
