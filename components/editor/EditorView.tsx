@@ -231,6 +231,7 @@ function SortableEditorBlock({
             <ImageBlockContent
               rawText={block.raw_text}
               onUpload={(file) => onImageUpload(file, block.id)}
+              onChange={onChange}
             />
           )}
 
@@ -249,13 +250,36 @@ function SortableEditorBlock({
 /* ═══ 그림 블록 내용 ═══ */
 
 function ImageBlockContent({
-  rawText, onUpload,
+  rawText, onUpload, onChange,
 }: {
   rawText: string;
   onUpload: (file: File) => void;
+  onChange: (value: string) => void;
 }) {
   const imgMatch = rawText.match(/src="([^"]+)"/);
   const imgUrl = imgMatch ? imgMatch[1] : null;
+
+  // width 파싱
+  const widthMatch = rawText.match(/width="(\d+)"/);
+  const currentWidth = widthMatch ? parseInt(widthMatch[1], 10) : 400;
+
+  const [hovered, setHovered] = useState(false);
+  const [sliderValue, setSliderValue] = useState(currentWidth);
+
+  // rawText가 외부에서 바뀌면 슬라이더 동기화
+  useEffect(() => {
+    const wm = rawText.match(/width="(\d+)"/);
+    if (wm) setSliderValue(parseInt(wm[1], 10));
+  }, [rawText]);
+
+  const handleSliderChange = (val: number) => {
+    setSliderValue(val);
+    // raw_text의 width="XXX" 값을 교체
+    if (widthMatch) {
+      const updated = rawText.replace(/width="\d+"/, `width="${val}"`);
+      onChange(updated);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -265,12 +289,56 @@ function ImageBlockContent({
   return (
     <div style={{ padding: 16, textAlign: 'center', minHeight: 120 }}>
       {imgUrl ? (
-        <div>
+        <div
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+          style={{ display: 'inline-block', position: 'relative' }}
+        >
           <img
             src={imgUrl}
             alt="블록 이미지"
-            style={{ maxWidth: 400, width: '100%', borderRadius: 8, marginBottom: 12 }}
+            style={{
+              width: sliderValue,
+              maxWidth: '100%',
+              borderRadius: 8,
+              marginBottom: 4,
+              display: 'block',
+              outline: hovered ? '2px solid var(--accent-primary, #B8845C)' : 'none',
+              outlineOffset: 2,
+              transition: 'outline 0.15s',
+            }}
           />
+
+          {/* 호버 시 크기조절 슬라이더 */}
+          {hovered && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              gap: 8, padding: '6px 12px', marginBottom: 8,
+              background: 'var(--bg-card, #fff)',
+              border: '1px solid var(--border-primary, #ddd)',
+              borderRadius: 8,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+            }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 36 }}>
+                {sliderValue}px
+              </span>
+              <input
+                type="range"
+                min={50}
+                max={800}
+                step={10}
+                value={sliderValue}
+                onChange={(e) => handleSliderChange(Number(e.target.value))}
+                onMouseDown={(e) => e.stopPropagation()}
+                style={{
+                  width: 150,
+                  accentColor: 'var(--accent-primary, #B8845C)',
+                  cursor: 'pointer',
+                }}
+              />
+            </div>
+          )}
+
           <div>
             <label style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,

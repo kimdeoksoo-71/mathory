@@ -12,6 +12,8 @@ import {
   moveProblemToFolder,
   getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
   getProblemWithBlocks,
+  duplicateProblem, moveToTrash, emptyTrash,
+  TRASH_FOLDER_ID,
 } from '../../lib/firestore';
 
 import Sidebar from '../layout/Sidebar';
@@ -83,7 +85,8 @@ export default function AppShell() {
         listRecentProblems(10),
       ]);
       setAllProblems(problems);
-      setRecentProblems(recent);
+      // 최근 문항에서 휴지통 문항 제외
+      setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
       if (user) {
         const userFolders = await listFolders(user.uid);
@@ -92,6 +95,8 @@ export default function AppShell() {
         for (const f of userFolders) {
           counts[f.id] = problems.filter((p) => p.folder_id === f.id).length;
         }
+        // 휴지통 카운트
+        counts[TRASH_FOLDER_ID] = problems.filter((p) => p.folder_id === TRASH_FOLDER_ID).length;
         setFolderCounts(counts);
       }
     } catch (error) {
@@ -137,6 +142,9 @@ export default function AppShell() {
   };
 
   const handleSelectFolder = (folder: Folder) => { setView({ type: 'folder', folder }); };
+  const handleSelectTrash = () => {
+    setView({ type: 'folder', folder: { id: TRASH_FOLDER_ID, name: '휴지통', user_id: '', order: 99999 } });
+  };
   const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); };
   const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
 
@@ -218,12 +226,45 @@ export default function AppShell() {
         }
         break;
       }
+      case 'duplicate': {
+        try {
+          const newId = await duplicateProblem(problem.id);
+          await loadData();
+          setView({ type: 'problem', problemId: newId });
+        } catch (error) {
+          console.error('사본 생성 에러:', error);
+          alert('사본 생성에 실패했습니다.');
+        }
+        break;
+      }
+      case 'trash': {
+        try {
+          await moveToTrash(problem.id);
+          if (view.type === 'problem' && view.problemId === problem.id) {
+            setView({ type: 'home' });
+          }
+          await loadData();
+        } catch (error) {
+          console.error('휴지통 이동 에러:', error);
+        }
+        break;
+      }
       case 'delete': {
-        if (confirm(`"${problem.title}"을(를) 삭제하시겠습니까?`)) {
+        // 휴지통에서 영구 삭제 (하위 호환)
+        if (confirm(`"${problem.title}"을(를) 영구 삭제하시겠습니까?`)) {
           const { deleteProblem } = await import('../../lib/firestore');
           await deleteProblem(problem.id);
           setView({ type: 'home' });
           await loadData();
+        }
+        break;
+      }
+      case 'restore': {
+        try {
+          await moveProblemToFolder(problem.id, null);
+          await loadData();
+        } catch (error) {
+          console.error('복원 에러:', error);
         }
         break;
       }
@@ -252,6 +293,24 @@ export default function AppShell() {
           alert('다운로드에 실패했습니다.');
         }
         break;
+      }
+    }
+  };
+
+  const handleEmptyTrash = async () => {
+    const trashCount = allProblems.filter((p) => p.folder_id === TRASH_FOLDER_ID).length;
+    if (trashCount === 0) {
+      alert('휴지통이 비어 있습니다.');
+      return;
+    }
+    if (confirm(`휴지통의 ${trashCount}개 문항을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+      try {
+        await emptyTrash();
+        setView({ type: 'home' });
+        await loadData();
+      } catch (error) {
+        console.error('휴지통 비우기 에러:', error);
+        alert('휴지통 비우기에 실패했습니다.');
       }
     }
   };
@@ -291,6 +350,8 @@ export default function AppShell() {
         onProblemAction={handleProblemAction}
         onLogin={handleLogin}
         onLogout={handleLogout}
+        onSelectTrash={handleSelectTrash}
+        trashCount={folderCounts[TRASH_FOLDER_ID] ?? 0}
       />
 
       <main style={{
@@ -304,15 +365,17 @@ export default function AppShell() {
         {view.type === 'home' && <HomeView />}
         {view.type === 'folder' && (
           <FolderView folder={view.folder} problems={allProblems}
-            onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction} />
+            onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
+            onEmptyTrash={handleEmptyTrash} />
         )}
         {view.type === 'problem' && (
           <ProblemView
             problemId={view.problemId}
             onRename={(p) => handleProblemAction('rename', p)}
             onEdit={(p) => handleEditProblem(p)}
+            onDuplicate={(p) => handleProblemAction('duplicate', p)}
             onMoveFolder={(p) => handleProblemAction('move', p)}
-            onDelete={(p) => handleProblemAction('delete', p)}
+            onTrash={(p) => handleProblemAction('trash', p)}
           />
         )}
         {view.type === 'editor' && (

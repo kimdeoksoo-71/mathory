@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useEffect } from 'react';
-import { IconRename, IconEdit, IconFolderMove, IconTrash } from '../ui/Icons';
+import { IconRename, IconEdit, IconFolderMove, IconTrash, IconCopy } from '../ui/Icons';
 
 // 다운로드 아이콘
 function IconDownload({ size = 14 }: { size?: number }) {
@@ -31,11 +31,12 @@ interface ContextMenuProps {
 
 const DEFAULT_ITEMS: ContextMenuAction[] = [
   { label: '편집', icon: <IconEdit />, action: 'edit' },
+  { label: '사본 만들기', icon: <IconCopy />, action: 'duplicate' },
   { label: '이름 변경', icon: <IconRename />, action: 'rename' },
   { label: '폴더 변경', icon: <IconFolderMove />, action: 'move' },
   { label: 'MD 다운로드', icon: <IconDownload />, action: 'download_md' },
   { label: 'divider', action: 'divider' },
-  { label: '삭제', icon: <IconTrash />, action: 'delete', danger: true },
+  { label: '휴지통', icon: <IconTrash />, action: 'trash', danger: true },
 ];
 
 export default function ContextMenu({ x, y, onClose, onAction, items = DEFAULT_ITEMS }: ContextMenuProps) {

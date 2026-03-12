@@ -5,7 +5,7 @@ import { ProblemWithBlocks } from '../../types/problem';
 import { getProblemWithBlocks } from '../../lib/firestore';
 import { DIFFICULTIES } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
-import { IconDots, IconRename, IconEdit, IconFolderMove, IconTrash } from '../ui/Icons';
+import { IconDots, IconRename, IconEdit, IconFolderMove, IconTrash, IconCopy } from '../ui/Icons';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -30,11 +30,12 @@ interface ProblemViewProps {
   problemId: string;
   onRename?: (problem: ProblemWithBlocks) => void;
   onEdit?: (problem: ProblemWithBlocks) => void;
+  onDuplicate?: (problem: ProblemWithBlocks) => void;
   onMoveFolder?: (problem: ProblemWithBlocks) => void;
-  onDelete?: (problem: ProblemWithBlocks) => void;
+  onTrash?: (problem: ProblemWithBlocks) => void;
 }
 
-export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder, onDelete }: ProblemViewProps) {
+export default function ProblemView({ problemId, onRename, onEdit, onDuplicate, onMoveFolder, onTrash }: ProblemViewProps) {
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
   const [showSolution, setShowSolution] = useState(false);
@@ -163,11 +164,12 @@ export default function ProblemView({ problemId, onRename, onEdit, onMoveFolder,
 
   const menuItems = [
     { label: '편집', icon: <IconEdit />, action: () => { setMenuOpen(false); onEdit?.(problem); } },
+    { label: '사본 만들기', icon: <IconCopy />, action: () => { setMenuOpen(false); onDuplicate?.(problem); } },
     { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },
     { label: '폴더 변경', icon: <IconFolderMove />, action: () => { setMenuOpen(false); onMoveFolder?.(problem); } },
     { label: 'MD 다운로드', icon: <IconDownload />, action: handleDownloadMarkdown },
     { label: 'divider' },
-    { label: '삭제', icon: <IconTrash />, action: () => { setMenuOpen(false); onDelete?.(problem); }, danger: true },
+    { label: '휴지통', icon: <IconTrash />, action: () => { setMenuOpen(false); onTrash?.(problem); }, danger: true },
   ];
 
   return (

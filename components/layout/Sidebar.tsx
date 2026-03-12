@@ -6,8 +6,9 @@ import { Problem, Folder } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
-  IconUser, IconDots, IconChevron, IconGoogle, IconGrip,
+  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash,
 } from '../ui/Icons';
+import { TRASH_FOLDER_ID } from '../../lib/firestore';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -405,6 +406,8 @@ export interface SidebarProps {
   onProblemAction: (action: string, problem: Problem) => void;
   onLogin: () => void;
   onLogout: () => void;
+  onSelectTrash: () => void;
+  trashCount: number;
 }
 
 export default function Sidebar({
@@ -427,6 +430,8 @@ export default function Sidebar({
   onProblemAction,
   onLogin,
   onLogout,
+  onSelectTrash,
+  trashCount,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [recentOpen, setRecentOpen] = useState(true);
@@ -615,6 +620,55 @@ export default function Sidebar({
                 />
               ))}
             </SortableContext>
+          )}
+
+          {/* 휴지통 (항상 맨 아래, 드래그 불가) */}
+          {!collapsed && foldersOpen && (
+            <button
+              onClick={onSelectTrash}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '8px 12px',
+                paddingLeft: 34,
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+                background: activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                color: activeFolderId === TRASH_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontSize: 13.5,
+                fontWeight: activeFolderId === TRASH_FOLDER_ID ? 600 : 400,
+                fontFamily: 'var(--font-ui)',
+                transition: 'all 0.15s',
+                marginTop: 4,
+              }}
+              onMouseEnter={(e) => {
+                if (activeFolderId !== TRASH_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                if (activeFolderId !== TRASH_FOLDER_ID) e.currentTarget.style.background = 'transparent';
+              }}
+            >
+              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === TRASH_FOLDER_ID ? 1 : 0.75 }}>
+                <IconTrash size={16} />
+              </span>
+              <span style={{
+                flex: 1, textAlign: 'left', overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                휴지통
+              </span>
+              {trashCount > 0 && (
+                <span style={{
+                  fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)',
+                  borderRadius: 10, padding: '1px 7px',
+                }}>
+                  {trashCount}
+                </span>
+              )}
+            </button>
           )}
         </div>
 

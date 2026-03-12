@@ -16,6 +16,9 @@ import {
 import { db } from './firebase';
 import { Problem, Block, ProblemWithBlocks, Folder } from '../types/problem';
 
+// ===== 휴지통 상수 =====
+export const TRASH_FOLDER_ID = '__trash__';
+
 // ===== Problem CRUD =====
 
 export async function createProblem(data: Omit<Problem, 'id' | 'created_at' | 'updated_at'>): Promise<string> {
@@ -250,4 +253,61 @@ export async function getFolderProblemCount(folderId: string): Promise<number> {
   const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));
   const snapshot = await getDocs(q);
   return snapshot.size;
+}
+
+// ===== Phase 14: 문제 복제 =====
+export async function duplicateProblem(problemId: string): Promise<string> {
+  const original = await getProblemWithBlocks(problemId);
+  if (!original) throw new Error('원본 문제를 찾을 수 없습니다.');
+
+  // 새 문제 생성 (제목에 "의 사본" 추가)
+  const newId = await createProblem({
+    title: `${original.title}의 사본`,
+    year: original.year,
+    exam_type: original.exam_type,
+    category: original.category,
+    difficulty: original.difficulty,
+    tags: [...original.tags],
+    answer: original.answer,
+    source: original.source,
+    subject: original.subject,
+    folder_id: original.folder_id,
+  });
+
+  // 블록 복제
+  for (const block of original.question_blocks) {
+    await saveQuestionBlock(newId, {
+      order: block.order,
+      type: block.type,
+      raw_text: block.raw_text,
+      title: block.title,
+    });
+  }
+  for (const block of original.solution_blocks) {
+    await saveSolutionBlock(newId, {
+      order: block.order,
+      type: block.type,
+      raw_text: block.raw_text,
+      step_label: block.step_label,
+    });
+  }
+
+  return newId;
+}
+
+// ===== Phase 14: 휴지통 =====
+export async function moveToTrash(problemId: string): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    folder_id: TRASH_FOLDER_ID,
+    updated_at: serverTimestamp(),
+  });
+}
+
+export async function emptyTrash(): Promise<void> {
+  const q = query(collection(db, 'problems'), where('folder_id', '==', TRASH_FOLDER_ID));
+  const snapshot = await getDocs(q);
+
+  for (const docSnap of snapshot.docs) {
+    await deleteProblem(docSnap.id);
+  }
 }

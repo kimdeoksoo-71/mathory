@@ -156,6 +156,23 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     }
   };
 
+  // ── 이미지 크기 조절 → raw_text의 width 업데이트 ──
+  const handleImageResize = (src: string, newWidth: number) => {
+    const updatedBlocks = blocks.map((block) => {
+      if (!block.raw_text.includes(src)) return block;
+      // <img ... width="XXX" ... /> 에서 width 값 교체
+      const updatedText = block.raw_text.replace(
+        new RegExp(`(<img[^>]*src=["']${src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*\\bwidth=["'])\\d+(["'][^>]*\\/?>)`, 'g'),
+        `$1${newWidth}$2`
+      );
+      if (updatedText !== block.raw_text) {
+        return { ...block, raw_text: updatedText };
+      }
+      return block;
+    });
+    onChange(updatedBlocks);
+  };
+
   const setEditorRef = (blockId: string, ref: MarkdownEditorHandle | null) => {
     editorRefs.current[blockId] = ref;
   };
@@ -245,7 +262,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
 
         {/* 오른쪽: 미리보기 */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <EditorPreview content={previewContent} />
+          <EditorPreview content={previewContent} onImageResize={handleImageResize} />
         </div>
       </div>
 
