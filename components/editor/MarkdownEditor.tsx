@@ -12,7 +12,6 @@ import { linter, lintGutter } from '@codemirror/lint';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
-import { checkSpelling } from '../../lib/spellcheck';
 
 interface MarkdownEditorProps {
   initialValue?: string;
@@ -142,14 +141,6 @@ const latexLinter = linter((view) => {
   return lintLaTeX(doc);
 }, {
   delay: 500,
-});
-
-// ── 맞춤법 린터 (비동기) ──────────────────────────────────
-const spellLinter = linter(async (view) => {
-  const doc = view.state.doc.toString();
-  return checkSpelling(doc);
-}, {
-  delay: 2000,
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
@@ -383,10 +374,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           basicSetup,
           markdown(),
           latexAutocompletion,
-          // ── 린트 (LaTeX 오류 + 맞춤법) ──
+          // ── 린트 (LaTeX 오류) ──
           latexLinter,
-          spellLinter,
           lintGutter(),
+          // ── 브라우저 내장 맞춤법 검사 ──
+          EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'ko' }),
           // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
           EditorView.lineWrapping,
           latexHighlightPlugin,

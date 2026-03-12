@@ -116,7 +116,8 @@ export default function FindReplacePanel({
   }
 
   // ── 검색 트리거 (디바운스) ──
-  function triggerSearch(immediate?: boolean) {
+  // navigate=true일 때만 에디터로 포커스 이동 (사용자가 ‹ › Enter 클릭 시)
+  function triggerSearch(navigate?: boolean) {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
 
     const doIt = () => {
@@ -124,23 +125,25 @@ export default function FindReplacePanel({
       setMatches(results);
       if (results.length > 0) {
         setCurrentIdx(0);
-        navigateToMatch(results[0]);
+        if (navigate) {
+          navigateToMatch(results[0]);
+        }
       } else {
         setCurrentIdx(-1);
       }
     };
 
-    if (immediate) {
+    if (navigate) {
       doIt();
     } else {
-      searchTimerRef.current = setTimeout(doIt, 150);
+      searchTimerRef.current = setTimeout(doIt, 200);
     }
   }
 
-  // ── query 변경 시 검색 ──
+  // ── query 변경 시 검색 (포커스 이동 없이 매치만 갱신) ──
   useEffect(() => {
     if (!open) return;
-    triggerSearch();
+    triggerSearch(false);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
@@ -200,8 +203,8 @@ export default function FindReplacePanel({
       return;
     }
 
-    // 바꾼 후 재검색
-    setTimeout(() => triggerSearch(true), 80);
+    // 바꾼 후 재검색 (포커스 이동 없이)
+    setTimeout(() => triggerSearch(false), 80);
   }
 
   // ── 모두 바꾸기 ──
@@ -229,7 +232,7 @@ export default function FindReplacePanel({
       }
     }
 
-    setTimeout(() => triggerSearch(true), 80);
+    setTimeout(() => triggerSearch(false), 80);
   }
 
   // ── 키보드 ──
@@ -353,47 +356,55 @@ export default function FindReplacePanel({
 
       {/* ── 찾기 행 ── */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showReplace ? 6 : 0 }}>
-        <input
-          ref={findInputRef}
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="찾기..."
-          style={inputStyle}
-          onFocus={focusHandler}
-          onBlur={blurHandler}
-        />
-        <span style={{
-          fontSize: 12, color: 'var(--text-muted)',
-          minWidth: 50, textAlign: 'center', whiteSpace: 'nowrap',
-          fontFamily: 'var(--font-ui)',
-        }}>
-          {matches.length > 0
-            ? `${currentIdx + 1} / ${matches.length}`
-            : query ? '0 / 0' : ''}
-        </span>
-        <button onClick={goPrev} style={navBtnStyle} title="이전 (Shift+Enter)">‹</button>
-        <button onClick={goNext} style={navBtnStyle} title="다음 (Enter)">›</button>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <input
+            ref={findInputRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="찾기..."
+            style={{ ...inputStyle, width: '100%' }}
+            onFocus={focusHandler}
+            onBlur={blurHandler}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 130, justifyContent: 'flex-end' }}>
+          <span style={{
+            fontSize: 12, color: 'var(--text-muted)',
+            minWidth: 50, textAlign: 'center', whiteSpace: 'nowrap',
+            fontFamily: 'var(--font-ui)',
+          }}>
+            {matches.length > 0
+              ? `${currentIdx + 1} / ${matches.length}`
+              : query ? '0 / 0' : ''}
+          </span>
+          <button onClick={goPrev} style={navBtnStyle} title="이전 (Shift+Enter)">‹</button>
+          <button onClick={goNext} style={navBtnStyle} title="다음 (Enter)">›</button>
+        </div>
       </div>
 
       {/* ── 바꾸기 행 ── */}
       {showReplace && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <input
-            type="text"
-            value={replaceText}
-            onChange={(e) => setReplaceText(e.target.value)}
-            placeholder="바꾸기..."
-            style={inputStyle}
-            onFocus={focusHandler}
-            onBlur={blurHandler}
-          />
-          <button onClick={doReplace} style={btnStyle} disabled={currentIdx < 0} title="현재 항목 바꾸기">
-            바꾸기
-          </button>
-          <button onClick={doReplaceAll} style={btnStyle} disabled={matches.length === 0} title="모두 바꾸기">
-            모두 바꾸기
-          </button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <input
+              type="text"
+              value={replaceText}
+              onChange={(e) => setReplaceText(e.target.value)}
+              placeholder="바꾸기..."
+              style={{ ...inputStyle, width: '100%' }}
+              onFocus={focusHandler}
+              onBlur={blurHandler}
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 130, justifyContent: 'flex-end' }}>
+            <button onClick={doReplace} style={btnStyle} disabled={currentIdx < 0} title="현재 항목 바꾸기">
+              바꾸기
+            </button>
+            <button onClick={doReplaceAll} style={btnStyle} disabled={matches.length === 0} title="모두 바꾸기">
+              모두 바꾸기
+            </button>
+          </div>
         </div>
       )}
 
