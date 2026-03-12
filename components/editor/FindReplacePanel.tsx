@@ -57,10 +57,17 @@ export default function FindReplacePanel({
       }, 50);
     }
     if (!open) {
+      // 패널 닫힐 때 모든 선택 해제
+      for (const id of blockIdsRef.current) {
+        const handle = editorRefs.current[id];
+        if (handle) {
+          try { handle.clearSelection(); } catch { /* skip */ }
+        }
+      }
       setMatches([]);
       setCurrentIdx(-1);
     }
-  }, [open]);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 핵심: 검색 함수 (ref 기반, 부작용 없음) ──
   function runSearch(searchQuery: string): Match[] {
@@ -162,16 +169,34 @@ export default function FindReplacePanel({
     const handle = editorRefs.current[match.blockId];
     if (!handle) return;
 
-    try {
-      handle.focus();
-      handle.setSelection(match.from, match.to);
-    } catch {
-      // 에디터가 마운트 해제된 경우
+    // 1) 다른 블록의 선택 해제 (배경색 잔류 방지)
+    for (const id of blockIdsRef.current) {
+      if (id !== match.blockId) {
+        const other = editorRefs.current[id];
+        if (other) {
+          try { other.clearSelection(); } catch { /* skip */ }
+        }
+      }
     }
 
+    // 2) 대상 블록에 선택 적용
+    try {
+      handle.setSelection(match.from, match.to);
+    } catch {
+      return;
+    }
+
+    // 3) 블록을 편집 스크롤 영역 내에서만 스크롤
     const blockEl = document.querySelector(`[data-block-id="${match.blockId}"]`);
     if (blockEl) {
-      blockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      const scroller = blockEl.closest('.scaled-editor');
+      if (scroller) {
+        const blockRect = blockEl.getBoundingClientRect();
+        const scrollRect = scroller.getBoundingClientRect();
+        if (blockRect.top < scrollRect.top || blockRect.bottom > scrollRect.bottom) {
+          blockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
     }
   }
 

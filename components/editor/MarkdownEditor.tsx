@@ -25,6 +25,7 @@ export interface MarkdownEditorHandle {
   getCursorPosition: () => number;
   getContent: () => string;
   setSelection: (from: number, to: number) => void;
+  clearSelection: () => void;
   replaceRange: (from: number, to: number, text: string) => void;
   focus: () => void;
 }
@@ -197,11 +198,17 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       setSelection(from: number, to: number) {
         const view = viewRef.current;
         if (!view) return;
-        view.dispatch({ selection: { anchor: from, head: to } });
-        // 선택 영역이 보이도록 스크롤
         view.dispatch({
-          effects: EditorView.scrollIntoView(from, { y: 'center' }),
+          selection: { anchor: from, head: to },
+          scrollIntoView: true,
         });
+      },
+      clearSelection() {
+        const view = viewRef.current;
+        if (!view) return;
+        // 커서를 현재 위치에 놓되, 선택 영역은 해제
+        const pos = view.state.selection.main.head;
+        view.dispatch({ selection: { anchor: pos } });
       },
       replaceRange(from: number, to: number, text: string) {
         const view = viewRef.current;
@@ -377,8 +384,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           // ── 린트 (LaTeX 오류) ──
           latexLinter,
           lintGutter(),
-          // ── 브라우저 내장 맞춤법 검사 ──
-          EditorView.contentAttributes.of({ spellcheck: 'true', lang: 'ko' }),
+          // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
           // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
           EditorView.lineWrapping,
           latexHighlightPlugin,
@@ -456,13 +462,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               textDecorationSkipInk: 'none',
               textUnderlineOffset: '3px',
             },
-            // 맞춤법 오류: 파란색 점선 밑줄
-            '.cm-lintRange-info': {
-              backgroundImage: 'none !important',
-              textDecoration: 'dotted underline #1976d2',
-              textDecorationSkipInk: 'none',
-              textUnderlineOffset: '3px',
-            },
 
             // ═══ Lint 거터 마커 ═══
             '.cm-lint-marker-error::after': {
@@ -473,11 +472,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-lint-marker-warning::after': {
               content: '"●"',
               color: '#f57c00',
-              fontSize: '10px',
-            },
-            '.cm-lint-marker-info::after': {
-              content: '"●"',
-              color: '#1976d2',
               fontSize: '10px',
             },
 
