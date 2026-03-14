@@ -281,10 +281,13 @@ export default function EditorPreview({
     const el = contentRef.current;
     if (!el) return;
 
-    // 이전 하이라이트 제거
+    // 이전 하이라이트 제거 — 모든 스타일을 원래대로 복원
     el.querySelectorAll('.preview-line-active').forEach((child) => {
-      (child as HTMLElement).style.borderLeft = '3px solid transparent';
-      (child as HTMLElement).style.backgroundColor = 'transparent';
+      (child as HTMLElement).style.borderLeft = '';
+      (child as HTMLElement).style.backgroundColor = '';
+      (child as HTMLElement).style.paddingLeft = '';
+      (child as HTMLElement).style.borderRadius = '';
+      (child as HTMLElement).style.transition = '';
       child.classList.remove('preview-line-active');
     });
 
@@ -303,6 +306,16 @@ export default function EditorPreview({
         target.style.paddingLeft = '8px';
         target.style.borderRadius = '4px';
         target.style.transition = 'all 0.15s ease';
+
+        // 미리보기 창 세로 중앙으로 스크롤
+        const container = containerRef.current;
+        if (container) {
+          const containerRect = container.getBoundingClientRect();
+          const targetRect = target.getBoundingClientRect();
+          const offset = targetRect.top - containerRect.top + container.scrollTop;
+          const center = offset - containerRect.height / 2 + targetRect.height / 2;
+          container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+        }
         break;
       }
     }

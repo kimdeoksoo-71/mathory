@@ -829,18 +829,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ref.setSelection(matchFrom, matchTo);
       ref.focus();
 
-      // 편집 패널에서 블록으로 스크롤
-      if (editorPanelRef.current) {
-        const el = editorPanelRef.current.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement;
-        if (el) {
-          const container = editorPanelRef.current;
+      // 편집 패널에서 선택된 텍스트를 세로 중앙으로 스크롤
+      requestAnimationFrame(() => {
+        const coords = ref.getCursorCoords();
+        const container = editorPanelRef.current;
+        if (coords && container) {
           const containerRect = container.getBoundingClientRect();
-          const elRect = el.getBoundingClientRect();
-          const offset = elRect.top - containerRect.top + container.scrollTop;
-          const center = offset - containerRect.height / 2 + elRect.height / 2;
+          const cursorRelativeTop = coords.top - containerRect.top + container.scrollTop;
+          const center = cursorRelativeTop - containerRect.height / 2;
           container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
         }
-      }
+      });
     }, 100);
   }, [setCurrentBlocks]);
 
@@ -1165,7 +1164,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             blockIds={currentBlocks.map((b) => b.id)}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '50vh', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => (
@@ -1240,7 +1239,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: 20, background: 'var(--bg-card)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 50vh 20px', background: 'var(--bg-card)', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               return (

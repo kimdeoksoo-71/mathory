@@ -30,6 +30,8 @@ export interface MarkdownEditorHandle {
   clearSelection: () => void;
   replaceRange: (from: number, to: number, text: string) => void;
   focus: () => void;
+  /** 커서 위치의 화면 좌표 반환 */
+  getCursorCoords: () => { top: number; left: number } | null;
 }
 
 // ── 수식 모드 감지 헬퍼 ──────────────────────────────────
@@ -214,7 +216,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (!view) return;
         view.dispatch({
           selection: { anchor: from, head: to },
-          scrollIntoView: true,
         });
       },
       clearSelection() {
@@ -231,6 +232,14 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       focus() {
         viewRef.current?.focus();
+      },
+      getCursorCoords() {
+        const view = viewRef.current;
+        if (!view) return null;
+        const pos = view.state.selection.main.head;
+        const coords = view.coordsAtPos(pos);
+        if (!coords) return null;
+        return { top: coords.top, left: coords.left };
       },
     }));
 
