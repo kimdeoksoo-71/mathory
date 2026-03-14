@@ -86,7 +86,7 @@ function SortableEditorBlock({
   onFocus, onChange, onTypeChange, onTitleChange,
   onDelete, onToggleCollapse,
   onImageUpload, problemId,
-  onSnippetShortcut,
+  onSnippetShortcut, onCursorActivity,
 }: {
   block: LocalBlock;
   index: number;
@@ -102,6 +102,7 @@ function SortableEditorBlock({
   onImageUpload: (file: File, blockId: string) => void;
   problemId: string;
   onSnippetShortcut?: (index: number) => void;
+  onCursorActivity?: (info: { line: number; offset: number }) => void;
 }) {
   const {
     attributes, listeners, setNodeRef,
@@ -224,6 +225,7 @@ function SortableEditorBlock({
               onChange={onChange}
               autoHeight
               onSnippetShortcut={onSnippetShortcut}
+              onCursorActivity={onCursorActivity}
             />
           )}
 
@@ -460,8 +462,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
 
+  // 미리보기 활성 행번호
+  const [activeSourceLine, setActiveSourceLine] = useState<number>(-1);
+
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
+  const editorPanelRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -600,6 +606,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
     if (!activeBlock) return;
 
+    // 원본 블록의 CodeMirror 내용을 즉시 갱신 (before만 남김)
+    ref.setContent(before);
+
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
       order: activeBlock.order + 1,
@@ -703,6 +712,137 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);
+
+  /* ─── 커서 활동 → 행번호 전달 ─── */
+  const handleCursorActivity = useCallback((info: { line: number; offset: number }) => {
+    setActiveSourceLine(info.line);
+  }, []);
+
+  /* ─── 미리보기 블록 클릭 → 편집창 블록으로 이동 ─── */
+  const handlePreviewBlockClick = useCallback((blockId: string) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
+    );
+    setActiveBlockId(blockId);
+
+    setTimeout(() => {
+      if (!editorPanelRef.current) return;
+      const el = editorPanelRef.current.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement;
+      if (el) {
+        const container = editorPanelRef.current;
+        const containerRect = container.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const offset = elRect.top - containerRect.top + container.scrollTop;
+        const center = offset - containerRect.height / 2 + elRect.height / 2;
+        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+      }
+    }, 60);
+  }, [setCurrentBlocks]);
+
+  /* ─── 미리보기 클릭 → 편집창에서 해당 텍스트/수식 찾기 ─── */
+  const handlePreviewClickSource = useCallback((blockId: string, info: { sourceLine: number; text: string; isMath: boolean }) => {
+    // 블록 활성화 + 펼치기
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
+    );
+    setActiveBlockId(blockId);
+
+    // 렌더 후 에디터에서 검색
+    setTimeout(() => {
+      const ref = editorRefs.current[blockId];
+      if (!ref) return;
+
+      const content = ref.getContent();
+      const lines = content.split('\n');
+
+      // 1차: sourceLine으로 행 위치 특정 (1-indexed → 0-indexed)
+      const lineIdx = info.sourceLine - 1;
+      let lineStartOffset = 0;
+      for (let i = 0; i < Math.min(lineIdx, lines.length); i++) {
+        lineStartOffset += lines[i].length + 1; // +1 for \n
+      }
+      const lineEndOffset = lineStartOffset + (lines[lineIdx]?.length || 0);
+
+      let matchFrom = lineStartOffset;
+      let matchTo = lineEndOffset;
+
+      // 2차: 행 안에서 수식/텍스트 정밀 검색
+      if (info.isMath && info.text.length > 0) {
+        // 해당 행 부근(sourceLine ~ sourceLine+20줄)에서 수식 검색
+        const searchStart = lineStartOffset;
+        const searchEndLine = Math.min(lineIdx + 20, lines.length);
+        let searchEnd = 0;
+        for (let i = 0; i < searchEndLine; i++) {
+          searchEnd += lines[i].length + 1;
+        }
+        const searchArea = content.slice(searchStart, searchEnd);
+
+        // 인라인 수식 $...$
+        const inlineRegex = /\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g;
+        let m;
+        while ((m = inlineRegex.exec(searchArea)) !== null) {
+          const inner = m[1].trim();
+          if (inner === info.text || inner.includes(info.text)) {
+            matchFrom = searchStart + m.index;
+            matchTo = searchStart + m.index + m[0].length;
+            break;
+          }
+        }
+
+        // 블록 수식 $$...$$
+        if (matchFrom === lineStartOffset) {
+          const blockRegex = /\$\$([\s\S]*?)\$\$/g;
+          while ((m = blockRegex.exec(searchArea)) !== null) {
+            const inner = m[1].trim();
+            if (inner === info.text || inner.includes(info.text)) {
+              matchFrom = searchStart + m.index;
+              matchTo = searchStart + m.index + m[0].length;
+              break;
+            }
+          }
+        }
+
+        // \[...\]
+        if (matchFrom === lineStartOffset) {
+          const bracketRegex = /\\\[([\s\S]*?)\\\]/g;
+          while ((m = bracketRegex.exec(searchArea)) !== null) {
+            const inner = m[1].trim();
+            if (inner === info.text || inner.includes(info.text)) {
+              matchFrom = searchStart + m.index;
+              matchTo = searchStart + m.index + m[0].length;
+              break;
+            }
+          }
+        }
+      } else if (!info.isMath && info.text.length > 0) {
+        // 일반 텍스트: 해당 행 부근에서 텍스트 검색
+        const searchArea = content.slice(lineStartOffset, Math.min(lineStartOffset + 500, content.length));
+        // 텍스트에서 첫 줄이나 짧은 구절로 검색
+        const searchTarget = info.text.split('\n')[0]?.trim() || info.text;
+        const idx = searchArea.indexOf(searchTarget);
+        if (idx !== -1) {
+          matchFrom = lineStartOffset + idx;
+          matchTo = lineStartOffset + idx + searchTarget.length;
+        }
+      }
+
+      ref.setSelection(matchFrom, matchTo);
+      ref.focus();
+
+      // 편집 패널에서 블록으로 스크롤
+      if (editorPanelRef.current) {
+        const el = editorPanelRef.current.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement;
+        if (el) {
+          const container = editorPanelRef.current;
+          const containerRect = container.getBoundingClientRect();
+          const elRect = el.getBoundingClientRect();
+          const offset = elRect.top - containerRect.top + container.scrollTop;
+          const center = offset - containerRect.height / 2 + elRect.height / 2;
+          container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+        }
+      }
+    }, 100);
+  }, [setCurrentBlocks]);
 
   /* ─── 저장 ─── */
   const handleSave = async () => {
@@ -1025,7 +1165,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             blockIds={currentBlocks.map((b) => b.id)}
           />
 
-          <div className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => (
@@ -1045,6 +1185,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onImageUpload={handleBlockImageUpload}
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
+                    onCursorActivity={handleCursorActivity}
                   />
                 ))}
               </SortableContext>
@@ -1100,30 +1241,51 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             미리보기
           </div>
           <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: 20, background: 'var(--bg-card)', minHeight: 0 }}>
-            {currentBlocks.map((block, i) => (
-              <div key={block.id} data-block-id={block.id}>
-                {block.type === 'box' ? (
-                  <div style={{
-                    border: '1.5px solid var(--text-muted, #888)',
-                    borderRadius: 8, padding: '12px 16px', margin: '8px 0',
-                    background: 'var(--bg-input, #fafafa)',
-                  }}>
-                    <EditorPreview content={block.raw_text} borderless />
-                  </div>
-                ) : block.type === 'choices' ? (
-                  <div style={{ padding: '8px 0' }}>
-                    <EditorPreview content={block.raw_text.replace(/\n/g, '\n\n')} />
-                  </div>
-                ) : (
-                  <div style={{ padding: '8px 0' }}>
-                    <EditorPreview content={block.raw_text} />
-                  </div>
-                )}
-                {i < currentBlocks.length - 1 && (
-                  <div style={{ borderTop: '1px dashed var(--border-dashed, #ddd)', margin: '4px 0' }} />
-                )}
-              </div>
-            ))}
+            {currentBlocks.map((block, i) => {
+              const isActivePreview = block.id === activeBlockId;
+              return (
+                <div
+                  key={block.id}
+                  data-block-id={block.id}
+                  onClick={() => handlePreviewBlockClick(block.id)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {block.type === 'box' ? (
+                    <div style={{
+                      border: '1.5px solid var(--text-muted, #888)',
+                      borderRadius: 8, padding: '12px 16px', margin: '8px 0',
+                      background: 'var(--bg-input, #fafafa)',
+                    }}>
+                      <EditorPreview
+                        content={block.raw_text}
+                        borderless
+                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
+                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                      />
+                    </div>
+                  ) : block.type === 'choices' ? (
+                    <div style={{ padding: '8px 0' }}>
+                      <EditorPreview
+                        content={block.raw_text.replace(/\n/g, '\n\n')}
+                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
+                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ padding: '8px 0' }}>
+                      <EditorPreview
+                        content={block.raw_text}
+                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
+                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                      />
+                    </div>
+                  )}
+                  {i < currentBlocks.length - 1 && (
+                    <div style={{ borderTop: '1px dashed var(--border-dashed, #ddd)', margin: '4px 0' }} />
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

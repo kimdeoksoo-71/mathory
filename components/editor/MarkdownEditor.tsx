@@ -18,12 +18,14 @@ interface MarkdownEditorProps {
   onChange?: (value: string) => void;
   autoHeight?: boolean;
   onSnippetShortcut?: (index: number) => void;
+  onCursorActivity?: (info: { line: number; offset: number }) => void;
 }
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
   getCursorPosition: () => number;
   getContent: () => string;
+  setContent: (text: string) => void;
   setSelection: (from: number, to: number) => void;
   clearSelection: () => void;
   replaceRange: (from: number, to: number, text: string) => void;
@@ -145,7 +147,7 @@ const latexLinter = linter((view) => {
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     const tabStopsRef = useRef<boolean>(false);
@@ -157,6 +159,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     useEffect(() => {
       snippetCallbackRef.current = onSnippetShortcut;
     }, [onSnippetShortcut]);
+
+    const cursorCallbackRef = useRef(onCursorActivity);
+    useEffect(() => {
+      cursorCallbackRef.current = onCursorActivity;
+    }, [onCursorActivity]);
 
     useImperativeHandle(ref, () => ({
       insertText(text: string, cursorOffset: number) {
@@ -194,6 +201,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const view = viewRef.current;
         if (!view) return '';
         return view.state.doc.toString();
+      },
+      setContent(text: string) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({
+          changes: { from: 0, to: view.state.doc.length, insert: text },
+        });
       },
       setSelection(from: number, to: number) {
         const view = viewRef.current;
@@ -393,6 +407,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             if (update.docChanged && onChange) {
               onChange(update.state.doc.toString());
             }
+            if (update.selectionSet || update.docChanged) {
+              if (cursorCallbackRef.current) {
+                const head = update.state.selection.main.head;
+                const line = update.state.doc.lineAt(head);
+                cursorCallbackRef.current({ line: line.number, offset: head });
+              }
+            }
           }),
           EditorView.theme({
             '&': {
@@ -412,6 +433,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-gutters': {
               backgroundColor: '#f8f9fa',
               borderRight: '1px solid #e0e0e0',
+            },
+            // 코드 접힘(fold) 화살표 숨김
+            '.cm-foldGutter': {
+              display: 'none !important',
             },
 
             // ═══ 자동완성 드롭다운 스타일 ═══
