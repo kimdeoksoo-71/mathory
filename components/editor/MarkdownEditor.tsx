@@ -5,7 +5,6 @@ import { EditorView } from 'codemirror';
 import { keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
-import { markdown } from '@codemirror/lang-markdown';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
 import { linter, lintGutter } from '@codemirror/lint';
 // search는 커스텀 FindReplacePanel에서 처리
@@ -34,9 +33,38 @@ export interface MarkdownEditorHandle {
   getCursorCoords: () => { top: number; left: number } | null;
 }
 
-// ── 수식 모드 감지 헬퍼 ──────────────────────────────────
-function findMathExit(doc: string, cursor: number): number {
-  // ── 1) $$ 블록 수식 검사
+// ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
+// 커서를 감싸는 가장 안쪽 괄호 또는 수식 기호의 닫는 위치+1 반환
+function findInnermostExit(doc: string, cursor: number): number {
+  const candidates: number[] = [];
+
+  // 1) 괄호 쌍 검사: (), {}, []
+  const pairs: [string, string][] = [['(', ')'], ['{', '}'], ['[', ']']];
+  for (const [open, close] of pairs) {
+    // 커서 왼쪽으로 스캔하며 매칭 안 된 여는 괄호 찾기
+    let depth = 0;
+    let foundOpen = -1;
+    for (let i = cursor - 1; i >= 0; i--) {
+      if (doc[i] === close) depth++;
+      else if (doc[i] === open) {
+        if (depth === 0) { foundOpen = i; break; }
+        depth--;
+      }
+    }
+    if (foundOpen === -1) continue;
+
+    // 커서 오른쪽으로 매칭되는 닫는 괄호 찾기
+    depth = 0;
+    for (let i = cursor; i < doc.length; i++) {
+      if (doc[i] === open) depth++;
+      else if (doc[i] === close) {
+        if (depth === 0) { candidates.push(i + 1); break; }
+        depth--;
+      }
+    }
+  }
+
+  // 2) $$ 블록 수식 검사
   let searchStart = 0;
   while (searchStart < doc.length) {
     const openIdx = doc.indexOf('$$', searchStart);
@@ -44,25 +72,21 @@ function findMathExit(doc: string, cursor: number): number {
     const innerStart = openIdx + 2;
     const closeIdx = doc.indexOf('$$', innerStart);
     if (closeIdx === -1) break;
-    const innerEnd = closeIdx;
-    const closeEnd = closeIdx + 2;
-
-    if (cursor >= innerStart && cursor <= innerEnd) {
-      return closeEnd;
+    if (cursor >= innerStart && cursor <= closeIdx) {
+      candidates.push(closeIdx + 2);
     }
-    searchStart = closeEnd;
+    searchStart = closeIdx + 2;
   }
 
-  // ── 2) $ 인라인 수식 검사
+  // 3) $ 인라인 수식 검사
   let i = 0;
   while (i < doc.length) {
-    if (doc[i] === '$' && doc[i + 1] === '$') {
+    if (doc[i] === '$' && i + 1 < doc.length && doc[i + 1] === '$') {
       const closeIdx = doc.indexOf('$$', i + 2);
       if (closeIdx === -1) break;
       i = closeIdx + 2;
       continue;
     }
-
     if (doc[i] === '$') {
       const innerStart = i + 1;
       let closeIdx = -1;
@@ -73,11 +97,9 @@ function findMathExit(doc: string, cursor: number): number {
         }
         if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
       }
-
       if (closeIdx !== -1 && cursor >= innerStart && cursor <= closeIdx) {
-        return closeIdx + 1;
+        candidates.push(closeIdx + 1);
       }
-
       if (closeIdx !== -1) {
         i = closeIdx + 1;
       } else {
@@ -85,11 +107,62 @@ function findMathExit(doc: string, cursor: number): number {
       }
       continue;
     }
-
     i++;
   }
 
-  return -1;
+  if (candidates.length === 0) return -1;
+  // 가장 안쪽(닫는 위치가 가장 가까운) 후보 반환
+  return Math.min(...candidates);
+}
+
+// ── 수식 영역 범위 반환 (Alt+Tab 중괄호 순회용) ──────────────
+function findMathRegion(doc: string, cursor: number): { start: number; end: number } | null {
+  // 1) $$ 블록 수식
+  let searchStart = 0;
+  while (searchStart < doc.length) {
+    const openIdx = doc.indexOf('$$', searchStart);
+    if (openIdx === -1) break;
+    const innerStart = openIdx + 2;
+    const closeIdx = doc.indexOf('$$', innerStart);
+    if (closeIdx === -1) break;
+    if (cursor >= innerStart && cursor <= closeIdx) {
+      return { start: innerStart, end: closeIdx };
+    }
+    searchStart = closeIdx + 2;
+  }
+
+  // 2) $ 인라인 수식
+  let i = 0;
+  while (i < doc.length) {
+    if (doc[i] === '$' && i + 1 < doc.length && doc[i + 1] === '$') {
+      const closeIdx = doc.indexOf('$$', i + 2);
+      if (closeIdx === -1) break;
+      i = closeIdx + 2;
+      continue;
+    }
+    if (doc[i] === '$') {
+      const innerStart = i + 1;
+      let closeIdx = -1;
+      for (let j = innerStart; j < doc.length; j++) {
+        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
+          closeIdx = j;
+          break;
+        }
+        if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
+      }
+      if (closeIdx !== -1 && cursor >= innerStart && cursor <= closeIdx) {
+        return { start: innerStart, end: closeIdx };
+      }
+      if (closeIdx !== -1) {
+        i = closeIdx + 1;
+      } else {
+        i++;
+      }
+      continue;
+    }
+    i++;
+  }
+  return null;
 }
 
 // ── LaTeX 자동완성 소스 ──────────────────────────────────
@@ -320,7 +393,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           run: (view) => {
             const doc = view.state.doc.toString();
             const cursor = view.state.selection.main.head;
-            const exitPos = findMathExit(doc, cursor);
+            const exitPos = findInnermostExit(doc, cursor);
 
             if (exitPos !== -1) {
               view.dispatch({
@@ -329,6 +402,34 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               return true;
             }
             return false;
+          },
+        },
+        // ── Alt+Tab: 수식 내 중괄호 순회 ──
+        {
+          key: 'Alt-Tab',
+          run: (view) => {
+            const doc = view.state.doc.toString();
+            const cursor = view.state.selection.main.head;
+            const region = findMathRegion(doc, cursor);
+            if (!region) return false;
+
+            // 수식 영역 내 모든 { 위치 수집 (커서를 { 바로 안쪽에 놓기 위해 +1)
+            const bracePositions: number[] = [];
+            for (let k = region.start; k < region.end; k++) {
+              if (doc[k] === '{') {
+                bracePositions.push(k + 1);
+              }
+            }
+            if (bracePositions.length === 0) return false;
+
+            // 현재 커서 다음 중괄호로 이동, 끝이면 처음으로 순회
+            let nextPos = bracePositions.find((p) => p > cursor);
+            if (nextPos === undefined) {
+              nextPos = bracePositions[0];
+            }
+
+            view.dispatch({ selection: { anchor: nextPos } });
+            return true;
           },
         },
         // ── Ctrl+Alt+1 ~ Ctrl+Alt+9 (수식 상용구 단축키) ──
@@ -402,8 +503,34 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           chordListener,
           tabHandler,
           basicSetup,
-          markdown(),
           latexAutocompletion,
+          // ── 괄호 자동닫기 제어 ──
+          Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {
+            const doc = view.state.doc.toString();
+            const inMath = isInsideMath(doc, from);
+
+            // 소괄호·대괄호: 수식 밖에서 자동닫기 차단
+            if (text === '(' || text === '[') {
+              if (inMath) return false; // 수식 안 → closeBrackets가 처리
+              view.dispatch({
+                changes: { from, to, insert: text },
+                selection: { anchor: from + 1 },
+              });
+              return true;
+            }
+
+            // 중괄호: 수식 안에서 항상 자동닫기 (뒤 문자 무관)
+            if (text === '{') {
+              if (!inMath) return false; // 수식 밖 → 기본 동작
+              view.dispatch({
+                changes: { from, to, insert: '{}' },
+                selection: { anchor: from + 1 },
+              });
+              return true;
+            }
+
+            return false;
+          })),
           // ── 린트 (LaTeX 오류) ──
           latexLinter,
           lintGutter(),
