@@ -18,6 +18,15 @@ interface EditorPreviewProps {
   onClickSource?: (info: { sourceLine: number; text: string; isMath: boolean }) => void;
 }
 
+/* ═══ <ol class="giyeok|gana"> → <div class="ol-giyeok|ol-gana"> 래퍼 변환 ═══ */
+/* 내부 마크다운 리스트는 그대로 두어 remark-math가 수식을 처리할 수 있게 함 */
+function preprocessOlTypes(text: string): string {
+  return text.replace(
+    /<ol\s+class="(giyeok|gana)">\s*\n([\s\S]*?)\n\s*<\/ol>/g,
+    (_, cls, inner) => `<div class="ol-${cls}">\n\n${inner.trim()}\n\n</div>`
+  );
+}
+
 function preprocessMath(text: string): string {
   let result = text.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
   result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
@@ -199,7 +208,7 @@ export default function EditorPreview({
   content, borderless = false, autoHeight = false,
   onImageResize, activeSourceLine, onClickSource,
 }: EditorPreviewProps) {
-  const processed = useMemo(() => preprocessMath(content), [content]);
+  const processed = useMemo(() => preprocessMath(preprocessOlTypes(content)), [content]);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [hoveredImg, setHoveredImg] = useState<HTMLImageElement | null>(null);

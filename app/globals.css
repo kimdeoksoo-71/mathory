@@ -179,5 +179,55 @@ ol ol > li::before {
   width: 3.5em;
 }
 
+/* Ordered list — ㄱ. ㄴ. ㄷ. (<ol class="giyeok"> → div.ol-giyeok 래퍼) */
+@counter-style giyeok-style {
+  system: fixed;
+  symbols: 'ㄱ' 'ㄴ' 'ㄷ' 'ㄹ' 'ㅁ' 'ㅂ' 'ㅅ' 'ㅇ' 'ㅈ' 'ㅊ' 'ㅋ' 'ㅌ' 'ㅍ' 'ㅎ';
+}
+
+.ol-giyeok > ol {
+  list-style: none;
+  counter-reset: giyeok-cnt;
+  padding-left: 2.5em;
+  margin: 0.4em 0;
+}
+
+.ol-giyeok > ol > li {
+  counter-increment: giyeok-cnt;
+  position: relative;
+}
+
+.ol-giyeok > ol > li::before {
+  content: counter(giyeok-cnt, giyeok-style) ". ";
+  position: absolute;
+  left: -2.5em;
+  width: 2.5em;
+}
+
+/* Ordered list — (가), (나), (다) (<ol class="gana"> → div.ol-gana 래퍼) */
+@counter-style gana-style {
+  system: fixed;
+  symbols: '가' '나' '다' '라' '마' '바' '사' '아' '자' '차' '카' '타' '파' '하';
+}
+
+.ol-gana > ol {
+  list-style: none;
+  counter-reset: gana-cnt;
+  padding-left: 3em;
+  margin: 0.4em 0;
+}
+
+.ol-gana > ol > li {
+  counter-increment: gana-cnt;
+  position: relative;
+}
+
+.ol-gana > ol > li::before {
+  content: "(" counter(gana-cnt, gana-style) ")";
+  position: absolute;
+  left: -3em;
+  width: 3em;
+}
+
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */
