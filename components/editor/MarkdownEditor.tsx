@@ -574,6 +574,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-foldGutter': {
               display: 'none !important',
             },
+            // 선택된 텍스트와 동일한 텍스트 하이라이트 비활성화
+            '.cm-selectionMatch': {
+              backgroundColor: 'transparent !important',
+            },
 
             // ═══ 자동완성 드롭다운 스타일 ═══
             '.cm-tooltip.cm-tooltip-autocomplete': {

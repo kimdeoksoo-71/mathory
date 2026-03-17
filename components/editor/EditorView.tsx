@@ -54,6 +54,73 @@ const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
 
+/* ═══ 수식 인덱싱: 원본 content에서 모든 수식의 {from, to} 추출 (출현 순서) ═══ */
+interface MathRange { from: number; to: number; }
+
+function buildMathIndex(content: string): MathRange[] {
+  const ranges: MathRange[] = [];
+  let i = 0;
+  while (i < content.length) {
+    // $$ 블록 수식
+    if (content[i] === '$' && content[i + 1] === '$') {
+      const start = i;
+      const closeIdx = content.indexOf('$$', i + 2);
+      if (closeIdx !== -1) {
+        ranges.push({ from: start, to: closeIdx + 2 });
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+    // $ 인라인 수식
+    if (content[i] === '$' && content[i + 1] !== '$') {
+      const start = i;
+      let j = i + 1;
+      let found = false;
+      while (j < content.length) {
+        if (content[j] === '$' && content[j - 1] !== '\\') {
+          ranges.push({ from: start, to: j + 1 });
+          i = j + 1;
+          found = true;
+          break;
+        }
+        if (content[j] === '\n' && j + 1 < content.length && content[j + 1] === '\n') break;
+        j++;
+      }
+      if (!found) i = start + 1;
+      continue;
+    }
+    // \[...\]
+    if (content[i] === '\\' && content[i + 1] === '[') {
+      const start = i;
+      const closeIdx = content.indexOf('\\]', i + 2);
+      if (closeIdx !== -1) {
+        ranges.push({ from: start, to: closeIdx + 2 });
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+    // \(...\)
+    if (content[i] === '\\' && content[i + 1] === '(') {
+      const start = i;
+      const closeIdx = content.indexOf('\\)', i + 2);
+      if (closeIdx !== -1) {
+        ranges.push({ from: start, to: closeIdx + 2 });
+        i = closeIdx + 2;
+        continue;
+      }
+    }
+    i++;
+  }
+  return ranges;
+}
+
+function findMathIdAtCursor(ranges: MathRange[], cursor: number): number {
+  for (let idx = 0; idx < ranges.length; idx++) {
+    if (cursor >= ranges[idx].from && cursor <= ranges[idx].to) return idx;
+  }
+  return -1;
+}
+
 /* ═══ Font Size 유틸 ═══ */
 
 function getStoredFontSize(): number {
@@ -462,8 +529,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // 미리보기 활성 행번호
-  const [activeSourceLine, setActiveSourceLine] = useState<number>(-1);
+  // 미리보기 활성 수식 인덱스 (-1이면 수식 밖)
+  const [activeMathId, setActiveMathId] = useState<number>(-1);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
@@ -680,19 +747,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기 스크롤 동기화: 활성 행을 세로 중앙으로 ─── */
+  /* ─── 미리보기 하이라이트 cleanup (블록 전환 시) ─── */
   useEffect(() => {
-    if (activeSourceLine < 1 || !previewRef.current) return;
+    if (!previewRef.current) return;
+    previewRef.current.querySelectorAll('.math-highlight-active').forEach((el) => {
+      el.classList.remove('math-highlight-active');
+    });
+  }, [activeBlockId]);
 
-    // EditorPreview가 하이라이트를 DOM에 적용한 뒤 실행
-    // 블록 전환 시 렌더 타이밍을 위해 약간의 지연 추가
+  /* ─── 미리보기 스크롤 동기화: 활성 수식을 세로 중앙으로 ─── */
+  useEffect(() => {
+    if (activeMathId < 0 || !previewRef.current) return;
     const timer = setTimeout(() => {
       requestAnimationFrame(() => {
         const container = previewRef.current;
         if (!container) return;
-        const highlighted = container.querySelector('.preview-line-active') as HTMLElement;
+        const highlighted = container.querySelector('.math-highlight-active') as HTMLElement;
         if (!highlighted) return;
-
         const containerRect = container.getBoundingClientRect();
         const highlightedRect = highlighted.getBoundingClientRect();
         const offset = highlightedRect.top - containerRect.top + container.scrollTop;
@@ -701,7 +772,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       });
     }, 50);
     return () => clearTimeout(timer);
-  }, [activeSourceLine, activeBlockId]);
+  }, [activeMathId, activeBlockId]);
 
   /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
   useEffect(() => {
@@ -723,123 +794,35 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => document.removeEventListener('keydown', handler);
   }, []);
 
-  /* ─── 커서 활동 → 행번호 전달 ─── */
+  /* ─── 커서 활동 → 수식 인덱스 계산 ─── */
   const handleCursorActivity = useCallback((info: { line: number; offset: number }) => {
-    setActiveSourceLine(info.line);
-  }, []);
+    if (!activeBlockId) { setActiveMathId(-1); return; }
+    const ref = editorRefs.current[activeBlockId];
+    if (!ref) { setActiveMathId(-1); return; }
+    const content = ref.getContent();
+    const ranges = buildMathIndex(content);
+    setActiveMathId(findMathIdAtCursor(ranges, info.offset));
+  }, [activeBlockId]);
 
-  /* ─── 미리보기 블록 클릭 → 편집창 블록으로 이동 ─── */
-  const handlePreviewBlockClick = useCallback((blockId: string) => {
+  /* ─── 미리보기 수식 클릭 → 편집창에서 해당 수식 선택 (mathId 기반) ─── */
+  const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
     );
     setActiveBlockId(blockId);
 
-    setTimeout(() => {
-      if (!editorPanelRef.current) return;
-      const el = editorPanelRef.current.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement;
-      if (el) {
-        const container = editorPanelRef.current;
-        const containerRect = container.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const offset = elRect.top - containerRect.top + container.scrollTop;
-        const center = offset - containerRect.height / 2 + elRect.height / 2;
-        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
-      }
-    }, 60);
-  }, [setCurrentBlocks]);
-
-  /* ─── 미리보기 클릭 → 편집창에서 해당 텍스트/수식 찾기 ─── */
-  const handlePreviewClickSource = useCallback((blockId: string, info: { sourceLine: number; text: string; isMath: boolean }) => {
-    // 블록 활성화 + 펼치기
-    setCurrentBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
-    );
-    setActiveBlockId(blockId);
-
-    // 렌더 후 에디터에서 검색
     setTimeout(() => {
       const ref = editorRefs.current[blockId];
       if (!ref) return;
-
       const content = ref.getContent();
-      const lines = content.split('\n');
+      const ranges = buildMathIndex(content);
+      if (mathId < 0 || mathId >= ranges.length) return;
 
-      // 1차: sourceLine으로 행 위치 특정 (1-indexed → 0-indexed)
-      const lineIdx = info.sourceLine - 1;
-      let lineStartOffset = 0;
-      for (let i = 0; i < Math.min(lineIdx, lines.length); i++) {
-        lineStartOffset += lines[i].length + 1; // +1 for \n
-      }
-      const lineEndOffset = lineStartOffset + (lines[lineIdx]?.length || 0);
-
-      let matchFrom = lineStartOffset;
-      let matchTo = lineEndOffset;
-
-      // 2차: 행 안에서 수식/텍스트 정밀 검색
-      if (info.isMath && info.text.length > 0) {
-        // 해당 행 부근(sourceLine ~ sourceLine+20줄)에서 수식 검색
-        const searchStart = lineStartOffset;
-        const searchEndLine = Math.min(lineIdx + 20, lines.length);
-        let searchEnd = 0;
-        for (let i = 0; i < searchEndLine; i++) {
-          searchEnd += lines[i].length + 1;
-        }
-        const searchArea = content.slice(searchStart, searchEnd);
-
-        // 인라인 수식 $...$
-        const inlineRegex = /\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g;
-        let m;
-        while ((m = inlineRegex.exec(searchArea)) !== null) {
-          const inner = m[1].trim();
-          if (inner === info.text || inner.includes(info.text)) {
-            matchFrom = searchStart + m.index;
-            matchTo = searchStart + m.index + m[0].length;
-            break;
-          }
-        }
-
-        // 블록 수식 $$...$$
-        if (matchFrom === lineStartOffset) {
-          const blockRegex = /\$\$([\s\S]*?)\$\$/g;
-          while ((m = blockRegex.exec(searchArea)) !== null) {
-            const inner = m[1].trim();
-            if (inner === info.text || inner.includes(info.text)) {
-              matchFrom = searchStart + m.index;
-              matchTo = searchStart + m.index + m[0].length;
-              break;
-            }
-          }
-        }
-
-        // \[...\]
-        if (matchFrom === lineStartOffset) {
-          const bracketRegex = /\\\[([\s\S]*?)\\\]/g;
-          while ((m = bracketRegex.exec(searchArea)) !== null) {
-            const inner = m[1].trim();
-            if (inner === info.text || inner.includes(info.text)) {
-              matchFrom = searchStart + m.index;
-              matchTo = searchStart + m.index + m[0].length;
-              break;
-            }
-          }
-        }
-      } else if (!info.isMath && info.text.length > 0) {
-        // 일반 텍스트: 해당 행 부근에서 텍스트 검색
-        const searchArea = content.slice(lineStartOffset, Math.min(lineStartOffset + 500, content.length));
-        // 텍스트에서 첫 줄이나 짧은 구절로 검색
-        const searchTarget = info.text.split('\n')[0]?.trim() || info.text;
-        const idx = searchArea.indexOf(searchTarget);
-        if (idx !== -1) {
-          matchFrom = lineStartOffset + idx;
-          matchTo = lineStartOffset + idx + searchTarget.length;
-        }
-      }
-
-      ref.setSelection(matchFrom, matchTo);
+      const range = ranges[mathId];
+      ref.setSelection(range.from, range.to);
       ref.focus();
 
-      // 편집 패널에서 선택된 텍스트를 세로 중앙으로 스크롤
+      // 편집 패널에서 선택된 수식을 세로 중앙으로 스크롤
       requestAnimationFrame(() => {
         const coords = ref.getCursorCoords();
         const container = editorPanelRef.current;
@@ -984,6 +967,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-editor .cm-editor { font-size: ${contentFontSize}px !important; }
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
+        .math-highlight-active {
+          background-color: rgba(229, 57, 53, 0.08) !important;
+          outline: 2px solid rgba(229, 57, 53, 0.4);
+          outline-offset: 2px;
+          border-radius: 3px;
+        }
       `}</style>
 
       {/* ═══ Row 1: 메타 정보 ═══ */}
@@ -1253,12 +1242,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               return (
-                <div
-                  key={block.id}
-                  data-block-id={block.id}
-                  onClick={() => handlePreviewBlockClick(block.id)}
-                  style={{ cursor: 'pointer' }}
-                >
+                <div key={block.id} data-block-id={block.id}>
                   {block.type === 'box' ? (
                     <div style={{
                       border: '1.5px solid var(--text-muted, #888)',
@@ -1268,24 +1252,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       <EditorPreview
                         content={block.raw_text}
                         borderless
-                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
-                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                        activeMathId={isActivePreview ? activeMathId : undefined}
+                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
                     </div>
                   ) : block.type === 'choices' ? (
                     <div style={{ padding: '8px 0' }}>
                       <EditorPreview
                         content={block.raw_text.replace(/\n/g, '\n\n')}
-                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
-                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                        activeMathId={isActivePreview ? activeMathId : undefined}
+                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
                     </div>
                   ) : (
                     <div style={{ padding: '8px 0' }}>
                       <EditorPreview
                         content={block.raw_text}
-                        activeSourceLine={isActivePreview ? activeSourceLine : undefined}
-                        onClickSource={(info) => handlePreviewClickSource(block.id, info)}
+                        activeMathId={isActivePreview ? activeMathId : undefined}
+                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
                     </div>
                   )}
