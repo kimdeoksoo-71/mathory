@@ -315,16 +315,6 @@ export default function EditorPreview({
         target.style.paddingLeft = '8px';
         target.style.borderRadius = '4px';
         target.style.transition = 'all 0.15s ease';
-
-        // 미리보기 창 세로 중앙으로 스크롤
-        const container = containerRef.current;
-        if (container) {
-          const containerRect = container.getBoundingClientRect();
-          const targetRect = target.getBoundingClientRect();
-          const offset = targetRect.top - containerRect.top + container.scrollTop;
-          const center = offset - containerRect.height / 2 + targetRect.height / 2;
-          container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
-        }
         break;
       }
     }

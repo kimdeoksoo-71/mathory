@@ -680,18 +680,28 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기 스크롤 동기화 ─── */
+  /* ─── 미리보기 스크롤 동기화: 활성 행을 세로 중앙으로 ─── */
   useEffect(() => {
-    if (!activeBlockId || !previewRef.current) return;
-    const container = previewRef.current;
-    const el = container.querySelector(`[data-block-id="${activeBlockId}"]`) as HTMLElement;
-    if (el) {
-      const containerRect = container.getBoundingClientRect();
-      const elRect = el.getBoundingClientRect();
-      const offset = elRect.top - containerRect.top + container.scrollTop;
-      container.scrollTo({ top: offset, behavior: 'smooth' });
-    }
-  }, [activeBlockId]);
+    if (activeSourceLine < 1 || !previewRef.current) return;
+
+    // EditorPreview가 하이라이트를 DOM에 적용한 뒤 실행
+    // 블록 전환 시 렌더 타이밍을 위해 약간의 지연 추가
+    const timer = setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const highlighted = container.querySelector('.preview-line-active') as HTMLElement;
+        if (!highlighted) return;
+
+        const containerRect = container.getBoundingClientRect();
+        const highlightedRect = highlighted.getBoundingClientRect();
+        const offset = highlightedRect.top - containerRect.top + container.scrollTop;
+        const center = offset - containerRect.height / 2 + highlightedRect.height / 2;
+        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+      });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeSourceLine, activeBlockId]);
 
   /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
   useEffect(() => {
