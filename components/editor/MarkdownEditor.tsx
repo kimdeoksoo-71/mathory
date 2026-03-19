@@ -7,8 +7,15 @@ import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
 import { linter, lintGutter } from '@codemirror/lint';
-// search는 커스텀 FindReplacePanel에서 처리
+// search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
+import {
+  SearchMatch,
+  searchHighlightField,
+  searchHighlightTheme,
+  setSearchHighlightsEffect,
+  clearSearchHighlightsEffect,
+} from '../../lib/search-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
 
@@ -31,6 +38,12 @@ export interface MarkdownEditorHandle {
   focus: () => void;
   /** 커서 위치의 화면 좌표 반환 */
   getCursorCoords: () => { top: number; left: number } | null;
+  /** 검색 매치 하이라이트 (Decoration) 설정 */
+  setSearchHighlights: (matches: SearchMatch[], activeIndex: number) => void;
+  /** 검색 매치 하이라이트 해제 */
+  clearSearchHighlights: () => void;
+  /** 특정 위치로 스크롤 (검색 결과 이동용) */
+  scrollToPos: (pos: number) => void;
 }
 
 // ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
@@ -314,6 +327,27 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (!coords) return null;
         return { top: coords.top, left: coords.left };
       },
+      setSearchHighlights(matches: SearchMatch[], activeIndex: number) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({
+          effects: setSearchHighlightsEffect.of({ matches, activeIndex }),
+        });
+      },
+      clearSearchHighlights() {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({
+          effects: clearSearchHighlightsEffect.of(null),
+        });
+      },
+      scrollToPos(pos: number) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({
+          effects: EditorView.scrollIntoView(pos, { y: 'center' }),
+        });
+      },
     }));
 
     useEffect(() => {
@@ -534,8 +568,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           // ── 린트 (LaTeX 오류) ──
           latexLinter,
           lintGutter(),
-          // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
-          // ── 검색은 커스텀 FindReplacePanel에서 처리 ──
+          // ── 검색 하이라이트 (커스텀 FindReplacePanel용) ──
+          searchHighlightField,
+          searchHighlightTheme,
           EditorView.lineWrapping,
           latexHighlightPlugin,
           latexHighlightTheme,

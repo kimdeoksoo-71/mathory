@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * 찾기 및 바꾸기 패널
+ * FindReplacePanel — Phase 18
  *
- * 모든 편집 블록을 가로질러 텍스트를 검색/바꾸기합니다.
- * - 편집창 전체(모든 블록)에서 검색
- * - 현재 위치 / 전체 개수 표시
- * - 대소문자 일치, 전체 일치, 정규식 옵션
- * - 바꾸기, 모두 바꾸기
+ * VSCode + 구글스프레드시트 스타일 커스텀 찾기/바꾸기 패널
+ * - CodeMirror Decoration 기반 매치 하이라이트 (활성=주황, 비활성=노란)
+ * - 블록 전체 검색/바꾸기
+ * - Ctrl+F 열기, Esc 닫기, Enter 다음, Shift+Enter 이전
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MarkdownEditorHandle } from './MarkdownEditor';
+
+/* ── 타입 ── */
 
 interface Match {
   blockId: string;
@@ -26,6 +27,17 @@ interface FindReplacePanelProps {
   blockIds: string[];
 }
 
+/* ── 전체 단어 일치 검사 ── */
+
+function isWholeWord(text: string, pos: number, len: number): boolean {
+  const before = pos > 0 ? text[pos - 1] : ' ';
+  const after = pos + len < text.length ? text[pos + len] : ' ';
+  const wordChar = /[\w가-힣]/;
+  return !wordChar.test(before) && !wordChar.test(after);
+}
+
+/* ── 컴포넌트 ── */
+
 export default function FindReplacePanel({
   open,
   onClose,
@@ -37,18 +49,29 @@ export default function FindReplacePanel({
   const [matches, setMatches] = useState<Match[]>([]);
   const [currentIdx, setCurrentIdx] = useState(-1);
   const [showReplace, setShowReplace] = useState(false);
+
+  // 옵션
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);
 
   const findInputRef = useRef<HTMLInputElement>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // blockIds를 ref로 보관 (배열 비교 문제 방지)
   const blockIdsRef = useRef(blockIds);
   blockIdsRef.current = blockIds;
 
-  // ── 패널 열릴 때 포커스 ──
+  // ── 모든 에디터의 하이라이트 해제 ──
+  const clearAllHighlights = useCallback(() => {
+    for (const id of blockIdsRef.current) {
+      const handle = editorRefs.current[id];
+      if (handle) {
+        try { handle.clearSearchHighlights(); } catch { /* skip */ }
+        try { handle.clearSelection(); } catch { /* skip */ }
+      }
+    }
+  }, [editorRefs]);
+
+  // ── 패널 열릴 때 포커스, 닫힐 때 정리 ──
   useEffect(() => {
     if (open && findInputRef.current) {
       setTimeout(() => {
@@ -57,19 +80,16 @@ export default function FindReplacePanel({
       }, 50);
     }
     if (!open) {
-      // 패널 닫힐 때 모든 선택 해제
-      for (const id of blockIdsRef.current) {
-        const handle = editorRefs.current[id];
-        if (handle) {
-          try { handle.clearSelection(); } catch { /* skip */ }
-        }
-      }
+      clearAllHighlights();
       setMatches([]);
       setCurrentIdx(-1);
+      setQuery('');
+      setReplaceText('');
+      setShowReplace(false);
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, clearAllHighlights]);
 
-  // ── 핵심: 검색 함수 (ref 기반, 부작용 없음) ──
+  // ── 검색 함수 (순수: 부작용 없음) ──
   function runSearch(searchQuery: string): Match[] {
     if (!searchQuery) return [];
 
@@ -81,11 +101,7 @@ export default function FindReplacePanel({
       if (!handle) continue;
 
       let content: string;
-      try {
-        content = handle.getContent();
-      } catch {
-        continue;
-      }
+      try { content = handle.getContent(); } catch { continue; }
       if (!content) continue;
 
       if (useRegex) {
@@ -99,7 +115,7 @@ export default function FindReplacePanel({
             results.push({ blockId, from: m.index, to: m.index + m[0].length });
           }
         } catch {
-          // 잘못된 정규식
+          // 잘못된 정규식 무시
         }
       } else {
         const haystack = caseSensitive ? content : content.toLowerCase();
@@ -122,82 +138,108 @@ export default function FindReplacePanel({
     return results;
   }
 
-  // ── 검색 트리거 (디바운스) ──
-  // navigate=true일 때만 에디터로 포커스 이동 (사용자가 ‹ › Enter 클릭 시)
-  function triggerSearch(navigate?: boolean) {
-    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+  // ── 하이라이트 적용: 블록별로 Decoration 설정 ──
+  const applyHighlights = useCallback((allMatches: Match[], activeIdx: number) => {
+    // 블록별로 그룹핑
+    const grouped: Record<string, { matches: { from: number; to: number }[]; activeLocalIdx: number }> = {};
 
-    const doIt = () => {
-      const results = runSearch(query);
-      setMatches(results);
-      if (results.length > 0) {
-        setCurrentIdx(0);
-        if (navigate) {
-          navigateToMatch(results[0]);
-        }
-      } else {
-        setCurrentIdx(-1);
-      }
-    };
-
-    if (navigate) {
-      doIt();
-    } else {
-      searchTimerRef.current = setTimeout(doIt, 200);
+    for (const id of blockIdsRef.current) {
+      grouped[id] = { matches: [], activeLocalIdx: -1 };
     }
-  }
 
-  // ── query 변경 시 검색 (포커스 이동 없이 매치만 갱신) ──
+    let globalIdx = 0;
+    for (const m of allMatches) {
+      if (!grouped[m.blockId]) {
+        grouped[m.blockId] = { matches: [], activeLocalIdx: -1 };
+      }
+      const localIdx = grouped[m.blockId].matches.length;
+      grouped[m.blockId].matches.push({ from: m.from, to: m.to });
+      if (globalIdx === activeIdx) {
+        grouped[m.blockId].activeLocalIdx = localIdx;
+      }
+      globalIdx++;
+    }
+
+    // 각 블록에 하이라이트 적용
+    for (const [blockId, data] of Object.entries(grouped)) {
+      const handle = editorRefs.current[blockId];
+      if (!handle) continue;
+      try {
+        if (data.matches.length > 0) {
+          handle.setSearchHighlights(data.matches, data.activeLocalIdx);
+        } else {
+          handle.clearSearchHighlights();
+        }
+      } catch { /* skip */ }
+    }
+  }, [editorRefs]);
+
+  // ── 검색 트리거 ──
+  const doSearch = useCallback((searchQuery: string, navigate: boolean) => {
+    const results = runSearch(searchQuery);
+    setMatches(results);
+    if (results.length > 0) {
+      const idx = 0;
+      setCurrentIdx(idx);
+      applyHighlights(results, idx);
+      if (navigate) {
+        navigateToMatchDirect(results[idx], idx, results);
+      }
+    } else {
+      setCurrentIdx(-1);
+      clearAllHighlights();
+    }
+  }, [applyHighlights, clearAllHighlights]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── query / 옵션 변경 시 재검색 (디바운스) ──
   useEffect(() => {
     if (!open) return;
-    triggerSearch(false);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => doSearch(query, false), 150);
     return () => {
       if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     };
-  }, [query, caseSensitive, wholeWord, useRegex]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [query, caseSensitive, wholeWord, useRegex, open, doSearch]);
 
-  // ── 전체 단어 일치 검사 ──
-  function isWholeWord(text: string, pos: number, len: number): boolean {
-    const before = pos > 0 ? text[pos - 1] : ' ';
-    const after = pos + len < text.length ? text[pos + len] : ' ';
-    const wordChar = /[\w가-힣]/;
-    return !wordChar.test(before) && !wordChar.test(after);
-  }
-
-  // ── 매치로 이동 ──
-  function navigateToMatch(match: Match) {
+  // ── 매치로 이동 (직접 데이터 전달 — stale closure 방지) ──
+  function navigateToMatchDirect(match: Match, idx: number, allMatches: Match[]) {
     const handle = editorRefs.current[match.blockId];
     if (!handle) return;
 
-    // 1) 다른 블록의 선택 해제 (배경색 잔류 방지)
-    for (const id of blockIdsRef.current) {
-      if (id !== match.blockId) {
-        const other = editorRefs.current[id];
-        if (other) {
-          try { other.clearSelection(); } catch { /* skip */ }
-        }
-      }
-    }
+    // 하이라이트 갱신 (활성 인덱스 변경)
+    applyHighlights(allMatches, idx);
 
-    // 2) 대상 블록에 선택 적용
+    // 선택만 적용 (scrollToPos 사용 금지 — autoHeight 모드에서 페이지 전체가 스크롤됨)
     try {
       handle.setSelection(match.from, match.to);
-    } catch {
-      return;
-    }
+    } catch { /* skip */ }
 
-    // 3) 블록을 편집 스크롤 영역 내에서만 스크롤
-    const blockEl = document.querySelector(`[data-block-id="${match.blockId}"]`);
-    if (blockEl) {
-      const scroller = blockEl.closest('.scaled-editor');
-      if (scroller) {
+    // .scaled-editor 컨테이너 내에서만 수동 스크롤
+    requestAnimationFrame(() => {
+      const coords = handle.getCursorCoords();
+      const blockEl = document.querySelector(`[data-block-id="${match.blockId}"]`);
+      const scroller = blockEl?.closest('.scaled-editor') as HTMLElement | null;
+      if (!scroller) return;
+
+      const scrollRect = scroller.getBoundingClientRect();
+
+      if (coords) {
+        // 커서 좌표 기반 정밀 스크롤 (커서가 컨테이너 밖이면 중앙으로 이동)
+        if (coords.top < scrollRect.top + 40 || coords.top > scrollRect.bottom - 40) {
+          const cursorRelTop = coords.top - scrollRect.top + scroller.scrollTop;
+          const center = cursorRelTop - scrollRect.height / 2;
+          scroller.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+        }
+      } else if (blockEl) {
+        // 좌표를 못 구한 경우 블록 요소 기준으로 스크롤
         const blockRect = blockEl.getBoundingClientRect();
-        const scrollRect = scroller.getBoundingClientRect();
         if (blockRect.top < scrollRect.top || blockRect.bottom > scrollRect.bottom) {
-          blockEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          const offset = blockRect.top - scrollRect.top + scroller.scrollTop;
+          const center = offset - scrollRect.height / 2 + blockRect.height / 2;
+          scroller.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
         }
       }
-    }
+    });
   }
 
   // ── 이전/다음 ──
@@ -205,14 +247,14 @@ export default function FindReplacePanel({
     if (matches.length === 0) return;
     const next = (currentIdx + 1) % matches.length;
     setCurrentIdx(next);
-    navigateToMatch(matches[next]);
+    navigateToMatchDirect(matches[next], next, matches);
   }
 
   function goPrev() {
     if (matches.length === 0) return;
     const prev = (currentIdx - 1 + matches.length) % matches.length;
     setCurrentIdx(prev);
-    navigateToMatch(matches[prev]);
+    navigateToMatchDirect(matches[prev], prev, matches);
   }
 
   // ── 바꾸기 ──
@@ -224,12 +266,10 @@ export default function FindReplacePanel({
 
     try {
       handle.replaceRange(match.from, match.to, replaceText);
-    } catch {
-      return;
-    }
+    } catch { return; }
 
-    // 바꾼 후 재검색 (포커스 이동 없이)
-    setTimeout(() => triggerSearch(false), 80);
+    // 바꾼 후 재검색
+    setTimeout(() => doSearch(query, false), 80);
   }
 
   // ── 모두 바꾸기 ──
@@ -249,15 +289,11 @@ export default function FindReplacePanel({
 
       const sorted = grouped[blockId].sort((a, b) => b.from - a.from);
       for (const m of sorted) {
-        try {
-          handle.replaceRange(m.from, m.to, replaceText);
-        } catch {
-          // skip
-        }
+        try { handle.replaceRange(m.from, m.to, replaceText); } catch { /* skip */ }
       }
     }
 
-    setTimeout(() => triggerSearch(false), 80);
+    setTimeout(() => doSearch(query, false), 80);
   }
 
   // ── 키보드 ──
@@ -276,178 +312,301 @@ export default function FindReplacePanel({
 
   if (!open) return null;
 
-  /* ── 스타일 ── */
+  /* ══════════ 렌더링 ══════════ */
 
-  const btnStyle: React.CSSProperties = {
-    border: '1px solid var(--border-primary, #E0DCD6)',
-    borderRadius: 4,
-    padding: '3px 10px',
-    backgroundColor: 'var(--bg-primary, #FAF9F7)',
-    color: 'var(--text-secondary, #5D5647)',
-    cursor: 'pointer',
-    fontSize: 12,
-    fontFamily: 'var(--font-ui)',
-    transition: 'background 0.15s',
-    whiteSpace: 'nowrap' as const,
-  };
-
-  const inputStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: 120,
-    border: '1px solid var(--border-primary, #E0DCD6)',
-    borderRadius: 4,
-    padding: '4px 8px',
-    fontSize: 13,
-    fontFamily: 'var(--font-ui)',
-    outline: 'none',
-    color: 'var(--text-primary)',
-    background: 'var(--bg-input, #fff)',
-  };
-
-  const checkStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 3,
-    fontSize: 11,
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    fontFamily: 'var(--font-ui)',
-    whiteSpace: 'nowrap' as const,
-  };
-
-  const navBtnStyle: React.CSSProperties = {
-    border: 'none',
-    background: 'none',
-    cursor: matches.length > 0 ? 'pointer' : 'default',
-    padding: '2px 6px',
-    fontSize: 18,
-    color: matches.length > 0 ? 'var(--text-secondary)' : 'var(--text-faint)',
-    fontFamily: 'var(--font-ui)',
-    borderRadius: 4,
-    lineHeight: 1,
-  };
-
-  const focusHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = 'var(--accent-primary)';
-    e.target.style.boxShadow = '0 0 0 2px rgba(184,132,92,0.15)';
-  };
-  const blurHandler = (e: React.FocusEvent<HTMLInputElement>) => {
-    e.target.style.borderColor = 'var(--border-primary, #E0DCD6)';
-    e.target.style.boxShadow = 'none';
-  };
+  const hasMatches = matches.length > 0;
+  const hasQuery = query.length > 0;
+  const regexError = useRegex ? (() => {
+    try { new RegExp(query); return false; } catch { return true; }
+  })() : false;
 
   return (
     <div
       style={{
-        padding: '10px 16px',
-        borderBottom: '1px solid var(--border-light)',
-        background: 'var(--bg-card)',
+        padding: '8px 12px',
+        borderBottom: '1px solid var(--border-light, #e0e0e0)',
+        background: 'var(--bg-card, #fff)',
         fontFamily: 'var(--font-ui)',
         fontSize: 13,
         flexShrink: 0,
+        display: 'flex',
+        gap: 6,
+        alignItems: 'flex-start',
       }}
       onKeyDown={handleKeyDown}
     >
-      {/* ── 제목 ── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        marginBottom: 8,
-      }}>
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', letterSpacing: 0.3 }}>
-          {showReplace ? '찾기 및 바꾸기' : '찾기'}
-        </span>
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button
-            onClick={() => setShowReplace(!showReplace)}
-            style={{
-              ...btnStyle, padding: '2px 8px', fontSize: 11,
-              background: showReplace ? 'var(--bg-active)' : 'var(--bg-primary)',
-            }}
-          >
-            {showReplace ? '찾기만' : '바꾸기'}
-          </button>
-          <button
-            onClick={onClose}
-            style={{
-              border: 'none', background: 'none', cursor: 'pointer',
-              color: 'var(--text-muted)', fontSize: 16, padding: '0 4px', lineHeight: 1,
-            }}
-            title="닫기 (Esc)"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
+      {/* ── 펼침 토글 (바꾸기 표시/숨기기) ── */}
+      <button
+        onClick={() => setShowReplace(!showReplace)}
+        title={showReplace ? '바꾸기 숨기기' : '바꾸기 표시'}
+        style={{
+          border: 'none',
+          background: 'none',
+          cursor: 'pointer',
+          padding: '4px 2px',
+          fontSize: 14,
+          color: 'var(--text-secondary, #5D5647)',
+          lineHeight: 1,
+          flexShrink: 0,
+          marginTop: 1,
+          transition: 'transform 0.15s',
+          transform: showReplace ? 'rotate(90deg)' : 'rotate(0deg)',
+        }}
+      >
+        ›
+      </button>
 
-      {/* ── 찾기 행 ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: showReplace ? 6 : 0 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <input
-            ref={findInputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="찾기..."
-            style={{ ...inputStyle, width: '100%' }}
-            onFocus={focusHandler}
-            onBlur={blurHandler}
-          />
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 160, flexShrink: 0, justifyContent: 'flex-end' }}>
-          <span style={{
-            fontSize: 12, color: 'var(--text-muted)',
-            minWidth: 50, textAlign: 'center', whiteSpace: 'nowrap',
-            fontFamily: 'var(--font-ui)',
+      {/* ── 입력 영역 ── */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 }}>
+
+        {/* ── 찾기 행 ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <div style={{
+            flex: 1, display: 'flex', alignItems: 'center',
+            border: regexError
+              ? '1px solid var(--accent-danger, #e53935)'
+              : '1px solid var(--border-primary, #d4d0ca)',
+            borderRadius: 4,
+            background: 'var(--bg-input, #fff)',
+            overflow: 'hidden',
           }}>
-            {matches.length > 0
-              ? `${currentIdx + 1} / ${matches.length}`
-              : query ? '0 / 0' : ''}
-          </span>
-          <button onClick={goPrev} style={navBtnStyle} title="이전 (Shift+Enter)">‹</button>
-          <button onClick={goNext} style={navBtnStyle} title="다음 (Enter)">›</button>
-        </div>
-      </div>
-
-      {/* ── 바꾸기 행 ── */}
-      {showReplace && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
             <input
+              ref={findInputRef}
               type="text"
-              value={replaceText}
-              onChange={(e) => setReplaceText(e.target.value)}
-              placeholder="바꾸기..."
-              style={{ ...inputStyle, width: '100%' }}
-              onFocus={focusHandler}
-              onBlur={blurHandler}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="찾기"
+              style={{
+                flex: 1,
+                border: 'none',
+                outline: 'none',
+                padding: '5px 8px',
+                fontSize: 13,
+                fontFamily: 'var(--font-ui)',
+                color: 'var(--text-primary)',
+                background: 'transparent',
+                minWidth: 0,
+              }}
+            />
+
+            {/* 옵션 토글 버튼들 (VSCode 스타일) */}
+            <OptionToggle
+              label="Aa"
+              title="대소문자 구별"
+              active={caseSensitive}
+              onClick={() => setCaseSensitive(!caseSensitive)}
+            />
+            <OptionToggle
+              label="ab"
+              title="전체 단어 일치"
+              active={wholeWord}
+              onClick={() => setWholeWord(!wholeWord)}
+              underline
+            />
+            <OptionToggle
+              label=".*"
+              title="정규 표현식"
+              active={useRegex}
+              onClick={() => setUseRegex(!useRegex)}
             />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, width: 160, flexShrink: 0, justifyContent: 'flex-end' }}>
-            <button onClick={doReplace} style={btnStyle} disabled={currentIdx < 0} title="현재 항목 바꾸기">
-              바꾸기
-            </button>
-            <button onClick={doReplaceAll} style={btnStyle} disabled={matches.length === 0} title="모두 바꾸기">
-              모두 바꾸기
+
+          {/* 오른쪽 컨트롤: 카운터 + 이동 + 닫기 (바꾸기 행과 동일 너비) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, minWidth: 168, justifyContent: 'flex-end', flexShrink: 0 }}>
+            <span style={{
+              fontSize: 12,
+              color: hasQuery && !hasMatches ? 'var(--accent-danger, #e53935)' : 'var(--text-muted, #999)',
+              minWidth: 52,
+              textAlign: 'center',
+              whiteSpace: 'nowrap',
+              fontFamily: 'var(--font-ui)',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {hasQuery
+                ? hasMatches
+                  ? `${currentIdx + 1} / ${matches.length}`
+                  : '결과 없음'
+                : ''}
+            </span>
+
+            <NavButton label="‹" title="이전 (Shift+Enter)" disabled={!hasMatches} onClick={goPrev} />
+            <NavButton label="›" title="다음 (Enter)" disabled={!hasMatches} onClick={goNext} />
+
+            <button
+              onClick={onClose}
+              title="닫기 (Esc)"
+              style={{
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                color: 'var(--text-muted, #999)',
+                fontSize: 16,
+                padding: '2px 4px',
+                lineHeight: 1,
+                borderRadius: 4,
+                flexShrink: 0,
+              }}
+            >
+              ✕
             </button>
           </div>
         </div>
-      )}
 
-      {/* ── 옵션 행 ── */}
-      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
-        <label style={checkStyle}>
-          <input type="checkbox" checked={caseSensitive} onChange={(e) => setCaseSensitive(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
-          대소문자 일치
-        </label>
-        <label style={checkStyle}>
-          <input type="checkbox" checked={wholeWord} onChange={(e) => setWholeWord(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
-          전체 일치
-        </label>
-        <label style={checkStyle}>
-          <input type="checkbox" checked={useRegex} onChange={(e) => setUseRegex(e.target.checked)} style={{ width: 13, height: 13, margin: 0 }} />
-          정규식
-        </label>
+        {/* ── 바꾸기 행 ── */}
+        {showReplace && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <div style={{
+              flex: 1, display: 'flex', alignItems: 'center',
+              border: '1px solid var(--border-primary, #d4d0ca)',
+              borderRadius: 4,
+              background: 'var(--bg-input, #fff)',
+              overflow: 'hidden',
+            }}>
+              <input
+                type="text"
+                value={replaceText}
+                onChange={(e) => setReplaceText(e.target.value)}
+                placeholder="바꾸기"
+                style={{
+                  flex: 1,
+                  border: 'none',
+                  outline: 'none',
+                  padding: '5px 8px',
+                  fontSize: 13,
+                  fontFamily: 'var(--font-ui)',
+                  color: 'var(--text-primary)',
+                  background: 'transparent',
+                  minWidth: 0,
+                }}
+              />
+            </div>
+
+            {/* 오른쪽 컨트롤 (찾기 행과 동일 너비) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 168, justifyContent: 'flex-end', flexShrink: 0 }}>
+              <ActionButton
+                label="바꾸기"
+                title="현재 항목 바꾸기"
+                disabled={currentIdx < 0}
+                onClick={doReplace}
+              />
+              <ActionButton
+                label="모두 바꾸기"
+                title="모두 바꾸기"
+                disabled={!hasMatches}
+                onClick={doReplaceAll}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
+  );
+}
+
+/* ══════════ 하위 컴포넌트 ══════════ */
+
+/** 옵션 토글 버튼 (Aa, ab, .*) */
+function OptionToggle({
+  label, title, active, onClick, underline,
+}: {
+  label: string;
+  title: string;
+  active: boolean;
+  onClick: () => void;
+  underline?: boolean;
+}) {
+  return (
+    <button
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      title={title}
+      style={{
+        border: active ? '1px solid var(--accent-primary, #5b6abf)' : '1px solid transparent',
+        background: active ? 'rgba(91, 106, 191, 0.12)' : 'transparent',
+        color: active ? 'var(--accent-primary, #5b6abf)' : 'var(--text-muted, #999)',
+        cursor: 'pointer',
+        padding: '2px 5px',
+        fontSize: 12,
+        fontFamily: 'monospace',
+        borderRadius: 3,
+        lineHeight: 1.3,
+        transition: 'all 0.12s',
+        flexShrink: 0,
+        textDecoration: underline ? 'underline' : 'none',
+        fontWeight: underline ? 700 : 400,
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** 이전/다음 이동 버튼 */
+function NavButton({
+  label, title, disabled, onClick,
+}: {
+  label: string;
+  title: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        border: 'none',
+        background: 'none',
+        cursor: disabled ? 'default' : 'pointer',
+        width: 28,
+        height: 26,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 22,
+        fontWeight: 300,
+        color: disabled ? 'var(--text-faint, #ccc)' : 'var(--text-secondary, #5D5647)',
+        fontFamily: 'var(--font-ui)',
+        borderRadius: 4,
+        lineHeight: 1,
+        flexShrink: 0,
+        transition: 'color 0.12s',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** 바꾸기 / 모두 바꾸기 버튼 */
+function ActionButton({
+  label, title, disabled, onClick,
+}: {
+  label: string;
+  title: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      style={{
+        border: '1px solid var(--border-primary, #d4d0ca)',
+        borderRadius: 4,
+        padding: '4px 10px',
+        backgroundColor: disabled ? 'var(--bg-hover, #f0ece8)' : 'var(--bg-primary, #FAF9F7)',
+        color: disabled ? 'var(--text-faint, #ccc)' : 'var(--text-secondary, #5D5647)',
+        cursor: disabled ? 'default' : 'pointer',
+        fontSize: 12,
+        fontFamily: 'var(--font-ui)',
+        transition: 'background 0.12s',
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
+      }}
+    >
+      {label}
+    </button>
   );
 }
