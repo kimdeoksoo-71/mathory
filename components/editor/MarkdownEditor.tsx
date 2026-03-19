@@ -578,6 +578,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-selectionMatch': {
               backgroundColor: 'transparent !important',
             },
+            // 비활성 에디터의 행 배경색 제거
+            '&:not(.cm-focused) .cm-activeLine': {
+              backgroundColor: 'transparent !important',
+            },
+            // 비활성 에디터의 선택 영역 배경색 제거
+            '&:not(.cm-focused) .cm-selectionBackground': {
+              backgroundColor: 'transparent !important',
+            },
+            // 비활성 에디터의 행번호 거터 배경색 제거
+            '&:not(.cm-focused) .cm-activeLineGutter': {
+              backgroundColor: 'transparent !important',
+            },
 
             // ═══ 자동완성 드롭다운 스타일 ═══
             '.cm-tooltip.cm-tooltip-autocomplete': {

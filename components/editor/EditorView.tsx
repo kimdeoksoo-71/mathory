@@ -747,12 +747,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기 하이라이트 cleanup (블록 전환 시) ─── */
+  /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
   useEffect(() => {
     if (!previewRef.current) return;
     previewRef.current.querySelectorAll('.math-highlight-active').forEach((el) => {
       el.classList.remove('math-highlight-active');
     });
+    // 다른 모든 블록의 선택 해제
+    for (const [id, ref] of Object.entries(editorRefs.current)) {
+      if (id !== activeBlockId && ref) ref.clearSelection();
+    }
   }, [activeBlockId]);
 
   /* ─── 미리보기 스크롤 동기화: 활성 수식을 세로 중앙으로 ─── */
@@ -810,6 +814,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
     );
     setActiveBlockId(blockId);
+
+    // 다른 모든 블록의 선택 해제
+    for (const [id, ref] of Object.entries(editorRefs.current)) {
+      if (id !== blockId && ref) ref.clearSelection();
+    }
 
     setTimeout(() => {
       const ref = editorRefs.current[blockId];
