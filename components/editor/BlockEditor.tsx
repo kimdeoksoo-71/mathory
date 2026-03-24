@@ -19,9 +19,7 @@ import {
 import SortableBlock from './SortableBlock';
 import MathToolbar from './MathToolbar';
 import EditorPreview from './EditorPreview';
-import ImageUploadButton from './ImageUploadButton';
 import { MarkdownEditorHandle } from './MarkdownEditor';
-import { uploadImage } from '../../lib/storage';
 import useSnippets from '../../hooks/useSnippets';
 
 export interface BlockData {
@@ -146,16 +144,6 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
     }
   };
 
-  const handleImageUpload = async (file: File) => {
-    const pid = problemId || `temp-${Date.now()}`;
-    const url = await uploadImage(file, pid);
-    const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
-
-    if (activeBlockId && editorRefs.current[activeBlockId]) {
-      editorRefs.current[activeBlockId]!.insertText(markdownImage, markdownImage.length);
-    }
-  };
-
   // ── 이미지 크기 조절 → raw_text의 width 업데이트 ──
   const handleImageResize = (src: string, newWidth: number) => {
     const updatedBlocks = blocks.map((block) => {
@@ -199,8 +187,6 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
           onSnippetEdit={editSnippet}
           onSnippetDelete={removeSnippet}
         />
-        <div style={{ width: '1px', height: '24px', backgroundColor: '#ddd', margin: '0 4px' }} />
-        <ImageUploadButton onUpload={handleImageUpload} />
       </div>
 
       {/* Split View */}

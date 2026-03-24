@@ -12,12 +12,11 @@ import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
-import ImageUploadButton from '../editor/ImageUploadButton';
 import { uploadImage } from '../../lib/storage';
 import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
-  IconChevron, IconChevronDown, IconTrash,
+  IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
 } from '../ui/Icons';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -166,7 +165,7 @@ function SortableEditorBlock({
   onTitleChange: (title: string) => void;
   onDelete: () => void;
   onToggleCollapse: () => void;
-  onImageUpload: (file: File, blockId: string) => void;
+  onImageUpload: (file: File, blockId: string) => Promise<void>;
   problemId: string;
   onSnippetShortcut?: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number }) => void;
@@ -322,7 +321,7 @@ function ImageBlockContent({
   rawText, onUpload, onChange,
 }: {
   rawText: string;
-  onUpload: (file: File) => void;
+  onUpload: (file: File) => Promise<void>;
   onChange: (value: string) => void;
 }) {
   const imgMatch = rawText.match(/src="([^"]+)"/);
@@ -332,8 +331,12 @@ function ImageBlockContent({
   const widthMatch = rawText.match(/width="(\d+)"/);
   const currentWidth = widthMatch ? parseInt(widthMatch[1], 10) : 400;
 
-  const [hovered, setHovered] = useState(false);
   const [sliderValue, setSliderValue] = useState(currentWidth);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [maxWidth, setMaxWidth] = useState(600);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // rawText가 외부에서 바뀌면 슬라이더 동기화
   useEffect(() => {
@@ -341,86 +344,129 @@ function ImageBlockContent({
     if (wm) setSliderValue(parseInt(wm[1], 10));
   }, [rawText]);
 
+  // 컨테이너 폭의 90%를 최대치로 설정
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const updateMax = () => {
+      const w = el.clientWidth;
+      if (w > 0) setMaxWidth(Math.floor(w * 0.9));
+    };
+    updateMax();
+    const observer = new ResizeObserver(updateMax);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const handleSliderChange = (val: number) => {
     setSliderValue(val);
-    // raw_text의 width="XXX" 값을 교체
     if (widthMatch) {
       const updated = rawText.replace(/width="\d+"/, `width="${val}"`);
       onChange(updated);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) onUpload(file);
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setError('이미지 파일만 업로드할 수 있습니다.');
+      return;
+    }
+    setError(null);
+    setUploading(true);
+    try {
+      await onUpload(file);
+    } catch (err: any) {
+      const msg = err?.message || err?.code || String(err);
+      console.error('이미지 업로드 실패:', err);
+      setError(`업로드 실패: ${msg}`);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
+  // dnd-kit PointerSensor 간섭 방지
+  const stopDnd = (e: React.PointerEvent) => e.stopPropagation();
+
   return (
-    <div style={{ padding: 16, textAlign: 'center', minHeight: 120 }}>
-      {imgUrl ? (
-        <div
-          onMouseEnter={() => setHovered(true)}
-          onMouseLeave={() => setHovered(false)}
-          style={{ display: 'inline-block', position: 'relative' }}
-        >
+    <div ref={containerRef} onPointerDown={stopDnd} style={{ padding: 16, textAlign: 'center', minHeight: 120 }}>
+      {/* 에러 메시지 */}
+      {error && (
+        <div style={{
+          padding: '8px 12px', marginBottom: 8, fontSize: 12,
+          color: '#c62828', background: '#ffebee', borderRadius: 6,
+          fontFamily: 'var(--font-ui)', textAlign: 'left',
+          wordBreak: 'break-all',
+        }}>
+          ❌ {error}
+          <button
+            onClick={() => setError(null)}
+            style={{
+              marginLeft: 8, border: 'none', background: 'none',
+              cursor: 'pointer', fontSize: 11, color: '#888',
+            }}
+          >✕</button>
+        </div>
+      )}
+
+      {uploading && (
+        <div style={{
+          padding: 20, color: 'var(--text-muted)', fontSize: 13,
+          fontFamily: 'var(--font-ui)',
+        }}>
+          ⏳ 이미지 업로드 중...
+        </div>
+      )}
+      {!uploading && imgUrl ? (
+        <div style={{ display: 'inline-block', position: 'relative' }}>
           <img
             src={imgUrl}
             alt="블록 이미지"
             style={{
-              width: sliderValue,
-              maxWidth: '100%',
+              width: Math.min(sliderValue, maxWidth),
+              maxWidth: '90%',
               borderRadius: 8,
-              marginBottom: 4,
+              marginBottom: 8,
               display: 'block',
-              outline: hovered ? '2px solid var(--accent-primary, #B8845C)' : 'none',
-              outlineOffset: 2,
-              transition: 'outline 0.15s',
             }}
           />
 
-          {/* 호버 시 크기조절 슬라이더 */}
-          {hovered && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              gap: 8, padding: '6px 12px', marginBottom: 8,
-              background: 'var(--bg-card, #fff)',
-              border: '1px solid var(--border-primary, #ddd)',
-              borderRadius: 8,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-            }}>
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 36 }}>
-                {sliderValue}px
-              </span>
-              <input
-                type="range"
-                min={50}
-                max={800}
-                step={10}
-                value={sliderValue}
-                onChange={(e) => handleSliderChange(Number(e.target.value))}
-                onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  width: 150,
-                  accentColor: 'var(--accent-primary, #B8845C)',
-                  cursor: 'pointer',
-                }}
-              />
-            </div>
-          )}
-
-          <div>
+          {/* 크기조절 슬라이더 + 이미지 교체 — 항상 표시 */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            gap: 8, padding: '6px 12px', marginBottom: 4,
+          }}>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 36 }}>
+              {Math.min(sliderValue, maxWidth)}px
+            </span>
+            <input
+              type="range"
+              min={50}
+              max={maxWidth}
+              step={10}
+              value={Math.min(sliderValue, maxWidth)}
+              onChange={(e) => handleSliderChange(Number(e.target.value))}
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: 150,
+                accentColor: 'var(--accent-primary, #B8845C)',
+                cursor: 'pointer',
+              }}
+            />
             <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              padding: '6px 14px', background: 'var(--bg-hover)', borderRadius: 6,
-              cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-ui)',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '4px 10px', background: 'var(--bg-hover)', borderRadius: 6,
+              cursor: 'pointer', fontSize: 11, color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
             }}>
-              🔄 이미지 교체
-              <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+              🔄 교체
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
             </label>
           </div>
         </div>
-      ) : (
+      ) : !uploading ? (
         <label style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
           gap: 8, padding: 24,
@@ -429,9 +475,9 @@ function ImageBlockContent({
         }}>
           <span style={{ fontSize: 28, opacity: 0.5 }}>🖼️</span>
           <span style={{ fontSize: 13, fontFamily: 'var(--font-ui)' }}>클릭하여 이미지 업로드</span>
-          <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
+          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
         </label>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -528,6 +574,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // 탭 markdown copy 상태 ('question' | 'solution' | null)
+  const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
   // 미리보기 활성 수식 인덱스 (-1이면 수식 밖)
   const [activeMathId, setActiveMathId] = useState<number>(-1);
@@ -700,12 +749,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 이미지 업로드 ─── */
   const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
+    console.log('[ImageUpload] 시작:', file.name, file.type, file.size, 'blockId:', blockId);
     const pid = problemId || `temp-${Date.now()}`;
-    const url = await uploadImage(file, pid);
-    const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
-    setCurrentBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? { ...b, raw_text: markdownImage } : b))
-    );
+    console.log('[ImageUpload] problemId:', pid);
+    try {
+      const url = await uploadImage(file, pid);
+      console.log('[ImageUpload] 성공, URL:', url?.substring(0, 80));
+      const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
+      setCurrentBlocks((prev) =>
+        prev.map((b) => (b.id === blockId ? { ...b, raw_text: markdownImage } : b))
+      );
+    } catch (err: any) {
+      console.error('[ImageUpload] 에러:', err);
+      console.error('[ImageUpload] 에러 코드:', err?.code);
+      console.error('[ImageUpload] 에러 메시지:', err?.message);
+      throw err; // ImageBlockContent의 catch에서 에러 메시지를 표시하도록 다시 throw
+    }
   }, [problemId, setCurrentBlocks]);
 
   /* ─── DnD ─── */
@@ -726,11 +785,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  const handleToolbarImageUpload = async (file: File) => {
-    const pid = problemId || `temp-${Date.now()}`;
-    const url = await uploadImage(file, pid);
-    const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
-    handleInsert(markdownImage, markdownImage.length);
+  /* ─── 탭 Markdown 복사 ─── */
+  const handleCopyTabMarkdown = async (tab: 'question' | 'solution') => {
+    const blocks = tab === 'question' ? questionBlocks : solutionBlocks;
+    const markdown = blocks.map((b) => b.raw_text).join('\n\n');
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopiedTab(tab);
+      setTimeout(() => setCopiedTab(null), 3000);
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+    }
   };
 
   /* ─── 수식 상용구 ─── */
@@ -1085,15 +1150,35 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
       }}>
         {(['question', 'solution'] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{
-            padding: '10px 20px', border: 'none', background: 'none', cursor: 'pointer',
-            fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
-            color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+          <div key={tab} style={{
+            display: 'flex', alignItems: 'center', gap: 4,
             borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            fontFamily: 'var(--font-ui)', transition: 'all var(--transition-fast)',
+            transition: 'all var(--transition-fast)',
           }}>
-            {tab === 'question' ? `문제 (${questionBlocks.length})` : `풀이 (${solutionBlocks.length})`}
-          </button>
+            <button onClick={() => setActiveTab(tab)} style={{
+              padding: '10px 6px 10px 12px', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
+              color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontFamily: 'var(--font-ui)', transition: 'all var(--transition-fast)',
+            }}>
+              {tab === 'question' ? `문제 (${questionBlocks.length})` : `풀이 (${solutionBlocks.length})`}
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab); }}
+              title="Markdown 복사"
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 22, height: 22, border: 'none', background: 'none',
+                cursor: 'pointer', borderRadius: 4, padding: 0,
+                color: copiedTab === tab ? '#34a853' : 'var(--text-faint)',
+                transition: 'color 0.2s, background 0.15s',
+              }}
+              onMouseEnter={(e) => { if (copiedTab !== tab) e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { if (copiedTab !== tab) e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'none'; }}
+            >
+              {copiedTab === tab ? <IconCheck size={13} /> : <IconCopy size={13} />}
+            </button>
+          </div>
         ))}
         <div style={{ flex: 1 }} />
         {status && (
@@ -1126,8 +1211,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onSnippetEdit={editSnippet}
             onSnippetDelete={removeSnippet}
           />
-          <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-          <ImageUploadButton onUpload={handleToolbarImageUpload} />
           <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
           <button
             onClick={() => setSearchOpen(!searchOpen)}

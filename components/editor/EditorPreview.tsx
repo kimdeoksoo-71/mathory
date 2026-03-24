@@ -18,6 +18,37 @@ interface EditorPreviewProps {
   onClickMath?: (mathId: number) => void;
 }
 
+/* ═══ setext heading 방지 ═══
+ * Markdown에서 텍스트 바로 아래에 "-" 또는 "=" 만 있는 줄이 오면
+ * setext heading(h1/h2)으로 해석됨. 예:
+ *   어떤 텍스트
+ *   -            ← <h2>어떤 텍스트</h2> 로 변환됨
+ *
+ * 이를 방지하기 위해 해당 줄 앞에 빈 줄을 삽입하여
+ * 리스트 아이템 또는 수평선(thematic break)으로 올바르게 처리.
+ */
+function preventSetextHeadings(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const prevLine = result.length > 0 ? result[result.length - 1] : '';
+
+    // setext underline: 줄 전체가 - 또는 = 만으로 구성 (선행 공백 0~3, 후행 공백 허용)
+    const isSetextUnderline =
+      /^\s{0,3}-+\s*$/.test(line) || /^\s{0,3}=+\s*$/.test(line);
+
+    if (isSetextUnderline && prevLine.trim() !== '') {
+      result.push(''); // 빈 줄 삽입 → setext heading 방지
+    }
+
+    result.push(line);
+  }
+
+  return result.join('\n');
+}
+
 /* ═══ ol giyeok/gana 래퍼 변환 ═══ */
 function preprocessOlTypes(text: string): string {
   return text.replace(
@@ -109,7 +140,10 @@ export default function EditorPreview({
   content, borderless = false, autoHeight = false,
   onImageResize, activeMathId, onClickMath,
 }: EditorPreviewProps) {
-  const processed = useMemo(() => preprocessMath(preprocessOlTypes(content)), [content]);
+  const processed = useMemo(
+    () => preprocessMath(preprocessOlTypes(preventSetextHeadings(content))),
+    [content],
+  );
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [hoveredImg, setHoveredImg] = useState<HTMLImageElement | null>(null);
