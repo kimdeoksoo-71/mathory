@@ -219,3 +219,30 @@ Extensions에 추가:
 - 블록별로 매치를 그룹핑하여 각 에디터에 독립적으로 Decoration 적용
 - 전역 activeIndex → 블록별 activeLocalIndex 변환 필요
 - 문서 변경 시 StateField가 자동으로 매치를 초기화 (FindReplacePanel이 재검색)
+
+## Phase 19: 탭 MD copy, 그림 삽입 복원, HWP 변환 개선 ✅
+> 목표: 편집기 안정화 및 HWP 변환기 기능 보강
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 탭 헤더 Markdown copy 버튼 | ✅ | 2026-03-21 | 클립보드 복사 |
+| 그림 삽입 버그 수정 | ✅ | 2026-03-21 | dnd-kit pointerdown 전파 차단 + Storage Rules 만료일 제거 |
+| Canvas API 600px 자동 리사이즈 | ✅ | 2026-03-21 | |
+| HWP 변환기 ordered list 변환 추가 | ✅ | 2026-03-21 | |
+
+## Phase 20: ol, uol, 수식 꼬리표 표준화 ✅
+> 목표: 국제 표준 입력 → 한국어 출력 변환 체계 확립, \tag 통일
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 기존 ol 스타일 전면 정리 | ✅ | 2026-03-28 | lower-roman counter, .ol-giyeok, .ol-gana CSS 99줄 삭제, preprocessOlTypes 제거 |
+| preprocessLocale 신규 구현 | ✅ | 2026-03-28 | 수식 보호(placeholder) → 텍스트 치환 → 복원 파이프라인 |
+| (a)~(e) → (가)~(마) 변환 | ✅ | 2026-03-28 | 5개 제한 — (i) 로마숫자 중복 회피, 행 시작 시 marker span + 내어쓰기 |
+| (i)~(v) → ㄱ.~ㅁ. 변환 | ✅ | 2026-03-28 | 5개 제한, 행 시작 시 marker span + 내어쓰기 |
+| Fig.N → [그림N] 변환 | ✅ | 2026-03-28 | word boundary 정규식 |
+| Table N → [표N] 변환 | ✅ | 2026-03-28 | word boundary 정규식 |
+| \tag{n} 독립행 수식 꼬리표 | ✅ | 2026-03-28 | KaTeX \tag*{…… ㉠} — Unicode 점 사용 |
+| \tag{n} 텍스트 행 꼬리표 | ✅ | 2026-03-28 | inline span + float right — 수식/텍스트 행 입력 방식 통일 |
+| (a)/(i) 행 빈 줄 자동 삽입 | ✅ | 2026-03-28 | soft line break에서도 독립 문단(내어쓰기) 보장 |
+
+**전처리 파이프라인**: `preventSetextHeadings → preprocessLocale → preprocessMath`

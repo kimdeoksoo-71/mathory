@@ -143,105 +143,30 @@ ul ul {
   list-style: circle;
 }
 
-/* Ordered list — Level 1: (i), (ii), (iii)... */
+/* Ordered list: 기본 숫자 (locale 변환은 전처리기에서 처리) */
 ol {
-  list-style: none;
-  counter-reset: roman;
-  padding-left: 3em;
+  list-style: decimal;
+  padding-left: 2em;
   margin: 0.4em 0;
 }
 
-ol > li {
-  counter-increment: roman;
-  position: relative;
-}
-
-ol > li::before {
-  content: "(" counter(roman, lower-roman) ")";
-  position: absolute;
-  left: -3em;
-  width: 3em;
-}
-
-/* Ordered list — Level 2: (i-1), (i-2)... */
-ol ol {
-  counter-reset: sub;
-  padding-left: 3.5em;
-}
-
-ol ol > li {
-  counter-increment: sub;
-}
-
-ol ol > li::before {
-  content: "(" counter(roman, lower-roman) "-" counter(sub) ")";
-  left: -3.5em;
-  width: 3.5em;
-}
-
-/* Ordered list — ㄱ. ㄴ. ㄷ. (<ol class="giyeok"> → div.ol-giyeok 래퍼) */
-.ol-giyeok > ol {
-  list-style: none;
+/* ═══ Ordered list markers — 내어쓰기 (hanging indent) ═══ */
+p:has(.marker-gana) {
   padding-left: 2.5em;
-  margin: 0.4em 0;
+  text-indent: -2.5em;
 }
 
-.ol-giyeok > ol > li {
-  position: relative;
+p:has(.marker-giyeok) {
+  padding-left: 2em;
+  text-indent: -2em;
 }
 
-.ol-giyeok > ol > li::before {
-  position: absolute;
-  left: -2.5em;
-  width: 2.5em;
+/* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */
+.tag-marker {
+  float: right;
+  white-space: nowrap;
+  margin-left: 2em;
 }
-
-.ol-giyeok > ol > li:nth-child(1)::before { content: "ㄱ. "; }
-.ol-giyeok > ol > li:nth-child(2)::before { content: "ㄴ. "; }
-.ol-giyeok > ol > li:nth-child(3)::before { content: "ㄷ. "; }
-.ol-giyeok > ol > li:nth-child(4)::before { content: "ㄹ. "; }
-.ol-giyeok > ol > li:nth-child(5)::before { content: "ㅁ. "; }
-.ol-giyeok > ol > li:nth-child(6)::before { content: "ㅂ. "; }
-.ol-giyeok > ol > li:nth-child(7)::before { content: "ㅅ. "; }
-.ol-giyeok > ol > li:nth-child(8)::before { content: "ㅇ. "; }
-.ol-giyeok > ol > li:nth-child(9)::before { content: "ㅈ. "; }
-.ol-giyeok > ol > li:nth-child(10)::before { content: "ㅊ. "; }
-.ol-giyeok > ol > li:nth-child(11)::before { content: "ㅋ. "; }
-.ol-giyeok > ol > li:nth-child(12)::before { content: "ㅌ. "; }
-.ol-giyeok > ol > li:nth-child(13)::before { content: "ㅍ. "; }
-.ol-giyeok > ol > li:nth-child(14)::before { content: "ㅎ. "; }
-
-/* Ordered list — (가), (나), (다) (<ol class="gana"> → div.ol-gana 래퍼) */
-.ol-gana > ol {
-  list-style: none;
-  padding-left: 3em;
-  margin: 0.4em 0;
-}
-
-.ol-gana > ol > li {
-  position: relative;
-}
-
-.ol-gana > ol > li::before {
-  position: absolute;
-  left: -3em;
-  width: 3em;
-}
-
-.ol-gana > ol > li:nth-child(1)::before { content: "(가)"; }
-.ol-gana > ol > li:nth-child(2)::before { content: "(나)"; }
-.ol-gana > ol > li:nth-child(3)::before { content: "(다)"; }
-.ol-gana > ol > li:nth-child(4)::before { content: "(라)"; }
-.ol-gana > ol > li:nth-child(5)::before { content: "(마)"; }
-.ol-gana > ol > li:nth-child(6)::before { content: "(바)"; }
-.ol-gana > ol > li:nth-child(7)::before { content: "(사)"; }
-.ol-gana > ol > li:nth-child(8)::before { content: "(아)"; }
-.ol-gana > ol > li:nth-child(9)::before { content: "(자)"; }
-.ol-gana > ol > li:nth-child(10)::before { content: "(차)"; }
-.ol-gana > ol > li:nth-child(11)::before { content: "(카)"; }
-.ol-gana > ol > li:nth-child(12)::before { content: "(타)"; }
-.ol-gana > ol > li:nth-child(13)::before { content: "(파)"; }
-.ol-gana > ol > li:nth-child(14)::before { content: "(하)"; }
 
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */

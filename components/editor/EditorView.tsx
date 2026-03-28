@@ -13,6 +13,7 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import { uploadImage } from '../../lib/storage';
+import PdfDownloadButton from '../print/PdfDownloadButton';
 import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
@@ -1195,6 +1196,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }}>
           <IconSave /> {saving ? '저장 중...' : '저장'}
         </button>
+        <PdfDownloadButton
+          title={editTitle || '수학 문제'}
+          headerInfo={`${editSource} | ${editCategory}`}
+          tabs={[
+            { label: '문제', blocks: questionBlocks.map(b => ({ id: b.id, type: b.type, raw_text: b.raw_text })) },
+            { label: '풀이', blocks: solutionBlocks.map(b => ({ id: b.id, type: b.type, raw_text: b.raw_text })) },
+          ]}
+          locale="ko"
+        />
       </div>
 
       {/* ═══ Row 3: Math Toolbar ═══ */}
@@ -1344,6 +1354,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       <EditorPreview
                         content={block.raw_text}
                         borderless
+                        locale="ko"
                         activeMathId={isActivePreview ? activeMathId : undefined}
                         onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
@@ -1352,6 +1363,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     <div style={{ padding: '8px 0' }}>
                       <EditorPreview
                         content={block.raw_text.replace(/\n/g, '\n\n')}
+                        locale="ko"
                         activeMathId={isActivePreview ? activeMathId : undefined}
                         onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
@@ -1360,6 +1372,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     <div style={{ padding: '8px 0' }}>
                       <EditorPreview
                         content={block.raw_text}
+                        locale="ko"
                         activeMathId={isActivePreview ? activeMathId : undefined}
                         onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
