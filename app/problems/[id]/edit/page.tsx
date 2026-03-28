@@ -248,7 +248,6 @@ export default function EditProblemPage() {
 
         <PdfDownloadButton
           title={title || '수학 문제'}
-          headerInfo={`${year}학년도 ${examType} | ${category}`}
           tabs={[
             { label: '문제', blocks: questionBlocks },
             { label: '풀이', blocks: solutionBlocks },

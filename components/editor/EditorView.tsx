@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Problem, Block, ProblemWithBlocks, Folder } from '../../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem,
-  saveQuestionBlock, saveSolutionBlock,
-  updateBlock, deleteBlock,
+  saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
 import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
@@ -13,11 +12,12 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import { uploadImage } from '../../lib/storage';
-import PdfDownloadButton from '../print/PdfDownloadButton';
+import PrintableContent, { PrintTab } from '../print/PrintableContent';
 import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
   IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
+  IconDotsVertical, IconDownload, IconRename,
 } from '../ui/Icons';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -121,16 +121,12 @@ function findMathIdAtCursor(ranges: MathRange[], cursor: number): number {
   return -1;
 }
 
-/* ═══ Font Size 유틸 ═══ */
-
 function getStoredFontSize(): number {
   if (typeof window === 'undefined') return FONT_SIZE_DEFAULT;
   const stored = localStorage.getItem(FONT_SIZE_KEY);
-  if (stored) {
-    const n = parseInt(stored, 10);
-    if (!isNaN(n) && n >= FONT_SIZE_MIN && n <= FONT_SIZE_MAX) return n;
-  }
-  return FONT_SIZE_DEFAULT;
+  if (!stored) return FONT_SIZE_DEFAULT;
+  const n = parseInt(stored, 10);
+  return isNaN(n) ? FONT_SIZE_DEFAULT : Math.max(FONT_SIZE_MIN, Math.min(FONT_SIZE_MAX, n));
 }
 
 function setStoredFontSize(size: number) {
@@ -138,22 +134,127 @@ function setStoredFontSize(size: number) {
   document.documentElement.style.setProperty('--content-font-size', size + 'px');
 }
 
-/* ═══ Props ═══ */
+/* ═══ ImageBlockContent ═══ */
 
-interface EditorViewProps {
+function ImageBlockContent({
+  block,
+  onImageUpload,
+  problemId,
+}: {
+  block: LocalBlock;
+  onImageUpload: (file: File, blockId: string) => Promise<void>;
   problemId: string;
-  folders: Folder[];
-  onBack: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+
+  if (block.raw_text) {
+    const srcMatch = block.raw_text.match(/src="([^"]+)"/);
+    const src = srcMatch?.[1] || '';
+    return (
+      <div style={{ padding: 8, textAlign: 'center' }}>
+        <img src={src} alt="" style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8 }} />
+        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
+          이미지를 변경하려면 새 파일을 선택하세요
+        </div>
+        <label
+          style={{
+            display: 'inline-block', marginTop: 6, padding: '4px 12px',
+            fontSize: 12, background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
+            borderRadius: 6, cursor: 'pointer',
+          }}
+        >
+          파일 선택
+          <input
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              setUploading(true);
+              setError('');
+              try {
+                await onImageUpload(file, block.id);
+              } catch (err: any) {
+                setError(`업로드 실패: ${err.message || err}`);
+              } finally {
+                setUploading(false);
+              }
+            }}
+          />
+        </label>
+        {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4 }}>{error}</div>}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      padding: 24, textAlign: 'center',
+      border: '2px dashed var(--border-light)', borderRadius: 8, margin: 8,
+    }}>
+      {uploading ? (
+        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>업로드 중...</span>
+      ) : (
+        <>
+          <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
+            이미지를 선택하세요
+          </div>
+          <label
+            style={{
+              display: 'inline-block', padding: '6px 16px',
+              fontSize: 13, background: 'var(--accent-primary)', color: '#fff',
+              borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            파일 선택
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                setError('');
+                try {
+                  await onImageUpload(file, block.id);
+                } catch (err: any) {
+                  setError(`업로드 실패: ${err.message || err}`);
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          </label>
+          {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 8 }}>{error}</div>}
+        </>
+      )}
+    </div>
+  );
 }
 
 /* ═══ SortableEditorBlock ═══ */
 
 function SortableEditorBlock({
-  block, index, isActive, canDelete, editorRefs,
-  onFocus, onChange, onTypeChange, onTitleChange,
-  onDelete, onToggleCollapse,
-  onImageUpload, problemId,
-  onSnippetShortcut, onCursorActivity,
+  block,
+  index,
+  isActive,
+  canDelete,
+  editorRefs,
+  onFocus,
+  onChange,
+  onTypeChange,
+  onTitleChange,
+  onDelete,
+  onToggleCollapse,
+  onImageUpload,
+  problemId,
+  onSnippetShortcut,
+  onCursorActivity,
 }: {
   block: LocalBlock;
   index: number;
@@ -161,64 +262,61 @@ function SortableEditorBlock({
   canDelete: boolean;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
   onFocus: () => void;
-  onChange: (value: string) => void;
+  onChange: (val: string) => void;
   onTypeChange: (type: Block['type']) => void;
   onTitleChange: (title: string) => void;
   onDelete: () => void;
   onToggleCollapse: () => void;
   onImageUpload: (file: File, blockId: string) => Promise<void>;
   problemId: string;
-  onSnippetShortcut?: (index: number) => void;
+  onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number }) => void;
 }) {
   const {
-    attributes, listeners, setNodeRef,
-    transform, transition, isDragging,
+    attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: block.id });
 
-  const style = {
+  const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    zIndex: isDragging ? 10 : undefined,
+    marginBottom: 6,
+    border: isActive
+      ? '1.5px solid var(--accent-primary)'
+      : '1px solid var(--border-light)',
+    borderRadius: 10,
+    background: 'var(--bg-card)',
+    overflow: 'hidden',
   };
 
-  const headerBg = isActive ? 'var(--accent-primary, #5b6abf)' : 'var(--bg-hover, #f0ece8)';
-  const headerColor = isActive ? '#fff' : 'var(--text-muted)';
-
   return (
-    <div
-      ref={setNodeRef}
-      style={{ ...style, marginBottom: 8 }}
-      onClick={onFocus}
-      data-block-id={block.id}
-    >
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 6,
-        padding: '5px 10px',
-        background: headerBg,
-        borderRadius: block.collapsed ? 8 : '8px 8px 0 0',
-        fontSize: 12, color: headerColor,
-        transition: 'background 0.15s',
-      }}>
-        <span
-          {...attributes}
-          {...listeners}
-          style={{ cursor: 'grab', display: 'flex', padding: '2px 2px', flexShrink: 0, opacity: 0.7 }}
-          title="드래그하여 이동"
-        >
-          <IconGrip size={13} />
-        </span>
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {/* ── Block Header ── */}
+      <div
+        style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          padding: '4px 8px', background: 'var(--bg-secondary)',
+          cursor: 'grab', fontSize: 12, color: 'var(--text-muted)',
+          fontFamily: 'var(--font-ui)', userSelect: 'none',
+        }}
+        {...listeners}
+      >
+        <IconGrip size={12} />
+
+        <button onClick={onToggleCollapse} style={{
+          border: 'none', background: 'none', cursor: 'pointer', padding: 2,
+          display: 'flex', color: 'var(--text-muted)',
+        }}>
+          {block.collapsed ? <IconChevron size={12} /> : <IconChevronDown size={12} />}
+        </button>
 
         <select
           value={block.type}
           onChange={(e) => onTypeChange(e.target.value as Block['type'])}
-          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
           style={{
-            padding: '1px 4px', border: '1px solid rgba(255,255,255,0.3)',
-            borderRadius: 4, fontSize: 11, cursor: 'pointer',
-            background: isActive ? 'rgba(255,255,255,0.2)' : 'var(--bg-card, #fff)',
-            color: isActive ? '#fff' : 'var(--text-secondary)',
+            border: 'none', background: 'none', fontSize: 11,
+            color: 'var(--text-muted)', cursor: 'pointer', outline: 'none',
             fontFamily: 'var(--font-ui)',
           }}
         >
@@ -227,321 +325,67 @@ function SortableEditorBlock({
           ))}
         </select>
 
-        <span style={{ fontSize: 11, opacity: 0.8, flexShrink: 0 }}>
-          {index + 1}
-        </span>
+        {(block.type === 'text' || block.type === 'box') && (
+          <input
+            value={block.title || ''}
+            onChange={(e) => onTitleChange(e.target.value)}
+            onPointerDown={(e) => e.stopPropagation()}
+            placeholder="제목"
+            style={{
+              flex: 1, border: 'none', background: 'none', fontSize: 11,
+              color: 'var(--text-secondary)', outline: 'none', padding: '1px 4px',
+              fontFamily: 'var(--font-ui)',
+            }}
+          />
+        )}
 
-        <input
-          value={block.title || ''}
-          onChange={(e) => onTitleChange(e.target.value)}
-          onClick={(e) => e.stopPropagation()}
-          placeholder="블록 이름..."
-          style={{
-            flex: 1, minWidth: 60,
-            border: 'none', outline: 'none',
-            background: 'transparent',
-            fontSize: 11, padding: '2px 4px',
-            color: isActive ? 'rgba(255,255,255,0.9)' : 'var(--text-muted)',
-            fontFamily: 'var(--font-ui)',
-          }}
-        />
+        <div style={{ flex: 1 }} />
 
         {canDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
               border: 'none', background: 'none', cursor: 'pointer',
-              display: 'flex', padding: 2, borderRadius: 4,
-              color: isActive ? 'rgba(255,255,255,0.6)' : 'var(--text-faint)',
+              padding: 2, display: 'flex', color: 'var(--text-faint)',
             }}
             title="블록 삭제"
           >
             <IconTrash size={12} />
           </button>
         )}
-
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleCollapse(); }}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer',
-            display: 'flex', padding: 2, borderRadius: 4,
-            color: isActive ? 'rgba(255,255,255,0.8)' : 'var(--text-muted)',
-            transition: 'transform 0.15s',
-            transform: block.collapsed ? 'rotate(-90deg)' : 'rotate(0deg)',
-          }}
-          title={block.collapsed ? '펼치기' : '접기'}
-        >
-          <IconChevronDown size={13} />
-        </button>
       </div>
 
+      {/* ── Block Content ── */}
       {!block.collapsed && (
-        <div style={{
-          border: isActive
-            ? '2px solid var(--accent-primary, #5b6abf)'
-            : '1px solid var(--border-primary, #ddd)',
-          borderTop: 'none',
-          borderRadius: '0 0 8px 8px',
-          overflow: 'hidden',
-          transition: 'border-color 0.15s',
-        }}>
-          {(block.type === 'text' || block.type === 'box') && (
+        <div style={{ padding: block.type === 'image' ? 0 : '0' }} onClick={onFocus}>
+          {block.type === 'image' ? (
+            <ImageBlockContent
+              block={block}
+              onImageUpload={onImageUpload}
+              problemId={problemId}
+            />
+          ) : (
             <MarkdownEditor
               ref={(el) => { editorRefs.current[block.id] = el; }}
               initialValue={block.raw_text}
               onChange={onChange}
-              autoHeight
               onSnippetShortcut={onSnippetShortcut}
               onCursorActivity={onCursorActivity}
             />
           )}
-
-          {block.type === 'image' && (
-            <ImageBlockContent
-              rawText={block.raw_text}
-              onUpload={(file) => onImageUpload(file, block.id)}
-              onChange={onChange}
-            />
-          )}
-
-          {block.type === 'choices' && (
-            <ChoicesBlockContent
-              rawText={block.raw_text}
-              onChange={onChange}
-            />
-          )}
         </div>
       )}
     </div>
   );
 }
 
-/* ═══ 그림 블록 내용 ═══ */
+/* ═══ EditorViewProps ═══ */
 
-function ImageBlockContent({
-  rawText, onUpload, onChange,
-}: {
-  rawText: string;
-  onUpload: (file: File) => Promise<void>;
-  onChange: (value: string) => void;
-}) {
-  const imgMatch = rawText.match(/src="([^"]+)"/);
-  const imgUrl = imgMatch ? imgMatch[1] : null;
-
-  // width 파싱
-  const widthMatch = rawText.match(/width="(\d+)"/);
-  const currentWidth = widthMatch ? parseInt(widthMatch[1], 10) : 400;
-
-  const [sliderValue, setSliderValue] = useState(currentWidth);
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [maxWidth, setMaxWidth] = useState(600);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // rawText가 외부에서 바뀌면 슬라이더 동기화
-  useEffect(() => {
-    const wm = rawText.match(/width="(\d+)"/);
-    if (wm) setSliderValue(parseInt(wm[1], 10));
-  }, [rawText]);
-
-  // 컨테이너 폭의 90%를 최대치로 설정
-  useEffect(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const updateMax = () => {
-      const w = el.clientWidth;
-      if (w > 0) setMaxWidth(Math.floor(w * 0.9));
-    };
-    updateMax();
-    const observer = new ResizeObserver(updateMax);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const handleSliderChange = (val: number) => {
-    setSliderValue(val);
-    if (widthMatch) {
-      const updated = rawText.replace(/width="\d+"/, `width="${val}"`);
-      onChange(updated);
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setError('이미지 파일만 업로드할 수 있습니다.');
-      return;
-    }
-    setError(null);
-    setUploading(true);
-    try {
-      await onUpload(file);
-    } catch (err: any) {
-      const msg = err?.message || err?.code || String(err);
-      console.error('이미지 업로드 실패:', err);
-      setError(`업로드 실패: ${msg}`);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  // dnd-kit PointerSensor 간섭 방지
-  const stopDnd = (e: React.PointerEvent) => e.stopPropagation();
-
-  return (
-    <div ref={containerRef} onPointerDown={stopDnd} style={{ padding: 16, textAlign: 'center', minHeight: 120 }}>
-      {/* 에러 메시지 */}
-      {error && (
-        <div style={{
-          padding: '8px 12px', marginBottom: 8, fontSize: 12,
-          color: '#c62828', background: '#ffebee', borderRadius: 6,
-          fontFamily: 'var(--font-ui)', textAlign: 'left',
-          wordBreak: 'break-all',
-        }}>
-          ❌ {error}
-          <button
-            onClick={() => setError(null)}
-            style={{
-              marginLeft: 8, border: 'none', background: 'none',
-              cursor: 'pointer', fontSize: 11, color: '#888',
-            }}
-          >✕</button>
-        </div>
-      )}
-
-      {uploading && (
-        <div style={{
-          padding: 20, color: 'var(--text-muted)', fontSize: 13,
-          fontFamily: 'var(--font-ui)',
-        }}>
-          ⏳ 이미지 업로드 중...
-        </div>
-      )}
-      {!uploading && imgUrl ? (
-        <div style={{ display: 'inline-block', position: 'relative' }}>
-          <img
-            src={imgUrl}
-            alt="블록 이미지"
-            style={{
-              width: Math.min(sliderValue, maxWidth),
-              maxWidth: '90%',
-              borderRadius: 8,
-              marginBottom: 8,
-              display: 'block',
-            }}
-          />
-
-          {/* 크기조절 슬라이더 + 이미지 교체 — 항상 표시 */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            gap: 8, padding: '6px 12px', marginBottom: 4,
-          }}>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 36 }}>
-              {Math.min(sliderValue, maxWidth)}px
-            </span>
-            <input
-              type="range"
-              min={50}
-              max={maxWidth}
-              step={10}
-              value={Math.min(sliderValue, maxWidth)}
-              onChange={(e) => handleSliderChange(Number(e.target.value))}
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                width: 150,
-                accentColor: 'var(--accent-primary, #B8845C)',
-                cursor: 'pointer',
-              }}
-            />
-            <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: 4,
-              padding: '4px 10px', background: 'var(--bg-hover)', borderRadius: 6,
-              cursor: 'pointer', fontSize: 11, color: 'var(--text-secondary)',
-              fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
-            }}>
-              🔄 교체
-              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-            </label>
-          </div>
-        </div>
-      ) : !uploading ? (
-        <label style={{
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-          gap: 8, padding: 24,
-          border: '2px dashed var(--border-light)', borderRadius: 12,
-          cursor: 'pointer', color: 'var(--text-muted)', minHeight: 100,
-        }}>
-          <span style={{ fontSize: 28, opacity: 0.5 }}>🖼️</span>
-          <span style={{ fontSize: 13, fontFamily: 'var(--font-ui)' }}>클릭하여 이미지 업로드</span>
-          <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} style={{ display: 'none' }} />
-        </label>
-      ) : null}
-    </div>
-  );
-}
-
-/* ═══ 선택지 블록 내용 ═══ */
-
-function ChoicesBlockContent({
-  rawText, onChange,
-}: {
-  rawText: string;
-  onChange: (value: string) => void;
-}) {
-  const parseChoices = (text: string): string[] => {
-    const lines = text.split('\n');
-    const choices: string[] = ['', '', '', '', ''];
-    lines.forEach((line, i) => {
-      if (i < 5) {
-        const match = line.match(/^[①②③④⑤]\s?(.*)/);
-        choices[i] = match ? match[1] : line.replace(/^[①②③④⑤]\s?/, '');
-      }
-    });
-    return choices;
-  };
-
-  const [choices, setChoices] = useState(() => parseChoices(rawText || DEFAULT_CHOICES));
-
-  const handleChange = (index: number, value: string) => {
-    const updated = [...choices];
-    updated[index] = value;
-    setChoices(updated);
-    const text = updated.map((c, i) => `${CHOICES_LABELS[i]} ${c}`).join('\n');
-    onChange(text);
-  };
-
-  return (
-    <div style={{ padding: 12 }}>
-      {CHOICES_LABELS.map((label, i) => (
-        <div key={i} style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6,
-        }}>
-          <span style={{
-            fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)',
-            width: 24, textAlign: 'center', flexShrink: 0,
-          }}>
-            {label}
-          </span>
-          <input
-            value={choices[i]}
-            onChange={(e) => handleChange(i, e.target.value)}
-            placeholder="입력..."
-            style={{
-              flex: 1, border: '1px solid var(--border-light)', borderRadius: 6,
-              padding: '6px 10px', fontSize: 14, fontFamily: 'var(--font-ui)',
-              outline: 'none', color: 'var(--text-primary)',
-              background: 'var(--bg-input, #fff)',
-            }}
-            onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
-            onBlur={(e) => { e.target.style.borderColor = 'var(--border-light)'; }}
-          />
-        </div>
-      ))}
-    </div>
-  );
+interface EditorViewProps {
+  problemId: string;
+  folders: Folder[];
+  onBack: () => void;
 }
 
 /* ═══ 메인 EditorView ═══ */
@@ -549,7 +393,19 @@ function ChoicesBlockContent({
 export default function EditorView({ problemId, folders, onBack }: EditorViewProps) {
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'question' | 'solution'>('question');
+
+  // ── 동적 탭 ──
+  const [tabs, setTabs] = useState<TabMeta[]>(DEFAULT_TABS);
+  const [activeTab, setActiveTab] = useState('question');
+  const [allBlocks, setAllBlocks] = useState<Record<string, LocalBlock[]>>({});
+  const [origBlockIds, setOrigBlockIds] = useState<Record<string, string[]>>({});
+  const [origTabs, setOrigTabs] = useState<TabMeta[]>(DEFAULT_TABS);
+
+  // 탭 이름 편집
+  const [editingTabId, setEditingTabId] = useState<string | null>(null);
+  const [editingTabLabel, setEditingTabLabel] = useState('');
+  const tabLabelInputRef = useRef<HTMLInputElement>(null);
+
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState('');
 
@@ -564,23 +420,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 글꼴 크기
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
 
-  // 블록 상태
-  const [questionBlocks, setQuestionBlocks] = useState<LocalBlock[]>([]);
-  const [solutionBlocks, setSolutionBlocks] = useState<LocalBlock[]>([]);
+  // 활성 블록
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
-
-  // 원본 블록 ID 추적
-  const [origQuestionIds, setOrigQuestionIds] = useState<string[]>([]);
-  const [origSolutionIds, setOrigSolutionIds] = useState<string[]>([]);
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
 
-  // 탭 markdown copy 상태 ('question' | 'solution' | null)
+  // 탭 markdown copy 상태
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
 
-  // 미리보기 활성 수식 인덱스 (-1이면 수식 밖)
+  // 미리보기 활성 수식 인덱스
   const [activeMathId, setActiveMathId] = useState<number>(-1);
+
+  // 3점 메뉴
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [pdfTabSelection, setPdfTabSelection] = useState<Record<string, boolean>>({});
+  const [isPrinting, setIsPrinting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
@@ -623,16 +479,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setEditAnswer(data.answer || '');
         setEditFolderId(data.folder_id || '');
 
+        const loadedTabs = data.tabs || DEFAULT_TABS;
+        setTabs(loadedTabs);
+        setOrigTabs(loadedTabs);
+
         const toLocal = (blocks: Block[]): LocalBlock[] =>
           blocks.map((b) => ({ ...b, collapsed: false, title: b.title || '' }));
 
-        const qBlocks = toLocal(data.question_blocks);
-        const sBlocks = toLocal(data.solution_blocks);
-        setQuestionBlocks(qBlocks);
-        setSolutionBlocks(sBlocks);
-        setOrigQuestionIds(data.question_blocks.map((b) => b.id));
-        setOrigSolutionIds(data.solution_blocks.map((b) => b.id));
-        if (qBlocks.length > 0) setActiveBlockId(qBlocks[0].id);
+        const blocksMap: Record<string, LocalBlock[]> = {};
+        const origIds: Record<string, string[]> = {};
+        for (const tab of loadedTabs) {
+          const blocks = data.tabBlocks[tab.id] || [];
+          blocksMap[tab.id] = toLocal(blocks);
+          origIds[tab.id] = blocks.map((b) => b.id);
+        }
+        setAllBlocks(blocksMap);
+        setOrigBlockIds(origIds);
+
+        // 첫 블록 활성화
+        const firstTabBlocks = blocksMap[loadedTabs[0].id] || [];
+        if (firstTabBlocks.length > 0) setActiveBlockId(firstTabBlocks[0].id);
       }
       setLoading(false);
     };
@@ -640,8 +506,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [problemId]);
 
   /* ─── 현재 탭의 블록 ─── */
-  const currentBlocks = activeTab === 'question' ? questionBlocks : solutionBlocks;
-  const setCurrentBlocks = activeTab === 'question' ? setQuestionBlocks : setSolutionBlocks;
+  const currentBlocks = allBlocks[activeTab] || [];
+  const setCurrentBlocks = useCallback((updater: LocalBlock[] | ((prev: LocalBlock[]) => LocalBlock[])) => {
+    setAllBlocks((prev) => ({
+      ...prev,
+      [activeTab]: typeof updater === 'function' ? updater(prev[activeTab] || []) : updater,
+    }));
+  }, [activeTab]);
 
   /* ─── 블록 조작 핸들러 ─── */
   const handleBlockChange = useCallback((blockId: string, value: string) => {
@@ -750,21 +621,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 이미지 업로드 ─── */
   const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
-    console.log('[ImageUpload] 시작:', file.name, file.type, file.size, 'blockId:', blockId);
     const pid = problemId || `temp-${Date.now()}`;
-    console.log('[ImageUpload] problemId:', pid);
     try {
       const url = await uploadImage(file, pid);
-      console.log('[ImageUpload] 성공, URL:', url?.substring(0, 80));
       const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
       setCurrentBlocks((prev) =>
         prev.map((b) => (b.id === blockId ? { ...b, raw_text: markdownImage } : b))
       );
     } catch (err: any) {
       console.error('[ImageUpload] 에러:', err);
-      console.error('[ImageUpload] 에러 코드:', err?.code);
-      console.error('[ImageUpload] 에러 메시지:', err?.message);
-      throw err; // ImageBlockContent의 catch에서 에러 메시지를 표시하도록 다시 throw
+      throw err;
     }
   }, [problemId, setCurrentBlocks]);
 
@@ -787,12 +653,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   };
 
   /* ─── 탭 Markdown 복사 ─── */
-  const handleCopyTabMarkdown = async (tab: 'question' | 'solution') => {
-    const blocks = tab === 'question' ? questionBlocks : solutionBlocks;
+  const handleCopyTabMarkdown = async (tabId: string) => {
+    const blocks = allBlocks[tabId] || [];
     const markdown = blocks.map((b) => b.raw_text).join('\n\n');
     try {
       await navigator.clipboard.writeText(markdown);
-      setCopiedTab(tab);
+      setCopiedTab(tabId);
       setTimeout(() => setCopiedTab(null), 3000);
     } catch (err) {
       console.error('클립보드 복사 실패:', err);
@@ -813,69 +679,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
-  useEffect(() => {
-    if (!previewRef.current) return;
-    previewRef.current.querySelectorAll('.math-highlight-active').forEach((el) => {
-      el.classList.remove('math-highlight-active');
-    });
-    // 다른 모든 블록의 선택 해제
-    for (const [id, ref] of Object.entries(editorRefs.current)) {
-      if (id !== activeBlockId && ref) ref.clearSelection();
-    }
-  }, [activeBlockId]);
-
-  /* ─── 미리보기 스크롤 동기화: 활성 수식을 세로 중앙으로 ─── */
-  useEffect(() => {
-    if (activeMathId < 0 || !previewRef.current) return;
-    const timer = setTimeout(() => {
-      requestAnimationFrame(() => {
-        const container = previewRef.current;
-        if (!container) return;
-        const highlighted = container.querySelector('.math-highlight-active') as HTMLElement;
-        if (!highlighted) return;
-        const containerRect = container.getBoundingClientRect();
-        const highlightedRect = highlighted.getBoundingClientRect();
-        const offset = highlightedRect.top - containerRect.top + container.scrollTop;
-        const center = offset - containerRect.height / 2 + highlightedRect.height / 2;
-        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
-      });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [activeMathId, activeBlockId]);
-
-  /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
-  useEffect(() => {
-    const blocks = activeTab === 'question' ? questionBlocks : solutionBlocks;
-    if (blocks.length > 0 && !blocks.find((b) => b.id === activeBlockId)) {
-      setActiveBlockId(blocks[0].id);
-    }
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Ctrl+F 단축키: 찾기/바꾸기 열기 ──
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        e.preventDefault();
-        setSearchOpen(true);
-      }
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, []);
-
-  /* ─── 커서 활동 → 수식 인덱스 계산 ─── */
+  /* ─── 커서 활동 → 수식 하이라이트 ─── */
   const handleCursorActivity = useCallback((info: { line: number; offset: number }) => {
-    if (!activeBlockId) { setActiveMathId(-1); return; }
+    if (!activeBlockId) return;
     const ref = editorRefs.current[activeBlockId];
-    if (!ref) { setActiveMathId(-1); return; }
+    if (!ref) return;
     const content = ref.getContent();
     const ranges = buildMathIndex(content);
-    setActiveMathId(findMathIdAtCursor(ranges, info.offset));
+    const mathId = findMathIdAtCursor(ranges, info.offset);
+    setActiveMathId(mathId);
   }, [activeBlockId]);
 
-  /* ─── 미리보기 수식 클릭 → 편집창에서 해당 수식 선택 (mathId 기반) ─── */
+  /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
+    // 블록 펼침 + 활성화
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
     );
@@ -911,7 +728,287 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 100);
   }, [setCurrentBlocks]);
 
-  /* ─── 저장 ─── */
+  /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
+  useEffect(() => {
+    if (!previewRef.current) return;
+    previewRef.current.querySelectorAll('.math-highlight-active').forEach((el) => {
+      el.classList.remove('math-highlight-active');
+    });
+    for (const [id, ref] of Object.entries(editorRefs.current)) {
+      if (id !== activeBlockId && ref) ref.clearSelection();
+    }
+  }, [activeBlockId]);
+
+  /* ─── 미리보기 스크롤 동기화 ─── */
+  useEffect(() => {
+    if (activeMathId < 0 || !previewRef.current) return;
+    const timer = setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const highlighted = container.querySelector('.math-highlight-active') as HTMLElement;
+        if (!highlighted) return;
+        const containerRect = container.getBoundingClientRect();
+        const highlightedRect = highlighted.getBoundingClientRect();
+        const offset = highlightedRect.top - containerRect.top + container.scrollTop;
+        const center = offset - containerRect.height / 2 + highlightedRect.height / 2;
+        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+      });
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [activeMathId, activeBlockId]);
+
+  /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
+  useEffect(() => {
+    const blocks = allBlocks[activeTab] || [];
+    if (blocks.length > 0 && !blocks.find((b) => b.id === activeBlockId)) {
+      setActiveBlockId(blocks[0].id);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Ctrl+F 단축키: 찾기/바꾸기 열기 ──
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
+
+  /* ─── 3점 메뉴 외부 클릭 닫기 ─── */
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [menuOpen]);
+
+  /* ═══ 탭 추가 ═══ */
+  const handleAddTab = () => {
+    // 다음 "풀이N" 번호 계산
+    let maxSolNum = 1;
+    for (const tab of tabs) {
+      const match = tab.label.match(/^풀이(\d*)$/);
+      if (match) {
+        const num = match[1] ? parseInt(match[1]) : 1;
+        maxSolNum = Math.max(maxSolNum, num);
+      }
+    }
+    const newLabel = `풀이${maxSolNum + 1}`;
+
+    // 다음 extra ID 계산
+    const extraTabs = tabs.filter((t) => t.id.startsWith('extra_'));
+    const maxExtraNum = extraTabs.reduce((max, t) => {
+      const num = parseInt(t.id.split('_')[1]);
+      return isNaN(num) ? max : Math.max(max, num);
+    }, -1);
+    const newId = `extra_${maxExtraNum + 1}`;
+
+    const newTab: TabMeta = { id: newId, label: newLabel };
+    setTabs((prev) => [...prev, newTab]);
+    setAllBlocks((prev) => ({
+      ...prev,
+      [newId]: [{
+        id: `new-${Date.now()}`,
+        order: 0,
+        type: 'text',
+        raw_text: '',
+        title: '',
+        collapsed: false,
+        isNew: true,
+      }],
+    }));
+    setActiveTab(newId);
+  };
+
+  /* ═══ 탭 삭제 (3번째 이후만) ═══ */
+  const handleDeleteTab = (tabId: string) => {
+    const tabIdx = tabs.findIndex((t) => t.id === tabId);
+    if (tabIdx < 2) return; // 문제/풀이 탭은 삭제 불가
+
+    const tabLabel = tabs[tabIdx].label;
+    if (!confirm(`'${tabLabel}' 탭을 삭제하시겠습니까? 탭 안의 모든 블록이 삭제됩니다.`)) return;
+
+    setTabs((prev) => prev.filter((t) => t.id !== tabId));
+    setAllBlocks((prev) => {
+      const next = { ...prev };
+      delete next[tabId];
+      return next;
+    });
+
+    // 삭제된 탭이 활성 탭이면 이전 탭으로 이동
+    if (activeTab === tabId) {
+      setActiveTab(tabs[tabIdx - 1]?.id || 'question');
+    }
+  };
+
+  /* ═══ 탭 이름 편집 (3번째 이후만) ═══ */
+  const startEditTabLabel = (tabId: string) => {
+    const tab = tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    setEditingTabId(tabId);
+    setEditingTabLabel(tab.label);
+    setTimeout(() => tabLabelInputRef.current?.focus(), 50);
+  };
+
+  const commitTabLabel = () => {
+    if (editingTabId && editingTabLabel.trim()) {
+      setTabs((prev) =>
+        prev.map((t) => (t.id === editingTabId ? { ...t, label: editingTabLabel.trim() } : t))
+      );
+    }
+    setEditingTabId(null);
+  };
+
+  /* ═══ PDF 인쇄 ═══ */
+  const handlePdfPrint = useCallback(async () => {
+    setIsPrinting(true);
+    setMenuOpen(false);
+
+    try {
+      const selectedTabs = tabs.filter((t) => pdfTabSelection[t.id] !== false);
+      const printTabs: PrintTab[] = selectedTabs.map((t) => ({
+        label: t.label,
+        blocks: (allBlocks[t.id] || []).map((b) => ({
+          id: b.id, type: b.type, raw_text: b.raw_text,
+        })),
+      }));
+
+      if (printTabs.length === 0) {
+        alert('출력할 탭을 하나 이상 선택해주세요.');
+        setIsPrinting(false);
+        return;
+      }
+
+      const katexCssUrl = 'https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.css';
+
+      // React → HTML
+      const tempDiv = document.createElement('div');
+      tempDiv.style.cssText = 'position:absolute;left:-9999px;top:0;';
+      document.body.appendChild(tempDiv);
+      const { createRoot } = await import('react-dom/client');
+      const root = createRoot(tempDiv);
+      await new Promise<void>((resolve) => {
+        root.render(
+          <PrintableContent
+            title={editTitle || '수학 문제'}
+            tabs={printTabs}
+            locale="ko"
+          />
+        );
+        setTimeout(resolve, 500);
+      });
+      const contentHtml = tempDiv.querySelector('.print-root')?.innerHTML || '';
+      root.unmount();
+      document.body.removeChild(tempDiv);
+
+      // 숨겨진 iframe → 시스템 인쇄 다이얼로그
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
+      document.body.appendChild(iframe);
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (!iframeDoc || !iframe.contentWindow) {
+        document.body.removeChild(iframe);
+        setIsPrinting(false);
+        return;
+      }
+
+      iframeDoc.open();
+      iframeDoc.write(`
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>${editTitle || '수학 문제'} - PDF</title>
+  <link rel="stylesheet" href="${katexCssUrl}" />
+  <style>
+    @page {
+      size: 297mm 420mm;
+      margin: 30mm 20mm;
+    }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0; padding: 0;
+      font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+      font-size: 12pt; line-height: 1.75; color: #000;
+    }
+    .print-body {
+      column-count: 2;
+      column-gap: 10mm;
+      column-fill: auto;
+      height: 100%;
+    }
+    .print-tab-section { break-before: column; }
+    .print-tab-label {
+      font-size: 14pt; font-weight: 700;
+      margin: 0 0 6pt; padding-bottom: 3pt;
+      border-bottom: 0.15mm solid #999; margin-bottom: 8pt;
+      break-after: avoid;
+    }
+    h1 { font-size: 16pt; font-weight: 700; margin: 0 0 6pt; break-after: avoid; }
+    h2 { font-size: 14pt; font-weight: 700; margin: 8pt 0 4pt; break-after: avoid; }
+    h3 { font-size: 12pt; font-weight: 700; margin: 6pt 0 3pt; break-after: avoid; }
+    p { margin: 0 0 6pt; text-align: justify; word-break: keep-all; }
+    blockquote, .text-box { border: 0.3mm solid #000; padding: 6pt 8pt; margin: 6pt 0; break-inside: avoid; }
+    ol { margin: 4pt 0; padding-left: 24pt; }
+    ol li { margin-bottom: 3pt; list-style-position: outside; }
+    ul { margin: 4pt 0; padding-left: 14pt; }
+    ul li { margin-bottom: 3pt; }
+    img { max-width: 100%; height: auto; break-inside: avoid; }
+    hr { border: none; border-top: 0.1mm solid #999; margin: 8pt 0; }
+    .katex-display { margin: 8pt 0; break-inside: avoid; }
+    .katex { font-size: 1em; }
+    table { border-collapse: collapse; width: 100%; margin: 6pt 0; font-size: 10pt; break-inside: avoid; }
+    th, td { border: 0.2mm solid #000; padding: 3pt 6pt; text-align: center; }
+    th { font-weight: 700; background-color: #f5f5f5; }
+    .tag-marker { float: right; font-size: 0.95em; }
+    .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
+    p:has(> .marker-gana:first-child),
+    p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
+  </style>
+</head>
+<body>
+  <div class="print-root">${contentHtml}</div>
+</body>
+</html>
+      `);
+      iframeDoc.close();
+
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      iframe.contentWindow.print();
+
+      setTimeout(() => {
+        try { document.body.removeChild(iframe); } catch {}
+        setIsPrinting(false);
+      }, 3000);
+
+    } catch (error) {
+      console.error('PDF 생성 오류:', error);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+      setIsPrinting(false);
+    }
+  }, [editTitle, tabs, pdfTabSelection, allBlocks]);
+
+  /* ─── 메뉴 열 때 기본 탭 선택 초기화 ─── */
+  const openMenu = () => {
+    const sel: Record<string, boolean> = {};
+    tabs.forEach((t) => { sel[t.id] = true; });
+    setPdfTabSelection(sel);
+    setMenuOpen(true);
+  };
+
+  /* ═══ 저장 ═══ */
   const handleSave = async () => {
     if (!problem) return;
     setSaving(true);
@@ -926,61 +1023,66 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         difficulty: editDifficulty,
         answer: editAnswer,
         folder_id: editFolderId || null,
+        tabs,
       };
       await updateProblem(problem.id, updateData);
 
-      const curQIds = questionBlocks.map((b) => b.id);
-      for (const oldId of origQuestionIds) {
-        if (!curQIds.includes(oldId)) {
-          await deleteBlock(problem.id, 'question_blocks', oldId);
+      // 삭제된 탭의 블록 정리
+      for (const origTab of origTabs) {
+        if (!tabs.find((t) => t.id === origTab.id)) {
+          await deleteAllTabBlocks(problem.id, origTab.id);
         }
-      }
-      for (const oldId of origQuestionIds) {
-        if (curQIds.includes(oldId)) {
-          await deleteBlock(problem.id, 'question_blocks', oldId);
-        }
-      }
-      for (let i = 0; i < questionBlocks.length; i++) {
-        const b = questionBlocks[i];
-        await saveQuestionBlock(problem.id, {
-          order: i, type: b.type, raw_text: b.raw_text,
-          title: b.title || '',
-        });
       }
 
-      const curSIds = solutionBlocks.map((b) => b.id);
-      for (const oldId of origSolutionIds) {
-        if (!curSIds.includes(oldId)) {
-          await deleteBlock(problem.id, 'solution_blocks', oldId);
+      // 각 탭의 블록 저장 (delete all → re-add)
+      for (const tab of tabs) {
+        const subcol = tabSubcollection(tab.id);
+        const origIds = origBlockIds[tab.id] || [];
+        const blocks = allBlocks[tab.id] || [];
+
+        // 기존 블록 전부 삭제
+        for (const oldId of origIds) {
+          try {
+            await deleteBlock(problem.id, subcol, oldId);
+          } catch (e) {
+            // 이미 삭제된 블록은 무시
+          }
         }
-      }
-      for (const oldId of origSolutionIds) {
-        if (curSIds.includes(oldId)) {
-          await deleteBlock(problem.id, 'solution_blocks', oldId);
+
+        // 새로 저장
+        for (let i = 0; i < blocks.length; i++) {
+          const b = blocks[i];
+          await saveTabBlock(problem.id, tab.id, {
+            order: i, type: b.type, raw_text: b.raw_text,
+            title: b.title || '',
+          });
         }
-      }
-      for (let i = 0; i < solutionBlocks.length; i++) {
-        const b = solutionBlocks[i];
-        await saveSolutionBlock(problem.id, {
-          order: i, type: b.type, raw_text: b.raw_text,
-          title: b.title || '',
-        });
       }
 
+      // 저장 후 리프레시
       const refreshed = await getProblemWithBlocks(problem.id);
       if (refreshed) {
         setProblem(refreshed);
+        const loadedTabs = refreshed.tabs || DEFAULT_TABS;
+        setTabs(loadedTabs);
+        setOrigTabs(loadedTabs);
+
         const toLocal = (blocks: Block[]): LocalBlock[] =>
           blocks.map((b, i) => ({
             ...b,
-            collapsed: (activeTab === 'question' ? questionBlocks : solutionBlocks)
+            collapsed: (allBlocks[activeTab] || [])
               .find((lb) => lb.order === i)?.collapsed ?? false,
             title: b.title || '',
           }));
-        setQuestionBlocks(toLocal(refreshed.question_blocks));
-        setSolutionBlocks(toLocal(refreshed.solution_blocks));
-        setOrigQuestionIds(refreshed.question_blocks.map((b) => b.id));
-        setOrigSolutionIds(refreshed.solution_blocks.map((b) => b.id));
+
+        const blocksMap: Record<string, LocalBlock[]> = {};
+        const newOrigIds: Record<string, string[]> = {};
+        for (const tab of loadedTabs) {
+          blocksMap[tab.id] = toLocal(refreshed.tabBlocks[tab.id] || []);
+          newOrigIds[tab.id] = (refreshed.tabBlocks[tab.id] || []).map((b) => b.id);
+        }
+        setAllBlocks(blocksMap);
+        setOrigBlockIds(newOrigIds);
       }
 
       setStatus('저장 완료');
@@ -1037,7 +1139,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
       display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)',
     }}>
-      {/* CSS 오버라이드: EditorPreview의 inline fontSize를 동적으로 덮어씀 */}
+      {/* CSS 오버라이드 */}
       <style>{`
         .scaled-editor .cm-editor { font-size: ${contentFontSize}px !important; }
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
@@ -1145,48 +1247,134 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       </div>
 
-      {/* ═══ Row 2: Tabs + Save ═══ */}
+      {/* ═══ Row 2: Tabs + Save + Menu ═══ */}
       <div style={{
         display: 'flex', alignItems: 'center', padding: '0 20px',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
       }}>
-        {(['question', 'solution'] as const).map((tab) => (
-          <div key={tab} style={{
-            display: 'flex', alignItems: 'center', gap: 4,
-            borderBottom: activeTab === tab ? '2px solid var(--accent-primary)' : '2px solid transparent',
+        {tabs.map((tab, tabIdx) => (
+          <div key={tab.id} style={{
+            display: 'flex', alignItems: 'center', gap: 2,
+            borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
             transition: 'all var(--transition-fast)',
+            position: 'relative',
           }}>
-            <button onClick={() => setActiveTab(tab)} style={{
-              padding: '10px 6px 10px 12px', border: 'none', background: 'none', cursor: 'pointer',
-              fontSize: 13.5, fontWeight: activeTab === tab ? 600 : 400,
-              color: activeTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
-              fontFamily: 'var(--font-ui)', transition: 'all var(--transition-fast)',
-            }}>
-              {tab === 'question' ? `문제 (${questionBlocks.length})` : `풀이 (${solutionBlocks.length})`}
-            </button>
+            {/* 탭 이름 편집 모드 */}
+            {editingTabId === tab.id ? (
+              <input
+                ref={tabLabelInputRef}
+                value={editingTabLabel}
+                onChange={(e) => setEditingTabLabel(e.target.value)}
+                onBlur={commitTabLabel}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commitTabLabel();
+                  if (e.key === 'Escape') setEditingTabId(null);
+                }}
+                style={{
+                  padding: '10px 6px 10px 12px', border: '1px solid var(--accent-primary)',
+                  background: 'var(--bg-input)', borderRadius: 4,
+                  fontSize: 13.5, fontWeight: 600, outline: 'none',
+                  fontFamily: 'var(--font-ui)', width: 80,
+                  color: 'var(--text-primary)',
+                }}
+              />
+            ) : (
+              <button
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  padding: '10px 6px 10px 12px', border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 13.5, fontWeight: activeTab === tab.id ? 600 : 400,
+                  color: activeTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                  fontFamily: 'var(--font-ui)', transition: 'all var(--transition-fast)',
+                }}
+              >
+                {`${tab.label} (${(allBlocks[tab.id] || []).length})`}
+              </button>
+            )}
+
+            {/* 탭 이름 변경 (3번째 이후만) */}
+            {tabIdx >= 2 && editingTabId !== tab.id && (
+              <button
+                onClick={(e) => { e.stopPropagation(); startEditTabLabel(tab.id); }}
+                title="탭 이름 변경"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 18, height: 18, border: 'none', background: 'none',
+                  cursor: 'pointer', borderRadius: 4, padding: 0,
+                  color: 'var(--text-faint)',
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+              >
+                <IconRename size={11} />
+              </button>
+            )}
+
+            {/* Markdown 복사 */}
             <button
-              onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab); }}
+              onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
               title="Markdown 복사"
               style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 width: 22, height: 22, border: 'none', background: 'none',
                 cursor: 'pointer', borderRadius: 4, padding: 0,
-                color: copiedTab === tab ? '#34a853' : 'var(--text-faint)',
+                color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
                 transition: 'color 0.2s, background 0.15s',
               }}
-              onMouseEnter={(e) => { if (copiedTab !== tab) e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (copiedTab !== tab) e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'none'; }}
+              onMouseEnter={(e) => { if (copiedTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { if (copiedTab !== tab.id) e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'none'; }}
             >
-              {copiedTab === tab ? <IconCheck size={13} /> : <IconCopy size={13} />}
+              {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
             </button>
+
+            {/* 탭 삭제 (3번째 이후만) */}
+            {tabIdx >= 2 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
+                title="탭 삭제"
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  width: 18, height: 18, border: 'none', background: 'none',
+                  cursor: 'pointer', borderRadius: 4, padding: 0,
+                  color: 'var(--text-faint)',
+                  transition: 'color 0.2s',
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent-danger)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; }}
+              >
+                <IconTrash size={11} />
+              </button>
+            )}
           </div>
         ))}
+
+        {/* 탭 추가 버튼 */}
+        <button
+          onClick={handleAddTab}
+          title="탭 추가"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 28, height: 28, border: 'none', background: 'none',
+            cursor: 'pointer', borderRadius: 6, padding: 0,
+            color: 'var(--text-faint)', marginLeft: 4,
+            transition: 'color 0.2s, background 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'none'; }}
+        >
+          <IconPlus size={14} />
+        </button>
+
         <div style={{ flex: 1 }} />
+
         {status && (
           <span style={{ fontSize: 12, marginRight: 12,
             color: status.includes('에러') ? 'var(--accent-danger)' : '#34a853',
           }}>{status}</span>
         )}
+
+        {/* 저장 버튼 */}
         <button onClick={handleSave} disabled={saving} style={{
           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
           background: saving ? 'var(--text-faint)' : 'var(--accent-primary)',
@@ -1196,15 +1384,85 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }}>
           <IconSave /> {saving ? '저장 중...' : '저장'}
         </button>
-        <PdfDownloadButton
-          title={editTitle || '수학 문제'}
-          headerInfo={`${editSource} | ${editCategory}`}
-          tabs={[
-            { label: '문제', blocks: questionBlocks.map(b => ({ id: b.id, type: b.type, raw_text: b.raw_text })) },
-            { label: '풀이', blocks: solutionBlocks.map(b => ({ id: b.id, type: b.type, raw_text: b.raw_text })) },
-          ]}
-          locale="ko"
-        />
+
+        {/* 3점 메뉴 */}
+        <div ref={menuRef} style={{ position: 'relative', marginLeft: 4 }}>
+          <button
+            onClick={openMenu}
+            disabled={isPrinting}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, border: '1px solid var(--border-light)',
+              background: menuOpen ? 'var(--bg-hover)' : 'var(--bg-card)',
+              borderRadius: 8, cursor: isPrinting ? 'not-allowed' : 'pointer',
+              color: 'var(--text-secondary)',
+              transition: 'background 0.15s',
+            }}
+            title="더보기"
+          >
+            {isPrinting ? '⏳' : <IconDotsVertical size={16} />}
+          </button>
+
+          {/* 드롭다운 메뉴 */}
+          {menuOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 4,
+              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              padding: '12px 16px', minWidth: 200, zIndex: 100,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+                marginBottom: 8, fontFamily: 'var(--font-ui)',
+              }}>
+                <IconDownload size={16} /> PDF 다운로드
+              </div>
+
+              <div style={{
+                fontSize: 12, color: 'var(--text-muted)', marginBottom: 8,
+                fontFamily: 'var(--font-ui)',
+              }}>
+                포함할 탭 선택:
+              </div>
+
+              {tabs.map((tab) => (
+                <label key={tab.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '4px 0', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--text-secondary)',
+                  fontFamily: 'var(--font-ui)',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={pdfTabSelection[tab.id] !== false}
+                    onChange={(e) => {
+                      setPdfTabSelection((prev) => ({
+                        ...prev,
+                        [tab.id]: e.target.checked,
+                      }));
+                    }}
+                    style={{ accentColor: 'var(--accent-primary)' }}
+                  />
+                  {tab.label}
+                </label>
+              ))}
+
+              <button
+                onClick={handlePdfPrint}
+                disabled={isPrinting}
+                style={{
+                  width: '100%', marginTop: 10, padding: '8px 0',
+                  background: 'var(--accent-primary)', color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {isPrinting ? '준비 중...' : '확인'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ═══ Row 3: Math Toolbar ═══ */}
@@ -1228,12 +1486,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             style={{
               width: 28, height: 28,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid var(--border-light)',
+              border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
               borderRadius: 6,
-              background: searchOpen ? 'var(--bg-active)' : 'var(--bg-card)',
+              background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
               cursor: 'pointer',
-              fontSize: 15,
-              color: 'var(--text-secondary)',
+              color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+              fontSize: 16,
               transition: 'all 0.15s',
             }}
           >

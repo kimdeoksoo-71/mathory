@@ -14,7 +14,7 @@ import {
   limit,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Problem, Block, ProblemWithBlocks, Folder } from '../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../types/problem';
 
 // ===== 휴지통 상수 =====
 export const TRASH_FOLDER_ID = '__trash__';
@@ -52,13 +52,16 @@ export async function updateProblem(problemId: string, data: Partial<Problem>): 
 }
 
 export async function deleteProblem(problemId: string): Promise<void> {
-  const qBlocks = await getDocs(collection(db, 'problems', problemId, 'question_blocks'));
-  const sBlocks = await getDocs(collection(db, 'problems', problemId, 'solution_blocks'));
+  // 탭 메타데이터 읽기 (없으면 기본 2탭)
+  const problem = await getProblem(problemId);
+  const tabs = problem?.tabs || DEFAULT_TABS;
 
-  const deletes = [
-    ...qBlocks.docs.map((d) => deleteDoc(d.ref)),
-    ...sBlocks.docs.map((d) => deleteDoc(d.ref)),
-  ];
+  const deletes: Promise<void>[] = [];
+  for (const tab of tabs) {
+    const subcol = tabSubcollection(tab.id);
+    const snap = await getDocs(collection(db, 'problems', problemId, subcol));
+    snap.docs.forEach((d) => deletes.push(deleteDoc(d.ref)));
+  }
   await Promise.all(deletes);
   await deleteDoc(doc(db, 'problems', problemId));
 }
@@ -137,17 +140,26 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
   const problem = await getProblem(problemId);
   if (!problem) return null;
 
-  const qSnap = await getDocs(
-    query(collection(db, 'problems', problemId, 'question_blocks'), orderBy('order'))
-  );
-  const sSnap = await getDocs(
-    query(collection(db, 'problems', problemId, 'solution_blocks'), orderBy('order'))
-  );
+  // 탭 메타데이터 (없으면 기본 2탭)
+  const tabs = problem.tabs || DEFAULT_TABS;
 
-  const question_blocks = qSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
-  const solution_blocks = sSnap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+  // 각 탭의 블록 로드
+  const tabBlocks: Record<string, Block[]> = {};
+  for (const tab of tabs) {
+    const subcol = tabSubcollection(tab.id);
+    const snap = await getDocs(
+      query(collection(db, 'problems', problemId, subcol), orderBy('order'))
+    );
+    tabBlocks[tab.id] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+  }
 
-  return { ...problem, question_blocks, solution_blocks };
+  return {
+    ...problem,
+    tabs,
+    question_blocks: tabBlocks['question'] || [],
+    solution_blocks: tabBlocks['solution'] || [],
+    tabBlocks,
+  };
 }
 
 async function saveBlock(
@@ -170,6 +182,11 @@ export async function saveSolutionBlock(problemId: string, block: Omit<Block, 'i
   return saveBlock(problemId, 'solution_blocks', block);
 }
 
+/** 범용 탭 블록 저장 */
+export async function saveTabBlock(problemId: string, tabId: string, block: Omit<Block, 'id'>): Promise<string> {
+  return saveBlock(problemId, tabSubcollection(tabId), block);
+}
+
 export async function updateBlock(
   problemId: string,
   subcollection: string,
@@ -186,6 +203,14 @@ export async function deleteBlock(
   blockId: string
 ): Promise<void> {
   await deleteDoc(doc(db, 'problems', problemId, subcollection, blockId));
+}
+
+/** 탭의 모든 블록 삭제 */
+export async function deleteAllTabBlocks(problemId: string, tabId: string): Promise<void> {
+  const subcol = tabSubcollection(tabId);
+  const snap = await getDocs(collection(db, 'problems', problemId, subcol));
+  const deletes = snap.docs.map((d) => deleteDoc(d.ref));
+  await Promise.all(deletes);
 }
 
 // ===== Folder CRUD (Phase 6) =====
@@ -260,6 +285,8 @@ export async function duplicateProblem(problemId: string): Promise<string> {
   const original = await getProblemWithBlocks(problemId);
   if (!original) throw new Error('원본 문제를 찾을 수 없습니다.');
 
+  const tabs = original.tabs || DEFAULT_TABS;
+
   // 새 문제 생성 (제목에 "의 사본" 추가)
   const newId = await createProblem({
     title: `${original.title}의 사본`,
@@ -272,24 +299,21 @@ export async function duplicateProblem(problemId: string): Promise<string> {
     source: original.source,
     subject: original.subject,
     folder_id: original.folder_id,
+    tabs,
   });
 
-  // 블록 복제
-  for (const block of original.question_blocks) {
-    await saveQuestionBlock(newId, {
-      order: block.order,
-      type: block.type,
-      raw_text: block.raw_text,
-      title: block.title,
-    });
-  }
-  for (const block of original.solution_blocks) {
-    await saveSolutionBlock(newId, {
-      order: block.order,
-      type: block.type,
-      raw_text: block.raw_text,
-      step_label: block.step_label,
-    });
+  // 각 탭의 블록 복제
+  for (const tab of tabs) {
+    const blocks = original.tabBlocks[tab.id] || [];
+    for (const block of blocks) {
+      await saveTabBlock(newId, tab.id, {
+        order: block.order,
+        type: block.type,
+        raw_text: block.raw_text,
+        title: block.title,
+        step_label: block.step_label,
+      });
+    }
   }
 
   return newId;
