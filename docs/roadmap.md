@@ -246,3 +246,87 @@ Extensions에 추가:
 | (a)/(i) 행 빈 줄 자동 삽입 | ✅ | 2026-03-28 | soft line break에서도 독립 문단(내어쓰기) 보장 |
 
 **전처리 파이프라인**: `preventSetextHeadings → preprocessLocale → preprocessMath`
+
+## Phase 21: PDF 출력 기능 + 편집창 탭 추가 ✅
+> 목표: A3 2단 PDF 출력 완성, 동적 탭 시스템 구현
+> 완료일: 2026-03-28
+
+### 21-A: 편집창 탭 추가 기능
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| TabMeta 인터페이스 설계 | ✅ | 2026-03-28 | `{id, label}`, Problem 문서에 `tabs` 배열 필드 |
+| 기존 데이터 100% 하위 호환 | ✅ | 2026-03-28 | `tabs` 없으면 DEFAULT_TABS fallback |
+| 동적 하위 컬렉션 | ✅ | 2026-03-28 | `extra_0_blocks`, `extra_1_blocks` 등 자동 생성 |
+| 탭 추가 | ✅ | 2026-03-28 | 자동 라벨: 풀이2, 풀이3, ... |
+| 탭 이름 변경 | ✅ | 2026-03-28 | 3번째 탭부터 연필 아이콘 클릭 → 인라인 입력 |
+| 탭 삭제 | ✅ | 2026-03-28 | 3번째 탭부터, confirm 후 블록 포함 삭제 |
+| Firestore Rules 업데이트 | ✅ | 2026-03-28 | 와일드카드 `/{subcollection}/{blockId}` 허용 |
+| allBlocks 통합 관리 | ✅ | 2026-03-28 | `Record<string, LocalBlock[]>` 구조 |
+| getProblemWithBlocks 동적 탭 로드 | ✅ | 2026-03-28 | tabBlocks 맵으로 모든 탭 블록 로드 |
+| 복제/삭제 동적 탭 지원 | ✅ | 2026-03-28 | duplicateProblem, deleteProblem에서 tabs 순회 |
+
+**DB 구조 변경:**
+```
+problems/{id}
+  ├── tabs: [{id:"question",label:"문제"}, {id:"solution",label:"풀이"}, {id:"extra_0",label:"풀이2"}, ...]
+  ├── question_blocks/{blockId}  ← 기존 그대로
+  ├── solution_blocks/{blockId}  ← 기존 그대로
+  ├── extra_0_blocks/{blockId}   ← 동적 생성
+  └── extra_1_blocks/{blockId}   ← 동적 생성
+```
+
+### 21-B: PDF 다운로드 기능
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 3점 메뉴 UI | ✅ | 2026-03-28 | 저장 버튼 옆 ⋮ → 드롭다운 |
+| 탭 선택 체크박스 | ✅ | 2026-03-28 | 디폴트 전체 선택, 탭별 포함/제외 |
+| iframe 방식 인쇄 | ✅ | 2026-03-28 | 미리보기 창 없이 시스템 인쇄 다이얼로그 직접 호출 |
+| A3 세로 2단 레이아웃 | ✅ | 2026-03-28 | @page 297×420mm, margin 30mm/20mm |
+| column-fill: auto | ✅ | 2026-03-28 | 왼쪽 단 먼저 채운 뒤 오른쪽 단 |
+| 탭별 단 바꿈 | ✅ | 2026-03-28 | break-before: column |
+| 탭 제목 표시 | ✅ | 2026-03-28 | 14pt 굵게 + 하단 구분선 |
+
+**현재 PDF 규격 (간소화 버전):**
+- 용지: A3 세로 (297 × 420mm)
+- 여백: 상하 30mm, 좌우 20mm
+- 본문: 2단, 단 간격 10mm, column-fill: auto
+- 부가 요소 없음 (구분선, 머리말, 꼬리말, 페이지 번호 제거 — 추후 안정적 방법으로 재추가 예정)
+
+### 21-C: \tag{} / \ref{} 통합
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| EditorPreview 전면 교체 | ✅ | 2026-03-28 | 자체 인라인 전처리 (preventSetextHeadings → preprocessLocale → preprocessMath) |
+| \tag{n} 수식 내 | ✅ | 2026-03-28 | → \tag*{…… ㉠} |
+| \tag{n} 텍스트 행 끝 | ✅ | 2026-03-28 | → <span class="tag-marker">…… ㉠</span> |
+| \ref{n} 수식 내 | ✅ | 2026-03-28 | → \text{㉠} |
+| \ref{n} 텍스트 | ✅ | 2026-03-28 | → ㉠ (직접 치환) |
+| (a)~(e) / (i)~(v) 5개 제한 통일 | ✅ | 2026-03-28 | locale.ts에서 a~n → a~e, i~xiv → i~v로 수정 |
+| 빈 줄 삽입 로직 분리 | ✅ | 2026-03-28 | insertMarkerLineBreaks() → 변환 전 1단계로 독립 |
+| marker 내어쓰기 CSS | ✅ | 2026-03-28 | p:has(>.marker-gana:first-child) text-indent hanging |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | problem.ts | types/problem.ts |
+| 2 | firestore.ts | lib/firestore.ts |
+| 3 | locale.ts | lib/locale.ts |
+| 4 | preprocess.ts | lib/preprocess.ts |
+| 5 | EditorView.tsx | components/editor/EditorView.tsx |
+| 6 | EditorPreview.tsx | components/editor/EditorPreview.tsx |
+| 7 | BlockEditor.tsx | components/editor/BlockEditor.tsx |
+| 8 | PrintableContent.tsx | components/print/PrintableContent.tsx |
+| 9 | PrintStyles.css | components/print/PrintStyles.css |
+| 10 | PdfDownloadButton.tsx | components/print/PdfDownloadButton.tsx |
+| 11 | Icons.tsx | components/ui/Icons.tsx |
+| 12 | page.tsx | app/problems/[id]/edit/page.tsx |
+
+### Key Learnings
+
+- **CSS @page + position:fixed로 mm 단위 정밀 배치는 불안정**: 브라우저 인쇄 엔진마다 position:fixed 기준점이 다르고, @page margin의 실제 적용 위치도 예측 불가. 구분선/머리말/꼬리말 같은 정밀 요소는 @page margin + column만으로는 한계가 있음. Puppeteer 또는 jsPDF 같은 도구가 필요.
+- **column-fill: auto**: CSS columns의 기본값은 balance(양쪽 균등)이며, auto로 바꾸면 왼쪽 단을 먼저 채움.
+- **iframe 인쇄**: window.open 팝업 대신 숨겨진 iframe.contentWindow.print()를 사용하면 미리보기 창 없이 시스템 인쇄 다이얼로그 직접 호출 가능.
+- **locale.ts에서 (a)~(e) 범위를 a~n으로 확장하면 (i)와 충돌**: EditorPreview는 a~e로 제한되어 있었으나 locale.ts만 a~n이라 PDF에서 (i)가 알파벳 9번째(자)로 잡힘. 두 파일의 범위를 반드시 동기화해야 함.
