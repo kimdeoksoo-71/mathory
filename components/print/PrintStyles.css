@@ -56,3 +56,32 @@
 .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
 p:has(> .marker-gana:first-child),
 p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
+
+/* ── bordered 블록 (gana, roman, box) ── */
+.print-bordered-block {
+  border: 0.3mm solid #000;
+  border-radius: 0;
+  padding: 6pt 8pt;
+  margin: 12pt 0;
+  break-inside: avoid;
+}
+
+/* ── 선택지 블록 ── */
+/* 기본 1행: 5등분 / 넘치면 수동으로 2행 구성 (JS 측에서 class 전환) */
+.print-choices-row {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0 8pt;
+  margin: 6pt 0;
+  break-inside: avoid;
+}
+.print-choice-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+  min-width: 0;
+}
+.print-choice-item p { margin: 0; display: inline; }
+.print-choice-label { font-weight: 400; flex-shrink: 0; }
+.print-choice-content { display: inline; }
+.print-choice-content p { margin: 0; display: inline; }

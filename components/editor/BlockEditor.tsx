@@ -24,7 +24,7 @@ import useSnippets from '../../hooks/useSnippets';
 
 export interface BlockData {
   id: string;
-  type: 'text' | 'image' | 'choices' | 'box';
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image';
   raw_text: string;
 }
 

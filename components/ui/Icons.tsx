@@ -187,6 +187,19 @@ export function IconSplit({ size = 14, color = 'currentColor' }: IconProps) {
   );
 }
 
+export function IconSplitAll({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
+      <line x1="4" y1="8" x2="20" y2="8" />
+      <polyline points="8,5 4,8 8,11" />
+      <polyline points="16,5 20,8 16,11" />
+      <line x1="4" y1="16" x2="20" y2="16" />
+      <polyline points="8,13 4,16 8,19" />
+      <polyline points="16,13 20,16 16,19" />
+    </svg>
+  );
+}
+
 export function IconImage({ size = 14, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">

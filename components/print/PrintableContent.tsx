@@ -13,6 +13,7 @@ export interface PrintBlock {
   id: string;
   type: string;
   raw_text: string;
+  imageWidth?: number;
 }
 
 export interface PrintTab {
@@ -25,6 +26,9 @@ interface PrintableContentProps {
   tabs: PrintTab[];
   locale?: Locale;
 }
+
+const CHOICES_LABELS_PRINT = ['①', '②', '③', '④', '⑤'];
+const BORDERED_TYPES_PRINT = new Set(['gana', 'roman', 'box']);
 
 /**
  * A3 2단 인쇄용 콘텐츠 렌더러 (간소화)
@@ -44,7 +48,17 @@ export default function PrintableContent({
             <div className="print-tab-label">{tab.label}</div>
             {tab.blocks.map((block) => (
               <div key={block.id} className="print-block">
-                <PrintBlockRenderer content={block.raw_text} locale={locale} />
+                {block.type === 'choices' ? (
+                  <PrintChoicesBlock content={block.raw_text} locale={locale} />
+                ) : block.type === 'image' ? (
+                  <PrintImageBlock content={block.raw_text} imageWidth={block.imageWidth} />
+                ) : BORDERED_TYPES_PRINT.has(block.type) ? (
+                  <div className="print-bordered-block">
+                    <PrintBlockRenderer content={block.raw_text} locale={locale} />
+                  </div>
+                ) : (
+                  <PrintBlockRenderer content={block.raw_text} locale={locale} />
+                )}
               </div>
             ))}
           </div>
@@ -72,5 +86,45 @@ function PrintBlockRenderer({ content, locale }: { content: string; locale: Loca
     >
       {processed}
     </ReactMarkdown>
+  );
+}
+
+/** 선택지 인쇄 블록: CSS flexbox wrap으로 1열/2열 자동 전환 */
+function PrintChoicesBlock({ content, locale }: { content: string; locale: Locale }) {
+  const lines = content.split('\n');
+  const choices = CHOICES_LABELS_PRINT.map((label, idx) => {
+    const line = lines[idx] || '';
+    const choiceContent = line.replace(/^[①②③④⑤]\s*/, '').trim();
+    return { label, content: choiceContent };
+  });
+
+  return (
+    <div className="print-choices-row">
+      {choices.map((c, i) => (
+        <div key={i} className="print-choice-item">
+          <span className="print-choice-label">{c.label}</span>
+          <span className="print-choice-content">
+            <PrintBlockRenderer content={c.content} locale={locale} />
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 이미지 인쇄 블록: imageWidth 적용 */
+function PrintImageBlock({ content, imageWidth }: { content: string; imageWidth?: number }) {
+  const srcMatch = content.match(/src="([^"]+)"/);
+  const src = srcMatch?.[1] || '';
+  if (!src) return null;
+  const w = imageWidth || 400;
+  return (
+    <div style={{ textAlign: 'center' }}>
+      <img
+        src={src}
+        alt=""
+        style={{ width: `${Math.min(w, 600)}px`, maxWidth: '90%', height: 'auto' }}
+      />
+    </div>
   );
 }

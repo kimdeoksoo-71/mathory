@@ -330,3 +330,97 @@ problems/{id}
 - **column-fill: auto**: CSS columns의 기본값은 balance(양쪽 균등)이며, auto로 바꾸면 왼쪽 단을 먼저 채움.
 - **iframe 인쇄**: window.open 팝업 대신 숨겨진 iframe.contentWindow.print()를 사용하면 미리보기 창 없이 시스템 인쇄 다이얼로그 직접 호출 가능.
 - **locale.ts에서 (a)~(e) 범위를 a~n으로 확장하면 (i)와 충돌**: EditorPreview는 a~e로 제한되어 있었으나 locale.ts만 a~n이라 PDF에서 (i)가 알파벳 9번째(자)로 잡힘. 두 파일의 범위를 반드시 동기화해야 함.
+## Phase 22: 블록 기능 강화 ✅
+> 목표: 블록 종류 9종 확장, 블록 추가/분할 UI 개선, 선택지 자동분류, 이미지 크기 조절, 자동 분할 기능
+
+### 22-A: 블록 타입 9종 확장
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| Block.type 9종 정의 | ✅ | 2026-04-01 | text, heading, math_block, bullet, gana, roman, box, choices, image |
+| 블록 프리셋 (BLOCK_PRESETS) | ✅ | 2026-04-01 | 타입별 기본 content 자동 입력 |
+| imageWidth 필드 추가 | ✅ | 2026-04-01 | Block 인터페이스에 optional 필드 |
+| BlockEditor.tsx 타입 동기화 | ✅ | 2026-04-01 | BlockData 타입 9종으로 업데이트 |
+
+### 22-B: 블록 추가/분할 UI 개선
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 추가/분할 버튼 상단 이동 | ✅ | 2026-04-01 | 편집창 하단 → "편집" 행 오른쪽 끝 |
+| 블록 추가 드롭다운 | ✅ | 2026-04-01 | 9종 타입 선택 → 프리셋 content로 즉시 생성 |
+| 블록 분할 text 전용 | ✅ | 2026-04-01 | text 타입만 커서 위치에서 분할 |
+| 블록 분할 단축키 | ✅ | 2026-04-01 | Cmd+B (Mac) / Ctrl+B (Win) |
+| 블록 분할 아이콘 | ✅ | 2026-04-01 | IconSplit 원래 아이콘 복원 |
+
+### 22-C: 모두 분할 기능
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| handleSplitAll 구현 | ✅ | 2026-04-01 | 현재 탭의 모든 text 블록 자동 분리 |
+| ## / ### 제목행 분리 | ✅ | 2026-04-01 | heading 블록으로 분리 |
+| $$ … $$ 수식행 분리 | ✅ | 2026-04-01 | math_block 블록으로 분리 |
+| IconSplitAll 아이콘 | ✅ | 2026-04-01 | 이중 화살표 아이콘 |
+| 닫히지 않은 $$ 안전 처리 | ✅ | 2026-04-01 | 텍스트로 복원 |
+
+### 22-D: bordered 블록 (gana, roman, box)
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 미리보기 각진 테두리 | ✅ | 2026-04-01 | borderRadius: 0, 1.5px solid |
+| ProblemView 동일 스타일 | ✅ | 2026-04-01 | 미리보기와 동일 |
+| 인쇄 CSS 반영 | ✅ | 2026-04-01 | .print-bordered-block |
+| 테두리 바깥 여백 | ✅ | 2026-04-01 | margin: 1.2em 0 (1행 높이) |
+
+### 22-E: 이미지 블록 개선
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 크기 조절 슬라이더 복원 | ✅ | 2026-04-01 | range input, 80~800px, 10px step |
+| imageWidth Firestore 저장 | ✅ | 2026-04-01 | handleSave에서 imageWidth 포함 |
+| 미리보기/인쇄 imageWidth 반영 | ✅ | 2026-04-01 | maxWidth: 90% 제한 |
+
+### 22-F: 선택지 블록
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 선택지 자동 분류 | ✅ | 2026-04-01 | (1)~(5) 패턴 감지 → ①~⑤ 자동 매핑 |
+| 선택지 5행 세로 출력 | ✅ | 2026-04-01 | 가로 배치는 향후 과제로 연기 |
+
+### 22-G: 미리보기/ProblemView 개선
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 미리보기 블록 테두리 제거 | ✅ | 2026-04-01 | borderless prop 전체 적용 |
+| 미리보기 블록 간 점선 제거 | ✅ | 2026-04-01 | 내용만 연속 표시 |
+| 미리보기 바탕색 흰색 | ✅ | 2026-04-01 | background: #ffffff |
+| ProblemView 전체 탭 표시 | ✅ | 2026-04-01 | problem.tabs 순회, 탭 라벨 + 구분선 |
+| ProblemView 탭 간 간격 | ✅ | 2026-04-01 | height: 2.5em |
+| 제목행 밑줄 색 진하게 | ✅ | 2026-04-01 | #E8E4DF → #999 |
+
+### 22-H: 기타
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 저장 시 빈줄 trim | ✅ | 2026-04-01 | 블록 위아래 빈 행 제거 |
+| 툴바 항상 표시 | ✅ | 2026-04-01 | 이미지 블록 시 opacity: 0.35 + pointerEvents: none |
+| TEXT_BASED_TYPES 상수 | ✅ | 2026-04-01 | 8종 텍스트 기반 블록 Set |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | problem.ts | types/problem.ts |
+| 2 | EditorView.tsx | components/editor/EditorView.tsx |
+| 3 | EditorPreview.tsx | components/editor/EditorPreview.tsx |
+| 4 | BlockEditor.tsx | components/editor/BlockEditor.tsx |
+| 5 | PrintableContent.tsx | components/print/PrintableContent.tsx |
+| 6 | PrintStyles.css | components/print/PrintStyles.css |
+| 7 | Icons.tsx | components/ui/Icons.tsx |
+| 8 | page.tsx | app/problems/[id]/page.tsx |
+
+### Key Learnings
+
+- **EditorPreview의 borderless prop**: borderless를 넘기지 않으면 내부에서 자체적으로 border + borderRadius를 그림. 미리보기 패널에서 블록 테두리를 없애려면 모든 EditorPreview 호출에 borderless를 명시해야 함.
+- **showToolbar 조건부 렌더링 vs opacity**: `{condition && <Component/>}`는 DOM에서 완전히 제거/재생성되므로 레이아웃 점프 유발. `opacity + pointerEvents`로 항상 렌더하되 비활성화하는 방식이 더 안정적.
+- **선택지 가로 배치의 어려움**: CSS grid 5등분은 가능하나, 내용 길이에 따른 1열/2열 자동 전환은 KaTeX 비동기 렌더와 충돌하여 안정적 구현이 어려움. 향후 과제로 연기.
+- **모두 분할 알고리즘**: 텍스트 블록의 줄 단위 파싱으로 ##/### 제목행과 $$...$$ 수식행을 감지. 닫히지 않은 $$는 텍스트로 복원하여 데이터 손실 방지.

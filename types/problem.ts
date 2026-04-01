@@ -18,10 +18,11 @@ export interface Problem {
 export interface Block {
   id: string;
   order: number;
-  type: 'text' | 'image' | 'choices' | 'box';
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image';
   raw_text: string;
   step_label?: string;
   title?: string;
+  imageWidth?: number;
 }
 
 /** 탭 메타데이터 */

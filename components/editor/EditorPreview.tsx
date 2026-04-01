@@ -249,7 +249,7 @@ export default function EditorPreview({
         ),
         h2: ({ children, ...props }) => (
           <h2 style={{ fontSize: '1.3em', fontWeight: 700, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4,
-            paddingBottom: '0.3em', borderBottom: '1px solid var(--border-light, #E8E4DF)' }} {...props}>{children}</h2>
+            paddingBottom: '0.3em', borderBottom: '1px solid #999' }} {...props}>{children}</h2>
         ),
         h3: ({ children, ...props }) => (
           <h3 style={{ fontSize: '1.15em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h3>

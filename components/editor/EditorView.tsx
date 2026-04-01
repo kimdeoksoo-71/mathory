@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem,
@@ -15,7 +15,7 @@ import { uploadImage } from '../../lib/storage';
 import PrintableContent, { PrintTab } from '../print/PrintableContent';
 import useSnippets from '../../hooks/useSnippets';
 import {
-  IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
+  IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
   IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
   IconDotsVertical, IconDownload, IconRename,
 } from '../ui/Icons';
@@ -33,16 +33,45 @@ import { CSS } from '@dnd-kit/utilities';
 interface LocalBlock extends Block {
   collapsed: boolean;
   isNew?: boolean;
+  imageWidth?: number;
 }
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
-  image: '그림',
-  choices: '선택지',
+  heading: '제목',
+  math_block: '수식행',
+  bullet: '•',
+  gana: '(가) (나) (다)',
+  roman: 'ㄱ. ㄴ. ㄷ.',
   box: '글상자',
+  choices: '선택지',
+  image: '그림',
 };
 
-const BLOCK_TYPES = ['text', 'image', 'choices', 'box'] as const;
+const BLOCK_TYPES: Block['type'][] = [
+  'text', 'heading', 'math_block', 'bullet', 'gana', 'roman', 'box', 'choices', 'image',
+];
+
+/** 블록 생성 시 기본 내용 */
+const BLOCK_PRESETS: Record<string, string> = {
+  text: '',
+  heading: '## ',
+  math_block: '$$\n\n$$',
+  bullet: '- \n- \n- ',
+  gana: '(a) \n(b) \n(c) ',
+  roman: '(i) \n(ii) \n(iii) ',
+  box: '',
+  choices: '',
+  image: '',
+};
+
+/** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
+const TEXT_BASED_TYPES: Set<string> = new Set([
+  'text', 'heading', 'math_block', 'bullet', 'gana', 'roman', 'box', 'choices',
+]);
+
+/** 외곽 상자를 두르는 블록 타입 */
+const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 const CHOICES_LABELS = ['①', '②', '③', '④', '⑤'];
 
@@ -139,52 +168,73 @@ function setStoredFontSize(size: number) {
 function ImageBlockContent({
   block,
   onImageUpload,
+  onImageWidthChange,
   problemId,
 }: {
   block: LocalBlock;
   onImageUpload: (file: File, blockId: string) => Promise<void>;
+  onImageWidthChange: (blockId: string, width: number) => void;
   problemId: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgWidth = block.imageWidth || 400;
 
   if (block.raw_text) {
     const srcMatch = block.raw_text.match(/src="([^"]+)"/);
     const src = srcMatch?.[1] || '';
+    const maxW = 600; // 에디터 패널 내 최대 폭 기준
     return (
-      <div style={{ padding: 8, textAlign: 'center' }}>
-        <img src={src} alt="" style={{ maxWidth: '100%', maxHeight: 300, borderRadius: 8 }} />
-        <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 4 }}>
-          이미지를 변경하려면 새 파일을 선택하세요
-        </div>
-        <label
-          style={{
-            display: 'inline-block', marginTop: 6, padding: '4px 12px',
-            fontSize: 12, background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
-            borderRadius: 6, cursor: 'pointer',
-          }}
-        >
-          파일 선택
+      <div ref={containerRef} style={{ padding: 8, textAlign: 'center' }}>
+        <img src={src} alt="" style={{ width: Math.min(imgWidth, maxW), maxWidth: '90%', borderRadius: 8 }} />
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 8, marginTop: 8, fontSize: 11, color: 'var(--text-muted)',
+        }}>
+          <span>크기</span>
           <input
-            type="file"
-            accept="image/*"
-            style={{ display: 'none' }}
+            type="range"
+            min={80}
+            max={800}
+            step={10}
+            value={imgWidth}
+            onChange={(e) => onImageWidthChange(block.id, Number(e.target.value))}
             onPointerDown={(e) => e.stopPropagation()}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              setUploading(true);
-              setError('');
-              try {
-                await onImageUpload(file, block.id);
-              } catch (err: any) {
-                setError(`업로드 실패: ${err.message || err}`);
-              } finally {
-                setUploading(false);
-              }
-            }}
+            style={{ width: 140, cursor: 'pointer' }}
           />
-        </label>
+          <span>{imgWidth}px</span>
+        </div>
+        <div style={{ marginTop: 6 }}>
+          <label
+            style={{
+              display: 'inline-block', padding: '4px 12px',
+              fontSize: 12, background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
+              borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            그림 변경
+            <input
+              type="file"
+              accept="image/*"
+              style={{ display: 'none' }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                setUploading(true);
+                setError('');
+                try {
+                  await onImageUpload(file, block.id);
+                } catch (err: any) {
+                  setError(`업로드 실패: ${err.message || err}`);
+                } finally {
+                  setUploading(false);
+                }
+              }}
+            />
+          </label>
+        </div>
         {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4 }}>{error}</div>}
       </div>
     );
@@ -237,6 +287,100 @@ function ImageBlockContent({
   );
 }
 
+/* ═══ ChoicesPreview: 선택지 1열/2열 자동 레이아웃 ═══ */
+
+function ChoicesPreview({
+  rawText,
+  locale,
+  activeMathId,
+  onClickMath,
+}: {
+  rawText: string;
+  locale?: string;
+  activeMathId?: number;
+  onClickMath?: (mathId: number) => void;
+}) {
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [twoRows, setTwoRows] = useState(false);
+
+  // 선택지 파싱: ①~⑤ 라벨 기준
+  const choices = useMemo(() => {
+    const lines = rawText.split('\n');
+    return CHOICES_LABELS.map((label, idx) => {
+      const line = lines[idx] || '';
+      const content = line.replace(/^[①②③④⑤]\s*/, '').trim();
+      return { label, content };
+    });
+  }, [rawText]);
+
+  // rawText 변경 시 초기화 → 5열 그리드로 먼저 렌더
+  useEffect(() => {
+    setTwoRows(false);
+  }, [rawText]);
+
+  // 높이 기반 overflow 감지: 5열 그리드의 높이가 단일행(~45px)을 초과하면 2행 전환
+  useEffect(() => {
+    if (twoRows) return;
+    const el = gridRef.current;
+    if (!el) return;
+    let cancelled = false;
+    const checkHeight = () => {
+      if (cancelled || !el) return;
+      if (el.scrollHeight > 45) {
+        setTwoRows(true);
+      }
+    };
+    checkHeight();
+    const t1 = setTimeout(checkHeight, 250);
+    const t2 = setTimeout(checkHeight, 700);
+    return () => { cancelled = true; clearTimeout(t1); clearTimeout(t2); };
+  }, [rawText, twoRows]);
+
+  /** 개별 선택지 아이템 렌더 */
+  const ChoiceItem = ({ label, content }: { label: string; content: string }) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6em' }}>
+      <span style={{ flexShrink: 0 }}>{label}</span>
+      <EditorPreview content={content} borderless locale={locale} />
+    </div>
+  );
+
+  if (twoRows) {
+    // 2행: 1행 ①②③ (3등분), 2행 ④⑤ (3등분), 행간 넓게
+    return (
+      <div style={{ padding: '8px 0' }}>
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 8px',
+        }}>
+          {choices.slice(0, 3).map((c, i) => (
+            <ChoiceItem key={i} label={c.label} content={c.content} />
+          ))}
+        </div>
+        <div style={{ height: 12 }} />
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 8px',
+        }}>
+          {choices.slice(3, 5).map((c, i) => (
+            <ChoiceItem key={i + 3} label={c.label} content={c.content} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 1열: 5등분 균등 배치
+  return (
+    <div style={{ padding: '8px 0' }}>
+      <div ref={gridRef} style={{
+        display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0 8px',
+      }}>
+        {choices.map((c, i) => (
+          <ChoiceItem key={i} label={c.label} content={c.content} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ═══ SortableEditorBlock ═══ */
 
 function SortableEditorBlock({
@@ -252,6 +396,7 @@ function SortableEditorBlock({
   onDelete,
   onToggleCollapse,
   onImageUpload,
+  onImageWidthChange,
   problemId,
   onSnippetShortcut,
   onCursorActivity,
@@ -268,6 +413,7 @@ function SortableEditorBlock({
   onDelete: () => void;
   onToggleCollapse: () => void;
   onImageUpload: (file: File, blockId: string) => Promise<void>;
+  onImageWidthChange: (blockId: string, width: number) => void;
   problemId: string;
   onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number }) => void;
@@ -288,6 +434,8 @@ function SortableEditorBlock({
     background: 'var(--bg-card)',
     overflow: 'hidden',
   };
+
+  const isTextBased = TEXT_BASED_TYPES.has(block.type);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
@@ -325,7 +473,7 @@ function SortableEditorBlock({
           ))}
         </select>
 
-        {(block.type === 'text' || block.type === 'box') && (
+        {isTextBased && (
           <input
             value={block.title || ''}
             onChange={(e) => onTitleChange(e.target.value)}
@@ -363,6 +511,7 @@ function SortableEditorBlock({
             <ImageBlockContent
               block={block}
               onImageUpload={onImageUpload}
+              onImageWidthChange={onImageWidthChange}
               problemId={problemId}
             />
           ) : (
@@ -425,6 +574,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
+
+  // 블록 추가 드롭다운
+  const [addBlockDropdownOpen, setAddBlockDropdownOpen] = useState(false);
+  const addBlockDropdownRef = useRef<HTMLDivElement>(null);
 
   // 탭 markdown copy 상태
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
@@ -526,12 +679,35 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       prev.map((b) => {
         if (b.id !== blockId) return b;
         let raw_text = b.raw_text;
+
         if (type === 'choices' && b.type !== 'choices') {
-          raw_text = DEFAULT_CHOICES;
-        }
-        if (type === 'image' && b.type !== 'image') {
+          // 선택지 자동 분류: (1)~(5) 패턴 감지
+          const choicesMatch = raw_text.match(/\(1\)\s*([\s\S]*)/);
+          if (choicesMatch) {
+            const fromFirstChoice = choicesMatch[0];
+            const lines = fromFirstChoice.split('\n');
+            const extracted: string[] = [];
+            for (const line of lines) {
+              const m = line.match(/^\((\d)\)\s*(.*)/);
+              if (m && Number(m[1]) >= 1 && Number(m[1]) <= 5) {
+                extracted[Number(m[1]) - 1] = m[2].trim();
+              }
+            }
+            if (extracted.filter(Boolean).length >= 2) {
+              raw_text = CHOICES_LABELS.map((label, i) => `${label} ${extracted[i] || ''}`).join('\n');
+            } else {
+              raw_text = DEFAULT_CHOICES;
+            }
+          } else {
+            raw_text = DEFAULT_CHOICES;
+          }
+        } else if (type === 'image' && b.type !== 'image') {
           raw_text = '';
+        } else if (type !== b.type && BLOCK_PRESETS[type] !== undefined && !TEXT_BASED_TYPES.has(b.type)) {
+          // 이미지→텍스트 계열 전환 시 프리셋 적용
+          raw_text = BLOCK_PRESETS[type];
         }
+
         return { ...b, type, raw_text };
       })
     );
@@ -560,16 +736,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, [setCurrentBlocks, activeBlockId]);
 
-  const handleAddBlock = useCallback(() => {
+  const handleAddBlock = useCallback((type: Block['type'] = 'text') => {
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
       order: 0,
-      type: 'text',
-      raw_text: '',
+      type,
+      raw_text: BLOCK_PRESETS[type] ?? '',
       title: '',
       collapsed: false,
       isNew: true,
     };
+    if (type === 'choices') {
+      newBlock.raw_text = DEFAULT_CHOICES;
+    }
     setCurrentBlocks((prev) => {
       const activeIdx = activeBlockId ? prev.findIndex((b) => b.id === activeBlockId) : -1;
       const insertIdx = activeIdx !== -1 ? activeIdx + 1 : prev.length;
@@ -580,8 +759,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setActiveBlockId(newBlock.id);
   }, [activeBlockId, setCurrentBlocks]);
 
+  /** 이미지 크기 변경 */
+  const handleImageWidthChange = useCallback((blockId: string, width: number) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, imageWidth: width } : b))
+    );
+  }, [setCurrentBlocks]);
+
   const handleSplitBlock = useCallback(() => {
     if (!activeBlockId) return;
+    const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
+    if (!activeBlock || activeBlock.type !== 'text') return;
+
     const ref = editorRefs.current[activeBlockId];
     if (!ref) return;
 
@@ -591,16 +780,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const before = content.slice(0, cursor);
     const after = content.slice(cursor);
 
-    const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
-    if (!activeBlock) return;
-
     // 원본 블록의 CodeMirror 내용을 즉시 갱신 (before만 남김)
     ref.setContent(before);
 
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
       order: activeBlock.order + 1,
-      type: activeBlock.type === 'text' || activeBlock.type === 'box' ? activeBlock.type : 'text',
+      type: 'text',
       raw_text: after,
       title: '',
       collapsed: false,
@@ -618,6 +804,100 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
     setActiveBlockId(newBlock.id);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
+
+  /** 모두 분할: 현재 탭의 모든 텍스트 블록에서 제목/수식행을 자동 분리 */
+  const handleSplitAll = useCallback(() => {
+    setCurrentBlocks((prev) => {
+      const result: LocalBlock[] = [];
+      let counter = Date.now();
+
+      for (const block of prev) {
+        // 텍스트 블록만 분할 대상
+        if (block.type !== 'text') {
+          result.push(block);
+          continue;
+        }
+
+        const content = editorRefs.current[block.id]?.getContent() ?? block.raw_text;
+        const lines = content.split('\n');
+        let buf: string[] = [];
+        let inMath = false;
+        let mathBuf: string[] = [];
+
+        const flushText = () => {
+          const text = buf.join('\n').trim();
+          if (text) {
+            result.push({
+              id: `split-${counter++}`,
+              order: 0, type: 'text', raw_text: text,
+              title: '', collapsed: false, isNew: true,
+            });
+          }
+          buf = [];
+        };
+
+        for (let li = 0; li < lines.length; li++) {
+          const line = lines[li];
+          const trimmed = line.trim();
+
+          if (inMath) {
+            mathBuf.push(line);
+            if (trimmed === '$$') {
+              // 수식행 블록 종료
+              flushText();
+              result.push({
+                id: `split-${counter++}`,
+                order: 0, type: 'math_block', raw_text: mathBuf.join('\n'),
+                title: '', collapsed: false, isNew: true,
+              });
+              inMath = false;
+              mathBuf = [];
+            }
+            continue;
+          }
+
+          // $$ 독립행: 수식행 시작
+          if (trimmed === '$$') {
+            flushText();
+            inMath = true;
+            mathBuf = [line];
+            continue;
+          }
+
+          // ## 또는 ### 제목행
+          if (/^#{2,3}\s/.test(trimmed)) {
+            flushText();
+            result.push({
+              id: `split-${counter++}`,
+              order: 0, type: 'heading', raw_text: line,
+              title: '', collapsed: false, isNew: true,
+            });
+            continue;
+          }
+
+          buf.push(line);
+        }
+
+        // 닫히지 않은 수식: 텍스트로 복원
+        if (inMath) {
+          buf = [...buf, ...mathBuf];
+          mathBuf = [];
+        }
+        flushText();
+      }
+
+      // 분할 결과가 비어있으면 빈 텍스트 블록 하나
+      if (result.length === 0) {
+        result.push({
+          id: `split-${Date.now()}`,
+          order: 0, type: 'text', raw_text: '',
+          title: '', collapsed: false, isNew: true,
+        });
+      }
+
+      return result;
+    });
+  }, [setCurrentBlocks]);
 
   /* ─── 이미지 업로드 ─── */
   const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
@@ -767,16 +1047,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Ctrl+F 단축키: 찾기/바꾸기 열기 ──
+  // ── Cmd+B 단축키: 블록 분할 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setSearchOpen(true);
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+        e.preventDefault();
+        handleSplitBlock();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [handleSplitBlock]);
 
   /* ─── 3점 메뉴 외부 클릭 닫기 ─── */
   useEffect(() => {
@@ -789,6 +1074,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [menuOpen]);
+
+  // 블록 추가 드롭다운 외부 클릭 닫기
+  useEffect(() => {
+    if (!addBlockDropdownOpen) return;
+    const handleClick = (e: MouseEvent) => {
+      if (addBlockDropdownRef.current && !addBlockDropdownRef.current.contains(e.target as Node)) {
+        setAddBlockDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [addBlockDropdownOpen]);
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
@@ -878,6 +1175,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         label: t.label,
         blocks: (allBlocks[t.id] || []).map((b) => ({
           id: b.id, type: b.type, raw_text: b.raw_text,
+          imageWidth: b.imageWidth,
         })),
       }));
 
@@ -976,6 +1274,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
     p:has(> .marker-gana:first-child),
     p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
+    /* bordered 블록 */
+    .print-bordered-block { border: 0.3mm solid #000; border-radius: 0; padding: 6pt 8pt; margin: 12pt 0; break-inside: avoid; }
+    /* 선택지 블록 */
+    .print-choices-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 8pt; margin: 6pt 0; break-inside: avoid; }
+    .print-choice-item { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
+    .print-choice-item p { margin: 0; display: inline; }
+    .print-choice-label { font-weight: 400; flex-shrink: 0; }
+    .print-choice-content { display: inline; }
+    .print-choice-content p { margin: 0; display: inline; }
   </style>
 </head>
 <body>
@@ -1049,13 +1356,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }
         }
 
-        // 새로 저장
+        // 새로 저장 (빈줄 trim 적용)
         for (let i = 0; i < blocks.length; i++) {
           const b = blocks[i];
-          await saveTabBlock(problem.id, tab.id, {
-            order: i, type: b.type, raw_text: b.raw_text,
+          // 위아래 빈 줄 제거
+          const trimmed = b.raw_text
+            .replace(/^\s*\n/, '')   // 첫 비어있지 않은 행 위의 빈 행 제거
+            .replace(/\n\s*$/, '');  // 마지막 비어있지 않은 행 아래의 빈 행 제거
+          const saveData: Record<string, any> = {
+            order: i, type: b.type, raw_text: trimmed,
             title: b.title || '',
-          });
+          };
+          if (b.type === 'image' && b.imageWidth) {
+            saveData.imageWidth = b.imageWidth;
+          }
+          await saveTabBlock(problem.id, tab.id, saveData as any);
         }
       }
 
@@ -1103,7 +1418,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }
 
   const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
-  const showToolbar = activeBlock && (activeBlock.type === 'text' || activeBlock.type === 'box');
+  const showToolbar = activeBlock && TEXT_BASED_TYPES.has(activeBlock.type);
 
   const metaInputStyle: React.CSSProperties = {
     border: '1px solid transparent', borderRadius: 6, padding: '3px 8px',
@@ -1466,39 +1781,40 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       </div>
 
       {/* ═══ Row 3: Math Toolbar ═══ */}
-      {showToolbar && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
-          borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
-        }}>
-          <MathToolbar
-            onInsert={handleInsert}
-            snippets={snippets}
-            onSnippetInsert={handleSnippetInsert}
-            onSnippetAdd={addSnippet}
-            onSnippetEdit={editSnippet}
-            onSnippetDelete={removeSnippet}
-          />
-          <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-          <button
-            onClick={() => setSearchOpen(!searchOpen)}
-            title="찾기 / 바꾸기 (Ctrl+F)"
-            style={{
-              width: 28, height: 28,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
-              borderRadius: 6,
-              background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
-              cursor: 'pointer',
-              color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-              fontSize: 16,
-              transition: 'all 0.15s',
-            }}
-          >
-            🔍
-          </button>
-        </div>
-      )}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
+        borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
+        opacity: showToolbar ? 1 : 0.35,
+        pointerEvents: showToolbar ? 'auto' : 'none',
+        transition: 'opacity 0.15s',
+      }}>
+        <MathToolbar
+          onInsert={handleInsert}
+          snippets={snippets}
+          onSnippetInsert={handleSnippetInsert}
+          onSnippetAdd={addSnippet}
+          onSnippetEdit={editSnippet}
+          onSnippetDelete={removeSnippet}
+        />
+        <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+        <button
+          onClick={() => setSearchOpen(!searchOpen)}
+          title="찾기 / 바꾸기 (Ctrl+F)"
+          style={{
+            width: 28, height: 28,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
+            borderRadius: 6,
+            background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
+            cursor: 'pointer',
+            color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+            fontSize: 16,
+            transition: 'all 0.15s',
+          }}
+        >
+          🔍
+        </button>
+      </div>
 
       {/* ═══ Row 4: Split View ═══ */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
@@ -1511,8 +1827,76 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <div style={{
             padding: '8px 16px 4px', fontSize: 11, color: 'var(--text-muted)',
             fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
+            display: 'flex', alignItems: 'center',
           }}>
             편집
+            <div style={{ flex: 1 }} />
+            {/* ── 블록 추가 드롭다운 ── */}
+            <div ref={addBlockDropdownRef} style={{ position: 'relative' }}>
+              <span
+                onClick={() => setAddBlockDropdownOpen((v) => !v)}
+                style={{
+                  cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
+                  fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
+                }}
+              >
+                + 블록 추가
+              </span>
+              {addBlockDropdownOpen && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, zIndex: 100,
+                  marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+                  borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                  minWidth: 140, overflow: 'hidden',
+                }}>
+                  {BLOCK_TYPES.map((t) => (
+                    <div
+                      key={t}
+                      onClick={() => {
+                        handleAddBlock(t);
+                        setAddBlockDropdownOpen(false);
+                      }}
+                      style={{
+                        padding: '7px 14px', fontSize: 12, cursor: 'pointer',
+                        color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+                    >
+                      {BLOCK_TYPE_LABELS[t]}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <span style={{ margin: '0 10px', color: 'var(--border-light)' }}>|</span>
+            {/* ── 블록 분할 ── */}
+            <span
+              onClick={activeBlock?.type === 'text' ? handleSplitBlock : undefined}
+              style={{
+                cursor: activeBlock?.type === 'text' ? 'pointer' : 'default',
+                fontSize: 11, color: 'var(--text-muted)',
+                fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
+                opacity: activeBlock?.type === 'text' ? 1 : 0.35,
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              <IconSplit size={12} /> 블록 분할
+            </span>
+            <span style={{ margin: '0 10px', color: 'var(--border-light)' }}>|</span>
+            {/* ── 모두 분할 ── */}
+            <span
+              onClick={handleSplitAll}
+              style={{
+                cursor: 'pointer',
+                fontSize: 11, color: 'var(--text-muted)',
+                fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: 3,
+              }}
+            >
+              <IconSplitAll size={12} /> 모두 분할
+            </span>
           </div>
 
           {/* ── 찾기/바꾸기 패널 ── */}
@@ -1541,6 +1925,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onDelete={() => handleDeleteBlock(block.id)}
                     onToggleCollapse={() => handleToggleCollapse(block.id)}
                     onImageUpload={handleBlockImageUpload}
+                    onImageWidthChange={handleImageWidthChange}
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
                     onCursorActivity={handleCursorActivity}
@@ -1548,43 +1933,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 ))}
               </SortableContext>
             </DndContext>
-          </div>
-
-          <div style={{
-            flexShrink: 0, display: 'flex',
-            borderTop: '1px solid var(--border-light)', background: 'var(--bg-card)',
-          }}>
-            <button onClick={handleAddBlock} style={{
-              flex: 1, padding: '10px 0', border: 'none',
-              background: 'none', cursor: 'pointer',
-              fontSize: 13, color: 'var(--text-muted)',
-              fontFamily: 'var(--font-ui)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              transition: 'background var(--transition-fast)',
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-            >
-              <IconPlus size={14} /> 블록 추가
-            </button>
-
-            <div style={{ width: 1, background: 'var(--border-light)' }} />
-
-            <button onClick={handleSplitBlock} style={{
-              flex: 1, padding: '10px 0', border: 'none',
-              background: 'none', cursor: 'pointer',
-              fontSize: 13, color: 'var(--text-muted)',
-              fontFamily: 'var(--font-ui)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              opacity: activeBlock && (activeBlock.type === 'text' || activeBlock.type === 'box') ? 1 : 0.4,
-              pointerEvents: activeBlock && (activeBlock.type === 'text' || activeBlock.type === 'box') ? 'auto' : 'none',
-              transition: 'background var(--transition-fast)',
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-            >
-              <IconSplit size={14} /> 블록 분할
-            </button>
           </div>
         </div>
 
@@ -1598,16 +1946,32 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 50vh 20px', background: 'var(--bg-card)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 50vh 20px', background: '#ffffff', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
+              const isBordered = BORDERED_TYPES.has(block.type);
               return (
                 <div key={block.id} data-block-id={block.id}>
-                  {block.type === 'box' ? (
+                  {block.type === 'image' ? (
+                    <div style={{ textAlign: 'center' }}>
+                      {block.raw_text ? (
+                        <img
+                          src={block.raw_text.match(/src="([^"]+)"/)?.[1] || ''}
+                          alt=""
+                          style={{
+                            width: block.imageWidth || 400,
+                            maxWidth: '90%',
+                            height: 'auto',
+                          }}
+                        />
+                      ) : (
+                        <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
+                      )}
+                    </div>
+                  ) : isBordered ? (
                     <div style={{
                       border: '1.5px solid var(--text-muted, #888)',
-                      borderRadius: 8, padding: '12px 16px', margin: '8px 0',
-                      background: 'var(--bg-input, #fafafa)',
+                      borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
                     }}>
                       <EditorPreview
                         content={block.raw_text}
@@ -1618,26 +1982,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       />
                     </div>
                   ) : block.type === 'choices' ? (
-                    <div style={{ padding: '8px 0' }}>
-                      <EditorPreview
-                        content={block.raw_text.replace(/\n/g, '\n\n')}
-                        locale="ko"
-                        activeMathId={isActivePreview ? activeMathId : undefined}
-                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
-                      />
-                    </div>
+                    <EditorPreview
+                      content={block.raw_text.replace(/\n/g, '\n\n')}
+                      borderless
+                      locale="ko"
+                      activeMathId={isActivePreview ? activeMathId : undefined}
+                      onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
+                    />
                   ) : (
-                    <div style={{ padding: '8px 0' }}>
-                      <EditorPreview
-                        content={block.raw_text}
-                        locale="ko"
-                        activeMathId={isActivePreview ? activeMathId : undefined}
-                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
-                      />
-                    </div>
-                  )}
-                  {i < currentBlocks.length - 1 && (
-                    <div style={{ borderTop: '1px dashed var(--border-dashed, #ddd)', margin: '4px 0' }} />
+                    <EditorPreview
+                      content={block.raw_text}
+                      borderless
+                      locale="ko"
+                      activeMathId={isActivePreview ? activeMathId : undefined}
+                      onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
+                    />
                   )}
                 </div>
               );
