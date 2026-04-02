@@ -63,7 +63,7 @@ ol{margin:4pt 0;padding-left:24pt}ol li{margin-bottom:3pt;list-style-position:ou
 ul{margin:4pt 0;padding-left:14pt}ul li{margin-bottom:3pt}
 img{max-width:100%;height:auto;break-inside:avoid}
 hr{border:none;border-top:0.1mm solid #999;margin:8pt 0}
-.katex-display{margin:8pt 0;break-inside:avoid}.katex{font-size:1em}
+.katex-display{margin:8pt 0;break-inside:avoid}.katex-display.fleqn>.katex{padding-left:3em}.katex{font-size:1em}
 table{border-collapse:collapse;width:100%;margin:6pt 0;font-size:10pt;break-inside:avoid}
 th,td{border:0.2mm solid #000;padding:3pt 6pt;text-align:center}th{font-weight:700;background-color:#f5f5f5}
 .tag-marker{float:right;font-size:0.95em}

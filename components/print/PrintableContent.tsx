@@ -75,7 +75,7 @@ function PrintBlockRenderer({ content, locale }: { content: string; locale: Loca
       remarkPlugins={[remarkMath, remarkGfm]}
       rehypePlugins={[
         rehypeRaw,
-        [rehypeKatex, { strict: false, trust: true, macros: { '\\arraystretch': '1.8' } }],
+        [rehypeKatex, { strict: false, trust: true, fleqn: true, macros: { '\\arraystretch': '1.8' } }],
       ]}
       components={{
         img: ({ src, alt, ...props }) => (

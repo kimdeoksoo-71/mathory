@@ -287,11 +287,13 @@ problems/{id}
 | column-fill: auto | ✅ | 2026-03-28 | 왼쪽 단 먼저 채운 뒤 오른쪽 단 |
 | 탭별 단 바꿈 | ✅ | 2026-03-28 | break-before: column |
 | 탭 제목 표시 | ✅ | 2026-03-28 | 14pt 굵게 + 하단 구분선 |
+| 독립행 수식 왼쪽 정렬 | ✅ | 2026-04-02 | rehype-katex fleqn:true 옵션, 미리보기와 동일하게 좌정렬 + padding-left 3em |
 
 **현재 PDF 규격 (간소화 버전):**
 - 용지: A3 세로 (297 × 420mm)
 - 여백: 상하 30mm, 좌우 20mm
 - 본문: 2단, 단 간격 10mm, column-fill: auto
+- 수식: 독립행 수식 왼쪽 정렬 + padding-left 3em (미리보기와 동일)
 - 부가 요소 없음 (구분선, 머리말, 꼬리말, 페이지 번호 제거 — 추후 안정적 방법으로 재추가 예정)
 
 ### 21-C: \tag{} / \ref{} 통합
@@ -330,6 +332,7 @@ problems/{id}
 - **column-fill: auto**: CSS columns의 기본값은 balance(양쪽 균등)이며, auto로 바꾸면 왼쪽 단을 먼저 채움.
 - **iframe 인쇄**: window.open 팝업 대신 숨겨진 iframe.contentWindow.print()를 사용하면 미리보기 창 없이 시스템 인쇄 다이얼로그 직접 호출 가능.
 - **locale.ts에서 (a)~(e) 범위를 a~n으로 확장하면 (i)와 충돌**: EditorPreview는 a~e로 제한되어 있었으나 locale.ts만 a~n이라 PDF에서 (i)가 알파벳 9번째(자)로 잡힘. 두 파일의 범위를 반드시 동기화해야 함.
+- **PDF 독립행 수식 정렬**: CSS `!important` 오버라이드나 DOM 조작으로는 KaTeX의 centering을 제어할 수 없음. `rehype-katex`의 `fleqn: true` 렌더링 옵션으로 KaTeX 출력 자체를 왼쪽 정렬로 만드는 것이 유일한 확실한 방법.
 ## Phase 22: 블록 기능 강화 ✅
 > 목표: 블록 종류 9종 확장, 블록 추가/분할 UI 개선, 선택지 자동분류, 이미지 크기 조절, 자동 분할 기능
 
