@@ -164,6 +164,18 @@ function preprocessMath(text: string): string {
     return match;
   });
 
+  // cases 환경 내 \sum, \int 등에 \displaystyle 자동 추가
+  result = result.replace(
+    /\\begin\{cases\}([\s\S]*?)\\end\{cases\}/g,
+    (match, inner) => {
+      const patched = inner.replace(
+        /(?<!\\displaystyle\s*)(\\(?:sum|int|prod|iint|iiint|oint|bigcup|bigcap)(?![a-zA-Z]))/g,
+        '\\displaystyle $1'
+      );
+      return `\\begin{cases}${patched}\\end{cases}`;
+    }
+  );
+
   result = result.replace(
     /(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g,
     (match, inner) => {
@@ -328,6 +340,7 @@ export default function EditorPreview({
       border: borderless ? 'none' : '1px solid #ddd',
       borderRadius: borderless ? '0' : '8px',
       overflow: 'auto', fontSize: '15px', lineHeight: '2.5',
+      fontFamily: "var(--font-content, 'Noto Serif KR', Georgia, serif)",
     }}>
       <div ref={contentRef} className="preview-content"
         onClick={handleContentClick}

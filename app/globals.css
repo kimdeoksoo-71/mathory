@@ -37,6 +37,7 @@
   /* Fonts */
   --font-logo: 'Noto Serif KR', 'Georgia', serif;
   --font-ui: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-content: 'Noto Serif KR', 'Georgia', 'Times New Roman', serif;
   --font-mono: 'Courier New', 'Consolas', monospace;
 
   /* Sizing */
@@ -106,7 +107,7 @@ textarea:focus-visible {
 }
 
 /* ═══ Google Fonts ═══ */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@500;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
 
 
 /* Display math: 왼쪽 정렬 + 들여쓰기 */
@@ -119,14 +120,9 @@ textarea:focus-visible {
   padding-left: 3em;
 }
 
-/* KaTeX \text{} 폰트를 본문과 동일하게 */
+/* KaTeX \text{} 폰트를 본문(명조체)과 동일하게 */
 .katex .text {
-  font-family: var(--font-ui) !important;
-}
-
-/* KaTeX \text{} 폰트를 본문과 동일하게 */
-.katex .text {
-  font-family: var(--font-ui) !important;
+  font-family: var(--font-content) !important;
   font-size: 15px !important;
 }
 

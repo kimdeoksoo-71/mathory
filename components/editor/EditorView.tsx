@@ -13,6 +13,7 @@ import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import { uploadImage } from '../../lib/storage';
 import PrintableContent, { PrintTab } from '../print/PrintableContent';
+import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
@@ -1262,8 +1263,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         return;
       }
 
-      const katexCssUrl = 'https://cdn.jsdelivr.net/npm/katex@0.16.28/dist/katex.min.css';
-
       // React → HTML
       const tempDiv = document.createElement('div');
       tempDiv.style.cssText = 'position:absolute;left:-9999px;top:0;';
@@ -1280,102 +1279,29 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         );
         setTimeout(resolve, 500);
       });
-      const contentHtml = tempDiv.querySelector('.print-root')?.innerHTML || '';
-      root.unmount();
-      document.body.removeChild(tempDiv);
-
-      // 숨겨진 iframe → 시스템 인쇄 다이얼로그
-      const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'position:fixed;width:0;height:0;border:none;left:-9999px;top:-9999px;';
-      document.body.appendChild(iframe);
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (!iframeDoc || !iframe.contentWindow) {
-        document.body.removeChild(iframe);
+      // print-root를 메인 DOM에 추가 → window.print() (폰트 이미 로드됨)
+      const printRoot = tempDiv.querySelector('.print-root');
+      if (!printRoot) {
+        root.unmount();
+        document.body.removeChild(tempDiv);
         setIsPrinting(false);
         return;
       }
+      const printNode = printRoot.cloneNode(true) as HTMLElement;
+      printNode.classList.add('print-root');
 
-      iframeDoc.open();
-      iframeDoc.write(`
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8" />
-  <title>${editTitle || '수학 문제'} - PDF</title>
-  <link rel="stylesheet" href="${katexCssUrl}" />
-  <style>
-    @page {
-      size: 297mm 420mm;
-      margin: 30mm 20mm;
-    }
-    * {
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-      box-sizing: border-box;
-    }
-    body {
-      margin: 0; padding: 0;
-      font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-      font-size: 12pt; line-height: 1.75; color: #000;
-    }
-    .print-body {
-      column-count: 2;
-      column-gap: 10mm;
-      column-fill: auto;
-      height: 100%;
-    }
-    .print-tab-section { break-before: column; }
-    .print-tab-label {
-      font-size: 14pt; font-weight: 700;
-      margin: 0 0 6pt; padding-bottom: 3pt;
-      border-bottom: 0.15mm solid #999; margin-bottom: 8pt;
-      break-after: avoid;
-    }
-    h1 { font-size: 16pt; font-weight: 700; margin: 0 0 6pt; break-after: avoid; }
-    h2 { font-size: 14pt; font-weight: 700; margin: 8pt 0 4pt; break-after: avoid; }
-    h3 { font-size: 12pt; font-weight: 700; margin: 6pt 0 3pt; break-after: avoid; }
-    p { margin: 0 0 6pt; text-align: justify; word-break: keep-all; }
-    blockquote, .text-box { border: 0.3mm solid #000; padding: 6pt 8pt; margin: 6pt 0; break-inside: avoid; }
-    ol { margin: 4pt 0; padding-left: 24pt; }
-    ol li { margin-bottom: 3pt; list-style-position: outside; }
-    ul { margin: 4pt 0; padding-left: 14pt; }
-    ul li { margin-bottom: 3pt; }
-    img { max-width: 100%; height: auto; break-inside: avoid; }
-    hr { border: none; border-top: 0.1mm solid #999; margin: 8pt 0; }
-    .katex-display { margin: 8pt 0; break-inside: avoid; }
-    .katex { font-size: 1em; }
-    table { border-collapse: collapse; width: 100%; margin: 6pt 0; font-size: 10pt; break-inside: avoid; }
-    th, td { border: 0.2mm solid #000; padding: 3pt 6pt; text-align: center; }
-    th { font-weight: 700; background-color: #f5f5f5; }
-    .tag-marker { float: right; font-size: 0.95em; }
-    .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
-    p:has(> .marker-gana:first-child),
-    p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
-    /* bordered 블록 */
-    .print-bordered-block { border: 0.3mm solid #000; border-radius: 0; padding: 6pt 8pt; margin: 12pt 0; break-inside: avoid; }
-    /* 선택지 블록 */
-    .print-choices-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0 8pt; margin: 6pt 0; break-inside: avoid; }
-    .print-choice-item { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
-    .print-choice-item p { margin: 0; display: inline; }
-    .print-choice-label { font-weight: 400; flex-shrink: 0; }
-    .print-choice-content { display: inline; }
-    .print-choice-content p { margin: 0; display: inline; }
-  </style>
-</head>
-<body>
-  <div class="print-root">${contentHtml}</div>
-</body>
-</html>
-      `);
-      iframeDoc.close();
+      root.unmount();
+      document.body.removeChild(tempDiv);
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
-      iframe.contentWindow.print();
+      document.body.appendChild(printNode);
+
+      await new Promise(resolve => setTimeout(resolve, 200));
+      window.print();
 
       setTimeout(() => {
-        try { document.body.removeChild(iframe); } catch {}
+        try { document.body.removeChild(printNode); } catch {}
         setIsPrinting(false);
-      }, 3000);
+      }, 1000);
 
     } catch (error) {
       console.error('PDF 생성 오류:', error);

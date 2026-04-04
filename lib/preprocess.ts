@@ -90,6 +90,18 @@ export function preprocessMath(text: string): string {
     return match;
   });
 
+  // cases 환경 내 \sum, \int 등에 \displaystyle 자동 추가
+  result = result.replace(
+    /\\begin\{cases\}([\s\S]*?)\\end\{cases\}/g,
+    (match, inner) => {
+      const patched = inner.replace(
+        /(?<!\\displaystyle\s*)(\\(?:sum|int|prod|iint|iiint|oint|bigcup|bigcap)(?![a-zA-Z]))/g,
+        '\\displaystyle $1'
+      );
+      return `\\begin{cases}${patched}\\end{cases}`;
+    }
+  );
+
   // $...$ 인라인 수식에 \displaystyle 추가 ($$...$$는 제외)
   result = result.replace(
     /(?<!\$)\$(?!\$)((?:[^$\\]|\\.)+)\$(?!\$)/g,

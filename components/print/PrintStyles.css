@@ -4,6 +4,9 @@
  * 부가 요소 없음 (구분선, 머리말, 꼬리말, 페이지 번호 전부 제거)
  */
 
+/* 화면에서는 print-root를 화면 밖에 배치 (display:none은 KaTeX 폰트 로드를 막으므로 사용 금지) */
+.print-root { position: absolute; left: -9999px; top: 0; width: 297mm; visibility: hidden; }
+
 @media print {
   @page {
     size: 297mm 420mm;
@@ -13,17 +16,21 @@
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+  body { background: #fff !important; }
   body > *:not(.print-root) { display: none !important; }
-  .print-root { display: block !important; }
+  .print-root { display: block !important; position: static !important; left: auto !important; visibility: visible !important; width: auto !important; background: #fff !important; }
+  .katex-display { padding-left: 0 !important; }
+  .katex-display.fleqn > .katex { padding-left: 2em !important; }
+  .katex .text { font-size: 1em !important; }
 }
 
 .print-body {
   column-count: 2;
   column-gap: 10mm;
   column-fill: auto;
-  font-family: 'Pretendard', 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: 'Noto Serif KR', 'Georgia', 'Times New Roman', serif;
   font-size: 12pt;
-  line-height: 1.75;
+  line-height: 2.5;
   color: #000;
 }
 
@@ -46,7 +53,7 @@
 .print-body ul li { margin-bottom: 3pt; }
 .print-body img { max-width: 100%; height: auto; break-inside: avoid; }
 .print-body hr { border: none; border-top: 0.1mm solid #999; margin: 8pt 0; }
-.print-body .katex-display { margin: 8pt 0; break-inside: avoid; padding-left: 3em; }
+.print-body .katex-display { margin: 8pt 0; break-inside: avoid; padding-left: 0 !important; }
 .print-body .katex-display,
 .print-body .katex-display > .katex { text-align: left !important; }
 .print-body .katex { font-size: 1em; }
