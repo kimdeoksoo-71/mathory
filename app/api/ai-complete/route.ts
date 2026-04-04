@@ -71,7 +71,7 @@ ${body.currentText}`;
     completion = completion.trim();
 
     // "생각: ..." 등 메타 텍스트 블록 제거
-    completion = completion.replace(/^생각:.*?\n\n/s, '');
+    completion = completion.replace(/^생각:[\s\S]*?\n\n/, '');
 
     // AI가 기존 텍스트를 반복한 경우 접두사 제거
     const currentTrimmed = body.currentText.trim();
