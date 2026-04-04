@@ -17,7 +17,7 @@ import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
   IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
-  IconDotsVertical, IconDownload, IconRename,
+  IconDotsVertical, IconDownload, IconRename, IconSparkle, IconLoader,
 } from '../ui/Icons';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -400,6 +400,8 @@ function SortableEditorBlock({
   problemId,
   onSnippetShortcut,
   onCursorActivity,
+  onAIComplete,
+  aiLoading,
 }: {
   block: LocalBlock;
   index: number;
@@ -417,6 +419,8 @@ function SortableEditorBlock({
   problemId: string;
   onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number }) => void;
+  onAIComplete?: () => void;
+  aiLoading?: boolean;
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -488,6 +492,23 @@ function SortableEditorBlock({
         )}
 
         <div style={{ flex: 1 }} />
+
+        {isTextBased && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onAIComplete?.(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            disabled={aiLoading}
+            style={{
+              border: 'none', background: 'none',
+              cursor: aiLoading ? 'wait' : 'pointer',
+              padding: 2, display: 'flex',
+              color: aiLoading ? 'var(--accent-primary)' : 'var(--text-faint)',
+            }}
+            title="AI 완성 (⌘J)"
+          >
+            {aiLoading ? <IconLoader size={12} /> : <IconSparkle size={12} />}
+          </button>
+        )}
 
         {canDelete && (
           <button
@@ -589,6 +610,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [menuOpen, setMenuOpen] = useState(false);
   const [pdfTabSelection, setPdfTabSelection] = useState<Record<string, boolean>>({});
   const [isPrinting, setIsPrinting] = useState(false);
+  const [aiLoadingBlockId, setAiLoadingBlockId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
@@ -666,6 +688,58 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       [activeTab]: typeof updater === 'function' ? updater(prev[activeTab] || []) : updater,
     }));
   }, [activeTab]);
+
+  /* ─── AI 자동완성 ─── */
+  const collectAIContext = useCallback((blockId: string) => {
+    const questionBlocks = allBlocks['question'] || [];
+    const questionContext = questionBlocks.map((b) => b.raw_text).filter(Boolean).join('\n');
+
+    const blocks = allBlocks[activeTab] || [];
+    const activeIdx = blocks.findIndex((b) => b.id === blockId);
+    const previousBlocks = activeIdx > 0
+      ? blocks.slice(0, activeIdx).map((b) => b.raw_text).filter(Boolean)
+      : [];
+
+    const ref = editorRefs.current[blockId];
+    const fullText = ref?.getContent() || '';
+    const cursorPos = ref?.getCursorPosition() ?? fullText.length;
+    const currentText = fullText.slice(0, cursorPos);
+
+    return { questionContext, previousBlocks, currentText };
+  }, [allBlocks, activeTab]);
+
+  const handleAIComplete = useCallback(async (blockId?: string) => {
+    const targetId = blockId || activeBlockId;
+    if (!targetId || aiLoadingBlockId) return;
+
+    const { questionContext, previousBlocks, currentText } = collectAIContext(targetId);
+    if (!currentText.trim()) return;
+
+    setAiLoadingBlockId(targetId);
+    try {
+      const res = await fetch('/api/ai-complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionContext, previousBlocks, currentText }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const { completion } = await res.json();
+      if (completion) {
+        const editor = editorRefs.current[targetId];
+        if (editor) {
+          editor.insertText(completion, completion.length);
+        }
+      }
+    } catch (e: any) {
+      console.error('[AI Complete] Error:', e);
+      setStatus(`AI 오류: ${e.message}`);
+    } finally {
+      setAiLoadingBlockId(null);
+    }
+  }, [activeBlockId, aiLoadingBlockId, collectAIContext]);
 
   /* ─── 블록 조작 핸들러 ─── */
   const handleBlockChange = useCallback((blockId: string, value: string) => {
@@ -1046,8 +1120,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Ctrl+F 단축키: 찾기/바꾸기 열기 ──
-  // ── Cmd+B 단축키: 블록 분할 ──
+  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
@@ -1058,10 +1131,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         e.preventDefault();
         handleSplitBlock();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
+        e.preventDefault();
+        handleAIComplete();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock]);
+  }, [handleSplitBlock, handleAIComplete]);
 
   /* ─── 3점 메뉴 외부 클릭 닫기 ─── */
   useEffect(() => {
@@ -1929,6 +2006,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
                     onCursorActivity={handleCursorActivity}
+                    onAIComplete={() => handleAIComplete(block.id)}
+                    aiLoading={aiLoadingBlockId === block.id}
                   />
                 ))}
               </SortableContext>

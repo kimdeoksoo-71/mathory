@@ -427,3 +427,34 @@ problems/{id}
 - **showToolbar 조건부 렌더링 vs opacity**: `{condition && <Component/>}`는 DOM에서 완전히 제거/재생성되므로 레이아웃 점프 유발. `opacity + pointerEvents`로 항상 렌더하되 비활성화하는 방식이 더 안정적.
 - **선택지 가로 배치의 어려움**: CSS grid 5등분은 가능하나, 내용 길이에 따른 1열/2열 자동 전환은 KaTeX 비동기 렌더와 충돌하여 안정적 구현이 어려움. 향후 과제로 연기.
 - **모두 분할 알고리즘**: 텍스트 블록의 줄 단위 파싱으로 ##/### 제목행과 $$...$$ 수식행을 감지. 닫히지 않은 $$는 텍스트로 복원하여 데이터 손실 방지.
+
+## Phase 23-A: AI 풀이 자동완성 ✅
+> 목표: 풀이 블록에서 문장 서두를 쓰면 AI가 수식 부분을 완성
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| AI Provider 추상화 (lib/ai-provider.ts) | ✅ | 2026-04-04 | Gemini/Claude 교체 가능 구조 |
+| API Route (app/api/ai-complete/route.ts) | ✅ | 2026-04-04 | POST, 시스템 프롬프트 + 후처리 |
+| 프롬프트 튜닝 | ✅ | 2026-04-04 | 문자식 우선, 숫자 대입 후 2단계 제한, \times, \dfrac |
+| EditorView AI 완성 로직 | ✅ | 2026-04-04 | collectAIContext + handleAIComplete |
+| 단축키 Cmd+J | ✅ | 2026-04-04 | 기존 Cmd+B/F 패턴과 동일 |
+| 블록 헤더 AI 버튼 (✨) | ✅ | 2026-04-04 | 삭제 버튼 왼쪽, 로딩 시 스피너 |
+| IconSparkle + IconLoader | ✅ | 2026-04-04 | SVG 아이콘 |
+| 중복 접두사 제거 | ✅ | 2026-04-04 | 서버 후처리 |
+| AI 모델: Gemini 2.5 Pro | ✅ | 2026-04-04 | 환경변수 AI_MODEL로 교체 가능 |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | ai-provider.ts | lib/ai-provider.ts (신규) |
+| 2 | route.ts | app/api/ai-complete/route.ts (신규) |
+| 3 | EditorView.tsx | components/editor/EditorView.tsx |
+| 4 | Icons.tsx | components/ui/Icons.tsx |
+| 5 | package.json | package.json |
+
+### Key Learnings
+
+- **프롬프트 반복 강조 필요**: Gemini는 "문자식 생략 금지"를 한 번만 쓰면 무시하는 경향. 규칙 + 절대 규칙 + 예시에서 3중으로 강조해야 효과적.
+- **후처리 필수**: AI가 기존 텍스트를 반복하거나 "생각:" 메타 텍스트를 붙이는 현상 → 서버에서 접두사 제거 로직 필요.
+- **Flash vs Pro**: Gemini 2.5 Flash는 수학 계산 실수 빈번. 풀이 정확성이 중요하므로 Pro 모델 사용.
