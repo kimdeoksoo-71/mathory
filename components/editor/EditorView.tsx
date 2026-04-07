@@ -6,7 +6,7 @@ import {
   getProblemWithBlocks, updateProblem,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
-import { CATEGORY_OPTIONS, DIFFICULTIES, DEFAULT_DIFFICULTY } from '../../lib/constants';
+import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
@@ -1559,34 +1559,97 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           style={{ ...metaInputStyle, flex: 1, minWidth: 120, fontSize: 15, fontWeight: 600 }}
         />
 
-        <input value={editSource} onChange={(e) => setEditSource(e.target.value)}
-          placeholder="출처" onFocus={focusHandler} onBlur={blurHandler}
-          style={{ ...metaInputStyle, width: 120, fontSize: 12 }}
-        />
+        {status && (
+          <span style={{ fontSize: 12, marginRight: 4,
+            color: status.includes('에러') || status.includes('오류') ? 'var(--accent-danger)' : '#34a853',
+          }}>{status}</span>
+        )}
 
-        <select value={editCategory} onChange={(e) => setEditCategory(e.target.value)} style={{
-          ...metaInputStyle, fontSize: 12, cursor: 'pointer',
-          background: 'var(--bg-hover)', minWidth: 160,
+        {/* 저장 버튼 */}
+        <button onClick={handleSave} disabled={saving} style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
+          background: saving ? 'var(--text-faint)' : 'var(--accent-primary)',
+          color: '#fff', border: 'none', borderRadius: 8,
+          cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
+          fontFamily: 'var(--font-ui)', transition: 'background var(--transition-fast)',
         }}>
-          <option value="">대단원 선택</option>
-          {CATEGORY_OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>{opt}</option>
-          ))}
-        </select>
+          <IconSave /> {saving ? '저장 중...' : '저장'}
+        </button>
 
-        <select value={editDifficulty} onChange={(e) => setEditDifficulty(Number(e.target.value))} style={{
-          ...metaInputStyle, fontSize: 12, cursor: 'pointer',
-          background: 'var(--bg-hover)',
-        }}>
-          {DIFFICULTIES.map((d) => (
-            <option key={d.value} value={d.value}>{d.label}</option>
-          ))}
-        </select>
+        {/* 3점 메뉴 (PDF) */}
+        <div ref={menuRef} style={{ position: 'relative' }}>
+          <button
+            onClick={openMenu}
+            disabled={isPrinting}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: 32, height: 32, border: '1px solid var(--border-light)',
+              background: menuOpen ? 'var(--bg-hover)' : 'var(--bg-card)',
+              borderRadius: 8, cursor: isPrinting ? 'not-allowed' : 'pointer',
+              color: 'var(--text-secondary)',
+              transition: 'background 0.15s',
+            }}
+            title="더보기"
+          >
+            {isPrinting ? '⏳' : <IconDotsVertical size={16} />}
+          </button>
 
-        <input value={editAnswer} onChange={(e) => setEditAnswer(e.target.value)}
-          placeholder="정답" onFocus={focusHandler} onBlur={blurHandler}
-          style={{ ...metaInputStyle, width: 70, fontSize: 12 }}
-        />
+          {menuOpen && (
+            <div style={{
+              position: 'absolute', top: '100%', right: 0, marginTop: 4,
+              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+              padding: '12px 16px', minWidth: 200, zIndex: 100,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+                marginBottom: 8, fontFamily: 'var(--font-ui)',
+              }}>
+                <IconDownload size={16} /> PDF 다운로드
+              </div>
+              <div style={{
+                fontSize: 12, color: 'var(--text-muted)', marginBottom: 8,
+                fontFamily: 'var(--font-ui)',
+              }}>
+                포함할 탭 선택:
+              </div>
+              {tabs.map((tab) => (
+                <label key={tab.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '4px 0', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--text-secondary)',
+                  fontFamily: 'var(--font-ui)',
+                }}>
+                  <input
+                    type="checkbox"
+                    checked={pdfTabSelection[tab.id] !== false}
+                    onChange={(e) => {
+                      setPdfTabSelection((prev) => ({
+                        ...prev,
+                        [tab.id]: e.target.checked,
+                      }));
+                    }}
+                    style={{ accentColor: 'var(--accent-primary)' }}
+                  />
+                  {tab.label}
+                </label>
+              ))}
+              <button
+                onClick={handlePdfPrint}
+                disabled={isPrinting}
+                style={{
+                  width: '100%', marginTop: 10, padding: '8px 0',
+                  background: 'var(--accent-primary)', color: '#fff',
+                  border: 'none', borderRadius: 6, cursor: 'pointer',
+                  fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-ui)',
+                }}
+              >
+                {isPrinting ? '준비 중...' : '확인'}
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* ─── 글꼴 크기 조절 ─── */}
         <div style={{
@@ -1628,11 +1691,44 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       </div>
 
-      {/* ═══ Row 2: Tabs + Save + Menu ═══ */}
+      {/* ═══ Row 2: Toolbar (좌) + Tabs (우) ═══ */}
       <div style={{
-        display: 'flex', alignItems: 'center', padding: '0 20px',
+        display: 'flex', alignItems: 'center', padding: '0 16px',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
+        gap: 4,
+        opacity: showToolbar ? 1 : 0.35,
+        pointerEvents: showToolbar ? 'auto' : 'none',
+        transition: 'opacity 0.15s',
       }}>
+        <MathToolbar
+          onInsert={handleInsert}
+          snippets={snippets}
+          onSnippetInsert={handleSnippetInsert}
+          onSnippetAdd={addSnippet}
+          onSnippetEdit={editSnippet}
+          onSnippetDelete={removeSnippet}
+        />
+        <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+        <button
+          onClick={() => setSearchOpen(!searchOpen)}
+          title="찾기 / 바꾸기 (Ctrl+F)"
+          style={{
+            width: 28, height: 28,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
+            borderRadius: 6,
+            background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
+            cursor: 'pointer',
+            color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
+            fontSize: 16,
+            transition: 'all 0.15s',
+          }}
+        >
+          🔍
+        </button>
+
+        <div style={{ flex: 1 }} />
+
         {tabs.map((tab, tabIdx) => (
           <div key={tab.id} style={{
             display: 'flex', alignItems: 'center', gap: 2,
@@ -1746,143 +1842,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         >
           <IconPlus size={14} />
         </button>
-
-        <div style={{ flex: 1 }} />
-
-        {status && (
-          <span style={{ fontSize: 12, marginRight: 12,
-            color: status.includes('에러') ? 'var(--accent-danger)' : '#34a853',
-          }}>{status}</span>
-        )}
-
-        {/* 저장 버튼 */}
-        <button onClick={handleSave} disabled={saving} style={{
-          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
-          background: saving ? 'var(--text-faint)' : 'var(--accent-primary)',
-          color: '#fff', border: 'none', borderRadius: 8,
-          cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
-          fontFamily: 'var(--font-ui)', transition: 'background var(--transition-fast)',
-        }}>
-          <IconSave /> {saving ? '저장 중...' : '저장'}
-        </button>
-
-        {/* 3점 메뉴 */}
-        <div ref={menuRef} style={{ position: 'relative', marginLeft: 4 }}>
-          <button
-            onClick={openMenu}
-            disabled={isPrinting}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, border: '1px solid var(--border-light)',
-              background: menuOpen ? 'var(--bg-hover)' : 'var(--bg-card)',
-              borderRadius: 8, cursor: isPrinting ? 'not-allowed' : 'pointer',
-              color: 'var(--text-secondary)',
-              transition: 'background 0.15s',
-            }}
-            title="더보기"
-          >
-            {isPrinting ? '⏳' : <IconDotsVertical size={16} />}
-          </button>
-
-          {/* 드롭다운 메뉴 */}
-          {menuOpen && (
-            <div style={{
-              position: 'absolute', top: '100%', right: 0, marginTop: 4,
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-              padding: '12px 16px', minWidth: 200, zIndex: 100,
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
-                marginBottom: 8, fontFamily: 'var(--font-ui)',
-              }}>
-                <IconDownload size={16} /> PDF 다운로드
-              </div>
-
-              <div style={{
-                fontSize: 12, color: 'var(--text-muted)', marginBottom: 8,
-                fontFamily: 'var(--font-ui)',
-              }}>
-                포함할 탭 선택:
-              </div>
-
-              {tabs.map((tab) => (
-                <label key={tab.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '4px 0', cursor: 'pointer',
-                  fontSize: 13, color: 'var(--text-secondary)',
-                  fontFamily: 'var(--font-ui)',
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={pdfTabSelection[tab.id] !== false}
-                    onChange={(e) => {
-                      setPdfTabSelection((prev) => ({
-                        ...prev,
-                        [tab.id]: e.target.checked,
-                      }));
-                    }}
-                    style={{ accentColor: 'var(--accent-primary)' }}
-                  />
-                  {tab.label}
-                </label>
-              ))}
-
-              <button
-                onClick={handlePdfPrint}
-                disabled={isPrinting}
-                style={{
-                  width: '100%', marginTop: 10, padding: '8px 0',
-                  background: 'var(--accent-primary)', color: '#fff',
-                  border: 'none', borderRadius: 6, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-ui)',
-                }}
-              >
-                {isPrinting ? '준비 중...' : '확인'}
-              </button>
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* ═══ Row 3: Math Toolbar ═══ */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 4, padding: '8px 16px',
-        borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
-        opacity: showToolbar ? 1 : 0.35,
-        pointerEvents: showToolbar ? 'auto' : 'none',
-        transition: 'opacity 0.15s',
-      }}>
-        <MathToolbar
-          onInsert={handleInsert}
-          snippets={snippets}
-          onSnippetInsert={handleSnippetInsert}
-          onSnippetAdd={addSnippet}
-          onSnippetEdit={editSnippet}
-          onSnippetDelete={removeSnippet}
-        />
-        <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-        <button
-          onClick={() => setSearchOpen(!searchOpen)}
-          title="찾기 / 바꾸기 (Ctrl+F)"
-          style={{
-            width: 28, height: 28,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
-            borderRadius: 6,
-            background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
-            cursor: 'pointer',
-            color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-            fontSize: 16,
-            transition: 'all 0.15s',
-          }}
-        >
-          🔍
-        </button>
-      </div>
-
-      {/* ═══ Row 4: Split View ═══ */}
+      {/* ═══ Row 3: Split View ═══ */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
 
         {/* ─── Left: Editor ─── */}
