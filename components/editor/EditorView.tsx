@@ -19,7 +19,9 @@ import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
   IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
   IconDotsVertical, IconDownload, IconRename, IconSparkle, IconLoader,
+  IconLineSplit,
 } from '../ui/Icons';
+import { splitDisplayMathAtCursor, splitDisplayMathBody, hasBlockedEnvironment } from '../../lib/mathSplit';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent,
@@ -403,6 +405,7 @@ function SortableEditorBlock({
   onCursorActivity,
   onAIComplete,
   aiLoading,
+  onSplitMathLines,
 }: {
   block: LocalBlock;
   index: number;
@@ -422,6 +425,7 @@ function SortableEditorBlock({
   onCursorActivity?: (info: { line: number; offset: number }) => void;
   onAIComplete?: () => void;
   aiLoading?: boolean;
+  onSplitMathLines?: () => void;
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
@@ -493,6 +497,20 @@ function SortableEditorBlock({
         )}
 
         <div style={{ flex: 1 }} />
+
+        {isTextBased && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onSplitMathLines?.(); }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              border: 'none', background: 'none', cursor: 'pointer',
+              padding: 2, display: 'flex', color: 'var(--text-faint)',
+            }}
+            title="수식행 분할 (⌘⇧L) — 커서가 위치한 $$...$$ 의 \\ 행을 각각 독립행 수식으로 분리"
+          >
+            <IconLineSplit size={12} />
+          </button>
+        )}
 
         {isTextBased && (
           <button
@@ -742,6 +760,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId, aiLoadingBlockId, collectAIContext]);
 
+  /* ─── 수식행 분할 ($$..$$ 를 \\ 단위로 분리) ─── */
+  const handleSplitMathLines = useCallback((blockId?: string) => {
+    const targetId = blockId || activeBlockId;
+    if (!targetId) return;
+    const editor = editorRefs.current[targetId];
+    if (!editor) return;
+
+    const content = editor.getContent();
+    const cursor = editor.getCursorPosition();
+    const result = splitDisplayMathAtCursor(content, cursor);
+    if (result.ok !== true) {
+      setStatus(result.reason);
+      return;
+    }
+    editor.setContent(result.newContent);
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === targetId ? { ...b, raw_text: result.newContent } : b))
+    );
+  }, [activeBlockId, setCurrentBlocks]);
+
   /* ─── 블록 조작 핸들러 ─── */
   const handleBlockChange = useCallback((blockId: string, value: string) => {
     setCurrentBlocks((prev) =>
@@ -880,15 +918,38 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setActiveBlockId(newBlock.id);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
 
-  /** 모두 분할: 현재 탭의 모든 텍스트 블록에서 제목/수식행을 자동 분리 */
+  /** 모두 분할: 현재 탭의 모든 텍스트/수식행 블록에서 제목/수식행을 자동 분리 */
   const handleSplitAll = useCallback(() => {
     setCurrentBlocks((prev) => {
       const result: LocalBlock[] = [];
       let counter = Date.now();
 
+      /** 수식 본문(양쪽 $$ 제외)을 \\ 단위로 분할해 math_block 들을 push.
+       *  분할 불가(차단 환경 / 1행) 시 원본 그대로 단일 math_block. */
+      const pushMathBlocks = (body: string) => {
+        if (!hasBlockedEnvironment(body)) {
+          const rows = splitDisplayMathBody(body);
+          if (rows.length >= 2) {
+            for (const row of rows) {
+              result.push({
+                id: `split-${counter++}`,
+                order: 0, type: 'math_block', raw_text: `$$\n${row}\n$$`,
+                title: '', collapsed: false, isNew: true,
+              });
+            }
+            return;
+          }
+        }
+        result.push({
+          id: `split-${counter++}`,
+          order: 0, type: 'math_block', raw_text: `$$\n${body.trim()}\n$$`,
+          title: '', collapsed: false, isNew: true,
+        });
+      };
+
       for (const block of prev) {
-        // 텍스트 블록만 분할 대상
-        if (block.type !== 'text') {
+        // 텍스트 / 수식행 블록만 분할 대상
+        if (block.type !== 'text' && block.type !== 'math_block') {
           result.push(block);
           continue;
         }
@@ -916,17 +977,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           const trimmed = line.trim();
 
           if (inMath) {
-            mathBuf.push(line);
             if (trimmed === '$$') {
-              // 수식행 블록 종료
+              // 수식행 블록 종료 — body는 양쪽 $$ 제외
               flushText();
-              result.push({
-                id: `split-${counter++}`,
-                order: 0, type: 'math_block', raw_text: mathBuf.join('\n'),
-                title: '', collapsed: false, isNew: true,
-              });
+              const body = mathBuf.slice(1).join('\n');
+              pushMathBlocks(body);
               inMath = false;
               mathBuf = [];
+            } else {
+              mathBuf.push(line);
             }
             continue;
           }
@@ -1136,10 +1195,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         e.preventDefault();
         handleAIComplete();
       }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyL') {
+        e.preventDefault();
+        handleSplitMathLines();
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock, handleAIComplete]);
+  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines]);
 
   /* ─── 3점 메뉴 외부 클릭 닫기 ─── */
   useEffect(() => {
@@ -1934,6 +1997,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onCursorActivity={handleCursorActivity}
                     onAIComplete={() => handleAIComplete(block.id)}
                     aiLoading={aiLoadingBlockId === block.id}
+                    onSplitMathLines={() => handleSplitMathLines(block.id)}
                   />
                 ))}
               </SortableContext>
