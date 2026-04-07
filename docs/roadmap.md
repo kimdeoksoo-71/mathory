@@ -408,6 +408,21 @@ problems/{id}
 | 툴바 항상 표시 | ✅ | 2026-04-01 | 이미지 블록 시 opacity: 0.35 + pointerEvents: none |
 | TEXT_BASED_TYPES 상수 | ✅ | 2026-04-01 | 8종 텍스트 기반 블록 Set |
 
+### 22-I: 수식행 분할 기능 (보완)
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| lib/mathSplit.ts 신규 모듈 | ✅ | 2026-04-07 | findEnclosingDisplayMath / splitDisplayMathBody / hasBlockedEnvironment / splitDisplayMathAtCursor |
+| 차단 환경 처리 | ✅ | 2026-04-07 | cases / dcases / rcases / matrix / pmatrix / bmatrix / vmatrix / Vmatrix / array / gathered / split |
+| aligned/align/align* 태그 제거 | ✅ | 2026-04-07 | 메모는 aligned만 언급했으나 align/align*도 함께 처리 |
+| 정렬용 & 제거 (\& 보존) | ✅ | 2026-04-07 | placeholder 치환으로 이스케이프 보존 |
+| \\\\[5pt] 옵션 spacing 인자 허용 | ✅ | 2026-04-07 | 정규식 `\\\\(?:\[[^\]]*\])?` |
+| 블록 헤더 ≡ 버튼 (IconLineSplit) | ✅ | 2026-04-07 | AI 버튼 왼쪽, 텍스트 계열 블록만 노출 |
+| 단축키 ⌘⇧L | ✅ | 2026-04-07 | `e.code === 'KeyL'` (한글 IME 대응) |
+| handleSplitMathLines 콜백 | ✅ | 2026-04-07 | in-place 치환, 실패 사유 status에 표시 |
+| '모두 분할'에 math_block 포함 | ✅ | 2026-04-07 | 다행 수식행 블록도 자동 분리 (pushMathBlocks 헬퍼) |
+| \rightarrow / \leftarrow 린터 오탐 수정 | ✅ | 2026-04-07 | leftRightRegex에 `(?![a-zA-Z])` 추가 |
+
 ### 변경 파일 목록
 
 | # | 파일 | 경로 |
@@ -458,33 +473,3 @@ problems/{id}
 - **프롬프트 반복 강조 필요**: Gemini는 "문자식 생략 금지"를 한 번만 쓰면 무시하는 경향. 규칙 + 절대 규칙 + 예시에서 3중으로 강조해야 효과적.
 - **후처리 필수**: AI가 기존 텍스트를 반복하거나 "생각:" 메타 텍스트를 붙이는 현상 → 서버에서 접두사 제거 로직 필요.
 - **Flash vs Pro**: Gemini 2.5 Flash는 수학 계산 실수 빈번. 풀이 정확성이 중요하므로 Pro 모델 사용.
-
-## Phase 25: 수식행 분할 기능 ✅
-> 목표: 다행 독립행 수식($$...$$)을 행별로 분리하는 전용 기능
-
-| 항목 | 상태 | 완료일 | 비고 |
-|------|------|--------|------|
-| lib/mathSplit.ts 신규 모듈 | ✅ | 2026-04-07 | findEnclosingDisplayMath / splitDisplayMathBody / hasBlockedEnvironment / splitDisplayMathAtCursor |
-| 차단 환경 처리 | ✅ | 2026-04-07 | cases / dcases / rcases / matrix / pmatrix / bmatrix / vmatrix / Vmatrix / array / gathered / split |
-| aligned/align/align* 태그 제거 | ✅ | 2026-04-07 | 메모는 aligned만 언급했으나 align/align*도 함께 처리 |
-| 정렬용 & 제거 (\& 보존) | ✅ | 2026-04-07 | placeholder 치환으로 이스케이프 보존 |
-| \\\\[5pt] 옵션 spacing 인자 허용 | ✅ | 2026-04-07 | 정규식 `\\\\(?:\[[^\]]*\])?` |
-| 블록 헤더 ≡ 버튼 (IconLineSplit) | ✅ | 2026-04-07 | AI 버튼 왼쪽, 텍스트 계열 블록만 노출 |
-| 단축키 ⌘⇧L | ✅ | 2026-04-07 | `e.code === 'KeyL'` (한글 IME 대응) |
-| handleSplitMathLines 콜백 | ✅ | 2026-04-07 | in-place 치환, 실패 사유 status에 표시 |
-| '모두 분할'에 math_block 포함 | ✅ | 2026-04-07 | 다행 수식행 블록도 자동 분리 (pushMathBlocks 헬퍼) |
-
-### 변경 파일 목록
-
-| # | 파일 | 경로 |
-|---|------|------|
-| 1 | mathSplit.ts | lib/mathSplit.ts (신규) |
-| 2 | EditorView.tsx | components/editor/EditorView.tsx |
-| 3 | Icons.tsx | components/ui/Icons.tsx |
-
-### Key Learnings
-
-- **차단 환경 범위 확장**: 메모는 cases만 명시했지만 matrix/array/gathered/split 등 `\\`가 행 구분이 아닌 환경 모두 차단해야 데이터 손실 없음.
-- **\& 이스케이프 보존**: `&` 일괄 제거 시 `\&`도 함께 사라짐. placeholder 치환(`\u0000ESC_AMP\u0000`) → 일괄 제거 → 복원 패턴.
-- **TS 판별 유니언 narrowing**: `if (!result.ok)` 형태가 strict 모드에서 narrowing 실패. `if (result.ok !== true)` 로 명시적 비교 필요.
-- **'모두 분할' 헬퍼 분리**: 텍스트 블록 스캔 중 발견한 $$..$$와 math_block 타입의 본문을 동일한 `pushMathBlocks(body)` 헬퍼로 처리하여 일관성 확보. body는 양쪽 `$$` 제외한 내용만 전달.

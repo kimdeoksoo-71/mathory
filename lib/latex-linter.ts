@@ -614,7 +614,8 @@ function checkLeftRightMismatch(doc: string, region: MathRegion): Diagnostic[] {
 
   // \left 와 \right 위치 수집
   // \left( \left[ \left\{ \left| \left. \left\langle 등
-  const leftRightRegex = /\\(left|right)\s*([(\[|.]|\\[a-zA-Z{}]+)?/g;
+  // (?![a-zA-Z]) 로 \rightarrow / \leftarrow / \Rightarrow 등 다른 명령어와 충돌 방지
+  const leftRightRegex = /\\(left|right)(?![a-zA-Z])\s*([(\[|.]|\\[a-zA-Z{}]+)?/g;
 
   interface LREntry {
     kind: 'left' | 'right';
