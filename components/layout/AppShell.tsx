@@ -327,6 +327,7 @@ export default function AppShell() {
 
   const activeFolderId = view.type === 'folder' ? view.folder.id : null;
   const isEditorMode = view.type === 'editor';
+  const isProblemMode = view.type === 'problem';
 
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
@@ -357,7 +358,7 @@ export default function AppShell() {
       <main style={{
         flex: 1,
         position: 'relative',
-        overflow: isEditorMode ? 'hidden' : 'auto',
+        overflow: isEditorMode || isProblemMode ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -371,11 +372,13 @@ export default function AppShell() {
         {view.type === 'problem' && (
           <ProblemView
             problemId={view.problemId}
+            folders={folders}
             onRename={(p) => handleProblemAction('rename', p)}
             onEdit={(p) => handleEditProblem(p)}
             onDuplicate={(p) => handleProblemAction('duplicate', p)}
             onMoveFolder={(p) => handleProblemAction('move', p)}
             onTrash={(p) => handleProblemAction('trash', p)}
+            onUpdated={() => loadData()}
           />
         )}
         {view.type === 'editor' && (

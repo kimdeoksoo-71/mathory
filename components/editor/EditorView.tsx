@@ -12,13 +12,12 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import { uploadImage } from '../../lib/storage';
-import PrintableContent, { PrintTab } from '../print/PrintableContent';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
-  IconChevron, IconChevronDown, IconTrash, IconCopy, IconCheck,
-  IconDotsVertical, IconDownload, IconRename, IconSparkle, IconLoader,
+  IconChevron, IconChevronDown, IconTrash,
+  IconRename, IconSparkle, IconLoader,
   IconLineSplit,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor, splitDisplayMathBody, hasBlockedEnvironment } from '../../lib/mathSplit';
@@ -619,18 +618,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [addBlockDropdownOpen, setAddBlockDropdownOpen] = useState(false);
   const addBlockDropdownRef = useRef<HTMLDivElement>(null);
 
-  // 탭 markdown copy 상태
-  const [copiedTab, setCopiedTab] = useState<string | null>(null);
-
   // 미리보기 활성 수식 인덱스
   const [activeMathId, setActiveMathId] = useState<number>(-1);
 
-  // 3점 메뉴
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [pdfTabSelection, setPdfTabSelection] = useState<Record<string, boolean>>({});
-  const [isPrinting, setIsPrinting] = useState(false);
   const [aiLoadingBlockId, setAiLoadingBlockId] = useState<string | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   const previewRef = useRef<HTMLDivElement>(null);
@@ -1066,19 +1057,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 탭 Markdown 복사 ─── */
-  const handleCopyTabMarkdown = async (tabId: string) => {
-    const blocks = allBlocks[tabId] || [];
-    const markdown = blocks.map((b) => b.raw_text).join('\n\n');
-    try {
-      await navigator.clipboard.writeText(markdown);
-      setCopiedTab(tabId);
-      setTimeout(() => setCopiedTab(null), 3000);
-    } catch (err) {
-      console.error('클립보드 복사 실패:', err);
-    }
-  };
-
   /* ─── 수식 상용구 ─── */
   const handleSnippetInsert = (content: string) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
@@ -1204,18 +1182,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => window.removeEventListener('keydown', handler);
   }, [handleSplitBlock, handleAIComplete, handleSplitMathLines]);
 
-  /* ─── 3점 메뉴 외부 클릭 닫기 ─── */
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [menuOpen]);
-
   // 블록 추가 드롭다운 외부 클릭 닫기
   useEffect(() => {
     if (!addBlockDropdownOpen) return;
@@ -1303,88 +1269,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       );
     }
     setEditingTabId(null);
-  };
-
-  /* ═══ PDF 인쇄 ═══ */
-  const handlePdfPrint = useCallback(async () => {
-    setIsPrinting(true);
-    setMenuOpen(false);
-
-    try {
-      const selectedTabs = tabs.filter((t) => pdfTabSelection[t.id] !== false);
-      const printTabs: PrintTab[] = selectedTabs.map((t) => ({
-        label: t.label,
-        blocks: (allBlocks[t.id] || []).map((b) => ({
-          id: b.id, type: b.type, raw_text: b.raw_text,
-          imageWidth: b.imageWidth,
-        })),
-      }));
-
-      if (printTabs.length === 0) {
-        alert('출력할 탭을 하나 이상 선택해주세요.');
-        setIsPrinting(false);
-        return;
-      }
-
-      // React → HTML
-      const tempDiv = document.createElement('div');
-      tempDiv.style.cssText = 'position:absolute;left:-9999px;top:0;';
-      document.body.appendChild(tempDiv);
-      const { createRoot } = await import('react-dom/client');
-      const root = createRoot(tempDiv);
-      await new Promise<void>((resolve) => {
-        root.render(
-          <PrintableContent
-            title={editTitle || '수학 문제'}
-            tabs={printTabs}
-            locale="ko"
-          />
-        );
-        setTimeout(resolve, 500);
-      });
-      // print-root를 메인 DOM에 추가 → window.print() (폰트 이미 로드됨)
-      const printRoot = tempDiv.querySelector('.print-root');
-      if (!printRoot) {
-        root.unmount();
-        document.body.removeChild(tempDiv);
-        setIsPrinting(false);
-        return;
-      }
-      const printNode = printRoot.cloneNode(true) as HTMLElement;
-      printNode.classList.add('print-root');
-
-      root.unmount();
-      document.body.removeChild(tempDiv);
-
-      document.body.appendChild(printNode);
-
-      // 파일명 = 문항 제목 (부적합 문자 공백 치환)
-      const origTitle = document.title;
-      const rawName = (editTitle || '').replace(/[\/\\:*?"<>|]/g, ' ').trim();
-      document.title = rawName || '수학 문제';
-
-      await new Promise(resolve => setTimeout(resolve, 200));
-      window.print();
-
-      setTimeout(() => {
-        try { document.body.removeChild(printNode); } catch {}
-        document.title = origTitle;
-        setIsPrinting(false);
-      }, 1000);
-
-    } catch (error) {
-      console.error('PDF 생성 오류:', error);
-      alert('PDF 생성 중 오류가 발생했습니다.');
-      setIsPrinting(false);
-    }
-  }, [editTitle, tabs, pdfTabSelection, allBlocks]);
-
-  /* ─── 메뉴 열 때 기본 탭 선택 초기화 ─── */
-  const openMenu = () => {
-    const sel: Record<string, boolean> = {};
-    tabs.forEach((t) => { sel[t.id] = true; });
-    setPdfTabSelection(sel);
-    setMenuOpen(true);
   };
 
   /* ═══ 저장 ═══ */
@@ -1581,81 +1465,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <IconSave /> {saving ? '저장 중...' : '저장'}
         </button>
 
-        {/* 3점 메뉴 (PDF) */}
-        <div ref={menuRef} style={{ position: 'relative' }}>
-          <button
-            onClick={openMenu}
-            disabled={isPrinting}
-            style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              width: 32, height: 32, border: '1px solid var(--border-light)',
-              background: menuOpen ? 'var(--bg-hover)' : 'var(--bg-card)',
-              borderRadius: 8, cursor: isPrinting ? 'not-allowed' : 'pointer',
-              color: 'var(--text-secondary)',
-              transition: 'background 0.15s',
-            }}
-            title="더보기"
-          >
-            {isPrinting ? '⏳' : <IconDotsVertical size={16} />}
-          </button>
-
-          {menuOpen && (
-            <div style={{
-              position: 'absolute', top: '100%', right: 0, marginTop: 4,
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-              padding: '12px 16px', minWidth: 200, zIndex: 100,
-            }}>
-              <div style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
-                marginBottom: 8, fontFamily: 'var(--font-ui)',
-              }}>
-                <IconDownload size={16} /> PDF 다운로드
-              </div>
-              <div style={{
-                fontSize: 12, color: 'var(--text-muted)', marginBottom: 8,
-                fontFamily: 'var(--font-ui)',
-              }}>
-                포함할 탭 선택:
-              </div>
-              {tabs.map((tab) => (
-                <label key={tab.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  padding: '4px 0', cursor: 'pointer',
-                  fontSize: 13, color: 'var(--text-secondary)',
-                  fontFamily: 'var(--font-ui)',
-                }}>
-                  <input
-                    type="checkbox"
-                    checked={pdfTabSelection[tab.id] !== false}
-                    onChange={(e) => {
-                      setPdfTabSelection((prev) => ({
-                        ...prev,
-                        [tab.id]: e.target.checked,
-                      }));
-                    }}
-                    style={{ accentColor: 'var(--accent-primary)' }}
-                  />
-                  {tab.label}
-                </label>
-              ))}
-              <button
-                onClick={handlePdfPrint}
-                disabled={isPrinting}
-                style={{
-                  width: '100%', marginTop: 10, padding: '8px 0',
-                  background: 'var(--accent-primary)', color: '#fff',
-                  border: 'none', borderRadius: 6, cursor: 'pointer',
-                  fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-ui)',
-                }}
-              >
-                {isPrinting ? '준비 중...' : '확인'}
-              </button>
-            </div>
-          )}
-        </div>
-
         {/* ─── 글꼴 크기 조절 ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
@@ -1792,23 +1601,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 <IconRename size={11} />
               </button>
             )}
-
-            {/* Markdown 복사 */}
-            <button
-              onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
-              title="Markdown 복사"
-              style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 22, height: 22, border: 'none', background: 'none',
-                cursor: 'pointer', borderRadius: 4, padding: 0,
-                color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
-                transition: 'color 0.2s, background 0.15s',
-              }}
-              onMouseEnter={(e) => { if (copiedTab !== tab.id) e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (copiedTab !== tab.id) e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'none'; }}
-            >
-              {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
-            </button>
 
             {/* 탭 삭제 (3번째 이후만) */}
             {tabIdx >= 2 && (

@@ -1,66 +1,82 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { ProblemWithBlocks } from '../../types/problem';
-import { getProblemWithBlocks } from '../../lib/firestore';
-import { DIFFICULTIES } from '../../lib/constants';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
+import { getProblemWithBlocks, updateProblem } from '../../lib/firestore';
+import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
-import { IconDots, IconRename, IconEdit, IconFolderMove, IconTrash, IconCopy } from '../ui/Icons';
+import PdfDialog from './PdfDialog';
+import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
+import {
+  IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload,
+} from '../ui/Icons';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
-
-function getDifficultyLabel(value: number): string {
-  const found = DIFFICULTIES.find((d) => d.value === value);
-  return found ? found.label : `${value}`;
-}
-
-// 간단한 다운로드 아이콘
-function IconDownload({ size = 14 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-      <polyline points="7 10 12 15 17 10" />
-      <line x1="12" y1="15" x2="12" y2="3" />
-    </svg>
-  );
-}
+const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 interface ProblemViewProps {
   problemId: string;
+  folders: Folder[];
   onRename?: (problem: ProblemWithBlocks) => void;
   onEdit?: (problem: ProblemWithBlocks) => void;
   onDuplicate?: (problem: ProblemWithBlocks) => void;
   onMoveFolder?: (problem: ProblemWithBlocks) => void;
   onTrash?: (problem: ProblemWithBlocks) => void;
+  onUpdated?: () => void;
 }
 
-export default function ProblemView({ problemId, onRename, onEdit, onDuplicate, onMoveFolder, onTrash }: ProblemViewProps) {
+function formatDate(d?: Date): string {
+  if (!d) return '';
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+function formatDateTime(d?: Date): string {
+  if (!d) return '';
+  const base = formatDate(d);
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${base} : ${hh}-${mi}`;
+}
+
+export default function ProblemView({
+  problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated,
+}: ProblemViewProps) {
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showSolution, setShowSolution] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [openTabs, setOpenTabs] = useState<Record<string, boolean>>({});
+  const [copiedTab, setCopiedTab] = useState<string | null>(null);
+  const [pdfOpen, setPdfOpen] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const data = await getProblemWithBlocks(problemId);
-      setProblem(data);
-      setLoading(false);
-    };
-    load();
+  /* ─── 데이터 로드 ─── */
+  const load = useCallback(async () => {
+    setLoading(true);
+    const data = await getProblemWithBlocks(problemId);
+    setProblem(data);
+    if (data) {
+      const tabs = data.tabs || DEFAULT_TABS;
+      // 기본: 첫 탭(문제)만 펼침
+      const next: Record<string, boolean> = {};
+      tabs.forEach((t, i) => { next[t.id] = i === 0; });
+      setOpenTabs(next);
+    }
+    setLoading(false);
   }, [problemId]);
 
-  // localStorage에서 글꼴 크기 읽기
+  useEffect(() => { load(); }, [load]);
+
+  /* ─── 글꼴 크기 로드 ─── */
   useEffect(() => {
     const stored = localStorage.getItem(FONT_SIZE_KEY);
     if (stored) {
       const n = parseInt(stored, 10);
       if (!isNaN(n) && n >= 11 && n <= 24) setContentFontSize(n);
     }
-    // CSS 변수 변경 감지 (EditorView에서 변경 시)
     const handleStorage = (e: StorageEvent) => {
       if (e.key === FONT_SIZE_KEY && e.newValue) {
         const n = parseInt(e.newValue, 10);
@@ -71,259 +87,377 @@ export default function ProblemView({ problemId, onRename, onEdit, onDuplicate, 
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
-  // 메뉴 외부 클릭 시 닫기
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    if (menuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [menuOpen]);
-
-  // Markdown 다운로드
-  const handleDownloadMarkdown = () => {
-    if (!problem) return;
-
-    const questionContent = problem.question_blocks
-      .map((b) => b.raw_text)
-      .join('\n\n');
-    const solutionContent = problem.solution_blocks
-      .map((b) => b.raw_text)
-      .join('\n\n');
-
-    let md = `# ${problem.title}\n\n`;
-    md += `> ${problem.source || problem.exam_type} | ${problem.subject || problem.category} | ${getDifficultyLabel(problem.difficulty)}`;
-    if (problem.answer) md += ` | 정답: ${problem.answer}`;
-    md += '\n\n';
-    md += `## 문제\n\n${questionContent}\n\n`;
-    if (solutionContent.trim()) {
-      md += `## 풀이\n\n${solutionContent}\n`;
-    }
-
-    // 파일명에서 사용 불가 문자 제거
-    const safeTitle = problem.title.replace(/[/\\:*?"<>|]/g, '_');
-    const filename = `${safeTitle}.md`;
-
-    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    setMenuOpen(false);
+  /* ─── 탭 토글 ─── */
+  const toggleTab = (tabId: string) => {
+    setOpenTabs((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
   };
 
-  if (loading) {
-    return (
-      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-        로딩 중...
-      </div>
-    );
-  }
+  /* ─── 탭 Markdown 복사 ─── */
+  const handleCopyTabMarkdown = async (tabId: string) => {
+    if (!problem) return;
+    const blocks = problem.tabBlocks[tabId] || [];
+    const markdown = blocks.map((b) => b.raw_text).join('\n\n');
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopiedTab(tabId);
+      setTimeout(() => setCopiedTab(null), 2000);
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+    }
+  };
 
-  if (!problem) {
-    return (
-      <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>
-        문제를 찾을 수 없습니다.
-      </div>
-    );
-  }
+  /* ─── 메타 인라인 편집 (undefined 는 빈 문자열로 변환 — Firestore가 undefined 거부) ─── */
+  const updateField = async (patch: Record<string, any>) => {
+    if (!problem) return;
+    const clean: Record<string, any> = {};
+    for (const k in patch) {
+      clean[k] = patch[k] === undefined ? '' : patch[k];
+    }
+    setProblem({ ...problem, ...clean } as ProblemWithBlocks);
+    try {
+      await updateProblem(problem.id, clean as any);
+      onUpdated?.();
+    } catch (err) {
+      console.error('저장 실패:', err);
+    }
+  };
 
-  const blockToText = (b: typeof problem.question_blocks[0]) =>
-    b.type === 'choices' ? b.raw_text.replace(/\n/g, '\n\n') : b.raw_text;
+  /* ─── PDF ─── */
+  const handlePdfConfirm = async (selectedTabIds: string[]) => {
+    if (!problem) return;
+    setIsPrinting(true);
+    try {
+      const tabs = problem.tabs || DEFAULT_TABS;
+      const printTabs: PdfPrintTab[] = tabs
+        .filter((t) => selectedTabIds.includes(t.id))
+        .map((t) => ({
+          label: t.label,
+          blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
+            id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
+          })),
+        }));
+      await printProblemPdf({ title: problem.title, tabs: printTabs });
+    } catch (e) {
+      console.error('PDF 생성 오류:', e);
+      alert('PDF 생성 중 오류가 발생했습니다.');
+    } finally {
+      setTimeout(() => setIsPrinting(false), 1200);
+      setPdfOpen(false);
+    }
+  };
 
-  const solutionContent = problem.solution_blocks.map(blockToText).join('\n\n');
-
-  const renderBlocks = (blocks: typeof problem.question_blocks) => {
+  /* ─── 블록 렌더 (EditorView 미리보기와 동일 규칙) ─── */
+  const renderBlocks = (blocks: Block[]) => {
     return blocks.map((block, i) => {
-      if (block.type === 'box') {
+      const isBordered = BORDERED_TYPES.has(block.type);
+      if (block.type === 'image') {
+        const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
         return (
-          <div key={block.id || `box-${i}`} style={{
-            border: '1.5px solid var(--text-muted, #888)',
-            borderRadius: 8, padding: '12px 16px',
-          }}>
-            <EditorPreview content={block.raw_text} borderless />
+          <div key={block.id || `img-${i}`} style={{ textAlign: 'center', margin: '0.8em 0' }}>
+            {src ? (
+              <img src={src} alt="" style={{
+                width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
+              }} />
+            ) : (
+              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
+            )}
           </div>
         );
       }
+      if (isBordered) {
+        return (
+          <div key={block.id || `b-${i}`} style={{
+            border: '1.5px solid var(--text-muted, #888)',
+            borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
+          }}>
+            <EditorPreview content={block.raw_text} borderless locale="ko" />
+          </div>
+        );
+      }
+      const content = block.type === 'choices'
+        ? block.raw_text.replace(/\n/g, '\n\n')
+        : block.raw_text;
       return (
-        <div key={block.id || `text-${i}`}>
-          <EditorPreview content={blockToText(block)} borderless />
+        <div key={block.id || `t-${i}`} data-block-id={block.id}>
+          <EditorPreview content={content} borderless locale="ko" />
         </div>
       );
     });
   };
 
+  if (loading) {
+    return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>로딩 중...</div>;
+  }
+  if (!problem) {
+    return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>문제를 찾을 수 없습니다.</div>;
+  }
+
+  const tabs = problem.tabs || DEFAULT_TABS;
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    background: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: 6,
+    padding: '6px 8px',
+    fontSize: 13,
+    color: 'var(--text-primary)',
+    fontFamily: 'var(--font-ui)',
+    outline: 'none',
+    transition: 'border-color 0.15s, background 0.15s',
+    boxSizing: 'border-box',
+  };
+  const inputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = 'var(--accent-primary)';
+    e.target.style.background = 'var(--bg-hover)';
+  };
+  const inputBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = 'transparent';
+    e.target.style.background = 'transparent';
+  };
+
+  const metaLabelStyle: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+    letterSpacing: 0.3, marginBottom: 4, fontFamily: 'var(--font-ui)',
+  };
+  const metaRowStyle: React.CSSProperties = { marginBottom: 14 };
+
   const menuItems = [
-    { label: '편집', icon: <IconEdit />, action: () => { setMenuOpen(false); onEdit?.(problem); } },
-    { label: '사본 만들기', icon: <IconCopy />, action: () => { setMenuOpen(false); onDuplicate?.(problem); } },
-    { label: '이름 변경', icon: <IconRename />, action: () => { setMenuOpen(false); onRename?.(problem); } },
-    { label: '폴더 변경', icon: <IconFolderMove />, action: () => { setMenuOpen(false); onMoveFolder?.(problem); } },
-    { label: 'MD 다운로드', icon: <IconDownload />, action: handleDownloadMarkdown },
-    { label: 'divider' },
-    { label: '휴지통', icon: <IconTrash />, action: () => { setMenuOpen(false); onTrash?.(problem); }, danger: true },
+    { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit?.(problem) },
+    { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onDuplicate?.(problem) },
+    { label: '이름 변경', icon: <IconRename size={14} />, action: () => onRename?.(problem) },
+    { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
+    { label: '휴지통', icon: <IconTrash size={14} />, action: () => onTrash?.(problem), danger: true },
   ];
 
   return (
-    <div style={{ padding: 32, width: `calc(35em + 64px)`, maxWidth: '100%', margin: '0 auto', fontSize: contentFontSize, boxSizing: 'border-box' }}>
-      {/* CSS 오버라이드: EditorPreview의 inline fontSize를 동적으로 덮어씀 */}
-      <style>{`
-        .problem-content-scaled > div { font-size: ${contentFontSize}px !important; }
-      `}</style>
-
-      {/* Meta */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
-          <span style={{
-            fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
-            padding: '2px 8px', borderRadius: 6,
-          }}>
-            {problem.source || problem.exam_type}
-          </span>
-          <span style={{
-            fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
-            padding: '2px 8px', borderRadius: 6,
-          }}>
-            {problem.subject || problem.category}
-          </span>
-          <span style={{
-            fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
-            padding: '2px 8px', borderRadius: 6,
-          }}>
-            {getDifficultyLabel(problem.difficulty)}
-          </span>
-          {problem.answer && (
-            <span style={{
-              fontSize: 12, color: 'var(--text-muted)', background: 'var(--bg-hover)',
-              padding: '2px 8px', borderRadius: 6,
-            }}>
-              정답: {problem.answer}
-            </span>
-          )}
-        </div>
-
-        {/* 제목 + ⋯ 메뉴 */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <h2
+    <div style={{
+      display: 'flex', flexDirection: 'row',
+      flex: 1, minHeight: 0, width: '100%',
+      background: '#ffffff', fontSize: contentFontSize,
+      overflowX: 'auto',
+    }}>
+      {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 ═══ */}
+      <div style={{
+        flex: 1, minWidth: `calc(35em + 64px)`,
+        display: 'flex', justifyContent: 'center',
+        overflowY: 'auto',
+      }}>
+        {/* ─── 가운데 단: 본문 (폭 고정 35em) ─── */}
+        <div style={{
+          width: `calc(35em + 64px)`, flexShrink: 0,
+          padding: '32px 32px 50vh 32px',
+          boxSizing: 'border-box',
+        }}>
+          {/* 제목 (클릭 시 EditorView 이동) */}
+          <h1
             onClick={() => onEdit?.(problem)}
             style={{
-              fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
-              fontFamily: 'var(--font-ui)', flex: 1,
+              fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
+              margin: '0 0 24px 0',
+              fontFamily: 'var(--font-ui)',
               cursor: 'pointer',
-              transition: 'color var(--transition-fast)',
+              transition: 'color 0.15s',
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary, #5b6abf)'; }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
             onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
             title="클릭하여 편집"
           >
             {problem.title}
-          </h2>
+          </h1>
 
-          <div ref={menuRef} style={{ position: 'relative' }}>
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              style={{
-                border: 'none', background: menuOpen ? 'var(--bg-hover)' : 'transparent',
-                cursor: 'pointer', padding: '4px 6px', borderRadius: 6,
-                color: 'var(--text-muted)', lineHeight: 1,
-                transition: 'background var(--transition-fast), color var(--transition-fast)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-              onMouseLeave={(e) => { if (!menuOpen) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; } }}
-              title="메뉴"
-            >
-              <IconDots size={16} />
-            </button>
-
-            {menuOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                background: '#fff',
-                borderRadius: 10,
-                boxShadow: '0 4px 24px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.06)',
-                minWidth: 180, zIndex: 1000,
-                padding: '4px 0',
-                animation: 'fadeIn 0.1s ease',
-              }}>
-                {menuItems.map((item, i) =>
-                  item.label === 'divider' ? (
-                    <div key={i} style={{ height: 1, background: 'var(--border-light)', margin: '4px 8px' }} />
-                  ) : (
-                    <button
-                      key={i}
-                      onClick={item.action}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10,
-                        width: '100%', padding: '8px 14px',
-                        border: 'none', background: 'none', cursor: 'pointer',
-                        fontSize: 13, fontFamily: 'var(--font-ui)',
-                        color: item.danger ? 'var(--accent-danger)' : 'var(--text-primary)',
-                        transition: 'background var(--transition-fast)',
-                      }}
-                      onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = item.danger
-                          ? 'var(--accent-danger-bg)'
-                          : 'var(--bg-secondary)';
-                      }}
-                      onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.background = 'none';
-                      }}
-                    >
-                      {item.icon && <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>}
-                      {item.label}
-                    </button>
-                  )
-                )}
+          {/* 탭별 콘텐츠 */}
+          {tabs.map((tab) => {
+            if (!openTabs[tab.id]) return null;
+            const blocks = problem.tabBlocks[tab.id] || [];
+            return (
+              <div key={tab.id} style={{ marginBottom: '5em' }}>
+                <div style={{
+                  fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
+                  letterSpacing: 0.5, marginBottom: 12, fontFamily: 'var(--font-ui)',
+                }}>
+                  {tab.label}
+                </div>
+                <div className="problem-content-scaled">
+                  <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
+                  {renderBlocks(blocks)}
+                </div>
               </div>
-            )}
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
+      <div style={{
+        flex: 1, minWidth: 240, maxWidth: 360,
+        padding: '32px 24px',
+        borderLeft: '1px solid var(--border-light)',
+        overflowY: 'auto',
+        fontSize: 13,
+        fontFamily: 'var(--font-ui)',
+        background: '#ffffff',
+      }}>
+        {/* 탭 목록 */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ ...metaLabelStyle, marginBottom: 8 }}>보기</div>
+          {tabs.map((tab) => {
+            const isOpen = !!openTabs[tab.id];
+            const count = (problem.tabBlocks[tab.id] || []).length;
+            return (
+              <div key={tab.id} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '6px 8px', borderRadius: 6,
+                marginBottom: 2,
+                transition: 'background 0.15s',
+              }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
+                  title="Markdown 복사"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 22, height: 22, border: 'none', background: 'none',
+                    cursor: 'pointer', borderRadius: 4, padding: 0,
+                    color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
+                    transition: 'color 0.2s',
+                  }}
+                >
+                  {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
+                </button>
+                <span
+                  onClick={() => toggleTab(tab.id)}
+                  style={{
+                    flex: 1, fontSize: 13,
+                    fontWeight: isOpen ? 600 : 400,
+                    color: isOpen ? 'var(--text-primary)' : 'var(--text-muted)',
+                    fontFamily: 'var(--font-ui)', userSelect: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {tab.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({count})</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 메뉴 모음 */}
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>
+          {menuItems.map((item, i) =>
+            item.label === 'divider' ? (
+              <div key={i} style={{ height: 1, background: 'var(--border-light)', margin: '8px 0' }} />
+            ) : (
+              <button
+                key={i}
+                onClick={item.action}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '7px 10px',
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 13, fontFamily: 'var(--font-ui)',
+                  color: item.danger ? 'var(--accent-danger)' : 'var(--text-primary)',
+                  borderRadius: 6, textAlign: 'left',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = item.danger
+                    ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))'
+                    : 'var(--bg-hover)';
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = 'none';
+                }}
+              >
+                <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
+                {item.label}
+              </button>
+            )
+          )}
+        </div>
+
+        {/* 메타 데이터 */}
+        <div style={metaRowStyle}>
+          <div style={metaLabelStyle}>폴더</div>
+          <select
+            value={problem.folder_id || ''}
+            onChange={(e) => updateField({ folder_id: e.target.value || undefined } as any)}
+            onFocus={inputFocus}
+            onBlur={inputBlur}
+            style={{ ...inputStyle, cursor: 'pointer' }}
+          >
+            <option value="">미분류</option>
+            {folders.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={metaRowStyle}>
+          <div style={metaLabelStyle}>대단원</div>
+          <select
+            value={problem.category || ''}
+            onChange={(e) => updateField({ category: e.target.value, subject: e.target.value } as any)}
+            onFocus={inputFocus}
+            onBlur={inputBlur}
+            style={{ ...inputStyle, cursor: 'pointer' }}
+          >
+            <option value="">선택</option>
+            {CATEGORY_OPTIONS.map((opt) => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={metaRowStyle}>
+          <div style={metaLabelStyle}>배점</div>
+          <select
+            value={problem.difficulty}
+            onChange={(e) => updateField({ difficulty: Number(e.target.value) } as any)}
+            onFocus={inputFocus}
+            onBlur={inputBlur}
+            style={{ ...inputStyle, cursor: 'pointer' }}
+          >
+            {DIFFICULTIES.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div style={metaRowStyle}>
+          <div style={metaLabelStyle}>정답</div>
+          <input
+            value={problem.answer || ''}
+            onChange={(e) => setProblem({ ...problem, answer: e.target.value })}
+            onBlur={(e) => { inputBlur(e); updateField({ answer: e.target.value } as any); }}
+            onFocus={inputFocus}
+            placeholder="정답"
+            style={inputStyle}
+          />
+        </div>
+
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+            <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>생성</span>
+            {formatDate(problem.created_at)}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+            <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>최종수정</span>
+            {formatDateTime(problem.updated_at)}
           </div>
         </div>
       </div>
 
-      {/* Question */}
-      <div className="problem-content-scaled">
-        <div style={{
-          fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12,
-          letterSpacing: 0.5, fontFamily: 'var(--font-ui)',
-        }}>
-          ► 문제
-        </div>
-        {renderBlocks(problem.question_blocks)}
-      </div>
-
-      {/* Solution Toggle */}
-      {solutionContent && (
-        <div className="problem-content-scaled" style={{ marginTop: 16 }}>
-          <button
-            onClick={() => setShowSolution(!showSolution)}
-            style={{
-              width: '100%', padding: '0',
-              background: 'none',
-              border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
-              textAlign: 'left', color: 'var(--text-muted)',
-              letterSpacing: 0.5, fontFamily: 'var(--font-ui)',
-              marginBottom: showSolution ? 12 : 0,
-              transition: 'background var(--transition-fast)',
-            }}
-          >
-            {showSolution ? '▼ 풀이 접기' : '► 풀이 보기'}
-          </button>
-          {showSolution && (
-            <div>
-              {renderBlocks(problem.solution_blocks)}
-            </div>
-          )}
-        </div>
-      )}
+      <PdfDialog
+        open={pdfOpen}
+        onClose={() => setPdfOpen(false)}
+        tabs={tabs}
+        onConfirm={handlePdfConfirm}
+        isPrinting={isPrinting}
+      />
     </div>
   );
 }

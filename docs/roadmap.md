@@ -505,3 +505,67 @@ problems/{id}
 - **중간 래퍼의 `overflow: auto`가 box-shadow/outline 클리핑의 진짜 원인**: 상위 컨테이너 패딩을 아무리 줘도, 중간 래퍼가 `overflow: auto`로 padding-box에서 잘라내면 무의미. borderless 모드에서는 자식의 시각 장식(outline/shadow)이 상위로 확장될 수 있도록 `overflow: visible` 로 전환해야 함.
 - **PDF 파일명 = document.title**: 브라우저 인쇄 다이얼로그가 `document.title`을 기본 파일명으로 사용. 인쇄 전 교체 + 후 복원 패턴이 가장 단순.
 - **`word-break: keep-all`**: 한글 어절 경계에서만 줄바꿈. `overflow-wrap: break-word`와 함께 쓰면 긴 영단어/URL만 예외적으로 분리되어 가독성 유지.
+
+## Phase 25: ProblemView 개편 ✅
+> 목표: ProblemView를 2단 구조(본문 + 우측 패널)로 재설계, EditorView의 PDF·MD 복사 기능 통합
+
+### 25-A: 레이아웃 (2단)
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 본문 단 가운데 정렬 | ✅ | 2026-04-15 | `calc(35em + 64px)` 고정폭, `justifyContent: center` |
+| 우측 단 독립 스크롤 | ✅ | 2026-04-15 | 본문은 `overflowY: auto`, 우측은 별도 overflow 컨테이너 |
+| 탭 사이 간격 | ✅ | 2026-04-15 | `marginBottom: 5em` |
+| 블록 타입별 렌더링 | ✅ | 2026-04-15 | bordered(gana/roman/box) + image 블록 추가 — EditorView 미리보기와 동등 |
+| 동적 탭 지원 | ✅ | 2026-04-15 | `problem.tabBlocks` 순회 (기존엔 question/solution만) |
+
+### 25-B: 우측 패널 (탭 목록 / 메뉴 / 메타)
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| "보기" 섹션 — 탭 목록 + 복사 버튼 | ✅ | 2026-04-15 | 각 탭 제목 클릭 시 본문 토글, 복사 버튼은 체크아이콘 2초 후 복원 |
+| 기본 펼침: 첫 탭(문제)만 | ✅ | 2026-04-15 | 나머지 탭은 접힘 |
+| 메뉴: 편집 / 사본 만들기 / 이름 변경 / PDF 다운로드 / 휴지통 | ✅ | 2026-04-15 | MD 다운로드·폴더 변경·divider 제거 |
+| 인라인 메타 편집 | ✅ | 2026-04-15 | 폴더(select) · 대단원(select) · 배점(select, difficulty 라벨만 교체) · 정답(input) — onBlur 시 즉시 Firestore 저장 |
+| 입력 배경 투명 / 포커스 시 강조 | ✅ | 2026-04-15 | 클릭 시에만 배경색·테두리 표시 |
+| 생성·최종수정 일자 표시 | ✅ | 2026-04-15 | YY-MM-DD / YY-MM-DD : hh-mm |
+
+### 25-C: EditorView 정리
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| Row 1 3점 PDF 메뉴 제거 | ✅ | 2026-04-15 | 저장 · 글꼴 크기만 남김 |
+| Row 2 탭 헤더 MD 복사 버튼 제거 | ✅ | 2026-04-15 | ProblemView 보기 섹션으로 이동 |
+| 관련 state/import 정리 | ✅ | 2026-04-15 | menuOpen/pdfTabSelection/isPrinting 등 삭제, PrintableContent import 제거 |
+
+### 25-D: 공용 모듈
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| lib/pdfPrint.ts 신규 | ✅ | 2026-04-15 | EditorView의 handlePdfPrint 로직을 공용 함수로 추출 |
+| PdfDialog.tsx 신규 | ✅ | 2026-04-15 | 탭 선택 모달 — ProblemView 우측 메뉴의 PDF 다운로드에서 사용 |
+
+### 25-E: 사본 만들기 버그 수정
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| undefined 필드 Firestore 거부 해결 | ✅ | 2026-04-15 | `stripUndefined` 헬퍼 — duplicateProblem 에서 undefined 필드 제거 후 전달 |
+| ProblemView 메타 업데이트 undefined 처리 | ✅ | 2026-04-15 | 폴더 해제 시 `undefined` → `''` 로 변환 |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | ProblemView.tsx | components/problem/ProblemView.tsx (전면 재작성) |
+| 2 | PdfDialog.tsx | components/problem/PdfDialog.tsx (신규) |
+| 3 | pdfPrint.ts | lib/pdfPrint.ts (신규) |
+| 4 | EditorView.tsx | components/editor/EditorView.tsx |
+| 5 | AppShell.tsx | components/layout/AppShell.tsx |
+| 6 | firestore.ts | lib/firestore.ts |
+
+### Key Learnings
+
+- **Firestore는 undefined 거부**: `addDoc`/`updateDoc`에 `{ field: undefined }` 를 넘기면 "Unsupported field value" 에러. optional 필드는 객체에서 완전히 제거하거나 `null`/`''` 로 변환 필요. `stripUndefined` 헬퍼 패턴 재사용 가능.
+- **PDF 인쇄 로직 공용화**: EditorView와 ProblemView에서 동일한 `printProblemPdf(title, tabs)` 호출. 한 곳에 있는 DOM 조작·파일명 설정·cleanup 로직을 두 번 유지할 필요 없음.
+- **우측 독립 스크롤 구조**: `flex row` 외곽 + 좌측 그룹 `overflowY: auto` + 우측 형제 `overflowY: auto` → `position: sticky` 의 복잡한 제약 없이 독립 스크롤 구현.
+- **난이도 = 배점**: `DIFFICULTIES`의 값(2/3/4)과 라벨(2점/3점/4점)이 이미 배점과 일치. 새 필드 추가 없이 UI 라벨만 "배점"으로 표기 변경.

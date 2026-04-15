@@ -281,14 +281,23 @@ export async function getFolderProblemCount(folderId: string): Promise<number> {
 }
 
 // ===== Phase 14: 문제 복제 =====
+/** Firestore는 undefined 값을 거부하므로 undefined 필드를 제거 */
+function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
+  const result: Partial<T> = {};
+  for (const key in obj) {
+    if (obj[key] !== undefined) result[key] = obj[key];
+  }
+  return result;
+}
+
 export async function duplicateProblem(problemId: string): Promise<string> {
   const original = await getProblemWithBlocks(problemId);
   if (!original) throw new Error('원본 문제를 찾을 수 없습니다.');
 
   const tabs = original.tabs || DEFAULT_TABS;
 
-  // 새 문제 생성 (제목에 "의 사본" 추가)
-  const newId = await createProblem({
+  // 새 문제 생성 (제목에 "의 사본" 추가) — undefined 필드 제거
+  const newId = await createProblem(stripUndefined({
     title: `${original.title}의 사본`,
     year: original.year,
     exam_type: original.exam_type,
@@ -300,19 +309,20 @@ export async function duplicateProblem(problemId: string): Promise<string> {
     subject: original.subject,
     folder_id: original.folder_id,
     tabs,
-  });
+  }) as any);
 
-  // 각 탭의 블록 복제
+  // 각 탭의 블록 복제 — undefined 필드 제거
   for (const tab of tabs) {
     const blocks = original.tabBlocks[tab.id] || [];
     for (const block of blocks) {
-      await saveTabBlock(newId, tab.id, {
+      await saveTabBlock(newId, tab.id, stripUndefined({
         order: block.order,
         type: block.type,
         raw_text: block.raw_text,
         title: block.title,
         step_label: block.step_label,
-      });
+        imageWidth: block.imageWidth,
+      }) as any);
     }
   }
 
