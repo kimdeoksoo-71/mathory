@@ -245,9 +245,9 @@ export default function ProblemView({
         display: 'flex', justifyContent: 'center',
         overflow: 'auto',
       }}>
-        {/* ─── 가운데 단: 본문 (폭 고정 35em) ─── */}
+        {/* ─── 가운데 단: 본문 (폭 고정 30em) ─── */}
         <div style={{
-          width: `calc(35em + 64px)`, flexShrink: 0,
+          width: `calc(30em + 64px)`, flexShrink: 0,
           padding: '32px 32px 50vh 32px',
           boxSizing: 'border-box',
         }}>

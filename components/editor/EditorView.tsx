@@ -1764,9 +1764,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ─── */}
+        {/* ─── Right: Preview (고정 폭 30em + 좌우 패딩 32px) ─── */}
         <div style={{
-          width: `calc(35em + 64px)`, flexShrink: 0,
+          width: `calc(30em + 64px)`, flexShrink: 0,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
