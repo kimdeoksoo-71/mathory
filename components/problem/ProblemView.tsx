@@ -9,6 +9,7 @@ import PdfDialog from './PdfDialog';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload,
+  IconChevron, IconChevronLeft,
 } from '../ui/Icons';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
@@ -52,6 +53,7 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [rightOpen, setRightOpen] = useState(true);
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
@@ -235,7 +237,7 @@ export default function ProblemView({
       display: 'flex', flexDirection: 'row',
       flex: 1, minHeight: 0, width: '100%',
       background: '#ffffff', fontSize: contentFontSize,
-      overflowX: 'auto',
+      overflowX: 'auto', position: 'relative',
     }}>
       {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 ═══ */}
       <div style={{
@@ -288,16 +290,53 @@ export default function ProblemView({
         </div>
       </div>
 
+      {/* ═══ 오른쪽 단 열기 버튼 (닫혔을 때만) ═══ */}
+      {!rightOpen && (
+        <button
+          onClick={() => setRightOpen(true)}
+          title="우측 패널 열기"
+          style={{
+            position: 'absolute', top: 16, right: 16, zIndex: 10,
+            width: 32, height: 32,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid var(--border-light)', borderRadius: 8,
+            background: 'var(--bg-card)', cursor: 'pointer',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <IconChevronLeft size={14} />
+        </button>
+      )}
+
       {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
-      <div style={{
-        flex: 1, minWidth: 240, maxWidth: 360,
-        padding: '32px 24px',
+      {rightOpen && <div style={{
+        flex: 1, minWidth: 150, maxWidth: 220,
+        padding: '32px 16px',
         borderLeft: '1px solid var(--border-light)',
         overflowY: 'auto',
         fontSize: 13,
         fontFamily: 'var(--font-ui)',
         background: '#ffffff',
+        position: 'relative',
       }}>
+        {/* 우측 패널 닫기 버튼 */}
+        <button
+          onClick={() => setRightOpen(false)}
+          title="우측 패널 닫기"
+          style={{
+            position: 'absolute', top: 8, right: 8,
+            width: 26, height: 26,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: 'none', borderRadius: 6,
+            background: 'transparent', cursor: 'pointer',
+            color: 'var(--text-faint)',
+            transition: 'background 0.15s, color 0.15s',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)'; }}
+        >
+          <IconChevron size={14} />
+        </button>
         {/* 탭 목록 */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ ...metaLabelStyle, marginBottom: 8 }}>보기</div>
@@ -449,7 +488,7 @@ export default function ProblemView({
             {formatDateTime(problem.updated_at)}
           </div>
         </div>
-      </div>
+      </div>}
 
       <PdfDialog
         open={pdfOpen}
