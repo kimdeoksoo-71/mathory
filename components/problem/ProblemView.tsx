@@ -237,13 +237,13 @@ export default function ProblemView({
       display: 'flex', flexDirection: 'row',
       flex: 1, minHeight: 0, width: '100%',
       background: '#ffffff', fontSize: contentFontSize,
-      overflowX: 'auto', position: 'relative',
+      overflow: 'hidden', position: 'relative',
     }}>
-      {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 ═══ */}
+      {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 (유일한 세로 스크롤) ═══ */}
       <div style={{
-        flex: 1, minWidth: `calc(35em + 64px)`,
+        flex: 1, minWidth: 0,
         display: 'flex', justifyContent: 'center',
-        overflowY: 'auto',
+        overflow: 'auto',
       }}>
         {/* ─── 가운데 단: 본문 (폭 고정 35em) ─── */}
         <div style={{
