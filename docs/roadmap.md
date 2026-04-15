@@ -473,3 +473,35 @@ problems/{id}
 - **프롬프트 반복 강조 필요**: Gemini는 "문자식 생략 금지"를 한 번만 쓰면 무시하는 경향. 규칙 + 절대 규칙 + 예시에서 3중으로 강조해야 효과적.
 - **후처리 필수**: AI가 기존 텍스트를 반복하거나 "생각:" 메타 텍스트를 붙이는 현상 → 서버에서 접두사 제거 로직 필요.
 - **Flash vs Pro**: Gemini 2.5 Flash는 수학 계산 실수 빈번. 풀이 정확성이 중요하므로 Pro 모델 사용.
+
+## Phase 101: 미리보기 / PDF 부분 개선 ✅
+> 목표: PDF 파일명, 텍스트·수식 줄바꿈, 미리보기 고정폭, 강조 테두리 클리핑 해결
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| PDF 파일명 = 문항 제목 | ✅ | 2026-04-15 | `window.print()` 직전 `document.title` 교체, 후 복원. 부적합 문자(`/ \ : * ? " < > \|`) 공백 치환 + trim, 빈 값 fallback `'수학 문제'` |
+| 텍스트 좌측정렬 + 한글 어절 단위 줄바꿈 | ✅ | 2026-04-15 | `.preview-content p/li/blockquote` 에 `text-align: left; word-break: keep-all; overflow-wrap: break-word` |
+| 인라인 수식 원자화 | ✅ | 2026-04-15 | `.preview-content .katex { display: inline-block }` — 기본 `inline`이라 수식 중간에서 줄바꿈되던 문제 해결 |
+| 미리보기 고정폭 35em | ✅ | 2026-04-15 | `width: calc(35em + 64px)`, `fontSize: contentFontSize` 로 A+/A- 시 폭 비례 확대 |
+| 좁은 창에서 가로 스크롤 | ✅ | 2026-04-15 | Row 3에 `overflowX: auto`, 편집창 `minWidth: 420` |
+| 좌우 패딩 확대 | ✅ | 2026-04-15 | 미리보기 좌우 20 → 32px |
+| ProblemView 35em 적용 | ✅ | 2026-04-15 | `components/problem/ProblemView.tsx` maxWidth 600 → `calc(35em + 64px)` |
+| 레거시 라우트 삭제 | ✅ | 2026-04-15 | `app/problems/[id]/page.tsx` 제거 (AppShell이 주 경로) |
+| 강조 테두리 클리핑 해결 | ✅ | 2026-04-15 | `outline` → `box-shadow` 교체, EditorPreview 외곽 div `overflow: auto → visible (borderless)` |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | EditorView.tsx | components/editor/EditorView.tsx |
+| 2 | EditorPreview.tsx | components/editor/EditorPreview.tsx |
+| 3 | ProblemView.tsx | components/problem/ProblemView.tsx |
+| 4 | globals.css | app/globals.css |
+| 5 | page.tsx (삭제) | app/problems/[id]/page.tsx |
+
+### Key Learnings
+
+- **KaTeX `.katex` 기본 display는 `inline`**: 긴 인라인 수식이 줄 끝에 걸리면 토큰 경계에서 자유롭게 줄바꿈됨. `display: inline-block` 으로 원자화해야 수식 중간 분리 방지.
+- **중간 래퍼의 `overflow: auto`가 box-shadow/outline 클리핑의 진짜 원인**: 상위 컨테이너 패딩을 아무리 줘도, 중간 래퍼가 `overflow: auto`로 padding-box에서 잘라내면 무의미. borderless 모드에서는 자식의 시각 장식(outline/shadow)이 상위로 확장될 수 있도록 `overflow: visible` 로 전환해야 함.
+- **PDF 파일명 = document.title**: 브라우저 인쇄 다이얼로그가 `document.title`을 기본 파일명으로 사용. 인쇄 전 교체 + 후 복원 패턴이 가장 단순.
+- **`word-break: keep-all`**: 한글 어절 경계에서만 줄바꿈. `overflow-wrap: break-word`와 함께 쓰면 긴 영단어/URL만 예외적으로 분리되어 가독성 유지.

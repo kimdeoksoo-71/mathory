@@ -164,5 +164,21 @@ p:has(.marker-giyeok) {
   margin-left: 2em;
 }
 
+/* ═══ 프리뷰 본문: 좌측 정렬 + 한글 어절 단위 줄바꿈 ═══ */
+/* 한글은 어절 단위, 긴 영단어/URL은 마지못해 분리. */
+.preview-content p,
+.preview-content li,
+.preview-content blockquote {
+  text-align: left;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 인라인 KaTeX를 원자적(atomic)으로 만들어 수식 중간에서 줄바꿈되지 않도록 함.
+   .katex-display(독립행 수식)은 부모가 block이라 영향 없음. */
+.preview-content .katex {
+  display: inline-block;
+}
+
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */

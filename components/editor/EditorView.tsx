@@ -1358,11 +1358,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
       document.body.appendChild(printNode);
 
+      // 파일명 = 문항 제목 (부적합 문자 공백 치환)
+      const origTitle = document.title;
+      const rawName = (editTitle || '').replace(/[\/\\:*?"<>|]/g, ' ').trim();
+      document.title = rawName || '수학 문제';
+
       await new Promise(resolve => setTimeout(resolve, 200));
       window.print();
 
       setTimeout(() => {
         try { document.body.removeChild(printNode); } catch {}
+        document.title = origTitle;
         setIsPrinting(false);
       }, 1000);
 
@@ -1527,8 +1533,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
         .math-highlight-active {
           background-color: rgba(229, 57, 53, 0.08) !important;
-          outline: 2px solid rgba(229, 57, 53, 0.4);
-          outline-offset: 2px;
+          box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.4);
           border-radius: 3px;
         }
       `}</style>
@@ -1844,12 +1849,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </button>
       </div>
 
-      {/* ═══ Row 3: Split View ═══ */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minHeight: 0 }}>
+      {/* ═══ Row 3: Split View (편집창 최소폭 미달 시 가로 스크롤) ═══ */}
+      <div style={{ flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0 }}>
 
         {/* ─── Left: Editor ─── */}
         <div style={{
-          flex: 1, borderRight: '1px solid var(--border-light)',
+          flex: 1, minWidth: 420, borderRight: '1px solid var(--border-light)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
         }}>
           <div style={{
@@ -1967,17 +1972,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview ─── */}
+        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ─── */}
         <div style={{
-          flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
+          width: `calc(35em + 64px)`, flexShrink: 0,
+          display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
+          fontSize: contentFontSize,
         }}>
           <div style={{
-            padding: '8px 16px 4px', fontSize: 11, color: 'var(--text-muted)',
+            padding: '8px 32px 4px', fontSize: 11, color: 'var(--text-muted)',
             fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 20px 50vh 20px', background: '#ffffff', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 50vh 32px', background: '#ffffff', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);

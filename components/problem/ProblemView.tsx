@@ -173,7 +173,7 @@ export default function ProblemView({ problemId, onRename, onEdit, onDuplicate, 
   ];
 
   return (
-    <div style={{ padding: 32, maxWidth: 600, margin: '0 auto' }}>
+    <div style={{ padding: 32, width: `calc(35em + 64px)`, maxWidth: '100%', margin: '0 auto', fontSize: contentFontSize, boxSizing: 'border-box' }}>
       {/* CSS 오버라이드: EditorPreview의 inline fontSize를 동적으로 덮어씀 */}
       <style>{`
         .problem-content-scaled > div { font-size: ${contentFontSize}px !important; }

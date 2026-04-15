@@ -339,7 +339,7 @@ export default function EditorPreview({
       backgroundColor: borderless ? 'transparent' : '#ffffff',
       border: borderless ? 'none' : '1px solid #ddd',
       borderRadius: borderless ? '0' : '8px',
-      overflow: 'auto', fontSize: '15px', lineHeight: '2.5',
+      overflow: borderless ? 'visible' : 'auto', fontSize: '15px', lineHeight: '2.5',
       fontFamily: "var(--font-content, 'Noto Serif KR', Georgia, serif)",
     }}>
       <div ref={contentRef} className="preview-content"
