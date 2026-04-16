@@ -57,12 +57,19 @@
 .print-body .katex-display { margin: 8pt 0; break-inside: avoid; padding-left: 0 !important; }
 .print-body .katex-display,
 .print-body .katex-display > .katex { text-align: left !important; }
-.print-body .katex { font-size: 1em; display: inline-block !important; }
+.print-body .katex { font-size: 1em; }
+/* 인라인 수식만 inline-block (수식 중간 줄바꿈 방지). 독립행 수식의 .katex는 제외 — \tag* 절대 위치가 깨짐 */
+.print-body :not(.katex-display) > .katex { display: inline-block !important; }
 .print-body table { border-collapse: collapse; width: 100%; margin: 6pt 0; font-size: 10pt; break-inside: avoid; }
 .print-body th, .print-body td { border: 0.2mm solid #000; padding: 3pt 6pt; text-align: center; }
 .print-body th { font-weight: 700; background-color: #f5f5f5; }
 
-.tag-marker { float: right; font-size: 0.95em; }
+.tag-marker {
+  float: right;
+  white-space: nowrap;
+  margin-left: 2em;
+  font-size: 0.95em;
+}
 .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
 p:has(> .marker-gana:first-child),
 p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
