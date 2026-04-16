@@ -447,7 +447,7 @@ function SortableEditorBlock({
   const isTextBased = TEXT_BASED_TYPES.has(block.type);
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes}>
+    <div ref={setNodeRef} style={style} {...attributes} data-editor-block-id={block.id}>
       {/* ── Block Header ── */}
       <div
         style={{
@@ -894,6 +894,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
 
     setActiveBlockId(newBlock.id);
+    setTimeout(() => {
+      editorRefs.current[newBlock.id]?.focus();
+    }, 50);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
 
   /** 모두 분할: 현재 탭의 모든 텍스트/수식행 블록에서 제목/수식행을 자동 분리 */
@@ -1059,7 +1062,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   };
 
   /* ─── 커서 활동 → 수식 하이라이트 ─── */
-  const handleCursorActivity = useCallback((info: { line: number; offset: number }) => {
+  const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean }) => {
     if (!activeBlockId) return;
     const ref = editorRefs.current[activeBlockId];
     if (!ref) return;
@@ -1106,6 +1109,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       });
     }, 100);
   }, [setCurrentBlocks]);
+
+  /* ─── 블록 활성화 시 편집창에서 해당 블록을 세로 중앙으로 자동 스크롤 ─── */
+  useEffect(() => {
+    if (!activeBlockId) return;
+    const timer = setTimeout(() => {
+      const container = editorPanelRef.current;
+      if (!container) return;
+      const blockEl = container.querySelector(`[data-editor-block-id="${activeBlockId}"]`);
+      if (!blockEl) return;
+      const containerRect = container.getBoundingClientRect();
+      const blockRect = (blockEl as HTMLElement).getBoundingClientRect();
+      const blockCenter = blockRect.top + blockRect.height / 2 - containerRect.top + container.scrollTop;
+      const target = blockCenter - containerRect.height / 2;
+      container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    }, 80);
+    return () => clearTimeout(timer);
+  }, [activeBlockId]);
 
   /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
   useEffect(() => {

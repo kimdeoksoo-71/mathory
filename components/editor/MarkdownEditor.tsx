@@ -24,7 +24,7 @@ interface MarkdownEditorProps {
   onChange?: (value: string) => void;
   autoHeight?: boolean;
   onSnippetShortcut?: (index: number) => void;
-  onCursorActivity?: (info: { line: number; offset: number }) => void;
+  onCursorActivity?: (info: { line: number; offset: number; docChanged: boolean }) => void;
 }
 
 export interface MarkdownEditorHandle {
@@ -582,7 +582,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               if (cursorCallbackRef.current) {
                 const head = update.state.selection.main.head;
                 const line = update.state.doc.lineAt(head);
-                cursorCallbackRef.current({ line: line.number, offset: head });
+                cursorCallbackRef.current({ line: line.number, offset: head, docChanged: update.docChanged });
               }
             }
           }),

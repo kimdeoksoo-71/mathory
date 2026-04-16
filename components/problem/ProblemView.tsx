@@ -279,7 +279,7 @@ export default function ProblemView({
         {/* ─── 가운데 단: 본문 (폭 고정 30em) ─── */}
         <div style={{
           width: `calc(30em + 64px)`, flexShrink: 0,
-          padding: '32px 32px 50vh 32px',
+          padding: '32px 32px 0 32px',
           boxSizing: 'border-box',
         }}>
           {/* 제목 (클릭 시 EditorView 이동) */}
@@ -318,6 +318,8 @@ export default function ProblemView({
               </div>
             );
           })}
+          {/* 하단 여백 — 마지막 행을 위로 스크롤 가능하게 */}
+          <div style={{ height: '70vh' }} />
         </div>
       </div>
 
