@@ -1,4 +1,6 @@
 import { Block } from '../types/problem';
+import PrintableContent, { PrintTab } from '../components/print/PrintableContent';
+import '../components/print/PrintStyles.css';
 
 export interface PdfPrintTab {
   label: string;
@@ -25,9 +27,7 @@ export async function printProblemPdf(params: {
     return;
   }
 
-  const { default: PrintableContent } = await import('../components/print/PrintableContent');
   const { createRoot } = await import('react-dom/client');
-  const React = await import('react');
 
   const tempDiv = document.createElement('div');
   tempDiv.style.cssText = 'position:absolute;left:-9999px;top:0;';
@@ -36,11 +36,11 @@ export async function printProblemPdf(params: {
   const root = createRoot(tempDiv);
   await new Promise<void>((resolve) => {
     root.render(
-      React.createElement(PrintableContent, {
-        title: title || '수학 문제',
-        tabs,
-        locale: 'ko',
-      } as any)
+      <PrintableContent
+        title={title || '수학 문제'}
+        tabs={tabs as PrintTab[]}
+        locale="ko"
+      />
     );
     setTimeout(resolve, 500);
   });

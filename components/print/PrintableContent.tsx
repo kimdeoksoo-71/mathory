@@ -46,8 +46,8 @@ export default function PrintableContent({
         {tabs.map((tab, tabIdx) => (
           <div key={tab.label + tabIdx} className={tabIdx > 0 ? 'print-tab-section' : ''}>
             <div className="print-tab-label">{tab.label}</div>
-            {tab.blocks.map((block) => (
-              <div key={block.id} className="print-block">
+            {tab.blocks.map((block, blockIdx) => (
+              <div key={block.id} className="print-block" style={block.type === 'heading' && blockIdx > 0 ? { paddingTop: '1.5em' } : undefined}>
                 {block.type === 'choices' ? (
                   <PrintChoicesBlock content={block.raw_text} locale={locale} />
                 ) : block.type === 'image' ? (
