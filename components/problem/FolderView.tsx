@@ -1,233 +1,363 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Problem, Folder } from '../../types/problem';
-import { DIFFICULTIES } from '../../lib/constants';
-import { IconFolder, IconDots, IconTrash, IconTrashEmpty } from '../ui/Icons';
-import ContextMenu from '../ui/ContextMenu';
-import { formatTimeAgo } from '../../lib/utils';
-import { TRASH_FOLDER_ID } from '../../lib/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { Problem, Block, Folder } from '../../types/problem';
+import { getQuestionBlocks, updateProblem, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID } from '../../lib/firestore';
+import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
+import EditorPreview from '../editor/EditorPreview';
+import ChoicesBlock from '../editor/ChoicesBlock';
+import {
+  IconEdit, IconRename, IconTrash, IconCopy, IconChevron, IconChevronLeft,
+  IconFolder, IconInbox,
+} from '../ui/Icons';
 
-function getDifficultyLabel(value: number): string {
-  const found = DIFFICULTIES.find((d) => d.value === value);
-  return found ? found.label : `${value}`;
-}
+const FONT_SIZE_KEY = 'mathory-content-font-size';
+const FONT_SIZE_DEFAULT = 15;
+const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 interface FolderViewProps {
   folder: Folder;
   problems: Problem[];
+  folders: Folder[];
   onEdit: (problem: Problem) => void;
   onView: (problem: Problem) => void;
   onProblemAction: (action: string, problem: Problem) => void;
   onEmptyTrash?: () => void;
+  onUpdated?: () => void;
 }
 
-function ProblemCard({
-  problem,
-  onEdit,
-  onView,
-  onAction,
-  isTrash,
-}: {
-  problem: Problem;
-  onEdit: (p: Problem) => void;
-  onView: (p: Problem) => void;
-  onAction: (action: string, p: Problem) => void;
-  isTrash?: boolean;
-}) {
-  const [hovered, setHovered] = useState(false);
-  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
-
-  // 휴지통 전용 메뉴 항목
-  const trashMenuItems = [
-    { label: '복원', icon: undefined, action: 'restore' },
-    { label: 'divider', action: 'divider' },
-    { label: '영구 삭제', icon: <IconTrash />, action: 'delete', danger: true },
-  ];
-
-  return (
-    <>
-      <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onClick={() => onView(problem)}
-        style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '14px 16px', borderRadius: 10, cursor: 'pointer',
-          background: hovered ? 'var(--bg-secondary)' : 'transparent',
-          transition: 'background var(--transition-fast)',
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <div style={{
-            fontSize: 14.5, fontWeight: 500, color: 'var(--text-primary)',
-            marginBottom: 4, fontFamily: 'var(--font-ui)',
-          }}>
-            {problem.title}
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {problem.source || problem.exam_type}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-placeholder)' }}>·</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {problem.subject || problem.category}
-            </span>
-            <span style={{ fontSize: 12, color: 'var(--text-placeholder)' }}>·</span>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-              {getDifficultyLabel(problem.difficulty)}
-            </span>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 12, color: 'var(--text-faint)' }}>
-            {formatTimeAgo(problem.updated_at)}
-          </span>
-          {hovered && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuPos({ x: e.clientX, y: e.clientY });
-              }}
-              style={{
-                border: 'none', background: 'none', cursor: 'pointer',
-                padding: 4, borderRadius: 4, color: 'var(--text-muted)', display: 'flex',
-              }}
-            >
-              <IconDots />
-            </button>
-          )}
-        </div>
-      </div>
-      {menuPos && (
-        <ContextMenu
-          x={menuPos.x}
-          y={menuPos.y}
-          onClose={() => setMenuPos(null)}
-          items={isTrash ? trashMenuItems : undefined}
-          onAction={(action) => {
-            if (action === 'edit') onEdit(problem);
-            else if (action === 'restore') {
-              onAction('restore', problem);
-            } else {
-              onAction(action, problem);
-            }
-          }}
-        />
-      )}
-    </>
-  );
+function formatDate(d?: Date): string {
+  if (!d) return '';
+  const yy = String(d.getFullYear()).slice(-2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
 }
 
-export default function FolderView({ folder, problems, onEdit, onView, onProblemAction, onEmptyTrash }: FolderViewProps) {
+function formatDateTime(d?: Date): string {
+  if (!d) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${formatDate(d)} : ${hh}-${mi}`;
+}
+
+export default function FolderView({
+  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated,
+}: FolderViewProps) {
+  const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
+  const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
+  const [blocksLoading, setBlocksLoading] = useState(false);
+  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
+  const [rightOpen, setRightOpen] = useState(false);
+
   const isTrash = folder.id === TRASH_FOLDER_ID;
-  const folderProblems = problems.filter((p) => p.folder_id === folder.id);
+  const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
 
-  // 휴지통 전용 메뉴
-  const [trashMenuOpen, setTrashMenuOpen] = useState(false);
-  const trashMenuRef = useRef<HTMLDivElement>(null);
+  const folderProblems = problems.filter((p) => {
+    if (isTrash) return p.folder_id === TRASH_FOLDER_ID;
+    if (isUnassigned) return !p.folder_id || p.folder_id === '';
+    return p.folder_id === folder.id;
+  });
 
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (trashMenuRef.current && !trashMenuRef.current.contains(e.target as Node)) {
-        setTrashMenuOpen(false);
-      }
-    };
-    if (trashMenuOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+    const stored = localStorage.getItem(FONT_SIZE_KEY);
+    if (stored) {
+      const n = parseInt(stored, 10);
+      if (!isNaN(n) && n >= 11 && n <= 24) setContentFontSize(n);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [trashMenuOpen]);
+  }, []);
+
+  useEffect(() => {
+    if (folderProblems.length === 0) { setBlocksLoading(false); return; }
+    setBlocksLoading(true);
+    const loadBlocks = async () => {
+      const map: Record<string, Block[]> = {};
+      await Promise.all(
+        folderProblems.map(async (p) => {
+          try { map[p.id] = await getQuestionBlocks(p.id); } catch { map[p.id] = []; }
+        })
+      );
+      setQuestionBlocksMap(map);
+      setBlocksLoading(false);
+    };
+    loadBlocks();
+  }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelectProblem = useCallback((problem: Problem) => {
+    setSelectedProblemId(problem.id);
+    setRightOpen(true);
+  }, []);
+
+  const selectedProblem = folderProblems.find((p) => p.id === selectedProblemId) || null;
+
+  const updateField = async (patch: Record<string, any>) => {
+    if (!selectedProblem) return;
+    const clean: Record<string, any> = {};
+    for (const k in patch) { clean[k] = patch[k] === undefined ? '' : patch[k]; }
+    try {
+      await updateProblem(selectedProblem.id, clean as any);
+      onUpdated?.();
+    } catch (err) {
+      console.error('저장 실패:', err);
+    }
+  };
+
+  const renderBlocks = (blocks: Block[]) => {
+    return blocks.map((block, i) => {
+      const isBordered = BORDERED_TYPES.has(block.type);
+      const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
+      if (block.type === 'image') {
+        const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
+        return (
+          <div key={block.id || `img-${i}`} style={{ textAlign: 'center', margin: '0.8em 0' }}>
+            {src ? <img src={src} alt="" style={{ width: block.imageWidth || 400, maxWidth: '90%', height: 'auto' }} /> : null}
+          </div>
+        );
+      }
+      if (isBordered) {
+        return (
+          <div key={block.id || `b-${i}`} style={{ border: '1.5px solid var(--text-muted, #888)', borderRadius: 0, padding: '12px 16px', margin: '1.2em 0' }}>
+            <EditorPreview content={block.raw_text} borderless locale="ko" />
+          </div>
+        );
+      }
+      if (block.type === 'choices') {
+        return <div key={block.id || `c-${i}`}><ChoicesBlock rawText={block.raw_text} locale="ko" /></div>;
+      }
+      return (
+        <div key={block.id || `t-${i}`} style={{ paddingTop: headingTopPad }}>
+          <EditorPreview content={block.raw_text} borderless locale="ko" />
+        </div>
+      );
+    });
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', background: 'transparent', border: '1px solid transparent',
+    borderRadius: 6, padding: '6px 8px', fontSize: 13, color: 'var(--text-primary)',
+    fontFamily: 'var(--font-ui)', outline: 'none', transition: 'border-color 0.15s, background 0.15s',
+    boxSizing: 'border-box',
+  };
+  const inputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = 'var(--accent-primary)';
+    e.target.style.background = 'var(--bg-hover)';
+  };
+  const inputBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    e.target.style.borderColor = 'transparent';
+    e.target.style.background = 'transparent';
+  };
+  const metaLabelStyle: React.CSSProperties = {
+    fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
+    letterSpacing: 0.3, marginBottom: 4, fontFamily: 'var(--font-ui)',
+  };
+  const metaRowStyle: React.CSSProperties = { marginBottom: 14 };
+
+  const menuItems = selectedProblem ? [
+    ...(isTrash ? [
+      { label: '복원', icon: <IconCopy size={14} />, action: () => { onProblemAction('restore', selectedProblem); setRightOpen(false); } },
+      { label: '영구 삭제', icon: <IconTrash size={14} />, action: () => { onProblemAction('delete', selectedProblem); setRightOpen(false); }, danger: true },
+    ] : [
+      { label: '보기', icon: <IconChevron size={14} />, action: () => onView(selectedProblem) },
+      { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit(selectedProblem) },
+      { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onProblemAction('duplicate', selectedProblem) },
+      { label: '이름 변경', icon: <IconRename size={14} />, action: () => onProblemAction('rename', selectedProblem) },
+      { label: '휴지통', icon: <IconTrash size={14} />, action: () => { onProblemAction('trash', selectedProblem); setRightOpen(false); }, danger: true },
+    ]),
+  ] : [];
 
   return (
-    <div style={{ padding: 32, maxWidth: 800, margin: '0 auto' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
-        <span style={{ color: 'var(--text-muted)' }}>
-          {isTrash ? <IconTrash size={18} /> : <IconFolder />}
-        </span>
-        <h2 style={{
-          fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', margin: 0,
-          fontFamily: 'var(--font-ui)',
+    <div style={{
+      display: 'flex', flexDirection: 'row',
+      flex: 1, minHeight: 0, width: '100%',
+      background: '#ffffff', fontSize: contentFontSize,
+      overflow: 'hidden', position: 'relative',
+    }}>
+      {/* ═══ 왼쪽: 문제 리스트 스크롤 ═══ */}
+      <div style={{
+        flex: 1, minWidth: 0,
+        overflow: 'auto',
+      }}>
+        <div style={{
+          width: `calc(30em + 64px)`, margin: '0 auto',
+          padding: '0 32px', boxSizing: 'border-box',
         }}>
-          {folder.name}
-        </h2>
-        <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-          {folderProblems.length}개 문항
-        </span>
-
-        {/* 휴지통 전용: ⋮ 메뉴 */}
-        {isTrash && folderProblems.length > 0 && (
-          <div ref={trashMenuRef} style={{ position: 'relative', marginLeft: 'auto' }}>
-            <button
-              onClick={() => setTrashMenuOpen(!trashMenuOpen)}
-              style={{
-                border: 'none', background: trashMenuOpen ? 'var(--bg-hover)' : 'transparent',
-                cursor: 'pointer', padding: '4px 6px', borderRadius: 6,
-                color: 'var(--text-muted)', display: 'flex',
-                transition: 'background var(--transition-fast)',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (!trashMenuOpen) e.currentTarget.style.background = 'transparent'; }}
-              title="메뉴"
-            >
-              <IconDots size={16} />
-            </button>
-
-            {trashMenuOpen && (
-              <div style={{
-                position: 'absolute', top: '100%', right: 0, marginTop: 4,
-                background: '#fff',
-                borderRadius: 10,
-                boxShadow: '0 4px 24px rgba(0,0,0,.12), 0 0 0 1px rgba(0,0,0,.06)',
-                minWidth: 160, zIndex: 1000,
-                padding: '4px 0',
-                animation: 'fadeIn 0.1s ease',
+          {/* 폴더명 헤더 (sticky) */}
+          <div style={{
+            position: 'sticky', top: 0, zIndex: 5,
+            background: '#ffffff', padding: '24px 0 12px 0',
+            borderBottom: '1px solid var(--border-light)',
+            marginBottom: 24,
+            fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
+            fontFamily: 'var(--font-ui)',
+          }}>
+            <span style={{ display: 'inline-flex', verticalAlign: 'middle', marginRight: 8, color: 'var(--text-muted)' }}>
+              {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : <IconFolder size={18} />}
+            </span>
+            {folder.name}
+            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
+              ({folderProblems.length})
+            </span>
+            {isTrash && folderProblems.length > 0 && onEmptyTrash && (
+              <button onClick={onEmptyTrash} style={{
+                float: 'right', border: 'none', background: 'none',
+                color: 'var(--accent-danger)', fontSize: 12, cursor: 'pointer',
+                fontFamily: 'var(--font-ui)', fontWeight: 500,
               }}>
-                <button
-                  onClick={() => {
-                    setTrashMenuOpen(false);
-                    onEmptyTrash?.();
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    width: '100%', padding: '8px 14px',
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    fontSize: 13, fontFamily: 'var(--font-ui)',
-                    color: 'var(--accent-danger)',
-                    transition: 'background var(--transition-fast)',
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-danger-bg)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                >
-                  <span style={{ opacity: 0.7, display: 'flex' }}><IconTrashEmpty /></span>
-                  휴지통 비우기
-                </button>
-              </div>
+                휴지통 비우기
+              </button>
             )}
           </div>
-        )}
+
+          {blocksLoading && (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
+          )}
+          {!blocksLoading && folderProblems.length === 0 && (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
+              {isTrash ? '휴지통이 비어 있습니다.' : '이 폴더에 문항이 없습니다.'}
+            </div>
+          )}
+
+          {!blocksLoading && folderProblems.map((problem) => {
+            const blocks = questionBlocksMap[problem.id] || [];
+            const isSelected = selectedProblemId === problem.id;
+            return (
+              <div key={problem.id} style={{ marginBottom: '5em' }}>
+                <h2
+                  onClick={() => handleSelectProblem(problem)}
+                  style={{
+                    fontSize: 18, fontWeight: 700, margin: '0 0 12px 0',
+                    fontFamily: 'var(--font-ui)',
+                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
+                    cursor: 'pointer', transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                  onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                >
+                  {problem.title}
+                </h2>
+                <div className="problem-content-scaled">
+                  <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
+                  {renderBlocks(blocks)}
+                </div>
+              </div>
+            );
+          })}
+
+          <div style={{ height: '70vh' }} />
+        </div>
       </div>
 
-      {folderProblems.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: 48, color: 'var(--text-muted)', fontSize: 14,
+      {/* ═══ 우측 패널 열기 버튼 ═══ */}
+      {!rightOpen && (
+        <button onClick={() => setRightOpen(true)} title="우측 패널 열기" style={{
+          position: 'absolute', top: 16, right: 16, zIndex: 10,
+          width: 32, height: 32,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px solid var(--border-light)', borderRadius: 8,
+          background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-muted)',
         }}>
-          {isTrash ? '휴지통이 비어 있습니다.' : '이 폴더에 문항이 없습니다.'}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {folderProblems.map((p) => (
-            <ProblemCard
-              key={p.id}
-              problem={p}
-              onEdit={onEdit}
-              onView={onView}
-              onAction={onProblemAction}
-              isTrash={isTrash}
-            />
-          ))}
-        </div>
+          <IconChevronLeft size={14} />
+        </button>
       )}
+
+      {/* ═══ 오른쪽 패널 ═══ */}
+      {rightOpen && <div style={{
+        flex: 1, minWidth: 150, maxWidth: 220,
+        padding: '32px 16px', borderLeft: '1px solid var(--border-light)',
+        overflowY: 'auto', fontSize: 13, fontFamily: 'var(--font-ui)',
+        background: '#ffffff', position: 'relative',
+      }}>
+        <button onClick={() => setRightOpen(false)} title="우측 패널 닫기" style={{
+          position: 'absolute', top: 8, right: 8, width: 26, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: 'none', borderRadius: 6, background: 'transparent',
+          cursor: 'pointer', color: 'var(--text-faint)',
+          transition: 'background 0.15s, color 0.15s',
+        }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)'; }}
+        >
+          <IconChevron size={14} />
+        </button>
+
+        {selectedProblem ? (
+          <>
+            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, paddingRight: 24, color: 'var(--text-primary)' }}>
+              {selectedProblem.title}
+            </div>
+
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>
+              {menuItems.map((item, i) => (
+                <button key={i} onClick={item.action} style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  width: '100%', padding: '7px 10px',
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  fontSize: 13, fontFamily: 'var(--font-ui)',
+                  color: (item as any).danger ? 'var(--accent-danger)' : 'var(--text-primary)',
+                  borderRadius: 6, textAlign: 'left', transition: 'background 0.15s',
+                }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = (item as any).danger ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))' : 'var(--bg-hover)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+                >
+                  <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {!isTrash && (
+              <>
+                <div style={metaRowStyle}>
+                  <div style={metaLabelStyle}>폴더</div>
+                  <select value={selectedProblem.folder_id || ''} onChange={(e) => updateField({ folder_id: e.target.value || '' })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="">미분류</option>
+                    {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div style={metaRowStyle}>
+                  <div style={metaLabelStyle}>대단원</div>
+                  <select value={selectedProblem.category || ''} onChange={(e) => updateField({ category: e.target.value, subject: e.target.value })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    <option value="">선택</option>
+                    {CATEGORY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+                <div style={metaRowStyle}>
+                  <div style={metaLabelStyle}>배점</div>
+                  <select value={selectedProblem.difficulty} onChange={(e) => updateField({ difficulty: Number(e.target.value) })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
+                    {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                  </select>
+                </div>
+                <div style={metaRowStyle}>
+                  <div style={metaLabelStyle}>정답</div>
+                  <input
+                    key={selectedProblem.id}
+                    defaultValue={selectedProblem.answer || ''}
+                    onBlur={(e) => { inputBlur(e); updateField({ answer: e.target.value }); }}
+                    onFocus={inputFocus}
+                    placeholder="정답"
+                    style={inputStyle}
+                  />
+                </div>
+                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
+                    <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>생성</span>
+                    {formatDate(selectedProblem.created_at)}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                    <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>최종수정</span>
+                    {formatDateTime(selectedProblem.updated_at)}
+                  </div>
+                </div>
+              </>
+            )}
+          </>
+        ) : (
+          <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 32 }}>
+            문제 제목을 클릭하면<br />메타 정보가 표시됩니다.
+          </div>
+        )}
+      </div>}
     </div>
   );
 }

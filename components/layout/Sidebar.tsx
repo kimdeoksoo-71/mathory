@@ -6,9 +6,9 @@ import { Problem, Folder } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
-  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash,
+  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox,
 } from '../ui/Icons';
-import { TRASH_FOLDER_ID } from '../../lib/firestore';
+import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID } from '../../lib/firestore';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -408,6 +408,8 @@ export interface SidebarProps {
   onLogout: () => void;
   onSelectTrash: () => void;
   trashCount: number;
+  onSelectUnassigned: () => void;
+  unassignedCount: number;
 }
 
 export default function Sidebar({
@@ -432,6 +434,8 @@ export default function Sidebar({
   onLogout,
   onSelectTrash,
   trashCount,
+  onSelectUnassigned,
+  unassignedCount,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [recentOpen, setRecentOpen] = useState(true);
@@ -620,6 +624,37 @@ export default function Sidebar({
                 />
               ))}
             </SortableContext>
+          )}
+
+          {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위) */}
+          {!collapsed && foldersOpen && (
+            <button
+              onClick={onSelectUnassigned}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '8px 12px', paddingLeft: 34,
+                border: 'none', borderRadius: 8, cursor: 'pointer',
+                background: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontSize: 13.5,
+                fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 600 : 400,
+                fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
+              }}
+              onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === UNASSIGNED_FOLDER_ID ? 1 : 0.75 }}>
+                <IconInbox size={16} />
+              </span>
+              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                미지정
+              </span>
+              {unassignedCount > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)', borderRadius: 10, padding: '1px 7px' }}>
+                  {unassignedCount}
+                </span>
+              )}
+            </button>
           )}
 
           {/* 휴지통 (항상 맨 아래, 드래그 불가) */}

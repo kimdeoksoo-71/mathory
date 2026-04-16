@@ -16,8 +16,9 @@ import {
 import { db } from './firebase';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../types/problem';
 
-// ===== 휴지통 상수 =====
+// ===== 특수 폴더 상수 =====
 export const TRASH_FOLDER_ID = '__trash__';
+export const UNASSIGNED_FOLDER_ID = '__unassigned__';
 
 // ===== Problem CRUD =====
 
@@ -160,6 +161,15 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
     solution_blocks: tabBlocks['solution'] || [],
     tabBlocks,
   };
+}
+
+/** 문제의 question 탭 블록만 경량 로딩 (FolderView 미리보기용) */
+export async function getQuestionBlocks(problemId: string): Promise<Block[]> {
+  const subcol = tabSubcollection('question');
+  const snap = await getDocs(
+    query(collection(db, 'problems', problemId, subcol), orderBy('order'))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
 }
 
 async function saveBlock(

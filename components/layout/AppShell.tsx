@@ -13,7 +13,7 @@ import {
   getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
   getProblemWithBlocks,
   duplicateProblem, moveToTrash, emptyTrash,
-  TRASH_FOLDER_ID,
+  TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID,
 } from '../../lib/firestore';
 
 import Sidebar from '../layout/Sidebar';
@@ -97,6 +97,7 @@ export default function AppShell() {
         }
         // 휴지통 카운트
         counts[TRASH_FOLDER_ID] = problems.filter((p) => p.folder_id === TRASH_FOLDER_ID).length;
+        counts[UNASSIGNED_FOLDER_ID] = problems.filter((p) => !p.folder_id || p.folder_id === '').length;
         setFolderCounts(counts);
       }
     } catch (error) {
@@ -142,6 +143,9 @@ export default function AppShell() {
   };
 
   const handleSelectFolder = (folder: Folder) => { setView({ type: 'folder', folder }); };
+  const handleSelectUnassigned = () => {
+    setView({ type: 'folder', folder: { id: UNASSIGNED_FOLDER_ID, name: '미지정', user_id: '', order: 99998 } });
+  };
   const handleSelectTrash = () => {
     setView({ type: 'folder', folder: { id: TRASH_FOLDER_ID, name: '휴지통', user_id: '', order: 99999 } });
   };
@@ -360,21 +364,23 @@ export default function AppShell() {
         onLogout={handleLogout}
         onSelectTrash={handleSelectTrash}
         trashCount={folderCounts[TRASH_FOLDER_ID] ?? 0}
+        onSelectUnassigned={handleSelectUnassigned}
+        unassignedCount={folderCounts[UNASSIGNED_FOLDER_ID] ?? 0}
       />
 
       <main style={{
         flex: 1,
         position: 'relative',
-        overflow: isEditorMode || isProblemMode ? 'hidden' : 'auto',
+        overflow: isEditorMode || isProblemMode || view.type === 'folder' ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
       }}>
         {view.type === 'home' && <HomeView />}
         {view.type === 'folder' && (
-          <FolderView folder={view.folder} problems={allProblems}
+          <FolderView folder={view.folder} problems={allProblems} folders={folders}
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
-            onEmptyTrash={handleEmptyTrash} />
+            onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()} />
         )}
         {view.type === 'problem' && (
           <ProblemView
