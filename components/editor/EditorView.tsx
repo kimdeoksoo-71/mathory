@@ -8,6 +8,7 @@ import {
 } from '../../lib/firestore';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
+import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
@@ -480,20 +481,6 @@ function SortableEditorBlock({
             <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
           ))}
         </select>
-
-        {isTextBased && (
-          <input
-            value={block.title || ''}
-            onChange={(e) => onTitleChange(e.target.value)}
-            onPointerDown={(e) => e.stopPropagation()}
-            placeholder="제목"
-            style={{
-              flex: 1, border: 'none', background: 'none', fontSize: 11,
-              color: 'var(--text-secondary)', outline: 'none', padding: '1px 4px',
-              fontFamily: 'var(--font-ui)',
-            }}
-          />
-        )}
 
         <div style={{ flex: 1 }} />
 
@@ -1764,24 +1751,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 30em + 좌우 패딩 32px) ─── */}
+        {/* ─── Right: Preview (고정 폭 30em + 좌우 패딩 64px) ─── */}
         <div style={{
-          width: `calc(30em + 64px)`, flexShrink: 0,
+          width: `calc(30em + 128px)`, flexShrink: 0,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
           <div style={{
-            padding: '8px 32px 4px', fontSize: 11, color: 'var(--text-muted)',
+            padding: '8px 64px 4px', fontSize: 11, color: 'var(--text-muted)',
             fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 50vh 32px', background: '#ffffff', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);
+              const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
               return (
-                <div key={block.id} data-block-id={block.id}>
+                <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
                   {block.type === 'image' ? (
                     <div style={{ textAlign: 'center' }}>
                       {block.raw_text ? (
@@ -1812,13 +1800,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       />
                     </div>
                   ) : block.type === 'choices' ? (
-                    <EditorPreview
-                      content={block.raw_text.replace(/\n/g, '\n\n')}
-                      borderless
-                      locale="ko"
-                      activeMathId={isActivePreview ? activeMathId : undefined}
-                      onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
-                    />
+                    <ChoicesBlock rawText={block.raw_text} locale="ko" />
                   ) : (
                     <EditorPreview
                       content={block.raw_text}

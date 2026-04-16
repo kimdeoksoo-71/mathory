@@ -5,6 +5,7 @@ import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../t
 import { getProblemWithBlocks, updateProblem } from '../../lib/firestore';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
+import ChoicesBlock from '../editor/ChoicesBlock';
 import PdfDialog from './PdfDialog';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import {
@@ -53,7 +54,7 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
-  const [rightOpen, setRightOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(false);
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
@@ -62,9 +63,9 @@ export default function ProblemView({
     setProblem(data);
     if (data) {
       const tabs = data.tabs || DEFAULT_TABS;
-      // 기본: 첫 탭(문제)만 펼침
+      // 기본: 모든 탭 펼침
       const next: Record<string, boolean> = {};
-      tabs.forEach((t, i) => { next[t.id] = i === 0; });
+      tabs.forEach((t) => { next[t.id] = true; });
       setOpenTabs(next);
     }
     setLoading(false);
@@ -124,6 +125,30 @@ export default function ProblemView({
     }
   };
 
+  /* ─── MD 다운로드 ─── */
+  const handleDownloadMarkdown = () => {
+    if (!problem) return;
+    const tabs = problem.tabs || DEFAULT_TABS;
+    let md = `# ${problem.title}\n\n`;
+    for (const tab of tabs) {
+      const blocks = problem.tabBlocks[tab.id] || [];
+      if (blocks.length === 0) continue;
+      md += `## ${tab.label}\n\n`;
+      md += blocks.map((b) => b.raw_text).join('\n\n');
+      md += '\n\n';
+    }
+    const safeTitle = problem.title.replace(/[\/\\:*?"<>|]/g, '_').trim() || '수학 문제';
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${safeTitle}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   /* ─── PDF ─── */
   const handlePdfConfirm = async (selectedTabIds: string[]) => {
     if (!problem) return;
@@ -152,6 +177,7 @@ export default function ProblemView({
   const renderBlocks = (blocks: Block[]) => {
     return blocks.map((block, i) => {
       const isBordered = BORDERED_TYPES.has(block.type);
+      const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
       if (block.type === 'image') {
         const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
         return (
@@ -176,12 +202,16 @@ export default function ProblemView({
           </div>
         );
       }
-      const content = block.type === 'choices'
-        ? block.raw_text.replace(/\n/g, '\n\n')
-        : block.raw_text;
+      if (block.type === 'choices') {
+        return (
+          <div key={block.id || `c-${i}`}>
+            <ChoicesBlock rawText={block.raw_text} locale="ko" />
+          </div>
+        );
+      }
       return (
-        <div key={block.id || `t-${i}`} data-block-id={block.id}>
-          <EditorPreview content={content} borderless locale="ko" />
+        <div key={block.id || `t-${i}`} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
+          <EditorPreview content={block.raw_text} borderless locale="ko" />
         </div>
       );
     });
@@ -229,6 +259,7 @@ export default function ProblemView({
     { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onDuplicate?.(problem) },
     { label: '이름 변경', icon: <IconRename size={14} />, action: () => onRename?.(problem) },
     { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
+    { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
     { label: '휴지통', icon: <IconTrash size={14} />, action: () => onTrash?.(problem), danger: true },
   ];
 

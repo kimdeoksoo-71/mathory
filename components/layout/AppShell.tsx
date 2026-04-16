@@ -145,7 +145,7 @@ export default function AppShell() {
   const handleSelectTrash = () => {
     setView({ type: 'folder', folder: { id: TRASH_FOLDER_ID, name: '휴지통', user_id: '', order: 99999 } });
   };
-  const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); };
+  const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); setCollapsed(true); };
   const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
 
   const handleNewFolder = async () => {
@@ -324,6 +324,13 @@ export default function AppShell() {
     setCollapsed(false);
     loadData();
   };
+
+  // ProblemView / EditorView 진입 시 사이드바 자동 접기
+  useEffect(() => {
+    if (view.type === 'problem' || view.type === 'editor') {
+      setCollapsed(true);
+    }
+  }, [view]);
 
   const activeFolderId = view.type === 'folder' ? view.folder.id : null;
   const isEditorMode = view.type === 'editor';

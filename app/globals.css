@@ -180,5 +180,10 @@ p:has(.marker-giyeok) {
   display: inline-block;
 }
 
+/* 선택지 가로 배열: 셀 내부 여백 최소화 */
+.choices-grid .preview-content p {
+  margin: 0;
+}
+
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */
