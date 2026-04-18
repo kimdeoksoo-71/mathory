@@ -27,7 +27,6 @@ interface PrintableContentProps {
   locale?: Locale;
 }
 
-const CHOICES_LABELS_PRINT = ['①', '②', '③', '④', '⑤'];
 const BORDERED_TYPES_PRINT = new Set(['gana', 'roman', 'box']);
 
 /**
@@ -89,17 +88,23 @@ function PrintBlockRenderer({ content, locale }: { content: string; locale: Loca
   );
 }
 
-/** 선택지 인쇄 블록: CSS flexbox wrap으로 1열/2열 자동 전환 */
+/** 선택지 인쇄 블록: 선택지 수에 따라 3/5등분, 라벨은 기록된 그대로 */
 function PrintChoicesBlock({ content, locale }: { content: string; locale: Locale }) {
-  const lines = content.split('\n');
-  const choices = CHOICES_LABELS_PRINT.map((label, idx) => {
-    const line = lines[idx] || '';
-    const choiceContent = line.replace(/^[①②③④⑤]\s*/, '').trim();
-    return { label, content: choiceContent };
-  });
+  const choices: { label: string; content: string }[] = [];
+  for (const line of content.split('\n')) {
+    const m = line.trim().match(/^([①②③④⑤])\s*(.*)$/);
+    if (!m) continue;
+    const c = m[2].trim();
+    if (!c) continue;
+    choices.push({ label: m[1], content: c });
+    if (choices.length >= 5) break;
+  }
+
+  // 1~3개 → 3등분, 4~5개 → 5등분
+  const cols = choices.length <= 3 ? 3 : 5;
 
   return (
-    <div className="print-choices-row">
+    <div className="print-choices-row" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {choices.map((c, i) => (
         <div key={i} className="print-choice-item">
           <span className="print-choice-label">{c.label}</span>
