@@ -15,6 +15,37 @@ const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
+/* ═══ 정렬 ═══ */
+type SortKey = 'name' | 'updated';
+type SortDir = 'asc' | 'desc';
+interface SortState { key: SortKey; dir: SortDir; }
+const SORT_KEY = 'mathory-folder-sort';
+const DEFAULT_SORT: SortState = { key: 'updated', dir: 'desc' };
+const SORT_KEY_LABELS: Record<SortKey, string> = { name: '이름', updated: '수정일' };
+
+function loadSort(): SortState {
+  if (typeof window === 'undefined') return DEFAULT_SORT;
+  try {
+    const raw = localStorage.getItem(SORT_KEY);
+    if (!raw) return DEFAULT_SORT;
+    const parsed = JSON.parse(raw) as SortState;
+    if (parsed?.key && parsed?.dir) return parsed;
+  } catch {}
+  return DEFAULT_SORT;
+}
+
+function compareBySort(a: Problem, b: Problem, s: SortState): number {
+  let v: number;
+  if (s.key === 'name') {
+    v = (a.title || '').localeCompare(b.title || '', 'ko');
+  } else {
+    const ta = a.updated_at ? a.updated_at.getTime() : 0;
+    const tb = b.updated_at ? b.updated_at.getTime() : 0;
+    v = ta - tb;
+  }
+  return s.dir === 'asc' ? v : -v;
+}
+
 interface FolderViewProps {
   folder: Folder;
   problems: Problem[];
@@ -49,15 +80,25 @@ export default function FolderView({
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
   const [rightOpen, setRightOpen] = useState(false);
+  const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+
+  useEffect(() => { setSort(loadSort()); }, []);
+
+  const updateSort = (next: SortState) => {
+    setSort(next);
+    try { localStorage.setItem(SORT_KEY, JSON.stringify(next)); } catch {}
+  };
 
   const isTrash = folder.id === TRASH_FOLDER_ID;
   const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
 
-  const folderProblems = problems.filter((p) => {
-    if (isTrash) return p.folder_id === TRASH_FOLDER_ID;
-    if (isUnassigned) return !p.folder_id || p.folder_id === '';
-    return p.folder_id === folder.id;
-  });
+  const folderProblems = problems
+    .filter((p) => {
+      if (isTrash) return p.folder_id === TRASH_FOLDER_ID;
+      if (isUnassigned) return !p.folder_id || p.folder_id === '';
+      return p.folder_id === folder.id;
+    })
+    .sort((a, b) => compareBySort(a, b, sort));
 
   useEffect(() => {
     const stored = localStorage.getItem(FONT_SIZE_KEY);
@@ -189,17 +230,21 @@ export default function FolderView({
             marginBottom: 24,
             fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
             fontFamily: 'var(--font-ui)',
+            display: 'flex', alignItems: 'center', gap: 8,
           }}>
-            <span style={{ display: 'inline-flex', verticalAlign: 'middle', marginRight: 8, color: 'var(--text-muted)' }}>
+            <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
               {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : <IconFolder size={18} />}
             </span>
-            {folder.name}
-            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)', marginLeft: 8 }}>
+            <span>{folder.name}</span>
+            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
               ({folderProblems.length})
             </span>
+            <div style={{ flex: 1 }} />
+            {/* 정렬 컨트롤 */}
+            <SortControls sort={sort} onChange={updateSort} />
             {isTrash && folderProblems.length > 0 && onEmptyTrash && (
               <button onClick={onEmptyTrash} style={{
-                float: 'right', border: 'none', background: 'none',
+                border: 'none', background: 'none',
                 color: 'var(--accent-danger)', fontSize: 12, cursor: 'pointer',
                 fontFamily: 'var(--font-ui)', fontWeight: 500,
               }}>
@@ -359,6 +404,32 @@ export default function FolderView({
           </div>
         )}
       </div>}
+    </div>
+  );
+}
+
+/* ═══ 정렬 컨트롤 ═══ */
+function SortControls({ sort, onChange }: { sort: SortState; onChange: (s: SortState) => void }) {
+  const selectStyle: React.CSSProperties = {
+    border: 'none', background: 'transparent', cursor: 'pointer',
+    fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+    outline: 'none', padding: '2px 4px', borderRadius: 4, fontWeight: 400,
+  };
+  const arrowBtnStyle: React.CSSProperties = {
+    border: 'none', background: 'transparent', cursor: 'pointer',
+    fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+    padding: '2px 4px', borderRadius: 4, minWidth: 16, lineHeight: 1, fontWeight: 400,
+  };
+  const toggleDir = () => onChange({ ...sort, dir: sort.dir === 'asc' ? 'desc' : 'asc' });
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 4 }}>
+      <select value={sort.key} onChange={(e) => onChange({ ...sort, key: e.target.value as SortKey })} style={selectStyle}>
+        <option value="updated">{SORT_KEY_LABELS.updated}</option>
+        <option value="name">{SORT_KEY_LABELS.name}</option>
+      </select>
+      <button onClick={toggleDir} style={arrowBtnStyle} title={sort.dir === 'asc' ? '오름차순' : '내림차순'}>
+        {sort.dir === 'asc' ? '↑' : '↓'}
+      </button>
     </div>
   );
 }

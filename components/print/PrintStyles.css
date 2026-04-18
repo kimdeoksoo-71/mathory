@@ -55,7 +55,8 @@
 .print-body ul li { margin-bottom: 3pt; }
 .print-body img { max-width: 100%; height: auto; break-inside: avoid; }
 .print-body hr { border: none; border-top: 0.1mm solid #999; margin: 8pt 0; }
-.print-body .katex-display { margin: 8pt 0; break-inside: avoid; padding-left: 0 !important; }
+/* 독립행 수식: 위는 기존 값(8pt), 아래는 1.8배(14.4pt) */
+.print-body .katex-display { margin: 8pt 0 14.4pt 0; break-inside: avoid; padding-left: 0 !important; }
 .print-body .katex-display,
 .print-body .katex-display > .katex { text-align: left !important; }
 .print-body .katex { font-size: 1em; }

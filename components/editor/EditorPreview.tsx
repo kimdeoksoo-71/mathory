@@ -342,6 +342,10 @@ export default function EditorPreview({
       overflow: borderless ? 'visible' : 'auto', fontSize: '15px', lineHeight: '2.5',
       fontFamily: "var(--font-content, 'Noto Serif KR', Georgia, serif)",
     }}>
+      {/* 독립행 수식: 위는 기존 KaTeX 기본값(1em), 아래는 1.8배 */}
+      <style>{`
+        .preview-content .katex-display { margin-top: 1em !important; margin-bottom: 1.8em !important; }
+      `}</style>
       <div ref={contentRef} className="preview-content"
         onClick={handleContentClick}
         style={{ cursor: onClickMath ? 'pointer' : undefined }}>
