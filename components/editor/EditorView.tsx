@@ -12,6 +12,8 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
+import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
+import { maskForProofread, detectJosaSpacing, ProofreadIssue } from '../../lib/proofread';
 import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -19,7 +21,7 @@ import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
   IconRename, IconSparkle, IconLoader,
-  IconLineSplit,
+  IconLineSplit, IconCheck,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import {
@@ -608,6 +610,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
 
+  // 교정 결과: tabId → blockId → 결과
+  const [proofreadResults, setProofreadResults] = useState<Record<string, Record<string, ProofreadBoxData>>>({});
+  const [proofreading, setProofreading] = useState(false);
+
   // 블록 추가 드롭다운
   const [addBlockDropdownOpen, setAddBlockDropdownOpen] = useState(false);
   const addBlockDropdownRef = useRef<HTMLDivElement>(null);
@@ -745,6 +751,128 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId, aiLoadingBlockId, collectAIContext]);
 
+  /* ─── 교정 (Phase 27) ─── */
+  const PROOFREAD_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'choices']), []);
+
+  const callProofreadApi = useCallback(async (
+    targets: { id: string; rawText: string }[],
+  ): Promise<Record<string, ProofreadBoxData>> => {
+    const now = Date.now();
+    // 마스킹 + 로컬 josa-space 검사
+    const apiBlocks: { id: string; masked: string }[] = [];
+    const localIssues: Record<string, ProofreadIssue[]> = {};
+    for (const t of targets) {
+      const { masked } = maskForProofread(t.rawText);
+      apiBlocks.push({ id: t.id, masked });
+      localIssues[t.id] = detectJosaSpacing(t.rawText);
+    }
+
+    const out: Record<string, ProofreadBoxData> = {};
+    try {
+      const res = await fetch('/api/proofread', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocks: apiBlocks }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      const json = await res.json() as { results: Record<string, { status: 'ok'; issues: ProofreadIssue[] }> };
+      for (const t of targets) {
+        const apiResult = json.results?.[t.id];
+        const merged = [...(apiResult?.issues || []), ...localIssues[t.id]];
+        out[t.id] = { status: 'ok', issues: merged, timestamp: now };
+      }
+    } catch (e: any) {
+      for (const t of targets) {
+        // 로컬 결과만이라도 보존
+        out[t.id] = {
+          status: 'failed',
+          issues: localIssues[t.id],
+          timestamp: now,
+          error: e?.message || '알 수 없는 오류',
+        };
+      }
+    }
+    return out;
+  }, []);
+
+  const handleRunProofread = useCallback(async () => {
+    if (proofreading) return;
+    const blocks = (allBlocks[activeTab] || []).filter(
+      (b) => !PROOFREAD_EXCLUDED_TYPES.has(b.type) && b.raw_text.trim()
+    );
+    if (blocks.length === 0) {
+      setStatus('교정할 텍스트가 없습니다');
+      setTimeout(() => setStatus(''), 2000);
+      return;
+    }
+    const tabIdAtStart = activeTab;
+
+    // 로딩 박스 즉시 표시
+    setProofreadResults((prev) => {
+      const tab = { ...(prev[tabIdAtStart] || {}) };
+      for (const b of blocks) {
+        tab[b.id] = { status: 'loading', issues: [], timestamp: Date.now() };
+      }
+      return { ...prev, [tabIdAtStart]: tab };
+    });
+    setProofreading(true);
+
+    const out = await callProofreadApi(blocks.map((b) => ({ id: b.id, rawText: b.raw_text })));
+
+    setProofreadResults((prev) => {
+      const tab = { ...(prev[tabIdAtStart] || {}) };
+      for (const [id, data] of Object.entries(out)) tab[id] = data;
+      return { ...prev, [tabIdAtStart]: tab };
+    });
+    setProofreading(false);
+  }, [proofreading, allBlocks, activeTab, callProofreadApi, PROOFREAD_EXCLUDED_TYPES]);
+
+  const handleRetryProofreadBlock = useCallback(async (blockId: string) => {
+    const block = (allBlocks[activeTab] || []).find((b) => b.id === blockId);
+    if (!block) return;
+    const tabIdAtStart = activeTab;
+
+    setProofreadResults((prev) => ({
+      ...prev,
+      [tabIdAtStart]: {
+        ...(prev[tabIdAtStart] || {}),
+        [blockId]: { status: 'loading', issues: [], timestamp: Date.now() },
+      },
+    }));
+
+    const out = await callProofreadApi([{ id: block.id, rawText: block.raw_text }]);
+    setProofreadResults((prev) => ({
+      ...prev,
+      [tabIdAtStart]: { ...(prev[tabIdAtStart] || {}), [blockId]: out[blockId] },
+    }));
+  }, [allBlocks, activeTab, callProofreadApi]);
+
+  const handleDismissProofreadIssue = useCallback((blockId: string, issueIndex: number) => {
+    setProofreadResults((prev) => {
+      const tab = prev[activeTab];
+      const data = tab?.[blockId];
+      if (!data || data.status !== 'ok') return prev;
+      const remaining = data.issues.filter((_, i) => i !== issueIndex);
+      const nextTab = { ...tab };
+      if (remaining.length === 0) delete nextTab[blockId];
+      else nextTab[blockId] = { ...data, issues: remaining };
+      return { ...prev, [activeTab]: nextTab };
+    });
+  }, [activeTab]);
+
+  const handleDismissProofreadBox = useCallback((blockId: string) => {
+    setProofreadResults((prev) => {
+      const tab = prev[activeTab];
+      if (!tab || !tab[blockId]) return prev;
+      const nextTab = { ...tab };
+      delete nextTab[blockId];
+      return { ...prev, [activeTab]: nextTab };
+    });
+  }, [activeTab]);
+
   /* ─── 수식행 분할 ($$..$$ 를 \\ 단위로 분리) ─── */
   const handleSplitMathLines = useCallback((blockId?: string) => {
     const targetId = blockId || activeBlockId;
@@ -770,7 +898,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, raw_text: value } : b))
     );
-  }, [setCurrentBlocks]);
+    // 편집 시: original 스니펫이 더 이상 본문에 없는 항목만 자동 제거
+    setProofreadResults((prev) => {
+      const tab = prev[activeTab];
+      const data = tab?.[blockId];
+      if (!data || data.status !== 'ok') return prev;
+      const remaining = data.issues.filter((iss) => value.includes(iss.original));
+      if (remaining.length === data.issues.length) return prev; // 변화 없음
+      const nextTab = { ...tab };
+      if (remaining.length === 0) {
+        delete nextTab[blockId];
+      } else {
+        nextTab[blockId] = { ...data, issues: remaining };
+      }
+      return { ...prev, [activeTab]: nextTab };
+    });
+  }, [setCurrentBlocks, activeTab]);
 
   const handleBlockTypeChange = useCallback((blockId: string, type: Block['type']) => {
     setCurrentBlocks((prev) =>
@@ -1257,6 +1400,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
         setAllBlocks(blocksMap);
         setOrigBlockIds(newOrigIds);
+        // 저장 시 블록 ID가 갱신되어 교정 결과 매칭이 깨지므로 초기화
+        setProofreadResults({});
       }
 
       if (!silent) {
@@ -1470,6 +1615,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           🔍
         </button>
 
+        {/* ── 맞춤법 검사 (Phase 27) ── */}
+        <button
+          onClick={handleRunProofread}
+          disabled={proofreading}
+          title="맞춤법 검사 (현재 탭)"
+          style={{
+            width: 28, height: 28,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            border: '1px solid transparent',
+            borderRadius: 6,
+            background: 'transparent',
+            cursor: proofreading ? 'wait' : 'pointer',
+            color: proofreading ? 'var(--accent-primary)' : 'var(--text-muted)',
+            transition: 'all 0.15s',
+          }}
+        >
+          {proofreading ? <IconLoader size={14} /> : <IconCheck size={14} />}
+        </button>
+
         <div style={{ flex: 1 }} />
 
         {tabs.map((tab, tabIdx) => (
@@ -1651,9 +1815,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <div ref={editorPanelRef} className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '50vh', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                {currentBlocks.map((block, i) => (
+                {currentBlocks.map((block, i) => {
+                  const proofData = proofreadResults[activeTab]?.[block.id];
+                  return (
+                  <div key={block.id}>
                   <SortableEditorBlock
-                    key={block.id}
                     block={block}
                     index={i}
                     isActive={activeBlockId === block.id}
@@ -1674,7 +1840,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     aiLoading={aiLoadingBlockId === block.id}
                     onSplitMathLines={() => handleSplitMathLines(block.id)}
                   />
-                ))}
+                  {proofData && (
+                    <ProofreadResultBox
+                      data={proofData}
+                      onDismiss={() => handleDismissProofreadBox(block.id)}
+                      onDismissIssue={(idx) => handleDismissProofreadIssue(block.id, idx)}
+                      onRetry={() => handleRetryProofreadBlock(block.id)}
+                    />
+                  )}
+                  </div>
+                  );
+                })}
               </SortableContext>
             </DndContext>
           </div>

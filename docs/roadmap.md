@@ -569,3 +569,80 @@ problems/{id}
 - **PDF 인쇄 로직 공용화**: EditorView와 ProblemView에서 동일한 `printProblemPdf(title, tabs)` 호출. 한 곳에 있는 DOM 조작·파일명 설정·cleanup 로직을 두 번 유지할 필요 없음.
 - **우측 독립 스크롤 구조**: `flex row` 외곽 + 좌측 그룹 `overflowY: auto` + 우측 형제 `overflowY: auto` → `position: sticky` 의 복잡한 제약 없이 독립 스크롤 구현.
 - **난이도 = 배점**: `DIFFICULTIES`의 값(2/3/4)과 라벨(2점/3점/4점)이 이미 배점과 일치. 새 필드 추가 없이 UI 라벨만 "배점"으로 표기 변경.
+
+## Phase 27: 교정 기능 신설 ✅
+> 목표: EditorView에서 한글 맞춤법·띄어쓰기·인라인수식 조사 공백 오류를 검출하는 검토 기능
+
+### 27-A: 정책 / 결정사항
+
+| 항목 | 결정 |
+|------|------|
+| 검증 엔진 | Anthropic Claude API (`claude-haiku-4-5-20251001`) |
+| 호출 단위 | 활성화된 탭의 모든 블록을 한 번의 API 호출로 일괄 처리 (rate limit·비용 대비) |
+| 제외 블록 | image, choices (그 외 text·heading·gana·roman·box 검사) |
+| 자동 적용 | 없음 — "사람이 생각하고 Mathory는 거든다" 이념 유지, 사용자가 수동으로 수정 |
+| 결과 영속성 | 세션 메모리만 (Firestore 저장 안 함) |
+| 결과 박스 위치 | 블록 카드 아래, 테두리 바깥 |
+
+### 27-B: 수식 보호 / 마커 마스킹
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 수식 마스킹 (`$..$`, `$$..$$`, `\[..\]`, `\(..\)`) | ✅ | 2026-04-18 | `⟦M0⟧`, `⟦M1⟧`… 토큰으로 치환 후 Claude 전달, 원형 보존 |
+| `\tag{}` / `\ref{}` 마스킹 | ✅ | 2026-04-18 | 동일 토큰으로 치환 |
+| (a)/(i) 라인 선두 마커 마스킹 | ✅ | 2026-04-18 | gana/roman 마커가 오타로 오인되는 것 방지 |
+
+### 27-C: 인라인수식 ↔ 조사 공백 검출 (로컬)
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 한국어 조사 25종 사전 | ✅ | 2026-04-18 | 은/는/이/가/을/를/의/에/와/과/도/만/부터/까지/마저/조차/으로/에서/에게/한테/이라고/이라는/이며/… (긴 조사 우선 매칭) |
+| 정규식 검출기 `detectJosaSpacing()` | ✅ | 2026-04-18 | 토큰 절약·결정적·키 없이도 항상 작동 |
+
+### 27-D: API / 백엔드
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| `@anthropic-ai/sdk` 의존성 추가 | ✅ | 2026-04-18 | `^0.32.1` |
+| `app/api/proofread/route.ts` 신규 | ✅ | 2026-04-18 | tool_use(`report_issues`) 강제로 strict JSON 보장 |
+| `ANTHROPIC_API_KEY` 환경변수 | ✅ | 2026-04-18 | Vercel + `.env.local` 등록, `ANTHROPIC_MODEL`로 모델 오버라이드 가능 |
+| 환경변수 등록 절차 문서화 | ✅ | 2026-04-18 | `docs/claude-api-setup.md` |
+
+### 27-E: UI / 프론트엔드
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 툴바 ✓ 버튼 (찾기 🔍 옆) | ✅ | 2026-04-18 | 활성 탭 전체 검사 트리거, 진행 중 IconLoader 표시 |
+| `ProofreadResultBox` 컴포넌트 | ✅ | 2026-04-18 | 노란 박스, 종류 태그(맞춤법/띄어쓰기/수식·조사 공백) 색상 구분, 검토 시각 기록 |
+| 결과 박스 표시 위치 | ✅ | 2026-04-18 | SortableEditorBlock 카드 아래, 테두리 바깥 |
+| 검토 실패 시 재시도 버튼 | ✅ | 2026-04-18 | 결과 상자 안에 배치, 해당 블록만 재호출 |
+| 전체 닫기 ✕ (박스 우상단) | ✅ | 2026-04-18 | |
+| 항목별 닫기 ✕ | ✅ | 2026-04-18 | 개별 항목 무시 가능 |
+| 인쇄/PDF에서 박스 숨김 | ✅ | 2026-04-18 | `@media print` `.proofread-box { display: none }` |
+
+### 27-F: 동기화 정책
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 블록 편집 시 stale 항목만 자동 제거 | ✅ | 2026-04-18 | `original` 스니펫이 본문에 더 이상 존재하지 않는 항목만 사라짐 (전체 박스를 닫지 않음) |
+| 저장 시 결과 전체 초기화 | ✅ | 2026-04-18 | Firestore 저장 후 블록 ID가 갱신되어 매칭이 깨지므로 |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | proofread.ts (신규) | lib/proofread.ts |
+| 2 | route.ts (신규) | app/api/proofread/route.ts |
+| 3 | ProofreadResultBox.tsx (신규) | components/editor/ProofreadResultBox.tsx |
+| 4 | claude-api-setup.md (신규) | docs/claude-api-setup.md |
+| 5 | EditorView.tsx | components/editor/EditorView.tsx |
+| 6 | PrintStyles.css | components/print/PrintStyles.css |
+| 7 | package.json | package.json |
+
+### Key Learnings
+
+- **tool_use로 strict JSON 강제**: Claude API에 `tool_choice: { type: 'tool', name: '...' }`로 지정하면 자유 텍스트가 아닌 정의된 schema의 input으로 응답이 보장됨. 자유 응답 파싱·재시도 로직 불필요.
+- **수식 보호 = 마스킹**: 검사 대상 영역만 분리해서 모델에 보내는 게 아니라, 보호 영역을 placeholder 토큰(`⟦M0⟧`)으로 치환해 통째로 보내고 결과를 그대로 표시. 위치 매핑·재조립 부담이 사라짐.
+- **로컬 규칙 + AI 분리**: 결정적인 검사(인라인수식↔조사 공백)는 정규식으로 로컬 처리, 모호한 한국어 맞춤법만 AI에게 위임 → 토큰 비용·키 의존도 양쪽 모두 절감.
+- **stale 자동 제거 정책**: 편집 시 박스 전체를 닫지 않고 `value.includes(issue.original)` 검사로 사라진 항목만 제거. 다중 오류 블록의 사용성 결정적 차이.
+- **dnd-kit + 외부 결과 박스**: SortableEditorBlock을 fragment로 감싸서 결과 박스를 형제로 추가해도 정렬/드래그가 정상 동작. 결과 박스는 sortable item이 아니어서 드래그 대상에서 자연스럽게 제외됨.
