@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
-import { getProblemWithBlocks, updateProblem } from '../../lib/firestore';
+import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -26,6 +26,7 @@ interface ProblemViewProps {
   onMoveFolder?: (problem: ProblemWithBlocks) => void;
   onTrash?: (problem: ProblemWithBlocks) => void;
   onUpdated?: () => void;
+  onNavigateFolder?: (folderId: string) => void;
 }
 
 function formatDate(d?: Date): string {
@@ -45,7 +46,7 @@ function formatDateTime(d?: Date): string {
 }
 
 export default function ProblemView({
-  problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated,
+  problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated, onNavigateFolder,
 }: ProblemViewProps) {
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
@@ -282,6 +283,35 @@ export default function ProblemView({
           padding: '32px 32px 0 32px',
           boxSizing: 'border-box',
         }}>
+          {/* 폴더명 (클릭 시 FolderView 이동) */}
+          {(() => {
+            const fid = problem.folder_id || '';
+            const isTrash = fid === TRASH_FOLDER_ID;
+            const folderLabel = isTrash
+              ? '휴지통'
+              : (folders.find((f) => f.id === fid)?.name || '미분류');
+            const targetId = isTrash ? TRASH_FOLDER_ID : (fid || '__unassigned__');
+            return (
+              <div
+                onClick={() => onNavigateFolder?.(targetId)}
+                style={{
+                  fontSize: 12, color: 'var(--text-muted)',
+                  fontFamily: 'var(--font-ui)',
+                  marginBottom: 4, cursor: 'pointer',
+                  display: 'inline-block',
+                  maxWidth: '100%',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  transition: 'color 0.15s',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                title="폴더로 이동"
+              >
+                {folderLabel}
+              </div>
+            );
+          })()}
+
           {/* 제목 (클릭 시 EditorView 이동) */}
           <h1
             onClick={() => onEdit?.(problem)}

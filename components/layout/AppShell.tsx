@@ -151,6 +151,12 @@ export default function AppShell() {
   };
   const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); setCollapsed(true); };
   const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
+  const handleNavigateFolder = (folderId: string) => {
+    if (folderId === TRASH_FOLDER_ID) { handleSelectTrash(); return; }
+    if (folderId === UNASSIGNED_FOLDER_ID || !folderId) { handleSelectUnassigned(); return; }
+    const folder = folders.find((f) => f.id === folderId);
+    if (folder) { setView({ type: 'folder', folder }); setCollapsed(false); }
+  };
 
   const handleNewFolder = async () => {
     if (!user) return;
@@ -392,6 +398,7 @@ export default function AppShell() {
             onMoveFolder={(p) => handleProblemAction('move', p)}
             onTrash={(p) => handleProblemAction('trash', p)}
             onUpdated={() => loadData()}
+            onNavigateFolder={handleNavigateFolder}
           />
         )}
         {view.type === 'editor' && (

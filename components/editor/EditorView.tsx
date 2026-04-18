@@ -16,12 +16,12 @@ import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import {
-  IconChevronLeft, IconSave, IconGrip, IconSplit, IconSplitAll, IconPlus,
+  IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
   IconRename, IconSparkle, IconLoader,
   IconLineSplit,
 } from '../ui/Icons';
-import { splitDisplayMathAtCursor, splitDisplayMathBody, hasBlockedEnvironment } from '../../lib/mathSplit';
+import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent,
@@ -42,8 +42,6 @@ interface LocalBlock extends Block {
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
   heading: '제목',
-  math_block: '수식행',
-  bullet: '•',
   gana: '(가) (나) (다)',
   roman: 'ㄱ. ㄴ. ㄷ.',
   box: '글상자',
@@ -52,15 +50,13 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 };
 
 const BLOCK_TYPES: Block['type'][] = [
-  'text', 'heading', 'math_block', 'bullet', 'gana', 'roman', 'box', 'choices', 'image',
+  'text', 'heading', 'gana', 'roman', 'box', 'choices', 'image',
 ];
 
 /** 블록 생성 시 기본 내용 */
 const BLOCK_PRESETS: Record<string, string> = {
   text: '',
   heading: '## ',
-  math_block: '$$\n\n$$',
-  bullet: '- \n- \n- ',
   gana: '(a) \n(b) \n(c) ',
   roman: '(i) \n(ii) \n(iii) ',
   box: '',
@@ -70,8 +66,19 @@ const BLOCK_PRESETS: Record<string, string> = {
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
 const TEXT_BASED_TYPES: Set<string> = new Set([
-  'text', 'heading', 'math_block', 'bullet', 'gana', 'roman', 'box', 'choices',
+  'text', 'heading', 'gana', 'roman', 'box', 'choices',
 ]);
+
+/** 블록 분할 허용 타입 (choices, image 제외) */
+const SPLITTABLE_TYPES: Set<string> = new Set([
+  'text', 'heading', 'gana', 'roman', 'box',
+]);
+
+/** 레거시 타입 → text 정규화 (DB 마이그레이션용) */
+function normalizeBlockType(type: Block['type']): Block['type'] {
+  if (type === 'math_block' || type === 'bullet') return 'text';
+  return type;
+}
 
 /** 외곽 상자를 두르는 블록 타입 */
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
@@ -432,7 +439,7 @@ function SortableEditorBlock({
   } = useSortable({ id: block.id });
 
   const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     marginBottom: 6,
@@ -656,7 +663,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setOrigTabs(loadedTabs);
 
         const toLocal = (blocks: Block[]): LocalBlock[] =>
-          blocks.map((b) => ({ ...b, collapsed: false, title: b.title || '' }));
+          blocks.map((b) => ({ ...b, type: normalizeBlockType(b.type), collapsed: false, title: b.title || '' }));
 
         const blocksMap: Record<string, LocalBlock[]> = {};
         const origIds: Record<string, string[]> = {};
@@ -860,7 +867,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleSplitBlock = useCallback(() => {
     if (!activeBlockId) return;
     const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
-    if (!activeBlock || activeBlock.type !== 'text') return;
+    if (!activeBlock || !SPLITTABLE_TYPES.has(activeBlock.type)) return;
 
     const ref = editorRefs.current[activeBlockId];
     if (!ref) return;
@@ -898,121 +905,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       editorRefs.current[newBlock.id]?.focus();
     }, 50);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
-
-  /** 모두 분할: 현재 탭의 모든 텍스트/수식행 블록에서 제목/수식행을 자동 분리 */
-  const handleSplitAll = useCallback(() => {
-    setCurrentBlocks((prev) => {
-      const result: LocalBlock[] = [];
-      let counter = Date.now();
-
-      /** 수식 본문(양쪽 $$ 제외)을 \\ 단위로 분할해 math_block 들을 push.
-       *  분할 불가(차단 환경 / 1행) 시 원본 그대로 단일 math_block. */
-      const pushMathBlocks = (body: string) => {
-        if (!hasBlockedEnvironment(body)) {
-          const rows = splitDisplayMathBody(body);
-          if (rows.length >= 2) {
-            for (const row of rows) {
-              result.push({
-                id: `split-${counter++}`,
-                order: 0, type: 'math_block', raw_text: `$$\n${row}\n$$`,
-                title: '', collapsed: false, isNew: true,
-              });
-            }
-            return;
-          }
-        }
-        result.push({
-          id: `split-${counter++}`,
-          order: 0, type: 'math_block', raw_text: `$$\n${body.trim()}\n$$`,
-          title: '', collapsed: false, isNew: true,
-        });
-      };
-
-      for (const block of prev) {
-        // 텍스트 / 수식행 블록만 분할 대상
-        if (block.type !== 'text' && block.type !== 'math_block') {
-          result.push(block);
-          continue;
-        }
-
-        const content = editorRefs.current[block.id]?.getContent() ?? block.raw_text;
-        const lines = content.split('\n');
-        let buf: string[] = [];
-        let inMath = false;
-        let mathBuf: string[] = [];
-
-        const flushText = () => {
-          const text = buf.join('\n').trim();
-          if (text) {
-            result.push({
-              id: `split-${counter++}`,
-              order: 0, type: 'text', raw_text: text,
-              title: '', collapsed: false, isNew: true,
-            });
-          }
-          buf = [];
-        };
-
-        for (let li = 0; li < lines.length; li++) {
-          const line = lines[li];
-          const trimmed = line.trim();
-
-          if (inMath) {
-            if (trimmed === '$$') {
-              // 수식행 블록 종료 — body는 양쪽 $$ 제외
-              flushText();
-              const body = mathBuf.slice(1).join('\n');
-              pushMathBlocks(body);
-              inMath = false;
-              mathBuf = [];
-            } else {
-              mathBuf.push(line);
-            }
-            continue;
-          }
-
-          // $$ 독립행: 수식행 시작
-          if (trimmed === '$$') {
-            flushText();
-            inMath = true;
-            mathBuf = [line];
-            continue;
-          }
-
-          // ## 또는 ### 제목행
-          if (/^#{2,3}\s/.test(trimmed)) {
-            flushText();
-            result.push({
-              id: `split-${counter++}`,
-              order: 0, type: 'heading', raw_text: line,
-              title: '', collapsed: false, isNew: true,
-            });
-            continue;
-          }
-
-          buf.push(line);
-        }
-
-        // 닫히지 않은 수식: 텍스트로 복원
-        if (inMath) {
-          buf = [...buf, ...mathBuf];
-          mathBuf = [];
-        }
-        flushText();
-      }
-
-      // 분할 결과가 비어있으면 빈 텍스트 블록 하나
-      if (result.length === 0) {
-        result.push({
-          id: `split-${Date.now()}`,
-          order: 0, type: 'text', raw_text: '',
-          title: '', collapsed: false, isNew: true,
-        });
-      }
-
-      return result;
-    });
-  }, [setCurrentBlocks]);
 
   /* ─── 이미지 업로드 ─── */
   const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
@@ -1279,10 +1171,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   };
 
   /* ═══ 저장 ═══ */
-  const handleSave = async () => {
+  const savingRef = useRef(false);
+  const handleSave = useCallback(async (silent = false) => {
     if (!problem) return;
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
-    setStatus('');
+    if (!silent) setStatus('');
     try {
       const updateData: Record<string, any> = {
         title: editTitle,
@@ -1348,6 +1243,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const toLocal = (blocks: Block[]): LocalBlock[] =>
           blocks.map((b, i) => ({
             ...b,
+            type: normalizeBlockType(b.type),
             collapsed: (allBlocks[activeTab] || [])
               .find((lb) => lb.order === i)?.collapsed ?? false,
             title: b.title || '',
@@ -1363,14 +1259,36 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setOrigBlockIds(newOrigIds);
       }
 
-      setStatus('저장 완료');
-      setTimeout(() => setStatus(''), 2000);
+      if (!silent) {
+        setStatus('저장 완료');
+        setTimeout(() => setStatus(''), 2000);
+      }
     } catch (error) {
       setStatus(`에러: ${error}`);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  };
+  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId]);
+
+  /* ─── 자동저장: 탭 전환 시 ─── */
+  const switchTab = useCallback((nextTabId: string) => {
+    if (nextTabId === activeTab) return;
+    handleSave(true);
+    setActiveTab(nextTabId);
+  }, [activeTab, handleSave]);
+
+  /* ─── 자동저장: EditorView 이탈(onBack) / unmount ─── */
+  const handleBackWithSave = useCallback(() => {
+    handleSave(true);
+    onBack();
+  }, [handleSave, onBack]);
+
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+  useEffect(() => {
+    return () => { handleSaveRef.current(true); };
+  }, []);
 
   /* ─── 로딩 / 에러 ─── */
   if (loading) {
@@ -1435,7 +1353,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
-        <button onClick={onBack} style={{
+        <button onClick={handleBackWithSave} style={{
           border: 'none', background: 'none', cursor: 'pointer',
           color: 'var(--text-muted)', display: 'flex', padding: 4, borderRadius: 4,
         }} title="뒤로">
@@ -1462,7 +1380,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         )}
 
         {/* 저장 버튼 */}
-        <button onClick={handleSave} disabled={saving} style={{
+        <button onClick={() => handleSave()} disabled={saving} style={{
           display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
           background: saving ? 'var(--text-faint)' : 'var(--accent-primary)',
           color: '#fff', border: 'none', borderRadius: 8,
@@ -1517,18 +1435,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center', padding: '0 16px',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
         gap: 4,
-        opacity: showToolbar ? 1 : 0.35,
-        pointerEvents: showToolbar ? 'auto' : 'none',
-        transition: 'opacity 0.15s',
       }}>
-        <MathToolbar
-          onInsert={handleInsert}
-          snippets={snippets}
-          onSnippetInsert={handleSnippetInsert}
-          onSnippetAdd={addSnippet}
-          onSnippetEdit={editSnippet}
-          onSnippetDelete={removeSnippet}
-        />
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          opacity: showToolbar ? 1 : 0.35,
+          pointerEvents: showToolbar ? 'auto' : 'none',
+          transition: 'opacity 0.15s',
+        }}>
+          <MathToolbar
+            onInsert={handleInsert}
+            snippets={snippets}
+            onSnippetInsert={handleSnippetInsert}
+            onSnippetAdd={addSnippet}
+            onSnippetEdit={editSnippet}
+            onSnippetDelete={removeSnippet}
+          />
+        </div>
         <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
         <button
           onClick={() => setSearchOpen(!searchOpen)}
@@ -1578,7 +1500,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               />
             ) : (
               <button
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => switchTab(tab.id)}
                 style={{
                   padding: '10px 6px 10px 12px', border: 'none', background: 'none', cursor: 'pointer',
                   fontSize: 13.5, fontWeight: activeTab === tab.id ? 600 : 400,
@@ -1705,29 +1627,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             <span style={{ margin: '0 10px', color: 'var(--border-light)' }}>|</span>
             {/* ── 블록 분할 ── */}
             <span
-              onClick={activeBlock?.type === 'text' ? handleSplitBlock : undefined}
+              onClick={activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? handleSplitBlock : undefined}
               style={{
-                cursor: activeBlock?.type === 'text' ? 'pointer' : 'default',
+                cursor: activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? 'pointer' : 'default',
                 fontSize: 11, color: 'var(--text-muted)',
                 fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
-                opacity: activeBlock?.type === 'text' ? 1 : 0.35,
+                opacity: activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? 1 : 0.35,
                 display: 'inline-flex', alignItems: 'center', gap: 3,
               }}
             >
               <IconSplit size={12} /> 블록 분할
-            </span>
-            <span style={{ margin: '0 10px', color: 'var(--border-light)' }}>|</span>
-            {/* ── 모두 분할 ── */}
-            <span
-              onClick={handleSplitAll}
-              style={{
-                cursor: 'pointer',
-                fontSize: 11, color: 'var(--text-muted)',
-                fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-              }}
-            >
-              <IconSplitAll size={12} /> 모두 분할
             </span>
           </div>
 
