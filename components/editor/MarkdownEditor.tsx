@@ -396,6 +396,14 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         },
       ]);
 
+      // ── Cmd+F / Ctrl+F 내장 검색 패널 차단 (커스텀 FindReplacePanel만 사용) ──
+      const disableBuiltinSearch = Prec.highest(keymap.of([
+        { key: 'Mod-f', run: () => true, preventDefault: true },
+        { key: 'Mod-h', run: () => true, preventDefault: true },
+        { key: 'F3', run: () => true, preventDefault: true },
+        { key: 'Mod-g', run: () => true, preventDefault: true },
+      ]));
+
       // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc + Ctrl+Alt+1~9 ──
       const mathShortcuts = Prec.highest(keymap.of([
         {
@@ -533,6 +541,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       const state = EditorState.create({
         doc: initialValue,
         extensions: [
+          disableBuiltinSearch,
           mathShortcuts,
           chordListener,
           tabHandler,

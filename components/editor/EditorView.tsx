@@ -13,7 +13,7 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
-import { maskForProofread, detectJosaSpacing, ProofreadIssue } from '../../lib/proofread';
+import { maskForProofread, detectJosaSpacing, detectSuperSubBraces, ProofreadIssue } from '../../lib/proofread';
 import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -624,6 +624,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [aiLoadingBlockId, setAiLoadingBlockId] = useState<string | null>(null);
 
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
+  // 자동 정정 중에는 handleBlockChange의 이슈 자동 제거 필터를 건너뛰기 위한 플래그
+  const autoFixInProgressRef = useRef<boolean>(false);
   const previewRef = useRef<HTMLDivElement>(null);
   const editorPanelRef = useRef<HTMLDivElement>(null);
 
@@ -764,7 +766,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     for (const t of targets) {
       const { masked } = maskForProofread(t.rawText);
       apiBlocks.push({ id: t.id, masked });
-      localIssues[t.id] = detectJosaSpacing(t.rawText);
+      localIssues[t.id] = [
+        ...detectJosaSpacing(t.rawText),
+        ...detectSuperSubBraces(t.rawText),
+      ];
     }
 
     const out: Record<string, ProofreadBoxData> = {};
@@ -863,6 +868,61 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, [activeTab]);
 
+  const handleAutoFixProofreadIssue = useCallback((blockId: string, issueIndex: number) => {
+    const tab = activeTab;
+    const data = proofreadResults[tab]?.[blockId];
+    if (!data || data.status !== 'ok') return;
+    const issue = data.issues[issueIndex];
+    if (!issue) return;
+
+    const editor = editorRefs.current[blockId];
+    const currentText = editor
+      ? editor.getContent()
+      : (allBlocks[tab] || []).find((b) => b.id === blockId)?.raw_text ?? '';
+
+    const idx = currentText.indexOf(issue.original);
+    if (idx === -1) {
+      // 본문에 더 이상 일치 없음 → 해당 항목만 제거
+      setProofreadResults((prev) => {
+        const t = prev[tab];
+        const d = t?.[blockId];
+        if (!d || d.status !== 'ok') return prev;
+        const remaining = d.issues.filter((_, i) => i !== issueIndex);
+        const nextTab = { ...t };
+        if (remaining.length === 0) delete nextTab[blockId];
+        else nextTab[blockId] = { ...d, issues: remaining };
+        return { ...prev, [tab]: nextTab };
+      });
+      return;
+    }
+
+    const newText =
+      currentText.slice(0, idx) + issue.suggestion + currentText.slice(idx + issue.original.length);
+
+    autoFixInProgressRef.current = true;
+    try {
+      if (editor) editor.setContent(newText);
+    } finally {
+      // setContent → onChange(handleBlockChange) 는 동기이므로 즉시 해제 안전
+      autoFixInProgressRef.current = false;
+    }
+    // 상태 동기화 (onChange가 발화하지 않는 경로 대비)
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, raw_text: newText } : b))
+    );
+    // 해당 항목 제거 (동일 suggestion이 남아 있을 수 있으므로 보수적으로 index 기준)
+    setProofreadResults((prev) => {
+      const t = prev[tab];
+      const d = t?.[blockId];
+      if (!d || d.status !== 'ok') return prev;
+      const remaining = d.issues.filter((_, i) => i !== issueIndex);
+      const nextTab = { ...t };
+      if (remaining.length === 0) delete nextTab[blockId];
+      else nextTab[blockId] = { ...d, issues: remaining };
+      return { ...prev, [tab]: nextTab };
+    });
+  }, [activeTab, proofreadResults, allBlocks, setCurrentBlocks]);
+
   const handleDismissProofreadBox = useCallback((blockId: string) => {
     setProofreadResults((prev) => {
       const tab = prev[activeTab];
@@ -898,6 +958,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, raw_text: value } : b))
     );
+    // 자동 정정 경로면 필터 건너뛰기 (handler가 직접 index 단위로 제거)
+    if (autoFixInProgressRef.current) return;
     // 편집 시: original 스니펫이 더 이상 본문에 없는 항목만 자동 제거
     setProofreadResults((prev) => {
       const tab = prev[activeTab];
@@ -1424,15 +1486,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [activeTab, handleSave]);
 
   /* ─── 자동저장: EditorView 이탈(onBack) / unmount ─── */
-  const handleBackWithSave = useCallback(() => {
-    handleSave(true);
+  const skipUnmountSaveRef = useRef<boolean>(false);
+  const handleBackWithSave = useCallback(async () => {
+    skipUnmountSaveRef.current = true; // 명시적 저장 후 언마운트 중복 저장 방지
+    await handleSave(true);
     onBack();
   }, [handleSave, onBack]);
 
   const handleSaveRef = useRef(handleSave);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
   useEffect(() => {
-    return () => { handleSaveRef.current(true); };
+    return () => {
+      if (skipUnmountSaveRef.current) return;
+      handleSaveRef.current(true);
+    };
   }, []);
 
   /* ─── 로딩 / 에러 ─── */
@@ -1845,6 +1912,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       data={proofData}
                       onDismiss={() => handleDismissProofreadBox(block.id)}
                       onDismissIssue={(idx) => handleDismissProofreadIssue(block.id, idx)}
+                      onAutoFixIssue={(idx) => handleAutoFixProofreadIssue(block.id, idx)}
                       onRetry={() => handleRetryProofreadBlock(block.id)}
                     />
                   )}

@@ -20,6 +20,7 @@ interface Props {
   data: ProofreadBoxData;
   onDismiss: () => void;
   onDismissIssue?: (issueIndex: number) => void;
+  onAutoFixIssue?: (issueIndex: number) => void;
   onRetry: () => void;
 }
 
@@ -27,8 +28,11 @@ const KIND_LABEL: Record<string, { text: string; color: string }> = {
   spelling: { text: '맞춤법', color: '#c0392b' },
   spacing: { text: '띄어쓰기', color: '#d68910' },
   'josa-space': { text: '수식·조사 공백', color: '#7d3c98' },
+  'latex-brace': { text: '첨자 중괄호', color: '#1a5490' },
   other: { text: '기타', color: '#566573' },
 };
+
+const AUTO_FIX_KINDS = new Set(['josa-space', 'latex-brace']);
 
 function fmtTime(ts: number): string {
   const d = new Date(ts);
@@ -36,7 +40,7 @@ function fmtTime(ts: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, onRetry }: Props) {
+export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, onAutoFixIssue, onRetry }: Props) {
   if (data.status === 'loading') {
     return (
       <div className="proofread-box" style={{
@@ -104,6 +108,18 @@ export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, on
                   <span style={{ margin: '0 6px', color: '#999' }}>→</span>
                   <span style={{ color: '#1e7a3a', fontWeight: 600 }}>{issue.suggestion}</span>
                 </span>
+                {onAutoFixIssue && AUTO_FIX_KINDS.has(issue.kind) && (
+                  <button
+                    onClick={() => onAutoFixIssue(i)}
+                    title="자동 정정"
+                    style={{
+                      border: '1px solid #1e7a3a', background: '#e8f5ec', cursor: 'pointer',
+                      color: '#1e7a3a', padding: '1px 8px', fontSize: 11, lineHeight: 1.4,
+                      borderRadius: 4, fontWeight: 600, flexShrink: 0,
+                      fontFamily: 'var(--font-ui)',
+                    }}
+                  >정정</button>
+                )}
                 {onDismissIssue && (
                   <button
                     onClick={() => onDismissIssue(i)}

@@ -6,7 +6,7 @@
  * - 인라인 수식과 한글 조사 사이의 잘못된 공백 로컬 검출 (결정적, 토큰 절약)
  */
 
-export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'other';
+export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'other';
 
 export interface ProofreadIssue {
   kind: ProofreadIssueKind;
@@ -157,6 +157,102 @@ export function detectJosaSpacing(text: string): ProofreadIssue[] {
       suggestion,
       reason: '인라인 수식과 조사 사이의 공백을 제거하세요.',
     });
+  }
+  return issues;
+}
+
+/* ─── LaTeX 윗첨자/아랫첨자 중괄호 누락 검출 ─── */
+
+/** 수식 영역을 [start, end) 쌍으로 추출. $$...$$, $...$, \[..\], \(..\) */
+function extractMathRegions(text: string): Array<{ start: number; end: number }> {
+  const regions: Array<{ start: number; end: number }> = [];
+  let i = 0;
+  while (i < text.length) {
+    // $$ 블록
+    if (text[i] === '$' && text[i + 1] === '$') {
+      const close = text.indexOf('$$', i + 2);
+      if (close !== -1) {
+        regions.push({ start: i + 2, end: close });
+        i = close + 2;
+        continue;
+      }
+      break;
+    }
+    // $ 인라인
+    if (text[i] === '$') {
+      let j = i + 1;
+      let found = -1;
+      while (j < text.length) {
+        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
+        if (text[j] === '\n' && text[j + 1] === '\n') break;
+        j++;
+      }
+      if (found !== -1) {
+        regions.push({ start: i + 1, end: found });
+        i = found + 1;
+        continue;
+      }
+    }
+    // \[..\]
+    if (text[i] === '\\' && text[i + 1] === '[') {
+      const close = text.indexOf('\\]', i + 2);
+      if (close !== -1) {
+        regions.push({ start: i + 2, end: close });
+        i = close + 2;
+        continue;
+      }
+    }
+    // \(..\)
+    if (text[i] === '\\' && text[i + 1] === '(') {
+      const close = text.indexOf('\\)', i + 2);
+      if (close !== -1) {
+        regions.push({ start: i + 2, end: close });
+        i = close + 2;
+        continue;
+      }
+    }
+    i++;
+  }
+  return regions;
+}
+
+/**
+ * 수식 내에서 `^` 또는 `_` 뒤에 `{`가 아닌 한 글자([0-9A-Za-z가-힣])가 올 때,
+ * `^{x}` / `_{x}` 로 감싸도록 제안.
+ *
+ * original/suggestion은 수식 경계를 포함한 짧은 스니펫으로 만들어
+ * 자동 정정 시 raw_text 에서 명확히 치환될 수 있게 한다.
+ */
+export function detectSuperSubBraces(text: string): ProofreadIssue[] {
+  const issues: ProofreadIssue[] = [];
+  const regions = extractMathRegions(text);
+  const CHAR_RE = /[0-9A-Za-z가-힣]/;
+
+  for (const { start, end } of regions) {
+    for (let k = start; k < end; k++) {
+      const ch = text[k];
+      if (ch !== '^' && ch !== '_') continue;
+      const next = text[k + 1];
+      if (!next || next === '{') continue;
+      if (!CHAR_RE.test(next)) continue;
+      // 앞이 \ 로 시작하는 escape 회피 (\^, \_ 자체가 독립 기호)
+      if (text[k - 1] === '\\') continue;
+
+      // 스니펫: 직전 1~3자 + op + char + 직후 1자 (경계 식별용)
+      const snipStart = Math.max(start, k - 3);
+      const snipEnd = Math.min(end, k + 3);
+      const original = text.slice(snipStart, snipEnd);
+      const opOffset = k - snipStart;
+      const suggestion =
+        original.slice(0, opOffset + 1) + '{' + next + '}' + original.slice(opOffset + 2);
+
+      issues.push({
+        kind: 'latex-brace',
+        original,
+        suggestion,
+        reason: `수식 ${ch} 뒤 한 글자는 중괄호로 감싸야 합니다.`,
+      });
+    }
   }
   return issues;
 }

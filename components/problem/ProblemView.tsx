@@ -182,7 +182,7 @@ export default function ProblemView({
       if (block.type === 'image') {
         const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
         return (
-          <div key={block.id || `img-${i}`} style={{ textAlign: 'center', margin: '0.8em 0' }}>
+          <div key={block.id} style={{ textAlign: 'center', margin: '0.8em 0' }}>
             {src ? (
               <img src={src} alt="" style={{
                 width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
@@ -195,7 +195,7 @@ export default function ProblemView({
       }
       if (isBordered) {
         return (
-          <div key={block.id || `b-${i}`} style={{
+          <div key={block.id} style={{
             border: '1.5px solid var(--text-muted, #888)',
             borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
           }}>
@@ -205,13 +205,13 @@ export default function ProblemView({
       }
       if (block.type === 'choices') {
         return (
-          <div key={block.id || `c-${i}`}>
+          <div key={block.id}>
             <ChoicesBlock rawText={block.raw_text} locale="ko" />
           </div>
         );
       }
       return (
-        <div key={block.id || `t-${i}`} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
+        <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
           <EditorPreview content={block.raw_text} borderless locale="ko" />
         </div>
       );

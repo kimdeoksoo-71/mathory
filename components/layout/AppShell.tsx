@@ -77,6 +77,7 @@ export default function AppShell() {
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
 
   const [view, setView] = useState<ViewState>({ type: 'home' });
+  const [problemViewNonce, setProblemViewNonce] = useState(0);
 
   const loadData = useCallback(async () => {
     try {
@@ -327,6 +328,7 @@ export default function AppShell() {
 
   const handleEditorBack = () => {
     if (view.type === 'editor') {
+      setProblemViewNonce((n) => n + 1);
       setView({ type: 'problem', problemId: view.problemId });
     } else {
       setView({ type: 'home' });
@@ -390,6 +392,7 @@ export default function AppShell() {
         )}
         {view.type === 'problem' && (
           <ProblemView
+            key={`${view.problemId}:${problemViewNonce}`}
             problemId={view.problemId}
             folders={folders}
             onRename={(p) => handleProblemAction('rename', p)}
