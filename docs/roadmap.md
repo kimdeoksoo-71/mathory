@@ -646,3 +646,46 @@ problems/{id}
 - **로컬 규칙 + AI 분리**: 결정적인 검사(인라인수식↔조사 공백)는 정규식으로 로컬 처리, 모호한 한국어 맞춤법만 AI에게 위임 → 토큰 비용·키 의존도 양쪽 모두 절감.
 - **stale 자동 제거 정책**: 편집 시 박스 전체를 닫지 않고 `value.includes(issue.original)` 검사로 사라진 항목만 제거. 다중 오류 블록의 사용성 결정적 차이.
 - **dnd-kit + 외부 결과 박스**: SortableEditorBlock을 fragment로 감싸서 결과 박스를 형제로 추가해도 정렬/드래그가 정상 동작. 결과 박스는 sortable item이 아니어서 드래그 대상에서 자연스럽게 제외됨.
+
+## Phase 28: OCR 기능 신설 ✅
+> 목표: Mathpix API로 수식 이미지를 LaTeX로 변환하여 에디터에 삽입
+
+### 28-A: 정책 / 결정사항
+
+| 항목 | 결정 |
+|------|------|
+| OCR 엔진 | Mathpix `/v3/text` (formats: `text`) |
+| 입력 방식 | 이미지 파일 업로드만 (스크린 영역 캡처는 추후) |
+| 대상 이미지 | 수식 + 일반 텍스트 혼합 허용 |
+| 허용 포맷 | PNG / JPG / WEBP, 최대 5MB, 2000px 초과 시 다운스케일 |
+| 삽입 위치 | 현재 블록 커서 위치에 `\n + 결과 + \n` |
+| 수식 구분자 | Mathpix 요청 시 `math_inline_delimiters: $`, `math_display_delimiters: $$`로 고정 |
+| `\[..\]` / `\(..\)` | 잔여분은 `$$`/`$`로 강제 치환 (안전장치) |
+| 후처리 | `autoFixDeterministicIssues` 재사용 (^/_ 중괄호, 조사 공백) |
+| 에러 UX | `alert()` |
+| API 키 보안 | 서버 라우트 프록시, `.env.local`에 `MATHPIX_APP_ID` / `MATHPIX_APP_KEY` |
+
+### 28-B: 구현
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| `lib/ocr.ts` 신규 | ✅ | 2026-04-22 | 파일 검증 / 다운스케일 / data URL / 정규화+교정 |
+| `app/api/ocr/route.ts` 신규 | ✅ | 2026-04-22 | Mathpix 프록시, `text` 포맷(수식+텍스트) 반환 |
+| EditorView 툴바에 OCR 버튼 | ✅ | 2026-04-22 | 맞춤법 ✓ 버튼 뒤, 블록 미선택 시 비활성 |
+| 파일 업로드 → 커서 위치 삽입 | ✅ | 2026-04-22 | `editorRefs.insertText(payload, payload.length)` |
+| 로딩 상태 | ✅ | 2026-04-22 | 버튼 스피너 + disabled |
+| `.env.local` 키 등록 | ⬜ |  | 덕수 직접 등록 (MATHPIX_APP_ID, MATHPIX_APP_KEY) |
+
+### 변경 파일 목록
+
+| # | 파일 | 경로 |
+|---|------|------|
+| 1 | ocr.ts (신규) | lib/ocr.ts |
+| 2 | route.ts (신규) | app/api/ocr/route.ts |
+| 3 | EditorView.tsx | components/editor/EditorView.tsx |
+
+### Key Learnings
+
+- **기존 교정 규칙 재사용**: OCR 후처리 스펙 두 항목(^/_ 중괄호, 조사 공백)은 Phase 27의 `autoFixDeterministicIssues`와 완전 동일 → 새 로직 작성 없이 그대로 호출.
+- **`text` 포맷 + 구분자 지정**: Mathpix `text`는 기본적으로 `\( \)`/`\[ \]` 구분자를 쓰지만 `math_inline_delimiters`/`math_display_delimiters` 파라미터로 mathory 규칙(`$`/`$$`)을 강제할 수 있음 → 클라이언트 후처리 부담 최소화.
+- **커서 이동 API의 `{}` 래핑**: `MarkdownEditor.insertText`는 `text.match(/\{\}/g)`로 **빈** 중괄호만 커서 이동 대상으로 삼음 → OCR 결과(`\frac{a}{b}` 등)는 영향 없음.

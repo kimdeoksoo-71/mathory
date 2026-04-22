@@ -14,6 +14,7 @@ import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
+import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -614,6 +615,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [proofreadResults, setProofreadResults] = useState<Record<string, Record<string, ProofreadBoxData>>>({});
   const [proofreading, setProofreading] = useState(false);
 
+  // OCR (Phase 28)
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const ocrInputRef = useRef<HTMLInputElement>(null);
+
   // 블록 추가 드롭다운
   const [addBlockDropdownOpen, setAddBlockDropdownOpen] = useState(false);
   const addBlockDropdownRef = useRef<HTMLDivElement>(null);
@@ -1190,6 +1195,51 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
+  /* ─── OCR (Phase 28) ─── */
+  const handleOcrClick = () => {
+    if (!activeBlockId) return;
+    const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
+    if (!activeBlock || !TEXT_BASED_TYPES.has(activeBlock.type)) return;
+    ocrInputRef.current?.click();
+  };
+
+  const handleOcrFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 같은 파일 재선택 허용
+    if (!file) return;
+
+    const err = validateOcrFile(file);
+    if (err) { alert(err); return; }
+
+    if (!activeBlockId || !editorRefs.current[activeBlockId]) {
+      alert('먼저 편집할 블록을 선택해 주세요.');
+      return;
+    }
+
+    setOcrLoading(true);
+    try {
+      const src = await toDataUrl(file);
+      const resp = await fetch('/api/ocr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ src }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        alert(data.error || 'OCR 실패');
+        return;
+      }
+      const normalized = normalizeAndFix(data.text as string);
+      // 커서 위치에 \n + 결과 + \n 삽입, 커서는 삽입 끝으로 이동
+      const payload = `\n${normalized}\n`;
+      editorRefs.current[activeBlockId]?.insertText(payload, payload.length);
+    } catch (e: any) {
+      alert(`OCR 처리 중 오류: ${e?.message || e}`);
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
   /* ─── 커서 활동 → 수식 하이라이트 ─── */
   const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean }) => {
     if (!activeBlockId) return;
@@ -1732,6 +1782,38 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         >
           {proofreading ? <IconLoader size={14} /> : <IconCheck size={14} />}
         </button>
+
+        {/* ── OCR (Phase 28): 수식 이미지 → LaTeX ── */}
+        <button
+          onClick={handleOcrClick}
+          disabled={ocrLoading || !showToolbar}
+          title="이미지 OCR (Mathpix) — 수식/텍스트 혼합 이미지 업로드"
+          style={{
+            height: 28,
+            padding: '0 8px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+            border: '1px solid transparent',
+            borderRadius: 6,
+            background: 'transparent',
+            cursor: ocrLoading ? 'wait' : (showToolbar ? 'pointer' : 'default'),
+            color: ocrLoading ? 'var(--accent-primary)' : 'var(--text-muted)',
+            opacity: showToolbar ? 1 : 0.35,
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 0.3,
+            transition: 'all 0.15s',
+          }}
+        >
+          {ocrLoading ? <IconLoader size={14} /> : null}
+          <span>OCR</span>
+        </button>
+        <input
+          ref={ocrInputRef}
+          type="file"
+          accept={OCR_ACCEPT}
+          onChange={handleOcrFileChange}
+          style={{ display: 'none' }}
+        />
 
         <div style={{ flex: 1 }} />
 
