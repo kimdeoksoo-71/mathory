@@ -13,7 +13,7 @@ import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
-import { maskForProofread, detectJosaSpacing, detectSuperSubBraces, ProofreadIssue } from '../../lib/proofread';
+import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -760,16 +760,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     targets: { id: string; rawText: string }[],
   ): Promise<Record<string, ProofreadBoxData>> => {
     const now = Date.now();
-    // 마스킹 + 로컬 josa-space 검사
+    // 마스킹 (결정적 규칙은 이미 호출 측에서 자동 적용됨)
     const apiBlocks: { id: string; masked: string }[] = [];
-    const localIssues: Record<string, ProofreadIssue[]> = {};
     for (const t of targets) {
       const { masked } = maskForProofread(t.rawText);
       apiBlocks.push({ id: t.id, masked });
-      localIssues[t.id] = [
-        ...detectJosaSpacing(t.rawText),
-        ...detectSuperSubBraces(t.rawText),
-      ];
     }
 
     const out: Record<string, ProofreadBoxData> = {};
@@ -786,15 +781,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const json = await res.json() as { results: Record<string, { status: 'ok'; issues: ProofreadIssue[] }> };
       for (const t of targets) {
         const apiResult = json.results?.[t.id];
-        const merged = [...(apiResult?.issues || []), ...localIssues[t.id]];
-        out[t.id] = { status: 'ok', issues: merged, timestamp: now };
+        out[t.id] = { status: 'ok', issues: apiResult?.issues || [], timestamp: now };
       }
     } catch (e: any) {
       for (const t of targets) {
-        // 로컬 결과만이라도 보존
         out[t.id] = {
           status: 'failed',
-          issues: localIssues[t.id],
+          issues: [],
           timestamp: now,
           error: e?.message || '알 수 없는 오류',
         };
@@ -802,6 +795,32 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
     return out;
   }, []);
+
+  /* 결정적 규칙(josa-space, latex-brace) 자동 적용 후, 수정된 rawText 배열 반환 */
+  const applyDeterministicAutoFix = useCallback((
+    blocks: { id: string; raw_text: string }[],
+  ): { targets: { id: string; rawText: string }[]; autoFixCount: number } => {
+    let autoFixCount = 0;
+    const targets: { id: string; rawText: string }[] = [];
+    for (const b of blocks) {
+      const { fixed, count } = autoFixDeterministicIssues(b.raw_text);
+      if (count > 0) {
+        autoFixCount += count;
+        const editor = editorRefs.current[b.id];
+        autoFixInProgressRef.current = true;
+        try {
+          if (editor) editor.setContent(fixed);
+        } finally {
+          autoFixInProgressRef.current = false;
+        }
+        setCurrentBlocks((prev) =>
+          prev.map((pb) => (pb.id === b.id ? { ...pb, raw_text: fixed } : pb))
+        );
+      }
+      targets.push({ id: b.id, rawText: fixed });
+    }
+    return { targets, autoFixCount };
+  }, [setCurrentBlocks]);
 
   const handleRunProofread = useCallback(async () => {
     if (proofreading) return;
@@ -815,6 +834,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
     const tabIdAtStart = activeTab;
 
+    // 결정적 규칙 자동 적용
+    const { targets, autoFixCount } = applyDeterministicAutoFix(blocks);
+
     // 로딩 박스 즉시 표시
     setProofreadResults((prev) => {
       const tab = { ...(prev[tabIdAtStart] || {}) };
@@ -825,7 +847,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
     setProofreading(true);
 
-    const out = await callProofreadApi(blocks.map((b) => ({ id: b.id, rawText: b.raw_text })));
+    const out = await callProofreadApi(targets);
 
     setProofreadResults((prev) => {
       const tab = { ...(prev[tabIdAtStart] || {}) };
@@ -833,12 +855,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return { ...prev, [tabIdAtStart]: tab };
     });
     setProofreading(false);
-  }, [proofreading, allBlocks, activeTab, callProofreadApi, PROOFREAD_EXCLUDED_TYPES]);
+    if (autoFixCount > 0) {
+      setStatus(`문법 자동 수정 ${autoFixCount}건`);
+      setTimeout(() => setStatus(''), 2000);
+    }
+  }, [proofreading, allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix, PROOFREAD_EXCLUDED_TYPES]);
 
   const handleRetryProofreadBlock = useCallback(async (blockId: string) => {
     const block = (allBlocks[activeTab] || []).find((b) => b.id === blockId);
     if (!block) return;
     const tabIdAtStart = activeTab;
+
+    const { targets, autoFixCount } = applyDeterministicAutoFix([{ id: block.id, raw_text: block.raw_text }]);
 
     setProofreadResults((prev) => ({
       ...prev,
@@ -848,12 +876,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       },
     }));
 
-    const out = await callProofreadApi([{ id: block.id, rawText: block.raw_text }]);
+    const out = await callProofreadApi(targets);
     setProofreadResults((prev) => ({
       ...prev,
       [tabIdAtStart]: { ...(prev[tabIdAtStart] || {}), [blockId]: out[blockId] },
     }));
-  }, [allBlocks, activeTab, callProofreadApi]);
+    if (autoFixCount > 0) {
+      setStatus(`문법 자동 수정 ${autoFixCount}건`);
+      setTimeout(() => setStatus(''), 2000);
+    }
+  }, [allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix]);
 
   const handleDismissProofreadIssue = useCallback((blockId: string, issueIndex: number) => {
     setProofreadResults((prev) => {
@@ -1879,7 +1911,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             blockIds={currentBlocks.map((b) => b.id)}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '50vh', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '50vh', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => {
@@ -1924,9 +1956,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 30em + 좌우 패딩 64px) ─── */}
+        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 64px) ─── */}
         <div style={{
-          width: `calc(30em + 128px)`, flexShrink: 0,
+          width: `calc(35em + 128px)`, flexShrink: 0,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
@@ -1936,7 +1968,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);

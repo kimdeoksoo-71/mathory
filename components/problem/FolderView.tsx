@@ -214,7 +214,7 @@ export default function FolderView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 왼쪽: 문제 리스트 스크롤 ═══ */}
-      <div style={{
+      <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
         overflow: 'auto',
       }}>
@@ -307,7 +307,7 @@ export default function FolderView({
       )}
 
       {/* ═══ 오른쪽 패널 ═══ */}
-      {rightOpen && <div style={{
+      {rightOpen && <div className="no-scrollbar" style={{
         flex: 1, minWidth: 150, maxWidth: 220,
         padding: '32px 16px', borderLeft: '1px solid var(--border-light)',
         overflowY: 'auto', fontSize: 13, fontFamily: 'var(--font-ui)',

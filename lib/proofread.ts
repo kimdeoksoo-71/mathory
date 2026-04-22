@@ -257,6 +257,54 @@ export function detectSuperSubBraces(text: string): ProofreadIssue[] {
   return issues;
 }
 
+/* ─── 자동 수정: josa-space + latex-brace 결정적 규칙 일괄 적용 ─── */
+
+/**
+ * 결정적 규칙(josa-space, latex-brace)만 한 번에 적용하여 수정된 raw_text를 반환.
+ * - 오프셋 기반 치환으로 수식 밖 우연 일치 방지 (수식 영역 내에서만 ^/_ 처리)
+ * - 길이가 변하므로 수정 위치는 뒤에서 앞으로 처리
+ *
+ * 반환값의 count는 실제 수정된 건수 (UI 알림용)
+ */
+export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
+  let count = 0;
+
+  // Step 1: 수식 내 ^/_ 뒤 단일 문자 → 중괄호 감싸기
+  const regions = extractMathRegions(text);
+  const braceEdits: Array<{ pos: number; ch: string }> = [];
+  const CHAR_RE = /[0-9A-Za-z가-힣]/;
+  for (const { start, end } of regions) {
+    for (let k = start; k < end; k++) {
+      const ch = text[k];
+      if (ch !== '^' && ch !== '_') continue;
+      const next = text[k + 1];
+      if (!next || next === '{') continue;
+      if (!CHAR_RE.test(next)) continue;
+      if (text[k - 1] === '\\') continue;
+      braceEdits.push({ pos: k + 1, ch: next });
+    }
+  }
+  // 뒤에서 앞으로 적용 (인덱스 보존)
+  braceEdits.sort((a, b) => b.pos - a.pos);
+  let fixed = text;
+  for (const e of braceEdits) {
+    fixed = fixed.slice(0, e.pos) + `{${e.ch}}` + fixed.slice(e.pos + 1);
+    count++;
+  }
+
+  // Step 2: 인라인 수식 끝 + 공백 + 조사 → 공백 제거
+  const re = new RegExp(
+    `((?:[^\\$\\n]\\$|\\\\\\)))[ \\t]+(${PARTICLES_ALT})(?=[\\s.,!?)\\]\\u3000-\\u303f가-힣]|$)`,
+    'g'
+  );
+  fixed = fixed.replace(re, (_m, pre, p) => {
+    count++;
+    return pre + p;
+  });
+
+  return { fixed, count };
+}
+
 /* ─── 블록 raw_text 정제: choices의 ① 라벨 등 제거 (필요 시) ─── */
 
 /** choices, image는 호출 측에서 이미 제외하므로 별도 처리 없음 */

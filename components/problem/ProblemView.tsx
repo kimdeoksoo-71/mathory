@@ -272,14 +272,14 @@ export default function ProblemView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 (유일한 세로 스크롤) ═══ */}
-      <div style={{
+      <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
         display: 'flex', justifyContent: 'center',
         overflow: 'auto',
       }}>
-        {/* ─── 가운데 단: 본문 (폭 고정 30em) ─── */}
+        {/* ─── 가운데 단: 본문 (폭 고정 35em) ─── */}
         <div style={{
-          width: `calc(30em + 64px)`, flexShrink: 0,
+          width: `calc(35em + 64px)`, flexShrink: 0,
           padding: '32px 32px 0 32px',
           boxSizing: 'border-box',
         }}>
@@ -298,7 +298,7 @@ export default function ProblemView({
                   fontSize: 12, color: 'var(--text-muted)',
                   fontFamily: 'var(--font-ui)',
                   marginBottom: 4, cursor: 'pointer',
-                  display: 'inline-block',
+                  display: 'inline-flex', alignItems: 'center', gap: 2,
                   maxWidth: '100%',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                   transition: 'color 0.15s',
@@ -307,6 +307,7 @@ export default function ProblemView({
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
                 title="폴더로 이동"
               >
+                <IconChevronLeft size={14} />
                 {folderLabel}
               </div>
             );
