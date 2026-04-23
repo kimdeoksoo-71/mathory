@@ -219,7 +219,7 @@ export default function FolderView({
         overflow: 'auto',
       }}>
         <div style={{
-          width: `calc(30em + 64px)`, margin: '0 auto',
+          width: `calc(35em + 64px)`, margin: '0 auto',
           padding: '0 32px', boxSizing: 'border-box',
         }}>
           {/* 폴더명 헤더 (sticky) */}
