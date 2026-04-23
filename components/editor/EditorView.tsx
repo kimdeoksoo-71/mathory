@@ -432,7 +432,7 @@ function SortableEditorBlock({
   onImageWidthChange: (blockId: string, width: number) => void;
   problemId: string;
   onSnippetShortcut: (index: number) => void;
-  onCursorActivity?: (info: { line: number; offset: number }) => void;
+  onCursorActivity?: (info: { line: number; offset: number; blockId: string }) => void;
   onAIComplete?: () => void;
   aiLoading?: boolean;
   onSplitMathLines?: () => void;
@@ -556,7 +556,9 @@ function SortableEditorBlock({
               initialValue={block.raw_text}
               onChange={onChange}
               onSnippetShortcut={onSnippetShortcut}
-              onCursorActivity={onCursorActivity}
+              onCursorActivity={onCursorActivity
+                ? (info) => onCursorActivity({ ...info, blockId: block.id })
+                : undefined}
             />
           )}
         </div>
@@ -1240,16 +1242,39 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 커서 활동 → 수식 하이라이트 ─── */
-  const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean }) => {
-    if (!activeBlockId) return;
-    const ref = editorRefs.current[activeBlockId];
+  /* ─── 미리보기에서 해당 블록의 수식을 세로 중앙으로 스크롤 ─── */
+  const scrollPreviewToMath = useCallback((blockId: string | null, mathId: number) => {
+    if (!blockId || mathId < 0) return;
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`);
+        if (!blockPreview) return;
+        // 디스플레이 수식은 .katex-display > .katex 구조. 외곽(.katex-display)이 있으면 그것을 우선.
+        const inner = blockPreview.querySelector(`[data-math-id="${mathId}"]`) as HTMLElement | null;
+        if (!inner) return;
+        const displayWrap = inner.closest('.katex-display') as HTMLElement | null;
+        const target = displayWrap || inner;
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const offset = targetRect.top - containerRect.top + container.scrollTop;
+        const center = offset - containerRect.height / 2 + targetRect.height / 2;
+        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+      });
+    }, 50);
+  }, []);
+
+  /* ─── 커서 활동 → 수식 하이라이트 + 미리보기 스크롤 ─── */
+  const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean; blockId: string }) => {
+    const ref = editorRefs.current[info.blockId];
     if (!ref) return;
     const content = ref.getContent();
     const ranges = buildMathIndex(content);
     const mathId = findMathIdAtCursor(ranges, info.offset);
     setActiveMathId(mathId);
-  }, [activeBlockId]);
+    if (mathId >= 0) scrollPreviewToMath(info.blockId, mathId);
+  }, [scrollPreviewToMath]);
 
   /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
@@ -1317,24 +1342,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId]);
 
-  /* ─── 미리보기 스크롤 동기화 ─── */
+  /* ─── 블록 전환으로 activeMathId 변할 때도 미리보기 동기화 ─── */
   useEffect(() => {
-    if (activeMathId < 0 || !previewRef.current) return;
-    const timer = setTimeout(() => {
-      requestAnimationFrame(() => {
-        const container = previewRef.current;
-        if (!container) return;
-        const highlighted = container.querySelector('.math-highlight-active') as HTMLElement;
-        if (!highlighted) return;
-        const containerRect = container.getBoundingClientRect();
-        const highlightedRect = highlighted.getBoundingClientRect();
-        const offset = highlightedRect.top - containerRect.top + container.scrollTop;
-        const center = offset - containerRect.height / 2 + highlightedRect.height / 2;
-        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
-      });
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [activeMathId, activeBlockId]);
+    if (activeMathId < 0) return;
+    scrollPreviewToMath(activeBlockId, activeMathId);
+  }, [activeMathId, activeBlockId, scrollPreviewToMath]);
 
   /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
   useEffect(() => {
