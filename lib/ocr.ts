@@ -12,6 +12,13 @@ export const OCR_MAX_BYTES = 5 * 1024 * 1024;
 export const OCR_MAX_DIM = 2000;
 export const OCR_ACCEPT = 'image/png,image/jpeg,image/webp';
 
+/**
+ * Mathpix 텍스트 인식 언어 힌트.
+ * 절대다수 사용자가 한국인이므로 현재는 `['ko']` 기본값.
+ * 추후 사용자별 로케일 설정이 생기면 이 상수 대신 설정값을 주입하도록 교체.
+ */
+export const OCR_LANGUAGES: string[] = ['ko'];
+
 /** 파일 사전 검증. 문제 있으면 오류 메시지, 없으면 null. */
 export function validateOcrFile(file: File): string | null {
   if (!/^image\/(png|jpeg|webp)$/.test(file.type)) {
@@ -65,13 +72,23 @@ function fileToDataUrl(file: File): Promise<string> {
  * Mathpix `text` 결과(수식+텍스트 혼합, `$`/`$$` 구분자 포함)를 mathory 문법으로 정규화하고 교정.
  *
  * 1) 예외적으로 남을 수 있는 `\[..\]` / `\(..\)` → `$$..$$` / `$..$` 로 강제 치환
- * 2) `autoFixDeterministicIssues`로 ^/_ 한 글자 중괄호 래핑 + 인라인수식-조사 공백 제거
+ * 2) 디스플레이 수식 `$$...$$`는 Markdown 블록 수식 렌더링을 위해 항상
+ *    `\n\n$$\n<content>\n$$\n\n` 형태로 강제 정규화 (구분자와 내용 사이 개행 필수)
+ * 3) `autoFixDeterministicIssues`로 ^/_ 한 글자 중괄호 래핑 + 인라인수식-조사 공백 제거
  */
 export function normalizeAndFix(raw: string): string {
   let s = raw.trim();
 
   s = s.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
   s = s.replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+
+  // $$...$$ 블록을 찾아 앞뒤 개행 + 내부 개행 강제
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, (_m, inner) => {
+    return `\n\n$$\n${inner.trim()}\n$$\n\n`;
+  });
+  // 과도한 연속 개행 축소
+  s = s.replace(/\n{3,}/g, '\n\n');
+  s = s.trim();
 
   const { fixed } = autoFixDeterministicIssues(s);
   return fixed;

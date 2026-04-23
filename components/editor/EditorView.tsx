@@ -14,7 +14,7 @@ import MathToolbar from '../editor/MathToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
-import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT } from '../../lib/ocr';
+import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -1222,7 +1222,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const resp = await fetch('/api/ocr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ src }),
+        body: JSON.stringify({ src, languages: OCR_LANGUAGES }),
       });
       const data = await resp.json();
       if (!resp.ok) {

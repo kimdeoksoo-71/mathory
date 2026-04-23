@@ -21,10 +21,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = (await req.json()) as { src?: string };
+    const body = (await req.json()) as { src?: string; languages?: string[] };
     if (!body.src || typeof body.src !== 'string') {
       return NextResponse.json({ error: '이미지 데이터(src)가 없습니다.' }, { status: 400 });
     }
+
+    // NOTE(언어 힌트): Mathpix `/v3/text`는 언어/로케일 파라미터를 공식 지원하지 않음.
+    // `alphabets_allowed`로 알파벳을 제한하면 인식률 자체가 급락하므로 전달하지 않는다.
+    // 텍스트 언어 편향은 Mathpix 대시보드의 계정 단위 Preferred Language로 조정 권장.
+    // (`body.languages`는 호환성 위해 받되 현재는 사용하지 않음)
 
     const resp = await fetch('https://api.mathpix.com/v3/text', {
       method: 'POST',
