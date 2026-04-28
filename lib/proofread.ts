@@ -6,7 +6,7 @@
  * - 인라인 수식과 한글 조사 사이의 잘못된 공백 로컬 검출 (결정적, 토큰 절약)
  */
 
-export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'other';
+export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'latex-comma' | 'other';
 
 export interface ProofreadIssue {
   kind: ProofreadIssueKind;
@@ -257,7 +257,55 @@ export function detectSuperSubBraces(text: string): ProofreadIssue[] {
   return issues;
 }
 
-/* ─── 자동 수정: josa-space + latex-brace 결정적 규칙 일괄 적용 ─── */
+/* ─── 수식 내 쉼표 뒤 ~ 간격 누락 검출 ─── */
+
+/**
+ * 수식 내에서 `,` 뒤에 토큰이 곧바로 이어질 때(공백이 있어도 LaTeX는 거의 무시),
+ * 가독성을 위해 `, ~ X` 형태로 정규화하도록 제안.
+ *
+ * 매칭 조건:
+ *   - 수식 영역 내부의 `,`
+ *   - `,` 직전이 `\`(즉 `\,`)이면 제외 (LaTeX small space 명령)
+ *   - `,` 다음 0개 이상의 공백 후, 다음 문자가 `~`/`,`/닫는 괄호이면 제외
+ *   - 다음 문자가 단어/식별자/`\`(매크로 시작) 일 때만 적용
+ */
+export function detectCommaSpacing(text: string): ProofreadIssue[] {
+  const issues: ProofreadIssue[] = [];
+  const regions = extractMathRegions(text);
+  const TOKEN_RE = /[0-9A-Za-z가-힣\\(\[]/;
+
+  for (const { start, end } of regions) {
+    for (let k = start; k < end; k++) {
+      if (text[k] !== ',') continue;
+      if (text[k - 1] === '\\') continue; // \, 제외
+      // 다음 non-space 위치
+      let j = k + 1;
+      while (j < end && (text[j] === ' ' || text[j] === '\t')) j++;
+      if (j >= end) continue;
+      const next = text[j];
+      if (next === '~' || next === ',' || next === ')' || next === ']' || next === '}') continue;
+      if (!TOKEN_RE.test(next)) continue;
+
+      // 스니펫: 직전 2자 ~ 다음 토큰 직후 1자
+      const snipStart = Math.max(start, k - 2);
+      const snipEnd = Math.min(end, j + 2);
+      const original = text.slice(snipStart, snipEnd);
+      const before = text.slice(snipStart, k + 1); // ',' 까지
+      const after = text.slice(j, snipEnd);        // 다음 토큰부터
+      const suggestion = before + ' ~ ' + after;
+
+      issues.push({
+        kind: 'latex-comma',
+        original,
+        suggestion,
+        reason: '수식 내 쉼표 뒤에 ~ 를 삽입해 가독성을 높이세요.',
+      });
+    }
+  }
+  return issues;
+}
+
+/* ─── 자동 수정: josa-space + latex-brace + latex-comma 결정적 규칙 일괄 적용 ─── */
 
 /**
  * 결정적 규칙(josa-space, latex-brace)만 한 번에 적용하여 수정된 raw_text를 반환.
@@ -269,26 +317,43 @@ export function detectSuperSubBraces(text: string): ProofreadIssue[] {
 export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
   let count = 0;
 
-  // Step 1: 수식 내 ^/_ 뒤 단일 문자 → 중괄호 감싸기
+  // Step 1: 수식 내 위치 기반 편집 수집 (브레이스 + 쉼표).
+  // 모든 편집을 (pos, replaceLen, insert) 형태로 모아 뒤에서 앞으로 적용.
+  type Edit = { pos: number; replaceLen: number; insert: string };
+  const edits: Edit[] = [];
   const regions = extractMathRegions(text);
-  const braceEdits: Array<{ pos: number; ch: string }> = [];
   const CHAR_RE = /[0-9A-Za-z가-힣]/;
+  const TOKEN_RE = /[0-9A-Za-z가-힣\\(\[]/;
+
   for (const { start, end } of regions) {
     for (let k = start; k < end; k++) {
       const ch = text[k];
-      if (ch !== '^' && ch !== '_') continue;
-      const next = text[k + 1];
-      if (!next || next === '{') continue;
-      if (!CHAR_RE.test(next)) continue;
-      if (text[k - 1] === '\\') continue;
-      braceEdits.push({ pos: k + 1, ch: next });
+      // ^/_ 뒤 단일 문자 → 중괄호 감싸기
+      if (ch === '^' || ch === '_') {
+        const next = text[k + 1];
+        if (next && next !== '{' && CHAR_RE.test(next) && text[k - 1] !== '\\') {
+          // pos=k+1 의 1글자(next) → "{next}"
+          edits.push({ pos: k + 1, replaceLen: 1, insert: `{${next}}` });
+        }
+        continue;
+      }
+      // 쉼표 뒤 ~ 간격 누락
+      if (ch === ',' && text[k - 1] !== '\\') {
+        let j = k + 1;
+        while (j < end && (text[j] === ' ' || text[j] === '\t')) j++;
+        if (j >= end) continue;
+        const nx = text[j];
+        if (nx === '~' || nx === ',' || nx === ')' || nx === ']' || nx === '}') continue;
+        if (!TOKEN_RE.test(nx)) continue;
+        // [k+1, j) 의 공백을 " ~ " 로 치환 (공백 0개여도 정확히 한 칸+~+한 칸 삽입)
+        edits.push({ pos: k + 1, replaceLen: j - (k + 1), insert: ' ~ ' });
+      }
     }
   }
-  // 뒤에서 앞으로 적용 (인덱스 보존)
-  braceEdits.sort((a, b) => b.pos - a.pos);
+  edits.sort((a, b) => b.pos - a.pos);
   let fixed = text;
-  for (const e of braceEdits) {
-    fixed = fixed.slice(0, e.pos) + `{${e.ch}}` + fixed.slice(e.pos + 1);
+  for (const e of edits) {
+    fixed = fixed.slice(0, e.pos) + e.insert + fixed.slice(e.pos + e.replaceLen);
     count++;
   }
 

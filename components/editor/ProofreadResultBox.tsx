@@ -29,10 +29,11 @@ const KIND_LABEL: Record<string, { text: string; color: string }> = {
   spacing: { text: '띄어쓰기', color: '#d68910' },
   'josa-space': { text: '수식·조사 공백', color: '#7d3c98' },
   'latex-brace': { text: '첨자 중괄호', color: '#1a5490' },
+  'latex-comma': { text: '수식 쉼표', color: '#0e6b5e' },
   other: { text: '기타', color: '#566573' },
 };
 
-const AUTO_FIX_KINDS = new Set(['josa-space', 'latex-brace']);
+const AUTO_FIX_KINDS = new Set(['josa-space', 'latex-brace', 'latex-comma']);
 
 function fmtTime(ts: number): string {
   const d = new Date(ts);
