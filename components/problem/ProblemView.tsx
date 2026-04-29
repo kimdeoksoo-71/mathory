@@ -297,7 +297,7 @@ export default function ProblemView({
                 style={{
                   fontSize: 12, color: 'var(--text-muted)',
                   fontFamily: 'var(--font-ui)',
-                  marginBottom: 4, cursor: 'pointer',
+                  marginBottom: 16, cursor: 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 2,
                   maxWidth: '100%',
                   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

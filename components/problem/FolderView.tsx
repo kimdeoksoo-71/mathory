@@ -127,6 +127,11 @@ export default function FolderView({
   const handleSelectProblem = useCallback((problem: Problem) => {
     setSelectedProblemId(problem.id);
     setRightOpen(true);
+    // 클릭한 문제를 페이지 상단으로 스크롤
+    requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-problem-id="${problem.id}"]`) as HTMLElement | null;
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
   }, []);
 
   const selectedProblem = folderProblems.find((p) => p.id === selectedProblemId) || null;
@@ -266,7 +271,7 @@ export default function FolderView({
             const blocks = questionBlocksMap[problem.id] || [];
             const isSelected = selectedProblemId === problem.id;
             return (
-              <div key={problem.id} style={{ marginBottom: '5em' }}>
+              <div key={problem.id} data-problem-id={problem.id} style={{ marginBottom: '5em', scrollMarginTop: '90px' }}>
                 <h2
                   onClick={() => handleSelectProblem(problem)}
                   onDoubleClick={() => onView(problem)}
