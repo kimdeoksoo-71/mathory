@@ -286,7 +286,7 @@ export default function FolderView({
                 >
                   {problem.title}
                 </h2>
-                <div className="problem-content-scaled">
+                <div className="problem-content-scaled problem-content-toned">
                   <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
                   {renderBlocks(blocks)}
                 </div>

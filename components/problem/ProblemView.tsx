@@ -277,13 +277,12 @@ export default function ProblemView({
         display: 'flex', justifyContent: 'center',
         overflow: 'auto',
       }}>
-        {/* ─── 가운데 단: 본문 (폭 고정 35em) ─── */}
+        {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
-          width: `calc(35em + 64px)`, flexShrink: 0,
           padding: '32px 32px 0 32px',
           boxSizing: 'border-box',
+          flexShrink: 0,
         }}>
-          {/* 폴더명 (클릭 시 FolderView 이동) */}
           {(() => {
             const fid = problem.folder_id || '';
             const isTrash = fid === TRASH_FOLDER_ID;
@@ -291,66 +290,116 @@ export default function ProblemView({
               ? '휴지통'
               : (folders.find((f) => f.id === fid)?.name || '미분류');
             const targetId = isTrash ? TRASH_FOLDER_ID : (fid || '__unassigned__');
+
+            const LABEL_GAP = 28; // 라벨↔본문 간격
+            const labelColStyle: React.CSSProperties = {
+              width: '7em', flexShrink: 0,
+              textAlign: 'right', fontFamily: 'var(--font-ui)',
+            };
+            const mainColStyle: React.CSSProperties = {
+              width: '35em', flexShrink: 0,
+            };
+
             return (
-              <div
-                onClick={() => onNavigateFolder?.(targetId)}
-                style={{
-                  fontSize: 12, color: 'var(--text-muted)',
-                  fontFamily: 'var(--font-ui)',
-                  marginBottom: 16, cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 2,
-                  maxWidth: '100%',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  transition: 'color 0.15s',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                title="폴더로 이동"
-              >
-                <IconChevronLeft size={14} />
-                {folderLabel}
-              </div>
+              <>
+                {/* 헤더 행: [폴더명 | 제목] — 제목 세로 중앙 정렬 */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: LABEL_GAP,
+                  marginBottom: 24,
+                }}>
+                  <div style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-end' }}>
+                    <div
+                      onClick={() => onNavigateFolder?.(targetId)}
+                      style={{
+                        fontSize: 12, color: 'var(--text-muted)',
+                        cursor: 'pointer',
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        transition: 'color 0.15s',
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                      title="폴더로 이동"
+                    >
+                      <IconChevronLeft size={14} />
+                      {folderLabel}
+                    </div>
+                  </div>
+                  <h1
+                    onClick={() => onEdit?.(problem)}
+                    style={{
+                      ...mainColStyle,
+                      fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
+                      margin: 0, lineHeight: 1.2,
+                      fontFamily: 'var(--font-ui)',
+                      cursor: 'pointer', transition: 'color 0.15s',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                    title="클릭하여 편집"
+                  >
+                    {problem.title}
+                  </h1>
+                </div>
+
+                {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글 */}
+                {tabs.map((tab) => {
+                  const blocks = problem.tabBlocks[tab.id] || [];
+                  const count = blocks.length;
+                  const isOpen = !!openTabs[tab.id];
+                  return (
+                    <div key={tab.id} style={{
+                      display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP,
+                      marginBottom: isOpen ? '5em' : '1.5em',
+                    }}>
+                      <div style={{
+                        ...labelColStyle,
+                        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4,
+                        paddingTop: isOpen ? 14 : 0,
+                      }}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
+                          title="Markdown 복사"
+                          style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            width: 22, height: 22, border: 'none', background: 'none',
+                            cursor: 'pointer', borderRadius: 4, padding: 0,
+                            color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
+                            transition: 'color 0.2s',
+                          }}
+                        >
+                          {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
+                        </button>
+                        <span
+                          onClick={() => toggleTab(tab.id)}
+                          style={{
+                            fontSize: 12, fontWeight: 600,
+                            color: isOpen ? 'var(--text-muted)' : 'var(--text-faint)',
+                            letterSpacing: 0.5,
+                            cursor: 'pointer', userSelect: 'none',
+                          }}
+                          title={isOpen ? '탭 접기' : '탭 펼치기'}
+                        >
+                          {tab.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({count})</span>
+                        </span>
+                      </div>
+                      {isOpen && (
+                        <div style={mainColStyle}>
+                          <div className="problem-content-scaled problem-content-toned">
+                            <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
+                            {renderBlocks(blocks)}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* 하단 여백 */}
+                <div style={{ height: '70vh' }} />
+              </>
             );
           })()}
-
-          {/* 제목 (클릭 시 EditorView 이동) */}
-          <h1
-            onClick={() => onEdit?.(problem)}
-            style={{
-              fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
-              margin: '0 0 24px 0',
-              fontFamily: 'var(--font-ui)',
-              cursor: 'pointer',
-              transition: 'color 0.15s',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-            title="클릭하여 편집"
-          >
-            {problem.title}
-          </h1>
-
-          {/* 탭별 콘텐츠 */}
-          {tabs.map((tab) => {
-            if (!openTabs[tab.id]) return null;
-            const blocks = problem.tabBlocks[tab.id] || [];
-            return (
-              <div key={tab.id} style={{ marginBottom: '5em' }}>
-                <div style={{
-                  fontSize: 12, fontWeight: 600, color: 'var(--text-muted)',
-                  letterSpacing: 0.5, marginBottom: 12, fontFamily: 'var(--font-ui)',
-                }}>
-                  {tab.label}
-                </div>
-                <div className="problem-content-scaled">
-                  <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
-                  {renderBlocks(blocks)}
-                </div>
-              </div>
-            );
-          })}
-          {/* 하단 여백 — 마지막 행을 위로 스크롤 가능하게 */}
-          <div style={{ height: '70vh' }} />
         </div>
       </div>
 
@@ -401,52 +450,6 @@ export default function ProblemView({
         >
           <IconChevron size={14} />
         </button>
-        {/* 탭 목록 */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ ...metaLabelStyle, marginBottom: 8 }}>보기</div>
-          {tabs.map((tab) => {
-            const isOpen = !!openTabs[tab.id];
-            const count = (problem.tabBlocks[tab.id] || []).length;
-            return (
-              <div key={tab.id} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 8px', borderRadius: 6,
-                marginBottom: 2,
-                transition: 'background 0.15s',
-              }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-              >
-                <button
-                  onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
-                  title="Markdown 복사"
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    width: 22, height: 22, border: 'none', background: 'none',
-                    cursor: 'pointer', borderRadius: 4, padding: 0,
-                    color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
-                    transition: 'color 0.2s',
-                  }}
-                >
-                  {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
-                </button>
-                <span
-                  onClick={() => toggleTab(tab.id)}
-                  style={{
-                    flex: 1, fontSize: 13,
-                    fontWeight: isOpen ? 600 : 400,
-                    color: isOpen ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontFamily: 'var(--font-ui)', userSelect: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {tab.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({count})</span>
-                </span>
-              </div>
-            );
-          })}
-        </div>
-
         {/* 메뉴 모음 */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>

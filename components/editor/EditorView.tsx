@@ -2075,7 +2075,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);

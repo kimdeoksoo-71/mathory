@@ -121,6 +121,10 @@ textarea:focus-visible {
 @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
 
 
+/* 본문 톤다운: 텍스트는 회색조, 수식은 100% 검정 (가독성 향상) */
+.problem-content-toned { color: #6a6a6a; }
+.problem-content-toned .katex { color: #000; }
+
 /* Display math: 왼쪽 정렬 + 들여쓰기 */
 .katex-display,
 .katex-display > .katex {
