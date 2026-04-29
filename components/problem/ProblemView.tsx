@@ -271,17 +271,18 @@ export default function ProblemView({
       background: '#ffffff', fontSize: contentFontSize,
       overflow: 'hidden', position: 'relative',
     }}>
-      {/* ═══ 왼쪽 + 가운데: 가운데 정렬된 본문 스크롤 컨테이너 (유일한 세로 스크롤) ═══ */}
+      {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 (sticky 호환을 위해 비-flex) ═══ */}
       <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
-        display: 'flex', justifyContent: 'center',
         overflow: 'auto',
+        background: 'var(--bg-primary, #FAF9F7)',
       }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
-          padding: '32px 32px 0 32px',
+          width: 'fit-content',
+          margin: '0 auto',
+          padding: '0 32px',
           boxSizing: 'border-box',
-          flexShrink: 0,
         }}>
           {(() => {
             const fid = problem.folder_id || '';
@@ -294,7 +295,7 @@ export default function ProblemView({
             const LABEL_GAP = 28; // 라벨↔본문 간격
             const labelColStyle: React.CSSProperties = {
               width: '7em', flexShrink: 0,
-              textAlign: 'right', fontFamily: 'var(--font-ui)',
+              textAlign: 'left', fontFamily: 'var(--font-ui)',
             };
             const mainColStyle: React.CSSProperties = {
               width: '35em', flexShrink: 0,
@@ -302,12 +303,16 @@ export default function ProblemView({
 
             return (
               <>
-                {/* 헤더 행: [폴더명 | 제목] — 제목 세로 중앙 정렬 */}
+                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정 */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: LABEL_GAP,
                   marginBottom: 24,
+                  position: 'sticky', top: 0, zIndex: 5,
+                  background: 'var(--bg-primary, #FAF9F7)',
+                  paddingTop: 32, paddingBottom: 16,
+                  borderBottom: '1px solid var(--border-light)',
                 }}>
-                  <div style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-end' }}>
+                  <div style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-start' }}>
                     <div
                       onClick={() => onNavigateFolder?.(targetId)}
                       style={{
@@ -343,18 +348,20 @@ export default function ProblemView({
                 </div>
 
                 {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글 */}
-                {tabs.map((tab) => {
+                {tabs.map((tab, tabIdx) => {
                   const blocks = problem.tabBlocks[tab.id] || [];
                   const count = blocks.length;
                   const isOpen = !!openTabs[tab.id];
+                  const isQuestion = tab.id === 'question';
                   return (
                     <div key={tab.id} style={{
                       display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP,
+                      marginTop: tabIdx === 0 ? 24 : 0,
                       marginBottom: isOpen ? '5em' : '1.5em',
                     }}>
                       <div style={{
                         ...labelColStyle,
-                        display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4,
+                        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4,
                         paddingTop: isOpen ? 14 : 0,
                       }}>
                         <button
@@ -384,7 +391,15 @@ export default function ProblemView({
                         </span>
                       </div>
                       {isOpen && (
-                        <div style={mainColStyle}>
+                        <div style={{
+                          ...mainColStyle,
+                          ...(isQuestion ? {
+                            background: '#ffffff',
+                            padding: '20px 24px',
+                            borderRadius: 8,
+                            marginLeft: -24,
+                          } : {}),
+                        }}>
                           <div className="problem-content-scaled problem-content-toned">
                             <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
                             {renderBlocks(blocks)}
