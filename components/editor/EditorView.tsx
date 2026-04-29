@@ -761,7 +761,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [activeBlockId, aiLoadingBlockId, collectAIContext]);
 
   /* ─── 교정 (Phase 27) ─── */
-  const PROOFREAD_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'choices']), []);
+  // 자동 수정 대상에서 제외할 타입 (image는 텍스트 없음)
+  const AUTOFIX_EXCLUDED_TYPES = useMemo(() => new Set(['image']), []);
+  // Claude API 교정 대상에서 제외할 타입 (choices는 ①②③④⑤ 라벨이 오탈자로 오인됨)
+  const API_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'choices']), []);
 
   const callProofreadApi = useCallback(async (
     targets: { id: string; rawText: string }[],
@@ -831,30 +834,37 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   const handleRunProofread = useCallback(async () => {
     if (proofreading) return;
-    const blocks = (allBlocks[activeTab] || []).filter(
-      (b) => !PROOFREAD_EXCLUDED_TYPES.has(b.type) && b.raw_text.trim()
+    // 자동 수정 대상: image 제외 (choices 포함 — 숫자 자동 수식화 등 적용)
+    const autoFixBlocks = (allBlocks[activeTab] || []).filter(
+      (b) => !AUTOFIX_EXCLUDED_TYPES.has(b.type) && b.raw_text.trim()
     );
-    if (blocks.length === 0) {
+    if (autoFixBlocks.length === 0) {
       setStatus('교정할 텍스트가 없습니다');
       setTimeout(() => setStatus(''), 2000);
       return;
     }
     const tabIdAtStart = activeTab;
 
-    // 결정적 규칙 자동 적용
-    const { targets, autoFixCount } = applyDeterministicAutoFix(blocks);
+    // 결정적 규칙 자동 적용 (choices 포함)
+    const { targets, autoFixCount } = applyDeterministicAutoFix(autoFixBlocks);
 
-    // 로딩 박스 즉시 표시
+    // Claude API 호출 대상: choices 추가 제외
+    const apiTargets = targets.filter((t) => {
+      const b = autoFixBlocks.find((bb) => bb.id === t.id);
+      return b && !API_EXCLUDED_TYPES.has(b.type);
+    });
+
+    // 로딩 박스 즉시 표시 (API 호출 대상에 한해)
     setProofreadResults((prev) => {
       const tab = { ...(prev[tabIdAtStart] || {}) };
-      for (const b of blocks) {
-        tab[b.id] = { status: 'loading', issues: [], timestamp: Date.now() };
+      for (const t of apiTargets) {
+        tab[t.id] = { status: 'loading', issues: [], timestamp: Date.now() };
       }
       return { ...prev, [tabIdAtStart]: tab };
     });
     setProofreading(true);
 
-    const out = await callProofreadApi(targets);
+    const out = await callProofreadApi(apiTargets);
 
     setProofreadResults((prev) => {
       const tab = { ...(prev[tabIdAtStart] || {}) };
@@ -866,7 +876,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       setStatus(`문법 자동 수정 ${autoFixCount}건`);
       setTimeout(() => setStatus(''), 2000);
     }
-  }, [proofreading, allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix, PROOFREAD_EXCLUDED_TYPES]);
+  }, [proofreading, allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix, AUTOFIX_EXCLUDED_TYPES, API_EXCLUDED_TYPES]);
 
   const handleRetryProofreadBlock = useCallback(async (blockId: string) => {
     const block = (allBlocks[activeTab] || []).find((b) => b.id === blockId);
@@ -997,21 +1007,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, raw_text: value } : b))
     );
-    // 자동 정정 경로면 필터 건너뛰기 (handler가 직접 index 단위로 제거)
     if (autoFixInProgressRef.current) return;
-    // 편집 시: original 스니펫이 더 이상 본문에 없는 항목만 자동 제거
+    // 교정 항목 자동 닫힘 규칙:
+    //   "original 부재 AND suggestion 존재" 일 때만 해당 항목 제거.
+    //   - original만 검사하면 편집 중간 상태(삭제 직후)나 인접 항목 컨텍스트 공유로 오삭제 발생
+    //   - suggestion 추가 검사로 "수정이 실제로 완성된 시점"만 포착
     setProofreadResults((prev) => {
       const tab = prev[activeTab];
       const data = tab?.[blockId];
       if (!data || data.status !== 'ok') return prev;
-      const remaining = data.issues.filter((iss) => value.includes(iss.original));
-      if (remaining.length === data.issues.length) return prev; // 변화 없음
+      const remaining = data.issues.filter((iss) => {
+        if (!iss.suggestion || iss.suggestion === iss.original) return true;
+        const fixed = !value.includes(iss.original) && value.includes(iss.suggestion);
+        return !fixed;
+      });
+      if (remaining.length === data.issues.length) return prev;
       const nextTab = { ...tab };
-      if (remaining.length === 0) {
-        delete nextTab[blockId];
-      } else {
-        nextTab[blockId] = { ...data, issues: remaining };
-      }
+      if (remaining.length === 0) delete nextTab[blockId];
+      else nextTab[blockId] = { ...data, issues: remaining };
       return { ...prev, [activeTab]: nextTab };
     });
   }, [setCurrentBlocks, activeTab]);

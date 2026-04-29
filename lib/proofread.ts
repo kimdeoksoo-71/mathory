@@ -305,6 +305,91 @@ export function detectCommaSpacing(text: string): ProofreadIssue[] {
   return issues;
 }
 
+/* ─── 텍스트 영역의 맨숫자(bare number) 자동 수식화 ─── */
+
+/**
+ * 수식/HTML/링크/코드/순서리스트 마커 등을 제외한 "일반 텍스트" 영역에서
+ * 숫자 시퀀스를 찾아 `$...$`로 감싸 반환.
+ *
+ * 사용자에게 이슈로 보고하지 않고 즉시 적용되는 규칙.
+ */
+export function autoWrapBareNumbers(text: string): { fixed: string; count: number } {
+  // 보호 영역(이 안의 인덱스는 건드리지 않음) 수집
+  const protectedRanges: Array<[number, number]> = [];
+
+  // 수식 영역 (구분자 포함)
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '$' && text[i + 1] === '$') {
+      const close = text.indexOf('$$', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+      break;
+    }
+    if (text[i] === '$') {
+      let j = i + 1, found = -1;
+      while (j < text.length) {
+        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
+        if (text[j] === '\n' && text[j + 1] === '\n') break;
+        j++;
+      }
+      if (found !== -1) { protectedRanges.push([i, found + 1]); i = found + 1; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '[') {
+      const close = text.indexOf('\\]', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '(') {
+      const close = text.indexOf('\\)', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    i++;
+  }
+
+  const addAll = (re: RegExp) => {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      protectedRanges.push([m.index, m.index + m[0].length]);
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  };
+  addAll(/<[^>\n]+>/g);                          // HTML 태그
+  addAll(/https?:\/\/\S+/g);                     // URL
+  addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);          // 마크다운 링크/이미지
+  addAll(/`[^`\n]*`/g);                          // 인라인 코드
+  addAll(/\\(?:tag|ref)\{[^}]*\}/g);             // \tag, \ref
+  // 순서 리스트 마커: 라인 선두 "  3. " 등의 숫자
+  {
+    const re = /^[ \t]*(\d+)\.(?=\s)/gm;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const numStart = m.index + m[0].lastIndexOf(m[1]);
+      protectedRanges.push([numStart, numStart + m[1].length]);
+    }
+  }
+
+  const inProtected = (pos: number) =>
+    protectedRanges.some(([s, e]) => pos >= s && pos < e);
+
+  // 숫자 시퀀스 (소수점 포함). 영문/숫자/마침표와 결합된 식별자(iPhone15, 1.0.0 등)는 제외.
+  // 한글이 인접한 경우는 정상적인 한국어 문장 패턴이므로 허용.
+  const numRe = /(?<![A-Za-z0-9.])\d+(?:\.\d+)?(?![A-Za-z0-9.])/g;
+  const matches: Array<{ start: number; end: number }> = [];
+  let nm: RegExpExecArray | null;
+  while ((nm = numRe.exec(text)) !== null) {
+    const start = nm.index;
+    const end = start + nm[0].length;
+    if (inProtected(start)) continue;
+    matches.push({ start, end });
+  }
+
+  matches.sort((a, b) => b.start - a.start);
+  let fixed = text;
+  for (const m of matches) {
+    fixed = fixed.slice(0, m.start) + '$' + fixed.slice(m.start, m.end) + '$' + fixed.slice(m.end);
+  }
+  return { fixed, count: matches.length };
+}
+
 /* ─── 자동 수정: josa-space + latex-brace + latex-comma 결정적 규칙 일괄 적용 ─── */
 
 /**
@@ -316,6 +401,14 @@ export function detectCommaSpacing(text: string): ProofreadIssue[] {
  */
 export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
   let count = 0;
+
+  // Step 0: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
+  // (이후 단계의 수식 내 규칙이 새 영역에도 작용)
+  {
+    const r = autoWrapBareNumbers(text);
+    text = r.fixed;
+    count += r.count;
+  }
 
   // Step 1: 수식 내 위치 기반 편집 수집 (브레이스 + 쉼표).
   // 모든 편집을 (pos, replaceLen, insert) 형태로 모아 뒤에서 앞으로 적용.
