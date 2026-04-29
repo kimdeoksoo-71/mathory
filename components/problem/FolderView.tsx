@@ -222,6 +222,7 @@ export default function FolderView({
       <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
         overflow: 'auto',
+        background: 'var(--bg-primary, #FAF9F7)',
       }}>
         <div style={{
           width: `calc(35em + 64px)`, margin: '0 auto',
@@ -230,7 +231,7 @@ export default function FolderView({
           {/* 폴더명 헤더 (sticky) */}
           <div style={{
             position: 'sticky', top: 0, zIndex: 5,
-            background: '#ffffff', padding: '24px 0 12px 0',
+            background: 'var(--bg-primary, #FAF9F7)', padding: '24px 0 12px 0',
             borderBottom: '1px solid var(--border-light)',
             marginBottom: 24,
             fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
@@ -286,7 +287,9 @@ export default function FolderView({
                 >
                   {problem.title}
                 </h2>
-                <div className="problem-content-scaled problem-content-toned">
+                <div className="problem-content-scaled problem-content-toned" style={{
+                  background: '#ffffff', padding: '20px 24px', borderRadius: 8,
+                }}>
                   <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
                   {renderBlocks(blocks)}
                 </div>

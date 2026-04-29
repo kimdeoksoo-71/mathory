@@ -2075,7 +2075,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: '#ffffff', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
+            <div style={activeTab === 'question' ? {
+              background: '#ffffff', padding: '20px 24px', borderRadius: 8,
+            } : undefined}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);
@@ -2125,6 +2128,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 </div>
               );
             })}
+            </div>
           </div>
         </div>
       </div>
