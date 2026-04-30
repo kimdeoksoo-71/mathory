@@ -1329,7 +1329,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 100);
   }, [setCurrentBlocks]);
 
-  /* ─── 블록 활성화 시 편집창에서 해당 블록을 세로 중앙으로 자동 스크롤 ─── */
+  /* ─── 블록 활성화 시 편집창에서 해당 블록 상단을 살짝 아래(80px)에 자동 스크롤 ─── */
   useEffect(() => {
     if (!activeBlockId) return;
     const timer = setTimeout(() => {
@@ -1339,8 +1339,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       if (!blockEl) return;
       const containerRect = container.getBoundingClientRect();
       const blockRect = (blockEl as HTMLElement).getBoundingClientRect();
-      const blockCenter = blockRect.top + blockRect.height / 2 - containerRect.top + container.scrollTop;
-      const target = blockCenter - containerRect.height / 2;
+      const blockTop = blockRect.top - containerRect.top + container.scrollTop;
+      const target = blockTop - 80;
       container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
     }, 80);
     return () => clearTimeout(timer);
@@ -2014,7 +2014,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             blockIds={currentBlocks.map((b) => b.id)}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '50vh', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '100vh', minHeight: 0 }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => {
