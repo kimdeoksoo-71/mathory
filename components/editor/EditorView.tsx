@@ -1255,30 +1255,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기에서 해당 블록의 수식을 세로 중앙으로 스크롤 ─── */
-  const scrollPreviewToMath = useCallback((blockId: string | null, mathId: number) => {
-    if (!blockId || mathId < 0) return;
+  /* ─── 미리보기에서 해당 블록의 첫 줄을 세로 중앙으로 스크롤 ─── */
+  const scrollPreviewToBlockTop = useCallback((blockId: string) => {
     setTimeout(() => {
       requestAnimationFrame(() => {
         const container = previewRef.current;
         if (!container) return;
-        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`);
+        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
         if (!blockPreview) return;
-        // 디스플레이 수식은 .katex-display > .katex 구조. 외곽(.katex-display)이 있으면 그것을 우선.
-        const inner = blockPreview.querySelector(`[data-math-id="${mathId}"]`) as HTMLElement | null;
-        if (!inner) return;
-        const displayWrap = inner.closest('.katex-display') as HTMLElement | null;
-        const target = displayWrap || inner;
         const containerRect = container.getBoundingClientRect();
-        const targetRect = target.getBoundingClientRect();
+        const targetRect = blockPreview.getBoundingClientRect();
         const offset = targetRect.top - containerRect.top + container.scrollTop;
-        const center = offset - containerRect.height / 2 + targetRect.height / 2;
-        container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+        // 블록 최상단을 미리보기 상단에서 살짝 아래(약 80px)로 위치
+        const target = offset - 80;
+        container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
       });
     }, 50);
   }, []);
 
-  /* ─── 커서 활동 → 수식 하이라이트 + 미리보기 스크롤 ─── */
+  /* ─── 커서 활동 → 수식 하이라이트(시각용)만. 미리보기 동기화는 onFocus에서 처리 ─── */
   const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean; blockId: string }) => {
     const ref = editorRefs.current[info.blockId];
     if (!ref) return;
@@ -1286,8 +1281,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const ranges = buildMathIndex(content);
     const mathId = findMathIdAtCursor(ranges, info.offset);
     setActiveMathId(mathId);
-    if (mathId >= 0) scrollPreviewToMath(info.blockId, mathId);
-  }, [scrollPreviewToMath]);
+  }, []);
+
+  /* ─── 블록 포커스 진입 → 미리보기 동기화 (다른 블록 진입 시에만) ─── */
+  const handleBlockFocus = useCallback((blockId: string) => {
+    if (blockId !== activeBlockId) {
+      setActiveBlockId(blockId);
+      scrollPreviewToBlockTop(blockId);
+    }
+  }, [activeBlockId, scrollPreviewToBlockTop]);
 
   /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
@@ -1354,12 +1356,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       if (id !== activeBlockId && ref) ref.clearSelection();
     }
   }, [activeBlockId]);
-
-  /* ─── 블록 전환으로 activeMathId 변할 때도 미리보기 동기화 ─── */
-  useEffect(() => {
-    if (activeMathId < 0) return;
-    scrollPreviewToMath(activeBlockId, activeMathId);
-  }, [activeMathId, activeBlockId, scrollPreviewToMath]);
 
   /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
   useEffect(() => {
@@ -2031,7 +2027,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     isActive={activeBlockId === block.id}
                     canDelete={currentBlocks.length > 1}
                     editorRefs={editorRefs}
-                    onFocus={() => setActiveBlockId(block.id)}
+                    onFocus={() => handleBlockFocus(block.id)}
                     onChange={(val) => handleBlockChange(block.id, val)}
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                     onTitleChange={(title) => handleBlockTitleChange(block.id, title)}
@@ -2075,7 +2071,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>
             미리보기
           </div>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 50vh 64px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 100vh 64px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
             <div style={activeTab === 'question' ? {
               background: '#ffffff', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
