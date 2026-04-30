@@ -76,7 +76,9 @@ function preprocessLocale(text: string): string {
   const forced: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isMarkerLine = /^\((iii|ii|iv|v|i|[a-e])\)/.test(line.trimStart());
+    const isMarkerLine =
+      /^\((iii|ii|iv|v|i|[a-e])\)/.test(line.trimStart()) ||
+      /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/.test(line.trimStart());
     const prevLine = forced.length > 0 ? forced[forced.length - 1] : '';
     if (isMarkerLine && prevLine.trim() !== '') {
       forced.push('');
@@ -96,6 +98,10 @@ function preprocessLocale(text: string): string {
   t = t.replace(/^\((iii|ii|iv|v|i)\)/gm, (_, r) =>
     `<span class="marker-giyeok">${giyeok[r]}.</span>`);
   t = t.replace(/([^a-zA-Z0-9\n])\((iii|ii|iv|v|i)\)/g, (_, pre, r) => `${pre}${giyeok[r]}.`);
+
+  // 4-1. ①②③ … 행 시작: marker span(내어쓰기용)
+  t = t.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])\s*/gm,
+    (_, ch) => `<span class="marker-circled">${ch}</span>`);
 
   // 5. Fig.N → [그림N]
   t = t.replace(/\bFig\.(\d+)/g, '[그림$1]');

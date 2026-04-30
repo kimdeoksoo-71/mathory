@@ -144,14 +144,21 @@ textarea:focus-visible {
 /* ═══ List Styles — Ordered & Unordered ═══ */
 
 /* Unordered list: 점 내어쓰기 */
+/* ul — 마커는 3em에 hang out, 본문은 5em (원숫자 리스트와 동일 정렬) */
 ul {
-  list-style: disc;
-  padding-left: 2em;
+  list-style: none;
+  padding-left: 5em;
   margin: 0.4em 0;
 }
-
-ul ul {
-  list-style: circle;
+ul li::before {
+  content: "•";
+  display: inline-block;
+  width: 2em;
+  margin-left: -2em;
+  font-weight: bold;
+}
+ul ul li::before {
+  content: "◦";
 }
 
 /* Ordered list: 기본 숫자 (locale 변환은 전처리기에서 처리) */
@@ -170,6 +177,18 @@ p:has(.marker-gana) {
 p:has(.marker-giyeok) {
   padding-left: 2em;
   text-indent: -2em;
+}
+
+/* ① ② ③ ... 원숫자 리스트 — 마커는 3em에 hang out, 본문은 5em */
+.marker-circled {
+  display: inline-block;
+  min-width: 2em;
+  font-weight: 600;
+  text-indent: 0;
+}
+p:has(.marker-circled) {
+  padding-left: 5em !important;
+  text-indent: -2em !important;
 }
 
 /* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */

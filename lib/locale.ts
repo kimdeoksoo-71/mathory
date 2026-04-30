@@ -59,7 +59,9 @@ function insertMarkerLineBreaks(text: string): string {
   const result: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isMarkerLine = /^\s*\((iii|ii|iv|v|i|[a-e])\)/.test(line);
+    const isMarkerLine =
+      /^\s*\((iii|ii|iv|v|i|[a-e])\)/.test(line) ||
+      /^\s*[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/.test(line);
     const prevLine = result.length > 0 ? result[result.length - 1] : '';
     if (isMarkerLine && prevLine.trim() !== '') {
       result.push('');
@@ -93,6 +95,12 @@ function convertRomanList(text: string): string {
     return korean ? `${pre}${korean}.` : `${pre}(${r})`;
   });
   return result;
+}
+
+/** ①②③ … 행 시작 → marker span (수식 표시와 같은 들여쓰기) */
+function convertCircledList(text: string): string {
+  return text.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])\s*/gm,
+    (_, ch) => `<span class="marker-circled">${ch}</span>`);
 }
 
 /** \ref{n} → ㉠ (텍스트 영역) */
@@ -139,6 +147,7 @@ export function preprocessLocale(text: string, locale: Locale): string {
   // 3단계: 텍스트 변환
   processed = convertAlphaList(processed);
   processed = convertRomanList(processed);
+  processed = convertCircledList(processed);
   processed = convertRefReferences(processed);
   processed = convertTextTags(processed);
   processed = convertFigureLabels(processed);
@@ -152,6 +161,7 @@ export {
   insertMarkerLineBreaks,
   convertAlphaList,
   convertRomanList,
+  convertCircledList,
   convertRefReferences,
   convertTextTags,
   convertFigureLabels,

@@ -51,8 +51,10 @@
 .print-body blockquote, .print-body .text-box { border: 0.3mm solid #000; padding: 6pt 8pt; margin: 6pt 0; break-inside: avoid; }
 .print-body ol { margin: 4pt 0; padding-left: 24pt; list-style-position: outside; }
 .print-body ol li { margin-bottom: 3pt; padding-left: 2pt; }
-.print-body ul { margin: 4pt 0; padding-left: 2em; list-style-position: outside; }
+.print-body ul { margin: 4pt 0; padding-left: 5em; list-style: none; }
 .print-body ul li { margin-bottom: 3pt; }
+.print-body ul li::before { content: "•"; display: inline-block; width: 2em; margin-left: -2em; font-weight: bold; }
+.print-body ul ul li::before { content: "◦"; }
 .print-body img { max-width: 100%; height: auto; break-inside: avoid; }
 .print-body hr { border: none; border-top: 0.1mm solid #999; margin: 8pt 0; }
 /* 독립행 수식: 위는 기존 값(8pt), 아래는 1.8배(14.4pt) */
@@ -75,6 +77,8 @@
 .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
 p:has(> .marker-gana:first-child),
 p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
+.marker-circled { display: inline-block; min-width: 2em; font-weight: 600; text-indent: 0; }
+p:has(.marker-circled) { padding-left: 5em; text-indent: -2em; }
 
 /* ── bordered 블록 (gana, roman, box) ── */
 .print-bordered-block {
