@@ -1,4 +1,5 @@
 import React from 'react';
+import { IconBlockchain } from './Icons';
 
 interface BadgeSource {
   blockchain?: { latest?: { contentHash: string } } | null;
@@ -11,8 +12,8 @@ interface Props {
 }
 
 /**
- * 블록체인 등록된 문제에 표시되는 자물쇠 배지.
- * 등록된 해시와 현재 contentHash 가 다르면 "수정됨" 상태(회색).
+ * 블록체인 등록된 문제에 표시되는 배지.
+ * 등록된 해시와 현재 contentHash 가 다르면 "수정됨" 상태(흐림).
  */
 export default function BlockchainBadge({ problem, size = 14 }: Props) {
   const latest = problem.blockchain?.latest;
@@ -31,13 +32,13 @@ export default function BlockchainBadge({ problem, size = 14 }: Props) {
       style={{
         display: 'inline-flex',
         alignItems: 'center',
-        fontSize: size,
         marginLeft: 6,
         opacity: isModified ? 0.55 : 1,
         verticalAlign: 'middle',
+        color: 'currentColor',
       }}
     >
-      🔒
+      <IconBlockchain size={size} />
     </span>
   );
 }

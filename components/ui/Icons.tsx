@@ -17,6 +17,21 @@ export function IconSidebar({ size = 20, color = 'currentColor' }: IconProps) {
   );
 }
 
+export function IconBlockchain({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter">
+      <rect x="1" y="1" width="8" height="8" />
+      <rect x="15" y="1" width="8" height="8" />
+      <rect x="1" y="15" width="8" height="8" />
+      <rect x="15" y="15" width="8" height="8" />
+      <line x1="9" y1="5" x2="15" y2="5" />
+      <line x1="9" y1="19" x2="15" y2="19" />
+      <line x1="5" y1="9" x2="5" y2="15" />
+      <line x1="19" y1="9" x2="19" y2="15" />
+    </svg>
+  );
+}
+
 export function IconPlus({ size = 18, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">

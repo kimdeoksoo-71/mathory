@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Problem, ProblemWithBlocks, BlockchainRecord, DEFAULT_TABS } from '../../types/problem';
 import { computeContentHash, formatRegisteredAt } from '../../lib/copyright';
 import { getProblemWithBlocks, updateProblem } from '../../lib/firestore';
+import { IconBlockchain } from '../ui/Icons';
 
 interface Props {
   /** 표시에 필요한 최소 정보. ProblemWithBlocks 면 등록 시 추가 fetch 생략. */
@@ -134,7 +135,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
               color: isModified ? 'var(--accent-danger, #e53935)' : 'var(--text-primary)',
             }}
           >
-            <span>🔒</span>
+            <IconBlockchain size={14} />
             <span>{isModified ? '블록체인 등록됨 (수정됨)' : '블록체인 등록됨'}</span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -156,7 +157,12 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
           </a>
           {isOwner && isModified && (
             <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-              {registering ? '⏳ 기록 중...' : '🔗 변경사항 재등록'}
+              {registering ? '기록 중...' : (
+                <>
+                  <IconBlockchain size={13} />
+                  변경사항 재등록
+                </>
+              )}
             </button>
           )}
         </>
@@ -166,7 +172,12 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             아직 블록체인에 등록되지 않은 문제입니다.
           </div>
           <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-            {registering ? '⏳ 블록체인 기록 중...' : '🔗 블록체인 등록하기'}
+            {registering ? '블록체인 기록 중...' : (
+              <>
+                <IconBlockchain size={13} />
+                블록체인 등록하기
+              </>
+            )}
           </button>
         </>
       ) : (
