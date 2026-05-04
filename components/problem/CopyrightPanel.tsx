@@ -1,16 +1,21 @@
 'use client';
 
 import { useState } from 'react';
-import { ProblemWithBlocks, BlockchainRecord, DEFAULT_TABS } from '../../types/problem';
+import { Problem, ProblemWithBlocks, BlockchainRecord, DEFAULT_TABS } from '../../types/problem';
 import { computeContentHash, formatRegisteredAt } from '../../lib/copyright';
-import { updateProblem } from '../../lib/firestore';
+import { getProblemWithBlocks, updateProblem } from '../../lib/firestore';
 
 interface Props {
-  problem: ProblemWithBlocks;
+  /** 표시에 필요한 최소 정보. ProblemWithBlocks 면 등록 시 추가 fetch 생략. */
+  problem: Problem | ProblemWithBlocks;
   isOwner: boolean;
   /** authorUid 가 없는 기존 문제를 등록할 때 채워 넣을 사용자 UID */
   currentUserUid?: string;
   onUpdated?: () => void;
+}
+
+function hasBlocks(p: Problem | ProblemWithBlocks): p is ProblemWithBlocks {
+  return (p as ProblemWithBlocks).tabBlocks !== undefined;
 }
 
 export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpdated }: Props) {
@@ -22,7 +27,6 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
   const isModified = !!latest && !!currentHash && latest.contentHash !== currentHash;
 
   const handleRegister = async () => {
-    // authorUid 가 없으면 현재 사용자를 작성자로 채워넣음 (기존 문제 마이그레이션)
     const authorUid = problem.authorUid || currentUserUid;
     if (!authorUid) {
       setError('로그인 정보를 확인할 수 없습니다.');
@@ -31,11 +35,21 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
     setRegistering(true);
     setError(null);
     try {
+      // 블록이 없으면 fetch
+      let withBlocks: ProblemWithBlocks;
+      if (hasBlocks(problem)) {
+        withBlocks = problem;
+      } else {
+        const fetched = await getProblemWithBlocks(problem.id);
+        if (!fetched) throw new Error('문제 데이터를 불러올 수 없습니다.');
+        withBlocks = fetched;
+      }
+
       const hash = await computeContentHash({
         authorUid,
-        createdAt: problem.created_at.toISOString(),
-        tabs: problem.tabs || DEFAULT_TABS,
-        tabBlocks: problem.tabBlocks,
+        createdAt: withBlocks.created_at.toISOString(),
+        tabs: withBlocks.tabs || DEFAULT_TABS,
+        tabBlocks: withBlocks.tabBlocks,
       });
 
       if (latest && latest.contentHash === hash) {
@@ -65,7 +79,6 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
         copyright: { contentHash: hash },
         blockchain: { history: newHistory, latest: record },
       };
-      // authorUid 가 없던 기존 문제면 함께 채워넣음
       if (!problem.authorUid && currentUserUid) {
         updatePayload.authorUid = currentUserUid;
       }

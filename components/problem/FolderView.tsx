@@ -7,6 +7,8 @@ import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import BlockchainBadge from '../ui/BlockchainBadge';
+import CopyrightPanel from './CopyrightPanel';
+import useAuth from '../../hooks/useAuth';
 import {
   IconEdit, IconRename, IconTrash, IconCopy, IconChevron, IconChevronLeft,
   IconFolder, IconInbox,
@@ -76,6 +78,7 @@ function formatDateTime(d?: Date): string {
 export default function FolderView({
   folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated,
 }: FolderViewProps) {
+  const { user } = useAuth();
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
   const [blocksLoading, setBlocksLoading] = useState(false);
@@ -406,6 +409,13 @@ export default function FolderView({
                     {formatDateTime(selectedProblem.updated_at)}
                   </div>
                 </div>
+
+                <CopyrightPanel
+                  problem={selectedProblem}
+                  isOwner={!!user && (!selectedProblem.authorUid || user.uid === selectedProblem.authorUid)}
+                  currentUserUid={user?.uid}
+                  onUpdated={() => onUpdated?.()}
+                />
               </>
             )}
           </>
