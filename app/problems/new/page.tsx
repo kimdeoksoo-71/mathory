@@ -51,6 +51,7 @@ export default function NewProblemPage() {
         difficulty,
         tags: [],
         answer,
+        authorUid: user.uid,
       });
 
       for (let i = 0; i < questionBlocks.length; i++) {

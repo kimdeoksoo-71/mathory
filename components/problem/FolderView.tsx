@@ -6,6 +6,7 @@ import { getQuestionBlocks, updateProblem, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
+import BlockchainBadge from '../ui/BlockchainBadge';
 import {
   IconEdit, IconRename, IconTrash, IconCopy, IconChevron, IconChevronLeft,
   IconFolder, IconInbox,
@@ -281,11 +282,13 @@ export default function FolderView({
                     fontFamily: 'var(--font-ui)',
                     color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
                     cursor: 'pointer', transition: 'color 0.15s',
+                    display: 'flex', alignItems: 'center',
                   }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
                   onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
                 >
-                  {problem.title}
+                  <span>{problem.title}</span>
+                  <BlockchainBadge problem={problem} size={14} />
                 </h2>
                 <div className="problem-content-scaled problem-content-toned" style={{
                   background: '#ffffff', padding: '20px 24px', borderRadius: 8,

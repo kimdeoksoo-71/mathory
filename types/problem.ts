@@ -13,6 +13,27 @@ export interface Problem {
   tabs?: TabMeta[];
   created_at: Date;
   updated_at: Date;
+  // Phase 29: 저작권 / 블록체인
+  authorUid?: string;
+  copyright?: CopyrightField;
+  blockchain?: BlockchainField | null;
+}
+
+export interface CopyrightField {
+  contentHash: string;
+}
+
+export interface BlockchainRecord {
+  txHash: string;
+  contentHash: string;
+  registeredAt: string;   // ISO
+  network: string;        // 'polygon'
+  explorerUrl: string;
+}
+
+export interface BlockchainField {
+  history: BlockchainRecord[];
+  latest: BlockchainRecord;
 }
 
 export interface Block {

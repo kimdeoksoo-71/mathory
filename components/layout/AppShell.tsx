@@ -131,6 +131,7 @@ export default function AppShell() {
         difficulty: 3,
         tags: [],
         answer: '',
+        authorUid: user.uid,
       });
       await saveQuestionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
       await saveSolutionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
@@ -239,7 +240,7 @@ export default function AppShell() {
       }
       case 'duplicate': {
         try {
-          const newId = await duplicateProblem(problem.id);
+          const newId = await duplicateProblem(problem.id, user?.uid);
           await loadData();
           setView({ type: 'problem', problemId: newId });
         } catch (error) {

@@ -16,6 +16,7 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
+import { computeContentHash } from '../../lib/copyright';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import {
@@ -1543,6 +1544,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       // 저장 후 리프레시
       const refreshed = await getProblemWithBlocks(problem.id);
       if (refreshed) {
+        // Phase 29: contentHash 자동 갱신 (authorUid 가 있는 문제만)
+        if (refreshed.authorUid) {
+          try {
+            const newHash = await computeContentHash({
+              authorUid: refreshed.authorUid,
+              createdAt: refreshed.created_at.toISOString(),
+              tabs: refreshed.tabs || DEFAULT_TABS,
+              tabBlocks: refreshed.tabBlocks,
+            });
+            if (newHash !== refreshed.copyright?.contentHash) {
+              await updateProblem(refreshed.id, { copyright: { contentHash: newHash } } as any);
+              refreshed.copyright = { contentHash: newHash };
+            }
+          } catch (e) {
+            console.error('contentHash 갱신 실패:', e);
+          }
+        }
+
         setProblem(refreshed);
         const loadedTabs = refreshed.tabs || DEFAULT_TABS;
         setTabs(loadedTabs);

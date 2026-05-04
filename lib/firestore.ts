@@ -23,8 +23,14 @@ export const UNASSIGNED_FOLDER_ID = '__unassigned__';
 // ===== Problem CRUD =====
 
 export async function createProblem(data: Omit<Problem, 'id' | 'created_at' | 'updated_at'>): Promise<string> {
+  // Firestore는 undefined 값을 거부하므로 사전 제거
+  const cleaned: Record<string, any> = {};
+  for (const k in data) {
+    const v = (data as any)[k];
+    if (v !== undefined) cleaned[k] = v;
+  }
   const docRef = await addDoc(collection(db, 'problems'), {
-    ...data,
+    ...cleaned,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
@@ -300,13 +306,14 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
   return result;
 }
 
-export async function duplicateProblem(problemId: string): Promise<string> {
+export async function duplicateProblem(problemId: string, authorUid?: string): Promise<string> {
   const original = await getProblemWithBlocks(problemId);
   if (!original) throw new Error('원본 문제를 찾을 수 없습니다.');
 
   const tabs = original.tabs || DEFAULT_TABS;
 
   // 새 문제 생성 (제목에 "의 사본" 추가) — undefined 필드 제거
+  // 사본은 새 작품으로 간주: copyright/blockchain 미상속, authorUid는 현재 사용자
   const newId = await createProblem(stripUndefined({
     title: `${original.title}의 사본`,
     year: original.year,
@@ -319,6 +326,7 @@ export async function duplicateProblem(problemId: string): Promise<string> {
     subject: original.subject,
     folder_id: original.folder_id,
     tabs,
+    authorUid: authorUid ?? original.authorUid,
   }) as any);
 
   // 각 탭의 블록 복제 — undefined 필드 제거

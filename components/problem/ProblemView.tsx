@@ -7,6 +7,9 @@ import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import PdfDialog from './PdfDialog';
+import CopyrightPanel from './CopyrightPanel';
+import BlockchainBadge from '../ui/BlockchainBadge';
+import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload,
@@ -48,6 +51,7 @@ function formatDateTime(d?: Date): string {
 export default function ProblemView({
   problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated, onNavigateFolder,
 }: ProblemViewProps) {
+  const { user } = useAuth();
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
@@ -338,12 +342,14 @@ export default function ProblemView({
                       margin: 0, lineHeight: 1.2,
                       fontFamily: 'var(--font-ui)',
                       cursor: 'pointer', transition: 'color 0.15s',
+                      display: 'flex', alignItems: 'center',
                     }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
                     title="클릭하여 편집"
                   >
-                    {problem.title}
+                    <span>{problem.title}</span>
+                    <BlockchainBadge problem={problem} size={16} />
                   </h1>
                 </div>
 
@@ -570,6 +576,13 @@ export default function ProblemView({
             {formatDateTime(problem.updated_at)}
           </div>
         </div>
+
+        <CopyrightPanel
+          problem={problem}
+          isOwner={!!user && (!problem.authorUid || user.uid === problem.authorUid)}
+          currentUserUid={user?.uid}
+          onUpdated={load}
+        />
       </div>}
 
       <PdfDialog
