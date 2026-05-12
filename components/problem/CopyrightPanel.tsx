@@ -68,11 +68,11 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
       if (!res.ok) throw new Error(data?.error || '등록 실패');
 
       const record: BlockchainRecord = {
-        txHash: data.txHash,
         contentHash: data.contentHash,
         registeredAt: data.registeredAt,
-        network: data.network,
-        explorerUrl: data.explorerUrl,
+        network: 'opentimestamps',
+        status: 'pending',
+        otsProof: data.otsProof,
       };
       const newHistory = [...(problem.blockchain?.history || []), record];
 
@@ -136,13 +136,22 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             }}
           >
             <IconBlockchain size={14} />
-            <span>{isModified ? '블록체인 등록됨 (수정됨)' : '블록체인 등록됨'}</span>
+            <span>
+              {isModified
+                ? '비트코인 등록됨 (수정됨)'
+                : latest.status === 'pending'
+                ? '비트코인 등록 중...'
+                : '비트코인 등록됨'}
+            </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
             {formatRegisteredAt(latest.registeredAt)}
+            {latest.status === 'pending' && (
+              <span style={{ marginLeft: 4, opacity: 0.7 }}>(블록 확정 대기 중)</span>
+            )}
           </div>
           <a
-            href={latest.explorerUrl}
+            href="https://opentimestamps.org"
             target="_blank"
             rel="noreferrer"
             style={{
@@ -153,7 +162,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
               marginBottom: 8,
             }}
           >
-            Polygonscan에서 확인 →
+            OpenTimestamps 검증 →
           </a>
           {isOwner && isModified && (
             <button onClick={handleRegister} disabled={registering} style={btnStyle}>
@@ -172,13 +181,13 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             아직 블록체인에 등록되지 않은 문제입니다.
           </div>
           <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-            {registering ? '블록체인 기록 중...' : (
-              <>
-                <IconBlockchain size={13} />
-                블록체인 등록하기
-              </>
-            )}
-          </button>
+              {registering ? '비트코인 블록체인 기록 중...' : (
+                <>
+                  <IconBlockchain size={13} />
+                  비트코인 블록체인 등록하기
+                </>
+              )}
+            </button>
         </>
       ) : (
         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>미등록</div>
