@@ -12,7 +12,7 @@ interface Props {
 }
 
 /**
- * 비트코인(OpenTimestamps) 등록된 문제에 표시되는 배지.
+ * 블록체인(OpenTimestamps) 저작권 등록된 문제에 표시되는 배지.
  * - pending: 흐리게 (블록 확정 대기 중)
  * - confirmed: 정상
  * - 수정됨: 흐리게
@@ -26,10 +26,10 @@ export default function BlockchainBadge({ problem, size = 14 }: Props) {
   const isPending = latest.status === 'pending';
 
   const title = isModified
-    ? '비트코인 등록됨 — 등록 후 수정됨 (재등록 권장)'
+    ? '블록체인 원본인증됨 — 인증 후 수정됨 (재인증 권장)'
     : isPending
-    ? '비트코인 블록체인 등록 중 (확정 대기)'
-    : '비트코인 블록체인 등록됨';
+    ? '블록체인 원본인증 중 (확정 대기)'
+    : '블록체인 원본인증됨';
 
   return (
     <span

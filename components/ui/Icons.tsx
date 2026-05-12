@@ -18,16 +18,29 @@ export function IconSidebar({ size = 20, color = 'currentColor' }: IconProps) {
 }
 
 export function IconBlockchain({ size = 14, color = 'currentColor' }: IconProps) {
+  // 3D 큐브 3개를 삼각형 배치로 연결한 블록체인 아이콘
+  // 큐브: top face(평행사변형) + left face + right face
+  const s = 0.28; // 큐브 한 변 길이 (viewBox 단위)
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="square" strokeLinejoin="miter">
-      <rect x="1" y="1" width="8" height="8" />
-      <rect x="15" y="1" width="8" height="8" />
-      <rect x="1" y="15" width="8" height="8" />
-      <rect x="15" y="15" width="8" height="8" />
-      <line x1="9" y1="5" x2="15" y2="5" />
-      <line x1="9" y1="19" x2="15" y2="19" />
-      <line x1="5" y1="9" x2="5" y2="15" />
-      <line x1="19" y1="9" x2="19" y2="15" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      {/* 상단 큐브 — 중앙 상단 */}
+      <polygon points="12,2 15.5,4 12,6 8.5,4" />
+      <polygon points="8.5,4 12,6 12,10 8.5,8" />
+      <polygon points="12,6 15.5,4 15.5,8 12,10" />
+      {/* 좌하단 큐브 */}
+      <polygon points="5,13.5 8.5,11.5 8.5,15.5 5,17.5" />
+      <polygon points="5,13.5 8.5,11.5 12,13.5 8.5,15.5" />
+      <polygon points="8.5,11.5 12,13.5 12,17.5 8.5,15.5" />
+      {/* 우하단 큐브 */}
+      <polygon points="12,13.5 15.5,11.5 19,13.5 15.5,15.5" />
+      <polygon points="12,13.5 15.5,15.5 15.5,19.5 12,17.5" />
+      <polygon points="15.5,11.5 19,13.5 19,17.5 15.5,15.5" />
+      {/* 연결선: 상단↔좌하단 */}
+      <line x1="9.5" y1="9.5" x2="7.5" y2="12" />
+      {/* 연결선: 상단↔우하단 */}
+      <line x1="14.5" y1="9.5" x2="16" y2="12" />
+      {/* 연결선: 좌하단↔우하단 */}
+      <line x1="10" y1="14.5" x2="14" y2="14.5" />
     </svg>
   );
 }

@@ -121,7 +121,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
 
   return (
     <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
-      <div style={labelStyle}>저작권</div>
+      <div style={labelStyle}>블록체인 원본인증</div>
 
       {latest ? (
         <>
@@ -138,10 +138,10 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             <IconBlockchain size={14} />
             <span>
               {isModified
-                ? '비트코인 등록됨 (수정됨)'
+                ? '블록체인 원본인증됨 (수정됨)'
                 : latest.status === 'pending'
-                ? '비트코인 등록 중...'
-                : '비트코인 등록됨'}
+                ? '블록체인 원본인증 중...'
+                : '블록체인 원본인증됨'}
             </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
@@ -169,7 +169,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
               {registering ? '기록 중...' : (
                 <>
                   <IconBlockchain size={13} />
-                  변경사항 재등록
+                  변경사항 재인증
                 </>
               )}
             </button>
@@ -178,19 +178,19 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
       ) : isOwner ? (
         <>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
-            아직 블록체인에 등록되지 않은 문제입니다.
+            아직 블록체인 원본인증이 되지 않은 문제입니다.
           </div>
           <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-              {registering ? '비트코인 블록체인 기록 중...' : (
+              {registering ? '블록체인 원본인증 중...' : (
                 <>
                   <IconBlockchain size={13} />
-                  비트코인 블록체인 등록하기
+                  블록체인 원본인증
                 </>
               )}
             </button>
         </>
       ) : (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>미등록</div>
+        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>미인증</div>
       )}
 
       {error && (
