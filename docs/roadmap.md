@@ -689,3 +689,80 @@ problems/{id}
 - **기존 교정 규칙 재사용**: OCR 후처리 스펙 두 항목(^/_ 중괄호, 조사 공백)은 Phase 27의 `autoFixDeterministicIssues`와 완전 동일 → 새 로직 작성 없이 그대로 호출.
 - **`text` 포맷 + 구분자 지정**: Mathpix `text`는 기본적으로 `\( \)`/`\[ \]` 구분자를 쓰지만 `math_inline_delimiters`/`math_display_delimiters` 파라미터로 mathory 규칙(`$`/`$$`)을 강제할 수 있음 → 클라이언트 후처리 부담 최소화.
 - **커서 이동 API의 `{}` 래핑**: `MarkdownEditor.insertText`는 `text.match(/\{\}/g)`로 **빈** 중괄호만 커서 이동 대상으로 삼음 → OCR 결과(`\frac{a}{b}` 등)는 영향 없음.
+
+## Phase 29: 블록체인 저작권 등록 기능 신설 ✅
+> 목표: 문제/풀이 콘텐츠를 블록체인 해시로 등록하여 작성 시각과 작성자를 위변조 불가능하게 증명
+
+### 29-A: 정책 / 결정사항
+
+| 항목 | 결정 |
+|------|------|
+| 두 레이어 구조 | Layer 1(자동, 무료, Firestore serverTimestamp + SHA-256) + Layer 2(선택, 버튼 클릭, 블록체인 트랜잭션) |
+| 해시 입력 범위 | 모든 탭의 모든 블록 (question + solution + extra_N) |
+| 해시 입력 정규화 | `{v, authorUid, createdAt, tabs:[{id, blocks:[{order,type,raw_text,title,imageWidth}]}]}` JSON 직렬화 |
+| authorUid 마이그레이션 | 신규 저장부터만 기록 (기존 문제는 첫 등록 시점에 현재 사용자로 자동 채움) |
+| API 인증 수준 | C2 (무인증) — 단일 사용자 운영. 오픈소스 공개 전 C1(Firebase ID 토큰)로 업그레이드 필요 |
+| 수정 후 UX | 자동 재등록 안 함, "수정됨" 배지 표시 (재등록은 사용자 선택) |
+| 배지 위치 | ProblemView/FolderView 제목 옆 (자체 SVG 아이콘) |
+| 비등록자 UI | 본인 문제만 등록 버튼 표시 |
+| 라이브러리 | viem ^2.48.8 |
+
+### 29-B: 구현
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| `types/problem.ts` 필드 확장 | ✅ | 2026-05-04 | authorUid, copyright, blockchain |
+| `lib/copyright.ts` 신규 | ✅ | 2026-05-04 | computeContentHash, formatRegisteredAt |
+| `app/api/copyright/register/route.ts` 신규 | ✅ | 2026-05-04 | 트랜잭션 전송 API |
+| EditorView 저장 시 contentHash 자동 갱신 | ✅ | 2026-05-04 | |
+| CopyrightPanel (ProblemView/FolderView 우측 패널) | ✅ | 2026-05-04 | 등록 버튼·상태 표시 |
+| BlockchainBadge (제목 옆 배지) | ✅ | 2026-05-04 | 수정 시 흐림 처리 |
+| IconBlockchain SVG | ✅ | 2026-05-04 | 4-블록 연결 아이콘 |
+| createProblem authorUid 전달 | ✅ | 2026-05-04 | AppShell, /problems/new |
+| 기존 문제 authorUid 자동 채움 | ✅ | 2026-05-04 | 첫 등록 시 현재 사용자 UID로 |
+
+### Key Learnings
+
+- **단일 사용자 단계에서는 인증 생략 가능**: API Route 인증은 정석적으로 firebase-admin + ID 토큰 검증이지만, 단일 사용자 운영 중에는 무인증 + 서버 지갑 키만으로 충분. 오픈소스 시점에 업그레이드.
+- **블록 ID는 해시 입력에서 제외**: 저장 시 delete-all → re-add 방식이라 ID가 매번 갱신됨. 해시는 `raw_text` + 메타로만 계산해야 결정적.
+- **`serverTimestamp()`는 클라이언트 SDK로도 충분**: firebase-admin 없이도 Google 서버가 직접 타임스탬프를 찍어주므로 클라이언트 조작 불가.
+- **viem `sendTransaction` 타입 우회**: `kzg` 필드 undefined 처리 + `as any` 캐스팅 필요.
+- **Vercel 환경변수는 프로젝트 레벨 등록**: 팀 레벨이 아닌 프로젝트 레벨에 등록해야 API Route에서 인식됨.
+
+## Phase 30: 블록체인 원본인증 (Polygon 복귀) ✅
+> 목표: 인증 시간 1시간+ 걸리는 OpenTimestamps의 실효성 한계를 해결하기 위해 Polygon mainnet으로 복귀. "저작권 등록" → "블록체인 원본인증"으로 용어 순화하여 법적 위험 회피.
+
+### 30-A: 정책 / 결정사항
+
+| 항목 | 결정 |
+|------|------|
+| 네트워크 | Polygon mainnet (POL 가스 토큰) |
+| 트랜잭션 형태 | 자기 주소로 0 POL 송금 + `data` 필드에 64-char hex hash |
+| Confirmation | 1 block (~2초) |
+| RPC | 기본 `polygon-rpc.com` (POLYGON_RPC_URL 환경변수로 override 가능) |
+| 서버 지갑 주소 | `0x04197058E88FE89ED12E8e4C5eD86B330Bc87328` (Mathory 01) |
+| Private key 관리 | Vercel 환경변수 `MATHORY_WALLET_PRIVATE_KEY` |
+| 초기 자본 | 50 POL (Upbit 구매 → MetaMask → Mathory 서버 지갑) |
+| 건당 비용 | 약 0.01~0.05 POL (~$0.001) |
+| 용어 | "저작권 등록" → "블록체인 원본인증" (법적 위험 회피) |
+| 검증 경로 | Polygonscan tx 상세 페이지 (data 필드 해시 직접 조회) |
+| 기존 OTS 레코드 처리 | `txHash` 없음 = 미인증 취급 → 재등록 유도 (마이그레이션 스크립트 불필요) |
+
+### 30-B: 구현
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| API Route를 viem + Polygon으로 복원 | ✅ | 2026-05-13 | `app/api/copyright/register/route.ts` |
+| `BlockchainRecord` 타입 Polygon화 | ✅ | 2026-05-13 | txHash, explorerUrl 기반 |
+| CopyrightPanel: pending 분기 제거, Polygonscan 링크 | ✅ | 2026-05-13 | |
+| BlockchainBadge: pending 분기 제거 | ✅ | 2026-05-13 | `txHash` 없는 레코드 무시 |
+| `opentimestamps` 의존성 제거 | ✅ | 2026-05-13 | `npm uninstall` |
+| Vercel 환경변수 갱신 | ⬜ | | 새 지갑 private key로 교체 (덕수 직접) |
+
+### Key Learnings
+
+- **Confirmation 시간이 UX를 결정**: OpenTimestamps는 비용 0 + 지갑 불필요라는 장점에도 불구하고 비트코인 블록 확정까지 1시간+ 걸려 실제 인증 UX 불가. 2~5초 내 확정되는 Polygon이 1인 사용자 입장에서는 훨씬 합리적.
+- **법적 용어 회피**: "저작권 등록"은 한국저작권위원회 절차를 연상시켜 오해 소지 → "블록체인 원본인증"이 정확함. 법적 안전 마진 확보.
+- **데이터 마이그레이션은 코드 가드로 대체 가능**: 기존 OTS 레코드를 Firestore에서 정리하지 않고, 표시 단계에서 `txHash` 유무로 분기 → 마이그레이션 스크립트 작성 비용 절감.
+- **지갑 private key 노출 사고**: 이전 지갑(`0x55c8...`) private key를 채팅창에 실수 입력 → 즉시 폐기하고 새 지갑(`0x0419...`) 생성. 비밀값은 절대 채팅창에 다루지 말 것.
+- **`npm uninstall`만으로 충분**: 코드에서 import 제거 후 npm uninstall하면 package-lock도 정리됨. 별도 vendoring/clean 단계 불필요.
