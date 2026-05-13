@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createWalletClient, createPublicClient, http } from 'viem';
+import { polygon } from 'viem/chains';
+import { privateKeyToAccount } from 'viem/accounts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// opentimestamps은 CommonJS 모듈
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const OpenTimestamps = require('opentimestamps');
-
 /**
  * POST /api/copyright/register
  * body: { contentHash: string (64 hex chars) }
- * OpenTimestamps 캘린더 서버에 해시를 제출하고 .ots 증명 파일을 반환.
- * 비용 무료, 지갑 불필요. 비트코인 블록 확정은 ~1시간 후 (백그라운드).
+ * Polygon mainnet 자기 주소로 0 POL 트랜잭션 전송, data 필드에 해시 기록.
+ * 인증: 없음 (단일 사용자 운영 동안의 임시 정책 — Phase 29 결정 C2)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -25,35 +24,43 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Buffer로 변환
-    const hashBuffer = Buffer.from(contentHash, 'hex');
+    const pk = process.env.MATHORY_WALLET_PRIVATE_KEY;
+    const rpc = process.env.POLYGON_RPC_URL || 'https://polygon-rpc.com';
+    if (!pk) {
+      return NextResponse.json(
+        { error: 'Server wallet not configured (MATHORY_WALLET_PRIVATE_KEY)' },
+        { status: 500 }
+      );
+    }
 
-    // OpenTimestamps DetachedTimestampFile 생성
-    const detached = OpenTimestamps.DetachedTimestampFile.fromHash(
-      new OpenTimestamps.Ops.OpSHA256(),
-      hashBuffer
-    );
+    const privateKey = (pk.startsWith('0x') ? pk : `0x${pk}`) as `0x${string}`;
+    const account = privateKeyToAccount(privateKey);
+    const wallet = createWalletClient({ account, chain: polygon, transport: http(rpc) });
+    const publicClient = createPublicClient({ chain: polygon, transport: http(rpc) });
 
-    // 캘린더 서버에 제출 (alice, bob, finney 3개 서버에 동시 제출)
-    await OpenTimestamps.stamp(detached);
+    const txHash = await wallet.sendTransaction({
+      account,
+      chain: polygon,
+      to: account.address,
+      value: 0n,
+      data: `0x${contentHash}` as `0x${string}`,
+      kzg: undefined,
+    } as any);
 
-    // .ots 증명 파일을 base64로 직렬화
-    const otsBytes = detached.serializeToBytes();
-    const otsBase64 = Buffer.from(otsBytes).toString('base64');
-
-    const registeredAt = new Date().toISOString();
+    // 1 confirmation 대기 (~2초)
+    await publicClient.waitForTransactionReceipt({ hash: txHash, confirmations: 1 });
 
     return NextResponse.json({
+      txHash,
       contentHash,
-      registeredAt,
-      network: 'opentimestamps',
-      status: 'pending',
-      otsProof: otsBase64,
+      registeredAt: new Date().toISOString(),
+      network: 'polygon',
+      explorerUrl: `https://polygonscan.com/tx/${txHash}`,
     });
   } catch (e: any) {
-    console.error('OpenTimestamps 등록 실패:', e);
+    console.error('블록체인 원본인증 실패:', e);
     return NextResponse.json(
-      { error: e?.message || 'Unknown error' },
+      { error: e?.shortMessage || e?.message || 'Unknown error' },
       { status: 500 }
     );
   }

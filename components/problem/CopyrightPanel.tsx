@@ -23,7 +23,9 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
   const [registering, setRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const latest = problem.blockchain?.latest;
+  // Polygon 레코드만 유효 — 과거 OpenTimestamps 레코드(txHash 없음)는 무시하여 재등록 유도
+  const rawLatest = problem.blockchain?.latest;
+  const latest = rawLatest && (rawLatest as any).txHash ? rawLatest : null;
   const currentHash = problem.copyright?.contentHash;
   const isModified = !!latest && !!currentHash && latest.contentHash !== currentHash;
 
@@ -68,11 +70,11 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
       if (!res.ok) throw new Error(data?.error || '등록 실패');
 
       const record: BlockchainRecord = {
+        txHash: data.txHash,
         contentHash: data.contentHash,
         registeredAt: data.registeredAt,
-        network: 'opentimestamps',
-        status: 'pending',
-        otsProof: data.otsProof,
+        network: 'polygon',
+        explorerUrl: data.explorerUrl,
       };
       const newHistory = [...(problem.blockchain?.history || []), record];
 
@@ -137,21 +139,14 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
           >
             <IconBlockchain size={14} />
             <span>
-              {isModified
-                ? '블록체인 원본인증됨 (수정됨)'
-                : latest.status === 'pending'
-                ? '블록체인 원본인증 중...'
-                : '블록체인 원본인증됨'}
+              {isModified ? '블록체인 원본인증됨 (수정됨)' : '블록체인 원본인증됨'}
             </span>
           </div>
           <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
             {formatRegisteredAt(latest.registeredAt)}
-            {latest.status === 'pending' && (
-              <span style={{ marginLeft: 4, opacity: 0.7 }}>(블록 확정 대기 중)</span>
-            )}
           </div>
           <a
-            href="https://opentimestamps.org"
+            href={latest.explorerUrl}
             target="_blank"
             rel="noreferrer"
             style={{
@@ -162,7 +157,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
               marginBottom: 8,
             }}
           >
-            OpenTimestamps 검증 →
+            Polygonscan에서 확인 →
           </a>
           {isOwner && isModified && (
             <button onClick={handleRegister} disabled={registering} style={btnStyle}>

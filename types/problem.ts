@@ -24,14 +24,11 @@ export interface CopyrightField {
 }
 
 export interface BlockchainRecord {
-  contentHash: string;
-  registeredAt: string;        // ISO — 등록 요청 시각
-  network: 'opentimestamps';
-  status: 'pending' | 'confirmed';
-  otsProof: string;            // base64-encoded .ots bytes
-  // confirmed 시 채워짐
-  bitcoinTx?: string;          // 비트코인 tx id
-  confirmedAt?: string;        // ISO
+  txHash: string;              // Polygon 트랜잭션 해시 (0x...)
+  contentHash: string;         // SHA-256 hash (64-char hex)
+  registeredAt: string;        // ISO
+  network: 'polygon';
+  explorerUrl: string;         // https://polygonscan.com/tx/{txHash}
 }
 
 export interface BlockchainField {
