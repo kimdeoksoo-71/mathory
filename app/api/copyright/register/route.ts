@@ -58,9 +58,22 @@ export async function POST(req: NextRequest) {
       explorerUrl: `https://polygonscan.com/tx/${txHash}`,
     });
   } catch (e: any) {
+    // 디버깅용: viem 에러는 여러 레이어를 가지므로 모두 노출
     console.error('블록체인 원본인증 실패:', e);
+    const detail = [
+      e?.shortMessage,
+      e?.message,
+      e?.cause?.shortMessage,
+      e?.cause?.message,
+      e?.details,
+      e?.metaMessages?.join('\n'),
+    ].filter(Boolean).join(' | ');
     return NextResponse.json(
-      { error: e?.shortMessage || e?.message || 'Unknown error' },
+      {
+        error: detail || 'Unknown error',
+        name: e?.name,
+        code: e?.code,
+      },
       { status: 500 }
     );
   }
