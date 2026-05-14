@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import useAuth from '../../../hooks/useAuth';
 
@@ -33,18 +33,21 @@ export default function MigratePage() {
     setResult(null);
     setLog([]);
     try {
-      const snap = await getDocs(collection(db, 'problems'));
-      const needAuthorUid: string[] = [];
+      // 본인 authorUid 문제 (이미 마이그레이션됐을 가능성)
+      const ownSnap = await getDocs(
+        query(collection(db, 'problems'), where('authorUid', '==', user.uid))
+      );
+      // visibility 만 누락된 케이스 체크
       const needVisibility: string[] = [];
-      snap.docs.forEach((d) => {
-        const data = d.data();
-        if (!data.authorUid) needAuthorUid.push(d.id);
-        if (!data.visibility) needVisibility.push(d.id);
+      ownSnap.docs.forEach((d) => {
+        if (!d.data().visibility) needVisibility.push(d.id);
       });
-      setResult({ total: snap.size, needAuthorUid, needVisibility });
-      appendLog(`스캔 완료: 전체 ${snap.size}개`);
-      appendLog(`authorUid 누락: ${needAuthorUid.length}개`);
+      // authorUid 자체가 없는 문제는 Rules에 막혀서 조회 불가
+      // (Rules 적용 전에 한 번이라도 마이그레이션을 돌렸으면 0개여야 정상)
+      setResult({ total: ownSnap.size, needAuthorUid: [], needVisibility });
+      appendLog(`내 authorUid 보유: ${ownSnap.size}개`);
       appendLog(`visibility 누락: ${needVisibility.length}개`);
+      appendLog('(authorUid 누락 문제는 Rules에 막혀 조회 불가. Rules 배포 전에 마이그레이션 완료했어야 함)');
     } catch (e: any) {
       appendLog(`스캔 실패: ${e?.message || e}`);
     } finally {
