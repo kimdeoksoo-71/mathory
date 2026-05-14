@@ -52,6 +52,7 @@ export default function NewProblemPage() {
         tags: [],
         answer,
         authorUid: user.uid,
+        visibility: 'private',
       });
 
       for (let i = 0; i < questionBlocks.length; i++) {

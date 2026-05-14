@@ -132,6 +132,7 @@ export default function AppShell() {
         tags: [],
         answer: '',
         authorUid: user.uid,
+        visibility: 'private',
       });
       await saveQuestionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
       await saveSolutionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });

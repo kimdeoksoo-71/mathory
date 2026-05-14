@@ -17,6 +17,18 @@ export interface Problem {
   authorUid?: string;
   copyright?: CopyrightField;
   blockchain?: BlockchainField | null;
+  // Stage 0 (공유 기능 기반): 공개 범위
+  visibility?: Visibility;
+}
+
+export type Visibility = 'private' | 'link' | 'public';
+
+export interface UserProfile {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL: string;
+  createdAt: Date;
 }
 
 export interface CopyrightField {

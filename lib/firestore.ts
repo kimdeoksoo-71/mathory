@@ -314,6 +314,7 @@ export async function duplicateProblem(problemId: string, authorUid?: string): P
 
   // 새 문제 생성 (제목에 "의 사본" 추가) — undefined 필드 제거
   // 사본은 새 작품으로 간주: copyright/blockchain 미상속, authorUid는 현재 사용자
+  // visibility는 기본 'private' (사본은 원본의 공개 범위를 자동 상속하지 않음)
   const newId = await createProblem(stripUndefined({
     title: `${original.title}의 사본`,
     year: original.year,
@@ -327,6 +328,7 @@ export async function duplicateProblem(problemId: string, authorUid?: string): P
     folder_id: original.folder_id,
     tabs,
     authorUid: authorUid ?? original.authorUid,
+    visibility: 'private' as const,
   }) as any);
 
   // 각 탭의 블록 복제 — undefined 필드 제거

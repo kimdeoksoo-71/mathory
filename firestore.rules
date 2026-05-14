@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===== users 컬렉션 =====
+    // 누구나 다른 사용자의 표시명/사진 조회 가능 (공유 시 작성자 표시용)
+    // 단, 본인 문서만 쓰기 가능
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // 사용자 스니펫: 본인만
+      match /math_snippets/{snippetId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ===== problems 컬렉션 =====
+    match /problems/{problemId} {
+
+      function isSignedIn() {
+        return request.auth != null;
+      }
+      function isOwner() {
+        return isSignedIn() && resource.data.authorUid == request.auth.uid;
+      }
+      function visibility() {
+        return resource.data.get('visibility', 'private');
+      }
+      function isLinkOrPublic() {
+        return visibility() == 'link' || visibility() == 'public';
+      }
+
+      // 읽기: 본인 OR (visibility == link/public)
+      allow read: if isOwner() || isLinkOrPublic();
+
+      // 생성: 로그인한 사용자가 자기 이름으로만 작성 가능
+      allow create: if isSignedIn()
+        && request.resource.data.authorUid == request.auth.uid;
+
+      // 수정/삭제: 본인만
+      allow update, delete: if isOwner();
+
+      // ===== problems/{id}/* 모든 서브컬렉션 =====
+      // question_blocks, solution_blocks, extra_N_blocks, comments, suggestions, versions
+      match /{subcollection}/{docId} {
+        function parentData() {
+          return get(/databases/$(database)/documents/problems/$(problemId)).data;
+        }
+        function parentOwner() {
+          return isSignedIn() && parentData().authorUid == request.auth.uid;
+        }
+        function parentVisibility() {
+          return parentData().get('visibility', 'private');
+        }
+        function parentLinkOrPublic() {
+          return parentVisibility() == 'link' || parentVisibility() == 'public';
+        }
+
+        allow read: if parentOwner() || parentLinkOrPublic();
+        allow write: if parentOwner();
+      }
+    }
+
+    // ===== folders 컬렉션 =====
+    // 본인 폴더만 R/W
+    match /folders/{folderId} {
+      allow read, update, delete: if request.auth != null
+        && resource.data.user_id == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.user_id == request.auth.uid;
+    }
+  }
+}
