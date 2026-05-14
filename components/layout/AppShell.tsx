@@ -80,16 +80,23 @@ export default function AppShell() {
   const [problemViewNonce, setProblemViewNonce] = useState(0);
 
   const loadData = useCallback(async () => {
+    if (!user) {
+      setAllProblems([]);
+      setRecentProblems([]);
+      setFolders([]);
+      setFolderCounts({});
+      return;
+    }
     try {
       const [problems, recent] = await Promise.all([
-        listProblems(),
-        listRecentProblems(10),
+        listProblems(user.uid),
+        listRecentProblems(user.uid, 10),
       ]);
       setAllProblems(problems);
       // 최근 문항에서 휴지통 문항 제외
       setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
-      if (user) {
+      {
         const userFolders = await listFolders(user.uid);
         setFolders(userFolders);
         const counts: Record<string, number> = {};
@@ -194,7 +201,8 @@ export default function AppShell() {
           : `"${folder.name}" 폴더를 삭제하시겠습니까?`;
         if (confirm(msg)) {
           try {
-            await deleteFolder(folder.id);
+            if (!user) return;
+            await deleteFolder(folder.id, user.uid);
             if (view.type === 'folder' && view.folder.id === folder.id) {
               setView({ type: 'home' });
             }
@@ -318,7 +326,8 @@ export default function AppShell() {
     }
     if (confirm(`휴지통의 ${trashCount}개 문항을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
       try {
-        await emptyTrash();
+        if (!user) return;
+        await emptyTrash(user.uid);
         setView({ type: 'home' });
         await loadData();
       } catch (error) {

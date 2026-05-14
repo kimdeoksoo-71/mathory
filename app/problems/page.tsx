@@ -22,6 +22,11 @@ export default function ProblemsPage() {
   const [difficultyFilter, setDifficultyFilter] = useState<number | ''>('');
 
   const loadProblems = async () => {
+    if (!user) {
+      setProblems([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const filter: ProblemFilter = {};
@@ -31,7 +36,7 @@ export default function ProblemsPage() {
       if (difficultyFilter) filter.difficulty = difficultyFilter;
       if (searchText.trim()) filter.searchText = searchText.trim();
 
-      const results = await listProblems(filter);
+      const results = await listProblems(user.uid, filter);
       setProblems(results);
     } catch (error) {
       console.error('문제 목록 로드 에러:', error);
@@ -42,7 +47,7 @@ export default function ProblemsPage() {
 
   useEffect(() => {
     loadProblems();
-  }, [yearFilter, examTypeFilter, categoryFilter, difficultyFilter]);
+  }, [user, yearFilter, examTypeFilter, categoryFilter, difficultyFilter]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

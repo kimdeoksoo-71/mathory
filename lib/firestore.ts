@@ -82,8 +82,13 @@ export interface ProblemFilter {
   folder_id?: string;
 }
 
-export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
-  let q = query(collection(db, 'problems'), orderBy('updated_at', 'desc'));
+export async function listProblems(userId: string, filter?: ProblemFilter): Promise<Problem[]> {
+  // Stage 0: Firestore Rules가 authorUid 기반 인가를 하므로 쿼리에도 명시 필요
+  let q = query(
+    collection(db, 'problems'),
+    where('authorUid', '==', userId),
+    orderBy('updated_at', 'desc')
+  );
 
   if (filter?.year) q = query(q, where('year', '==', filter.year));
   if (filter?.exam_type) q = query(q, where('exam_type', '==', filter.exam_type));
@@ -115,9 +120,10 @@ export async function listProblems(filter?: ProblemFilter): Promise<Problem[]> {
 }
 
 // Phase 6: 최근 문항 조회
-export async function listRecentProblems(maxCount: number = 10): Promise<Problem[]> {
+export async function listRecentProblems(userId: string, maxCount: number = 10): Promise<Problem[]> {
   const q = query(
     collection(db, 'problems'),
+    where('authorUid', '==', userId),
     orderBy('updated_at', 'desc'),
     limit(maxCount)
   );
@@ -267,9 +273,14 @@ export async function updateFolder(folderId: string, data: { name?: string; orde
   });
 }
 
-export async function deleteFolder(folderId: string): Promise<void> {
+export async function deleteFolder(folderId: string, userId: string): Promise<void> {
   // 폴더 삭제 시 해당 폴더의 문항들은 미분류로 변경
-  const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));
+  // Stage 0: Rules가 authorUid 기반 인가 → 쿼리에도 명시
+  const q = query(
+    collection(db, 'problems'),
+    where('authorUid', '==', userId),
+    where('folder_id', '==', folderId)
+  );
   const snapshot = await getDocs(q);
   const updates = snapshot.docs.map((d) =>
     updateDoc(d.ref, { folder_id: null, updated_at: serverTimestamp() })
@@ -290,8 +301,12 @@ export async function updateFolderOrders(folderOrders: { id: string; order: numb
 }
 
 // 폴더별 문항 수 조회
-export async function getFolderProblemCount(folderId: string): Promise<number> {
-  const q = query(collection(db, 'problems'), where('folder_id', '==', folderId));
+export async function getFolderProblemCount(folderId: string, userId: string): Promise<number> {
+  const q = query(
+    collection(db, 'problems'),
+    where('authorUid', '==', userId),
+    where('folder_id', '==', folderId)
+  );
   const snapshot = await getDocs(q);
   return snapshot.size;
 }
@@ -357,8 +372,12 @@ export async function moveToTrash(problemId: string): Promise<void> {
   });
 }
 
-export async function emptyTrash(): Promise<void> {
-  const q = query(collection(db, 'problems'), where('folder_id', '==', TRASH_FOLDER_ID));
+export async function emptyTrash(userId: string): Promise<void> {
+  const q = query(
+    collection(db, 'problems'),
+    where('authorUid', '==', userId),
+    where('folder_id', '==', TRASH_FOLDER_ID)
+  );
   const snapshot = await getDocs(q);
 
   for (const docSnap of snapshot.docs) {

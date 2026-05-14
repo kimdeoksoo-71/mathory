@@ -58,9 +58,10 @@ export default function FirebaseTestPage() {
   };
 
   const handleLoad = async () => {
+    if (!user) { setStatus('로그인 필요'); return; }
     try {
       setStatus('문제 목록 불러오는 중...');
-      const list = await listProblems();
+      const list = await listProblems(user.uid);
 
       const detailed: ProblemWithBlocks[] = [];
       for (const p of list) {
