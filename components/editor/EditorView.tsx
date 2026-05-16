@@ -164,6 +164,23 @@ function findMathIdAtCursor(ranges: MathRange[], cursor: number): number {
   return -1;
 }
 
+/* ─── 빠른 부드러운 스크롤 (기본 smooth는 너무 느려 멀미 유발) ─── */
+function fastScrollTo(container: HTMLElement, top: number, duration = 220) {
+  const start = container.scrollTop;
+  const delta = Math.max(0, top) - start;
+  if (Math.abs(delta) < 1) return;
+  const startTime = performance.now();
+  // easeOutCubic: 빠르게 출발해 부드럽게 정착
+  const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+  const step = (now: number) => {
+    const elapsed = now - startTime;
+    const t = Math.min(1, elapsed / duration);
+    container.scrollTop = start + delta * ease(t);
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
 function getStoredFontSize(): number {
   if (typeof window === 'undefined') return FONT_SIZE_DEFAULT;
   const stored = localStorage.getItem(FONT_SIZE_KEY);
@@ -1269,7 +1286,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const offset = targetRect.top - containerRect.top + container.scrollTop;
         // 블록 최상단을 미리보기 상단에서 살짝 아래(약 80px)로 위치
         const target = offset - 80;
-        container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        fastScrollTo(container, target);
       });
     }, 50);
   }, []);
@@ -1324,7 +1341,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           const containerRect = container.getBoundingClientRect();
           const cursorRelativeTop = coords.top - containerRect.top + container.scrollTop;
           const center = cursorRelativeTop - containerRect.height / 2;
-          container.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
+          fastScrollTo(container, center);
         }
       });
     }, 100);
@@ -1342,7 +1359,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const blockRect = (blockEl as HTMLElement).getBoundingClientRect();
       const blockTop = blockRect.top - containerRect.top + container.scrollTop;
       const target = blockTop - 80;
-      container.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+      fastScrollTo(container, target);
     }, 80);
     return () => clearTimeout(timer);
   }, [activeBlockId]);
