@@ -367,7 +367,7 @@ export default function MathSnippetMenu({
                 border: '1px solid #ddd',
                 borderRadius: 6,
                 fontSize: 13,
-                fontFamily: "'Menlo', 'Monaco', monospace",
+                fontFamily: "'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
                 outline: 'none',
                 resize: 'vertical',
                 boxSizing: 'border-box',

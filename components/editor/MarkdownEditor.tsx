@@ -602,7 +602,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             },
             '.cm-scroller': {
               overflow: 'auto',
-              fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+              fontFamily: "'Menlo', 'Monaco', 'Courier New', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
             },
             '.cm-content': {
               padding: '16px',
@@ -642,7 +642,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               backgroundColor: '#fff',
               overflow: 'hidden',
-              fontFamily: "'Menlo', 'Monaco', 'Courier New', monospace",
+              fontFamily: "'Menlo', 'Monaco', 'Courier New', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
               fontSize: '13px',
             },
             '.cm-tooltip-autocomplete ul': {
