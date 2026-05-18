@@ -163,6 +163,8 @@ export const latexHighlightPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
+      // 한글 IME 조합 중에는 decoration 재빌드 스킵 (자소 분리 방지)
+      if (update.view.composing) return;
       if (update.docChanged || update.viewportChanged) {
         this.decorations = buildDecorations(update.view);
       }
