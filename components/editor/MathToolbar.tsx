@@ -171,7 +171,7 @@ function DropdownCategory({
         style={{
           padding: '4px 8px',
           fontSize: '13px',
-          fontFamily: "'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+          fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
           backgroundColor: open ? '#e0e0e0' : '#fff',
           border: '1px solid #ccc',
           borderRadius: '4px',
@@ -307,7 +307,7 @@ function DropdownCategory({
                     background: 'none',
                     cursor: 'pointer',
                     fontSize: 13,
-                    fontFamily: "'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+                    fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
                     color: '#333',
                     textAlign: 'left',
                     whiteSpace: 'nowrap',
@@ -403,7 +403,7 @@ export default function MathToolbar({
           style={{
             padding: '4px 10px',
             fontSize: '14px',
-            fontFamily: "'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+            fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
             backgroundColor: '#fff',
             border: '1px solid #ccc',
             borderRadius: '4px',
