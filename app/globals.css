@@ -1,3 +1,7 @@
+/* ═══ Google Fonts (반드시 파일 최상단: CSS @import는 다른 규칙보다 앞에 와야 함) ═══ */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+
 /* ═══════════════════════════════════════════════
    Mathory Design System — Phase 6 Clay Theme
    Claude-inspired warm, earthy color palette
@@ -116,11 +120,6 @@ textarea:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
-
-/* ═══ Google Fonts ═══ */
-@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-
 
 /* 본문 톤다운: 텍스트는 회색조, 수식은 100% 검정 (가독성 향상) */
 .problem-content-toned { color: #6a6a6a; }
