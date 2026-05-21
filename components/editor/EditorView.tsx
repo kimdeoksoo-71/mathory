@@ -19,6 +19,8 @@ import { uploadImage } from '../../lib/storage';
 import { computeContentHash } from '../../lib/copyright';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
+import useAuth from '../../hooks/useAuth';
+import ShareDialog from './ShareDialog';
 import {
   IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
@@ -596,8 +598,10 @@ interface EditorViewProps {
 /* ═══ 메인 EditorView ═══ */
 
 export default function EditorView({ problemId, folders, onBack }: EditorViewProps) {
+  const { user } = useAuth();
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
 
   // ── 동적 탭 ──
   const [tabs, setTabs] = useState<TabMeta[]>(DEFAULT_TABS);
@@ -1741,6 +1745,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <IconSave /> {saving ? '저장 중...' : '저장'}
         </button>
 
+        {/* 공유 버튼 (Stage 1) */}
+        <button
+          onClick={() => setShareDialogOpen(true)}
+          disabled={!user}
+          title={user ? '공유 링크 생성' : '로그인 후 공유 가능'}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+            background: 'transparent',
+            color: user ? 'var(--accent-primary)' : 'var(--text-faint)',
+            border: `1px solid ${user ? 'var(--accent-primary)' : 'var(--border-light)'}`,
+            borderRadius: 8, cursor: user ? 'pointer' : 'not-allowed',
+            fontSize: 13, fontWeight: 500, fontFamily: 'var(--font-ui)',
+          }}
+        >
+          공유
+        </button>
+
         {/* ─── 글꼴 크기 조절 ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
@@ -2164,6 +2185,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
       </div>
+
+      {/* 공유 다이얼로그 (Stage 1) */}
+      {shareDialogOpen && user && (
+        <ShareDialog
+          problemId={problemId}
+          ownerUid={user.uid}
+          tabs={tabs}
+          onClose={() => setShareDialogOpen(false)}
+        />
+      )}
     </div>
   );
 }

@@ -28,12 +28,14 @@ service cloud.firestore {
       function visibility() {
         return resource.data.get('visibility', 'private');
       }
-      function isLinkOrPublic() {
-        return visibility() == 'link' || visibility() == 'public';
+      function isPublic() {
+        return visibility() == 'public';
       }
 
-      // 읽기: 본인 OR (visibility == link/public)
-      allow read: if isOwner() || isLinkOrPublic();
+      // 읽기: 본인 OR public.
+      // 'link' 공유는 별도 shares/{shareId} 문서에 스냅샷을 저장하는 방식이므로
+      // 여기서 'link' visibility는 따로 처리하지 않는다.
+      allow read: if isOwner() || isPublic();
 
       // 생성: 로그인한 사용자가 자기 이름으로만 작성 가능
       allow create: if isSignedIn()
@@ -54,13 +56,36 @@ service cloud.firestore {
         function parentVisibility() {
           return parentData().get('visibility', 'private');
         }
-        function parentLinkOrPublic() {
-          return parentVisibility() == 'link' || parentVisibility() == 'public';
+        function parentIsPublic() {
+          return parentVisibility() == 'public';
         }
 
-        allow read: if parentOwner() || parentLinkOrPublic();
+        // 'link' 공유는 shares 스냅샷으로 별도 처리 (여기서 link 허용 안 함)
+        allow read: if parentOwner() || parentIsPublic();
         allow write: if parentOwner();
       }
+    }
+
+    // ===== shares 컬렉션 (Stage 1: 공유 링크 — 스냅샷 모델) =====
+    //   - share 문서에 problem + tabBlocks 스냅샷 + 작성자 정보를 denormalize 저장
+    //   - 뷰어는 share 문서 1건만 읽으면 됨 → problems 권한 변경 불필요, 비로그인도 접근 가능
+    //   - 만료 차단은 클라이언트의 expiresAt 검사 + 소유자의 revoke(=문서 삭제)로 강제
+    //   - 본인 소유 share listing 가능 (where ownerUid == uid)
+    match /shares/{shareId} {
+      // 읽기: 누구나 (shareId는 비밀에 가까운 nanoid)
+      allow read: if true;
+
+      // 생성: 로그인 사용자가 자기가 소유한 problem에 대해서만
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && get(/databases/$(database)/documents/problems/$(request.resource.data.problemId)).data.authorUid == request.auth.uid;
+
+      // 삭제: 소유자만 (revoke)
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+
+      // 수정은 금지 (재발급 = delete + create)
+      allow update: if false;
     }
 
     // ===== folders 컬렉션 =====

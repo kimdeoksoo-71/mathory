@@ -83,6 +83,20 @@ export interface Folder {
   created_at?: Date;
 }
 
+// ═══ Stage 1: 공유 ═══
+
+/** 공유 링크에서 각 탭의 노출 여부 */
+export type ShareTabVisibility = Record<string, boolean>;
+
+export interface Share {
+  id: string;                          // nanoid shareId
+  problemId: string;
+  ownerUid: string;
+  createdAt: Date;
+  expiresAt: Date;                     // 필수 (기본 72h, 최대 30일)
+  tabVisibility: ShareTabVisibility;   // 탭 id → 공개 여부
+}
+
 export interface ProblemWithBlocks extends Problem {
   question_blocks: Block[];
   solution_blocks: Block[];
