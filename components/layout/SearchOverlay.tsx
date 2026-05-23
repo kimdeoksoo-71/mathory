@@ -7,11 +7,19 @@ import { formatTimeAgo } from '../../lib/utils';
 
 interface SearchOverlayProps {
   problems: Problem[];
+  /** problemId → 모든 탭 본문(소문자). 비어있으면 본문 검색은 아직 인덱스 미빌드 상태 */
+  textIndex?: Record<string, string>;
+  indexLoading?: boolean;
+  /** 오버레이가 열릴 때 인덱스 빌드 요청 (AppShell이 한 번만 빌드) */
+  onRequestIndex?: () => void;
   onClose: () => void;
   onSelect: (problem: Problem) => void;
 }
 
-export default function SearchOverlay({ problems, onClose, onSelect }: SearchOverlayProps) {
+export default function SearchOverlay({
+  problems, textIndex = {}, indexLoading = false, onRequestIndex,
+  onClose, onSelect,
+}: SearchOverlayProps) {
   const [query, setQuery] = useState('');
 
   // ESC 키로 닫기
@@ -23,12 +31,17 @@ export default function SearchOverlay({ problems, onClose, onSelect }: SearchOve
     return () => document.removeEventListener('keydown', handler);
   }, [onClose]);
 
-  const filtered = problems.filter((p) =>
-    p.title.toLowerCase().includes(query.toLowerCase()) ||
-    (p.source || '').toLowerCase().includes(query.toLowerCase()) ||
-    (p.subject || p.category || '').toLowerCase().includes(query.toLowerCase()) ||
-    p.tags?.some((t) => t.toLowerCase().includes(query.toLowerCase()))
-  );
+  // 마운트 시 인덱스 빌드 요청 (이미 빌드되어 있으면 AppShell이 무시)
+  useEffect(() => { onRequestIndex?.(); }, [onRequestIndex]);
+
+  const q = query.trim().toLowerCase();
+  const filtered = !q ? problems : problems.filter((p) => {
+    const meta = `${p.title} ${p.source || ''} ${p.exam_type || ''} ${p.subject || ''} ${p.category || ''} ${(p.tags || []).join(' ')}`.toLowerCase();
+    if (meta.includes(q)) return true;
+    const body = textIndex[p.id];
+    if (body && body.includes(q)) return true;
+    return false;
+  });
 
   return (
     <div
@@ -56,13 +69,18 @@ export default function SearchOverlay({ problems, onClose, onSelect }: SearchOve
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="문항 검색..."
+            placeholder="제목·본문 검색..."
             style={{
               flex: 1, border: 'none', outline: 'none', fontSize: 15,
               color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
               background: 'transparent',
             }}
           />
+          {indexLoading && (
+            <span style={{ fontSize: 10, color: 'var(--text-faint)', whiteSpace: 'nowrap' }}>
+              본문 색인 중…
+            </span>
+          )}
           <button
             onClick={onClose}
             style={{

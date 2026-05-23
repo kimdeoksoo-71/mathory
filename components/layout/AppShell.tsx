@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase';
 import useAuth from '../../hooks/useAuth';
@@ -14,6 +14,7 @@ import {
   getProblemWithBlocks,
   duplicateProblem, moveToTrash, emptyTrash,
   TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID,
+  getProblemSearchText,
 } from '../../lib/firestore';
 import { listSharedWithMe } from '../../lib/membership';
 
@@ -77,6 +78,31 @@ export default function AppShell() {
   const [allProblems, setAllProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
   const [sharedProblems, setSharedProblems] = useState<Problem[]>([]);
+  // 검색 인덱스: problemId → 본문 텍스트(소문자). 첫 검색 시 lazy 로드.
+  const [searchTextIndex, setSearchTextIndex] = useState<Record<string, string>>({});
+  const [searchIndexLoading, setSearchIndexLoading] = useState(false);
+  const searchIndexBuiltRef = useRef(false);
+
+  const buildSearchIndex = useCallback(async () => {
+    if (searchIndexBuiltRef.current || searchIndexLoading) return;
+    searchIndexBuiltRef.current = true;
+    setSearchIndexLoading(true);
+    try {
+      const all = [...allProblems, ...sharedProblems];
+      const entries = await Promise.all(
+        all.map(async (p) => [p.id, await getProblemSearchText(p.id, p.tabs || []).catch(() => '')] as const),
+      );
+      setSearchTextIndex(Object.fromEntries(entries));
+    } finally {
+      setSearchIndexLoading(false);
+    }
+  }, [allProblems, sharedProblems, searchIndexLoading]);
+
+  // 문항 목록이 바뀌면(추가/삭제) 인덱스 무효화
+  useEffect(() => {
+    searchIndexBuiltRef.current = false;
+    setSearchTextIndex({});
+  }, [allProblems.length, sharedProblems.length]);
 
   const [view, setView] = useState<ViewState>({ type: 'home' });
   const [problemViewNonce, setProblemViewNonce] = useState(0);
@@ -453,7 +479,14 @@ export default function AppShell() {
       </main>
 
       {showSearch && (
-        <SearchOverlay problems={allProblems} onClose={() => setShowSearch(false)} onSelect={handleViewProblem} />
+        <SearchOverlay
+          problems={allProblems}
+          textIndex={searchTextIndex}
+          indexLoading={searchIndexLoading}
+          onRequestIndex={buildSearchIndex}
+          onClose={() => setShowSearch(false)}
+          onSelect={handleViewProblem}
+        />
       )}
     </div>
   );

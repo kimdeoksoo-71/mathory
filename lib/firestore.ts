@@ -192,6 +192,27 @@ export async function getQuestionBlocks(problemId: string): Promise<Block[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
 }
 
+/** 검색 인덱스용 — 한 문항의 모든 탭 블록 raw_text를 이어붙여 소문자로 반환 */
+export async function getProblemSearchText(problemId: string, tabs: TabMeta[]): Promise<string> {
+  const ordered = (tabs && tabs.length > 0) ? tabs : DEFAULT_TABS;
+  const parts: string[] = [];
+  for (const tab of ordered) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'problems', problemId, tabSubcollection(tab.id)), orderBy('order'))
+      );
+      for (const d of snap.docs) {
+        const block = d.data() as Block;
+        if (block.raw_text) parts.push(block.raw_text);
+        if (block.title) parts.push(block.title);
+      }
+    } catch {
+      // 권한 거부된 탭은 스킵
+    }
+  }
+  return parts.join('\n').toLowerCase();
+}
+
 /** 카드 미리보기용 — 첫 비어있지 않은 탭의 블록을 반환 (question 비면 solution → 그다음 탭…). */
 export async function getPreviewBlocks(problemId: string, tabs: TabMeta[]): Promise<Block[]> {
   const ordered = (tabs && tabs.length > 0) ? tabs : DEFAULT_TABS;
