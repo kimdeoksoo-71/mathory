@@ -353,6 +353,15 @@ function MemberShareSection({
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** 멤버 추가/제거/역할변경 후 "변경완료" 토스트 (1.6초 뒤 자연 페이드아웃) */
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = () => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastVisible(true);
+    toastTimerRef.current = setTimeout(() => setToastVisible(false), 1600);
+  };
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -376,13 +385,14 @@ function MemberShareSection({
       await addMember(problemId, user.uid, 'commenter');
       setSearchInput(''); setSearchResults([]);
       await onChanged();
+      showToast();
     } catch (e: any) { setError(e.message || '멤버 추가 실패'); }
     finally { setBusy(false); }
   };
 
   const handleRoleChange = async (uid: string, role: MemberRole) => {
     setBusy(true); setError(null);
-    try { await updateMemberRole(problemId, uid, role); await onChanged(); }
+    try { await updateMemberRole(problemId, uid, role); await onChanged(); showToast(); }
     catch (e: any) { setError(e.message || '역할 변경 실패'); }
     finally { setBusy(false); }
   };
@@ -390,7 +400,7 @@ function MemberShareSection({
   const handleRemove = async (uid: string) => {
     if (!confirm('이 멤버를 제거하시겠습니까?')) return;
     setBusy(true); setError(null);
-    try { await removeMember(problemId, uid); await onChanged(); }
+    try { await removeMember(problemId, uid); await onChanged(); showToast(); }
     catch (e: any) { setError(e.message || '제거 실패'); }
     finally { setBusy(false); }
   };
@@ -498,6 +508,20 @@ function MemberShareSection({
           {error}
         </div>
       )}
+
+      {/* "변경완료" 토스트 — 멤버 변경 후 1.6초 페이드아웃 */}
+      <div style={{
+        marginTop: 18,
+        textAlign: 'center',
+        fontSize: 11, fontWeight: 600,
+        color: 'var(--accent-primary, #B8845C)',
+        opacity: toastVisible ? 1 : 0,
+        transition: 'opacity 0.4s',
+        pointerEvents: 'none',
+        height: 14,
+      }}>
+        변경완료
+      </div>
     </div>
   );
 }

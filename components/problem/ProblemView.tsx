@@ -12,8 +12,11 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import SharePanel from '../editor/SharePanel';
+import { getUserProfile } from '../../lib/users';
+import { UserProfile } from '../../types/problem';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
+  IconDocLines,
   IconChevron, IconChevronLeft,
 } from '../ui/Icons';
 
@@ -43,10 +46,47 @@ function formatDate(d?: Date): string {
 
 function formatDateTime(d?: Date): string {
   if (!d) return '';
-  const base = formatDate(d);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
   const hh = String(d.getHours()).padStart(2, '0');
   const mi = String(d.getMinutes()).padStart(2, '0');
-  return `${base} : ${hh}-${mi}`;
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} : ${hh}-${mi}-${ss}`;
+}
+
+/** 하단 정보 한 줄: [라벨(고정 폭)] [값] — 라벨 폭 통일로 값 시작 x 정렬 */
+function BottomRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      marginBottom: 6, fontSize: 11, color: 'var(--text-muted)',
+      fontFamily: 'var(--font-ui)',
+    }}>
+      <span style={{ color: 'var(--text-faint)', width: 36, flexShrink: 0 }}>{label}</span>
+      {children}
+    </div>
+  );
+}
+
+/** 문제정보 한 줄: [라벨 ......... [값(고정 폭, 우측 정렬)]] */
+function CompactRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '4px 0', fontSize: 12,
+      fontFamily: 'var(--font-ui)',
+      color: 'var(--text-muted)',
+    }}>
+      <span style={{ color: 'var(--text-faint)', flex: 1 }}>{label}</span>
+      <div style={{
+        width: 130, flexShrink: 0,
+        display: 'flex', justifyContent: 'flex-end',
+      }}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export default function ProblemView({
@@ -60,6 +100,24 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Phase 1.5: 문제정보 펼침 상태 (localStorage 기억, 기본 접힘)
+  const PROBLEM_INFO_KEY = 'mathory-problem-info-open';
+  const [problemInfoOpen, setProblemInfoOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(PROBLEM_INFO_KEY);
+      if (stored === '1') setProblemInfoOpen(true);
+    } catch {}
+  }, []);
+  const toggleProblemInfo = () => {
+    setProblemInfoOpen((v) => {
+      const next = !v;
+      try { localStorage.setItem(PROBLEM_INFO_KEY, next ? '1' : '0'); } catch {}
+      return next;
+    });
+  };
+  // 저자 프로필
+  const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -74,6 +132,10 @@ export default function ProblemView({
       const next: Record<string, boolean> = {};
       tabs.forEach((t) => { next[t.id] = true; });
       setOpenTabs(next);
+      // 저자 프로필 로드 (실패는 조용히 무시)
+      if (data.authorUid) {
+        getUserProfile(data.authorUid).then(setAuthorProfile).catch(() => setAuthorProfile(null));
+      }
     }
     setLoading(false);
   }, [problemId]);
@@ -267,23 +329,33 @@ export default function ProblemView({
   };
   const metaRowStyle: React.CSSProperties = { marginBottom: 14 };
 
+  const compactInputStyle = (editable: boolean): React.CSSProperties => ({
+    width: '100%',
+    border: 'none', background: 'transparent',
+    fontSize: 12, color: 'var(--text-primary)',
+    fontFamily: 'var(--font-ui)', textAlign: 'right',
+    cursor: editable ? 'pointer' : 'default',
+    padding: '2px 0', outline: 'none',
+    boxSizing: 'border-box',
+  });
+
   interface MenuItem {
     label: string;
     icon: React.ReactNode;
     action: () => void;
     danger?: boolean;
-    /** 공유 항목 — 클릭 시 모달 대신 인라인 펼침. 좌측 chevron 아이콘으로 표시. */
-    kind?: 'share';
+    /** 공유 항목 — 클릭 시 인라인 펼침. > 기호가 우측에 표시되고 ↓로 회전. */
+    kind?: 'share' | 'spacer';
   }
 
   const menuItems: MenuItem[] = isOwnerView ? [
     { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit?.(problem) },
-    { label: '공유', icon: <IconShare size={14} />, action: () => setShareOpen((v) => !v), kind: 'share' },
     { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onDuplicate?.(problem) },
-    { label: '이름 변경', icon: <IconRename size={14} />, action: () => onRename?.(problem) },
     { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
     { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
     { label: '휴지통', icon: <IconTrash size={14} />, action: () => onTrash?.(problem), danger: true },
+    { label: 'spacer', icon: null, action: () => {}, kind: 'spacer' },
+    { label: '공유', icon: <IconShare size={14} />, action: () => setShareOpen((v) => !v), kind: 'share' },
   ] : [
     // 멤버 / 공유받은 사용자: 편집 관련 메뉴 제거. 다운로드는 허용.
     { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
@@ -474,6 +546,7 @@ export default function ProblemView({
         fontFamily: 'var(--font-ui)',
         background: '#ffffff',
         position: 'relative',
+        display: 'flex', flexDirection: 'column',
       }}>
         {/* 우측 패널 닫기 버튼 */}
         <button
@@ -493,12 +566,11 @@ export default function ProblemView({
         >
           <IconChevron size={14} />
         </button>
-        {/* 메뉴 모음 */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>
+        {/* ───── 메뉴 모음 (편집/사본/PDF/MD/휴지통 → spacer → 공유) ───── */}
+        <div style={{ marginBottom: 18 }}>
           {menuItems.map((item, i) => {
-            if (item.label === 'divider') {
-              return <div key={i} style={{ height: 1, background: 'var(--border-light)', margin: '8px 0' }} />;
+            if (item.kind === 'spacer') {
+              return <div key={i} style={{ height: 14 }} />;
             }
             const isShare = item.kind === 'share';
             const isExpanded = isShare && shareOpen;
@@ -525,25 +597,21 @@ export default function ProblemView({
                     (e.currentTarget as HTMLElement).style.background = 'none';
                   }}
                 >
-                  {isShare ? (
+                  <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {isShare && (
                     <span style={{
-                      width: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: 'var(--text-muted)',
                       transition: 'transform 0.15s',
                       transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                     }}>
                       <IconChevron size={12} />
                     </span>
-                  ) : (
-                    <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
                   )}
-                  {item.label}
                 </button>
                 {isShare && isExpanded && user && (
-                  <div style={{
-                    marginLeft: 4, padding: '6px 10px 10px',
-                    borderLeft: '2px solid var(--border-light)',
-                  }}>
+                  <div style={{ padding: '6px 10px 10px' }}>
                     <SharePanel
                       problemId={problem.id}
                       ownerUid={user.uid}
@@ -556,87 +624,118 @@ export default function ProblemView({
           })}
         </div>
 
-        {/* 메타 데이터 — 멤버는 read-only */}
-        <div style={metaRowStyle}>
-          <div style={metaLabelStyle}>폴더</div>
-          <select
-            value={problem.folder_id || ''}
-            onChange={(e) => updateField({ folder_id: e.target.value || undefined } as any)}
-            onFocus={inputFocus}
-            onBlur={inputBlur}
-            disabled={!isOwnerView}
-            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
+        {/* ───── 문제정보 (폴더/대단원/배점/정답 통합, 접힘 토글) ───── */}
+        <div style={{ marginBottom: 18 }}>
+          <button onClick={toggleProblemInfo}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 10,
+              width: '100%', padding: '7px 10px',
+              border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: 13, fontFamily: 'var(--font-ui)',
+              color: 'var(--text-primary)', borderRadius: 6, textAlign: 'left',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
           >
-            <option value="">미분류</option>
-            {folders.map((f) => (
-              <option key={f.id} value={f.id}>{f.name}</option>
-            ))}
-          </select>
+            <span style={{ opacity: 0.7, display: 'flex' }}><IconDocLines size={14} /></span>
+            <span style={{ flex: 1 }}>문제정보</span>
+            <span style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--text-muted)',
+              transition: 'transform 0.15s',
+              transform: problemInfoOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+            }}>
+              <IconChevron size={12} />
+            </span>
+          </button>
+
+          {problemInfoOpen && (
+            <div style={{ padding: '6px 10px 4px' }}>
+              <CompactRow label="폴더">
+                <select
+                  value={problem.folder_id || ''}
+                  onChange={(e) => updateField({ folder_id: e.target.value || undefined } as any)}
+                  disabled={!isOwnerView}
+                  style={compactInputStyle(isOwnerView)}
+                >
+                  <option value="">미분류</option>
+                  {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </CompactRow>
+              <CompactRow label="대단원">
+                <select
+                  value={problem.category || ''}
+                  onChange={(e) => updateField({ category: e.target.value, subject: e.target.value } as any)}
+                  disabled={!isOwnerView}
+                  style={compactInputStyle(isOwnerView)}
+                >
+                  <option value="">선택</option>
+                  {CATEGORY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </CompactRow>
+              <CompactRow label="배점">
+                <select
+                  value={problem.difficulty}
+                  onChange={(e) => updateField({ difficulty: Number(e.target.value) } as any)}
+                  disabled={!isOwnerView}
+                  style={compactInputStyle(isOwnerView)}
+                >
+                  {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+                </select>
+              </CompactRow>
+              <CompactRow label="정답">
+                <input
+                  value={problem.answer || ''}
+                  onChange={(e) => setProblem({ ...problem, answer: e.target.value })}
+                  onBlur={(e) => updateField({ answer: e.target.value } as any)}
+                  placeholder="정답"
+                  disabled={!isOwnerView}
+                  style={compactInputStyle(isOwnerView)}
+                />
+              </CompactRow>
+            </div>
+          )}
         </div>
 
-        <div style={metaRowStyle}>
-          <div style={metaLabelStyle}>대단원</div>
-          <select
-            value={problem.category || ''}
-            onChange={(e) => updateField({ category: e.target.value, subject: e.target.value } as any)}
-            onFocus={inputFocus}
-            onBlur={inputBlur}
-            disabled={!isOwnerView}
-            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
-          >
-            <option value="">선택</option>
-            {CATEGORY_OPTIONS.map((opt) => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={metaRowStyle}>
-          <div style={metaLabelStyle}>배점</div>
-          <select
-            value={problem.difficulty}
-            onChange={(e) => updateField({ difficulty: Number(e.target.value) } as any)}
-            onFocus={inputFocus}
-            onBlur={inputBlur}
-            disabled={!isOwnerView}
-            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
-          >
-            {DIFFICULTIES.map((d) => (
-              <option key={d.value} value={d.value}>{d.label}</option>
-            ))}
-          </select>
-        </div>
-
-        <div style={metaRowStyle}>
-          <div style={metaLabelStyle}>정답</div>
-          <input
-            value={problem.answer || ''}
-            onChange={(e) => setProblem({ ...problem, answer: e.target.value })}
-            onBlur={(e) => { inputBlur(e); updateField({ answer: e.target.value } as any); }}
-            onFocus={inputFocus}
-            placeholder="정답"
-            disabled={!isOwnerView}
-            style={inputStyle}
+        {/* ───── 하단 정보 묶음: 저자 / 생성 / 수정 / 원본인증 — 사이드바 맨 아래로 ───── */}
+        <div style={{
+          marginTop: 'auto', paddingTop: 14,
+          borderTop: '1px solid var(--border-light)',
+        }}>
+          {/* 저자 / 생성 / 수정 — 라벨 width 동일하게 맞춰 값 시작 x 정렬 */}
+          {problem.authorUid && (
+            <BottomRow label="저자">
+              {authorProfile?.photoURL ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={authorProfile.photoURL} alt={authorProfile.displayName}
+                  referrerPolicy="no-referrer"
+                  style={{ width: 16, height: 16, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{
+                  width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
+                  background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 600, color: '#666',
+                }}>
+                  {((authorProfile?.email || authorProfile?.displayName || '?').charAt(0)).toUpperCase()}
+                </div>
+              )}
+              <span style={{ color: 'var(--text-secondary)' }}>
+                {(authorProfile?.email || '').split('@')[0] || authorProfile?.displayName || '—'}
+              </span>
+            </BottomRow>
+          )}
+          <BottomRow label="생성">{formatDateTime(problem.created_at)}</BottomRow>
+          <BottomRow label="수정">{formatDateTime(problem.updated_at)}</BottomRow>
+          <div style={{ height: 10 }} />
+          {/* 원본인증 */}
+          <CopyrightPanel
+            problem={problem}
+            isOwner={!!user && (!problem.authorUid || user.uid === problem.authorUid)}
+            currentUserUid={user?.uid}
+            onUpdated={load}
           />
         </div>
-
-        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-            <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>생성</span>
-            {formatDate(problem.created_at)}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-            <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>최종수정</span>
-            {formatDateTime(problem.updated_at)}
-          </div>
-        </div>
-
-        <CopyrightPanel
-          problem={problem}
-          isOwner={!!user && (!problem.authorUid || user.uid === problem.authorUid)}
-          currentUserUid={user?.uid}
-          onUpdated={load}
-        />
       </div>}
 
       <PdfDialog

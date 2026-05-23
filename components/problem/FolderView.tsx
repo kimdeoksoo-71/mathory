@@ -2,16 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Problem, Block, Folder } from '../../types/problem';
-import { getQuestionBlocks, updateProblem, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
-import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
+import { getQuestionBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import BlockchainBadge from '../ui/BlockchainBadge';
-import CopyrightPanel from './CopyrightPanel';
-import useAuth from '../../hooks/useAuth';
+import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
-  IconEdit, IconRename, IconTrash, IconCopy, IconChevron, IconChevronLeft,
-  IconFolder, IconInbox,
+  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare,
 } from '../ui/Icons';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
@@ -78,13 +75,12 @@ function formatDateTime(d?: Date): string {
 export default function FolderView({
   folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated,
 }: FolderViewProps) {
-  const { user } = useAuth();
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
   const [blocksLoading, setBlocksLoading] = useState(false);
-  const [selectedProblemId, setSelectedProblemId] = useState<string | null>(null);
-  const [rightOpen, setRightOpen] = useState(false);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  // ⋮ 카드 메뉴
+  const [cardMenu, setCardMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
 
   useEffect(() => { setSort(loadSort()); }, []);
 
@@ -130,28 +126,31 @@ export default function FolderView({
     loadBlocks();
   }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSelectProblem = useCallback((problem: Problem) => {
-    setSelectedProblemId(problem.id);
-    setRightOpen(true);
-    // 클릭한 문제를 페이지 상단으로 스크롤
-    requestAnimationFrame(() => {
-      const el = document.querySelector(`[data-problem-id="${problem.id}"]`) as HTMLElement | null;
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, []);
+  /** 카드 ⋮ 메뉴 열기 — 버튼 위치 기준 */
+  const openCardMenu = (e: React.MouseEvent<HTMLButtonElement>, problem: Problem) => {
+    e.stopPropagation();
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setCardMenu({ x: rect.right, y: rect.bottom + 4, problem });
+  };
 
-  const selectedProblem = folderProblems.find((p) => p.id === selectedProblemId) || null;
+  const cardMenuItems: ContextMenuAction[] = (() => {
+    if (isTrash) return [
+      { label: '복원', icon: <IconCopy size={14} />, action: 'restore' },
+      { label: '영구 삭제', icon: <IconTrash size={14} />, action: 'delete', danger: true },
+    ];
+    if (isSharedWithMe) return [
+      { label: '공유 받기 해제', icon: <IconShare size={14} />, action: 'leave_shared', danger: true },
+    ];
+    return [
+      { label: '사본 만들기', icon: <IconCopy size={14} />, action: 'duplicate' },
+      { label: '휴지통', icon: <IconTrash size={14} />, action: 'trash', danger: true },
+    ];
+  })();
 
-  const updateField = async (patch: Record<string, any>) => {
-    if (!selectedProblem) return;
-    const clean: Record<string, any> = {};
-    for (const k in patch) { clean[k] = patch[k] === undefined ? '' : patch[k]; }
-    try {
-      await updateProblem(selectedProblem.id, clean as any);
-      onUpdated?.();
-    } catch (err) {
-      console.error('저장 실패:', err);
-    }
+  const handleCardMenuAction = (action: string) => {
+    if (!cardMenu) return;
+    onProblemAction(action, cardMenu.problem);
+    setCardMenu(null);
   };
 
   const renderBlocks = (blocks: Block[]) => {
@@ -184,252 +183,145 @@ export default function FolderView({
     });
   };
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%', background: 'transparent', border: '1px solid transparent',
-    borderRadius: 6, padding: '6px 8px', fontSize: 13, color: 'var(--text-primary)',
-    fontFamily: 'var(--font-ui)', outline: 'none', transition: 'border-color 0.15s, background 0.15s',
-    boxSizing: 'border-box',
-  };
-  const inputFocus = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.target.style.borderColor = 'var(--accent-primary)';
-    e.target.style.background = 'var(--bg-hover)';
-  };
-  const inputBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
-    e.target.style.borderColor = 'transparent';
-    e.target.style.background = 'transparent';
-  };
-  const metaLabelStyle: React.CSSProperties = {
-    fontSize: 11, fontWeight: 600, color: 'var(--text-muted)',
-    letterSpacing: 0.3, marginBottom: 4, fontFamily: 'var(--font-ui)',
-  };
-  const metaRowStyle: React.CSSProperties = { marginBottom: 14 };
-
-  const menuItems = selectedProblem ? [
-    ...(isTrash ? [
-      { label: '복원', icon: <IconCopy size={14} />, action: () => { onProblemAction('restore', selectedProblem); setRightOpen(false); } },
-      { label: '영구 삭제', icon: <IconTrash size={14} />, action: () => { onProblemAction('delete', selectedProblem); setRightOpen(false); }, danger: true },
-    ] : isSharedWithMe ? [
-      { label: '보기', icon: <IconChevron size={14} />, action: () => onView(selectedProblem) },
-      { label: '공유 받기 해제', icon: <IconTrash size={14} />, action: () => { onProblemAction('leave_shared', selectedProblem); setRightOpen(false); }, danger: true },
-    ] : [
-      { label: '보기', icon: <IconChevron size={14} />, action: () => onView(selectedProblem) },
-      { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit(selectedProblem) },
-      { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onProblemAction('duplicate', selectedProblem) },
-      { label: '이름 변경', icon: <IconRename size={14} />, action: () => onProblemAction('rename', selectedProblem) },
-      { label: '휴지통', icon: <IconTrash size={14} />, action: () => { onProblemAction('trash', selectedProblem); setRightOpen(false); }, danger: true },
-    ]),
-  ] : [];
-
   return (
     <div style={{
-      display: 'flex', flexDirection: 'row',
       flex: 1, minHeight: 0, width: '100%',
-      background: '#ffffff', fontSize: contentFontSize,
-      overflow: 'hidden', position: 'relative',
+      background: 'var(--bg-primary, #FAF9F7)',
+      fontSize: contentFontSize,
+      overflow: 'auto', position: 'relative',
     }}>
-      {/* ═══ 왼쪽: 문제 리스트 스크롤 ═══ */}
-      <div className="no-scrollbar" style={{
-        flex: 1, minWidth: 0,
-        overflow: 'auto',
-        background: 'var(--bg-primary, #FAF9F7)',
-      }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
+        {/* 폴더명 헤더 (sticky) */}
         <div style={{
-          width: `calc(35em + 64px)`, margin: '0 auto',
-          padding: '0 32px', boxSizing: 'border-box',
+          position: 'sticky', top: 0, zIndex: 5,
+          background: 'var(--bg-primary, #FAF9F7)', padding: '24px 0 12px 0',
+          borderBottom: '1px solid var(--border-light)',
+          marginBottom: 20,
+          fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
+          fontFamily: 'var(--font-ui)',
+          display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          {/* 폴더명 헤더 (sticky) */}
-          <div style={{
-            position: 'sticky', top: 0, zIndex: 5,
-            background: 'var(--bg-primary, #FAF9F7)', padding: '24px 0 12px 0',
-            borderBottom: '1px solid var(--border-light)',
-            marginBottom: 24,
-            fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
-            fontFamily: 'var(--font-ui)',
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
-              {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : isSharedWithMe ? <IconChevron size={18} /> : <IconFolder size={18} />}
-            </span>
-            <span>{folder.name}</span>
-            <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
-              ({folderProblems.length})
-            </span>
-            <div style={{ flex: 1 }} />
-            {/* 정렬 컨트롤 */}
-            <SortControls sort={sort} onChange={updateSort} />
-            {isTrash && folderProblems.length > 0 && onEmptyTrash && (
-              <button onClick={onEmptyTrash} style={{
-                border: 'none', background: 'none',
-                color: 'var(--accent-danger)', fontSize: 12, cursor: 'pointer',
-                fontFamily: 'var(--font-ui)', fontWeight: 500,
-              }}>
-                휴지통 비우기
-              </button>
-            )}
-          </div>
-
-          {blocksLoading && (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
+          <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
+            {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : isSharedWithMe ? <IconShare size={18} /> : <IconFolder size={18} />}
+          </span>
+          <span>{folder.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
+            ({folderProblems.length})
+          </span>
+          <div style={{ flex: 1 }} />
+          <SortControls sort={sort} onChange={updateSort} />
+          {isTrash && folderProblems.length > 0 && onEmptyTrash && (
+            <button onClick={onEmptyTrash} style={{
+              border: 'none', background: 'none',
+              color: 'var(--accent-danger)', fontSize: 12, cursor: 'pointer',
+              fontFamily: 'var(--font-ui)', fontWeight: 500,
+            }}>
+              휴지통 비우기
+            </button>
           )}
-          {!blocksLoading && folderProblems.length === 0 && (
-            <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
-              {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
-            </div>
-          )}
-
-          {!blocksLoading && folderProblems.map((problem) => {
-            const blocks = questionBlocksMap[problem.id] || [];
-            const isSelected = selectedProblemId === problem.id;
-            return (
-              <div key={problem.id} data-problem-id={problem.id} style={{ marginBottom: '5em', scrollMarginTop: '90px' }}>
-                <h2
-                  onClick={() => handleSelectProblem(problem)}
-                  onDoubleClick={() => onView(problem)}
-                  style={{
-                    fontSize: 18, fontWeight: 700, margin: '0 0 12px 0',
-                    fontFamily: 'var(--font-ui)',
-                    color: isSelected ? 'var(--accent-primary)' : 'var(--text-primary)',
-                    cursor: 'pointer', transition: 'color 0.15s',
-                    display: 'flex', alignItems: 'center',
-                  }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                  onMouseLeave={(e) => { if (!isSelected) (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-                >
-                  <span>{problem.title}</span>
-                  <BlockchainBadge problem={problem} size={14} />
-                </h2>
-                <div className="problem-content-scaled problem-content-toned" style={{
-                  background: '#ffffff', padding: '20px 24px', borderRadius: 8,
-                }}>
-                  <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
-                  {renderBlocks(blocks)}
-                </div>
-              </div>
-            );
-          })}
-
-          <div style={{ height: '70vh' }} />
         </div>
-      </div>
 
-      {/* ═══ 우측 패널 열기 버튼 ═══ */}
-      {!rightOpen && (
-        <button onClick={() => setRightOpen(true)} title="우측 패널 열기" style={{
-          position: 'absolute', top: 16, right: 16, zIndex: 10,
-          width: 32, height: 32,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: '1px solid var(--border-light)', borderRadius: 8,
-          background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-muted)',
-        }}>
-          <IconChevronLeft size={14} />
-        </button>
-      )}
-
-      {/* ═══ 오른쪽 패널 ═══ */}
-      {rightOpen && <div className="no-scrollbar" style={{
-        flex: 1, minWidth: 150, maxWidth: 220,
-        padding: '32px 16px', borderLeft: '1px solid var(--border-light)',
-        overflowY: 'auto', fontSize: 13, fontFamily: 'var(--font-ui)',
-        background: '#ffffff', position: 'relative',
-      }}>
-        <button onClick={() => setRightOpen(false)} title="우측 패널 닫기" style={{
-          position: 'absolute', top: 8, right: 8, width: 26, height: 26,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          border: 'none', borderRadius: 6, background: 'transparent',
-          cursor: 'pointer', color: 'var(--text-faint)',
-          transition: 'background 0.15s, color 0.15s',
-        }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)'; }}
-        >
-          <IconChevron size={14} />
-        </button>
-
-        {selectedProblem ? (
-          <>
-            <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, paddingRight: 24, color: 'var(--text-primary)' }}>
-              {selectedProblem.title}
-            </div>
-
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>
-              {menuItems.map((item, i) => (
-                <button key={i} onClick={item.action} style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '7px 10px',
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: 13, fontFamily: 'var(--font-ui)',
-                  color: (item as any).danger ? 'var(--accent-danger)' : 'var(--text-primary)',
-                  borderRadius: 6, textAlign: 'left', transition: 'background 0.15s',
-                }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = (item as any).danger ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))' : 'var(--bg-hover)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
-                >
-                  <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            {!isTrash && !isSharedWithMe && (
-              <>
-                <div style={metaRowStyle}>
-                  <div style={metaLabelStyle}>폴더</div>
-                  <select value={selectedProblem.folder_id || ''} onChange={(e) => updateField({ folder_id: e.target.value || '' })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="">미분류</option>
-                    {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                  </select>
-                </div>
-                <div style={metaRowStyle}>
-                  <div style={metaLabelStyle}>대단원</div>
-                  <select value={selectedProblem.category || ''} onChange={(e) => updateField({ category: e.target.value, subject: e.target.value })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    <option value="">선택</option>
-                    {CATEGORY_OPTIONS.map((opt) => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-                <div style={metaRowStyle}>
-                  <div style={metaLabelStyle}>배점</div>
-                  <select value={selectedProblem.difficulty} onChange={(e) => updateField({ difficulty: Number(e.target.value) })} onFocus={inputFocus} onBlur={inputBlur} style={{ ...inputStyle, cursor: 'pointer' }}>
-                    {DIFFICULTIES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
-                  </select>
-                </div>
-                <div style={metaRowStyle}>
-                  <div style={metaLabelStyle}>정답</div>
-                  <input
-                    key={selectedProblem.id}
-                    defaultValue={selectedProblem.answer || ''}
-                    onBlur={(e) => { inputBlur(e); updateField({ answer: e.target.value }); }}
-                    onFocus={inputFocus}
-                    placeholder="정답"
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 6 }}>
-                    <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>생성</span>
-                    {formatDate(selectedProblem.created_at)}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    <span style={{ color: 'var(--text-faint)', marginRight: 6 }}>최종수정</span>
-                    {formatDateTime(selectedProblem.updated_at)}
-                  </div>
-                </div>
-
-                <CopyrightPanel
-                  problem={selectedProblem}
-                  isOwner={!!user && (!selectedProblem.authorUid || user.uid === selectedProblem.authorUid)}
-                  currentUserUid={user?.uid}
-                  onUpdated={() => onUpdated?.()}
-                />
-              </>
-            )}
-          </>
-        ) : (
-          <div style={{ color: 'var(--text-muted)', fontSize: 12, textAlign: 'center', marginTop: 32 }}>
-            문제 제목을 클릭하면<br />메타 정보가 표시됩니다.
+        {blocksLoading && (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
+        )}
+        {!blocksLoading && folderProblems.length === 0 && (
+          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
+            {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
           </div>
         )}
-      </div>}
+
+        {/* ═══ 카드 그리드 — 카드 폭 고정(35em), 브라우저 폭에 따라 1~2열 자동 ═══ */}
+        {!blocksLoading && folderProblems.length > 0 && (
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, 35em)',
+            justifyContent: 'center',
+            gap: 20,
+            paddingBottom: '20vh',
+          }}>
+            {folderProblems.map((problem) => {
+              const blocks = questionBlocksMap[problem.id] || [];
+              return (
+                <div
+                  key={problem.id}
+                  onClick={() => onView(problem)}
+                  style={{
+                    background: '#ffffff',
+                    border: '1px solid var(--border-light)',
+                    borderRadius: 12,
+                    padding: '18px 22px',
+                    height: 320,
+                    overflow: 'hidden',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'box-shadow 0.15s, transform 0.15s',
+                    display: 'flex', flexDirection: 'column',
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
+                >
+                  {/* 카드 제목 + ⋮ 메뉴 */}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    marginBottom: 10, paddingRight: 4,
+                  }}>
+                    <h2 style={{
+                      flex: 1, minWidth: 0,
+                      fontSize: 16, fontWeight: 700, margin: 0,
+                      fontFamily: 'var(--font-ui)',
+                      color: 'var(--text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {problem.title}
+                    </h2>
+                    <BlockchainBadge problem={problem} size={13} />
+                    <button
+                      onClick={(e) => openCardMenu(e, problem)}
+                      title="더보기"
+                      style={{
+                        border: 'none', background: 'transparent', cursor: 'pointer',
+                        padding: 4, borderRadius: 4,
+                        color: 'var(--text-faint)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        transition: 'color 0.15s, background 0.15s',
+                      }}
+                      onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-faint)'; e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <IconDotsVertical size={16} />
+                    </button>
+                  </div>
+
+                  {/* 카드 본문 — 잘림 */}
+                  <div className="problem-content-scaled problem-content-toned" style={{
+                    flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative',
+                  }}>
+                    <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
+                    {renderBlocks(blocks)}
+                    {/* 하단 fade out 그라데이션으로 잘린 부분 자연스럽게 */}
+                    <div style={{
+                      position: 'absolute', bottom: 0, left: 0, right: 0, height: 36,
+                      background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, #ffffff 100%)',
+                      pointerEvents: 'none',
+                    }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ⋮ 카드 메뉴 */}
+      {cardMenu && (
+        <ContextMenu
+          x={cardMenu.x}
+          y={cardMenu.y}
+          items={cardMenuItems}
+          onClose={() => setCardMenu(null)}
+          onAction={handleCardMenuAction}
+        />
+      )}
     </div>
   );
 }

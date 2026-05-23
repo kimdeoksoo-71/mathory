@@ -95,22 +95,14 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
     }
   };
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: 11,
-    fontWeight: 600,
-    color: 'var(--text-muted)',
-    letterSpacing: 0.3,
-    marginBottom: 8,
-    fontFamily: 'var(--font-ui)',
-  };
   const btnStyle: React.CSSProperties = {
     width: '100%',
-    padding: '8px 12px',
+    padding: '6px 10px',
     borderRadius: 6,
     border: '1px solid var(--border-light)',
     background: 'var(--bg-card, #fff)',
     cursor: registering ? 'not-allowed' : 'pointer',
-    fontSize: 12,
+    fontSize: 11,
     color: 'var(--text-primary)',
     fontFamily: 'var(--font-ui)',
     display: 'flex',
@@ -121,75 +113,82 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
     opacity: registering ? 0.7 : 1,
   };
 
-  return (
-    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border-light)' }}>
-      <div style={labelStyle}>블록체인 원본인증</div>
+  // 정밀한 일시: yyyy-mm-dd : hh-mm-ss
+  const formatFullDateTime = (iso: string) => {
+    try {
+      const d = new Date(iso);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mi = String(d.getMinutes()).padStart(2, '0');
+      const ss = String(d.getSeconds()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd} : ${hh}-${mi}-${ss}`;
+    } catch { return iso; }
+  };
 
+  // 2·3행 들여쓰기를 1행 아이콘+간격(13+6=19)과 일치시켜 텍스트 시작 x 정렬
+  const INDENT = 19;
+
+  return (
+    <div>
       {latest ? (
         <>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              fontSize: 12,
-              marginBottom: 4,
-              color: isModified ? 'var(--accent-danger, #e53935)' : 'var(--text-primary)',
-            }}
-          >
-            <IconBlockchain size={14} />
-            <span>
-              {isModified ? '블록체인 원본인증됨 (수정됨)' : '블록체인 원본인증됨'}
-            </span>
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
-            {formatRegisteredAt(latest.registeredAt)}
-          </div>
+          {/* 1행: 아이콘 + 텍스트(Polygonscan 링크) */}
           <a
             href={latest.explorerUrl}
             target="_blank"
             rel="noreferrer"
+            title="Polygonscan에서 확인"
             style={{
+              display: 'flex', alignItems: 'center', gap: 6,
               fontSize: 11,
-              color: 'var(--accent-primary)',
+              color: isModified ? 'var(--accent-danger, #e53935)' : 'var(--text-primary)',
+              marginBottom: 4,
               textDecoration: 'none',
-              display: 'inline-block',
-              marginBottom: 8,
+              transition: 'color 0.15s',
+              cursor: 'pointer',
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary, #B8845C)';
+              const span = (e.currentTarget as HTMLElement).querySelector('span');
+              if (span) (span as HTMLElement).style.textDecoration = 'underline';
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color = isModified
+                ? 'var(--accent-danger, #e53935)'
+                : 'var(--text-primary)';
+              const span = (e.currentTarget as HTMLElement).querySelector('span');
+              if (span) (span as HTMLElement).style.textDecoration = 'none';
             }}
           >
-            Polygonscan에서 확인 →
+            <IconBlockchain size={13} />
+            <span style={{ fontWeight: 500 }}>
+              {isModified ? '블록체인 원본인증완료 (수정됨)' : '블록체인 원본인증완료'}
+            </span>
           </a>
+          {/* 2행: 들여쓰기 + 정밀 일시 */}
+          <div style={{
+            marginLeft: INDENT, fontSize: 11,
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-ui)',
+          }}>
+            {formatFullDateTime(latest.registeredAt)}
+          </div>
           {isOwner && isModified && (
-            <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-              {registering ? '기록 중...' : (
-                <>
-                  <IconBlockchain size={13} />
-                  변경사항 재인증
-                </>
-              )}
+            <button onClick={handleRegister} disabled={registering} style={{ ...btnStyle, marginTop: 10 }}>
+              {registering ? '기록 중...' : (<><IconBlockchain size={12} /> 변경사항 재인증</>)}
             </button>
           )}
         </>
       ) : isOwner ? (
-        <>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
-            아직 블록체인 원본인증이 되지 않은 문제입니다.
-          </div>
-          <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-              {registering ? '블록체인 원본인증 중...' : (
-                <>
-                  <IconBlockchain size={13} />
-                  블록체인 원본인증
-                </>
-              )}
-            </button>
-        </>
-      ) : (
-        <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>미인증</div>
-      )}
+        <button onClick={handleRegister} disabled={registering} style={btnStyle}>
+          {registering ? '원본인증 중...' : (<><IconBlockchain size={12} /> 원본인증</>)}
+        </button>
+      ) : null}
 
       {error && (
-        <div style={{ fontSize: 11, color: 'var(--accent-danger, #e53935)', marginTop: 8 }}>
+        <div style={{ fontSize: 11, color: 'var(--accent-danger, #e53935)', marginTop: 6 }}>
           {error}
         </div>
       )}
