@@ -766,3 +766,52 @@ problems/{id}
 - **데이터 마이그레이션은 코드 가드로 대체 가능**: 기존 OTS 레코드를 Firestore에서 정리하지 않고, 표시 단계에서 `txHash` 유무로 분기 → 마이그레이션 스크립트 작성 비용 절감.
 - **지갑 private key 노출 사고**: 이전 지갑(`0x55c8...`) private key를 채팅창에 실수 입력 → 즉시 폐기하고 새 지갑(`0x0419...`) 생성. 비밀값은 절대 채팅창에 다루지 말 것.
 - **`npm uninstall`만으로 충분**: 코드에서 import 제거 후 npm uninstall하면 package-lock도 정리됨. 별도 vendoring/clean 단계 불필요.
+
+## Phase 31: 공유 기능 (웹 공개 / 멤버 공유 / 댓글) ✅
+> 목표: 단일 사용자 도구에서 다중 사용자 협업 도구로 확장하는 첫 단계. 외부 비로그인 사용자에겐 링크 기반 읽기 공유, 지인에겐 멤버 기반 권한 공유, 멤버 간 토론을 위해 탭 단위 댓글까지 한 흐름으로 구축.
+
+### 31-A: 정책 / 결정사항
+
+| 항목 | 결정 |
+|------|------|
+| 공유 모델 분리 | (1) **웹에 공개** — 링크 + 비로그인 접근, 스냅샷 / (2) **멤버에 공유** — 로그인 + 역할 기반, 라이브 |
+| 멤버 역할 | viewer / commenter 2종 (편집은 오너 전용. 공동편집은 향후 워크스페이스에서) |
+| 멤버 검색 | 이메일 prefix 자동완성 → 정확 매칭으로 추가 |
+| 탭별 가시성 | `problem.memberTabVisibility` 단일 소스로 통합. 웹 공개 생성 시점에 스냅샷에 복사, 멤버 공유는 라이브 반영 |
+| 공개기간 | 1일 / 3일(기본) / 7일 / 30일 / 무기한 (`expiresAt: Date \| null`) |
+| 단일 공유 정책 | 한 문항당 활성 링크 1건 + 멤버 목록 1개 |
+| 본인 공유 해제 | 멤버가 자기 자신을 멤버 목록에서 제거 가능 (Rules `diff().affectedKeys().hasOnly()` 보호) |
+| 댓글 단위 | 탭 단위 (블록 단위는 차후 "편집 제안"에서) |
+| 댓글 권한 | 읽기: 오너 + 모든 멤버 / 작성: 오너 + commenter / 수정·삭제: 작성 본인만 / 해결됨 토글: 작성자 또는 오너 |
+| 댓글 콘텐츠 | KaTeX 수식 지원 (간소 미니 툴바: 인라인 $·분수·제곱·아래첨자·루트·적분·시그마) |
+| 알림 | (이번 Phase에서는 미구현) 향후 본인 문항 새 댓글, 내 댓글에 답글, 멤버 초대 시 인앱 알림 |
+| 인가 모델 | 웹 공개는 `shares/{shareId}` 스냅샷 단일 읽기로 단순화. 멤버 공유는 problem 문서의 `members`/`memberUids`/`memberTabVisibility` |
+| 검색 인덱스 | 사이드바 검색에 본문 lazy 인덱스 추가 (`getProblemSearchText`) — 첫 검색 시 1회 빌드 후 메모리 캐시 |
+
+### 31-B: 구현
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| `types/problem.ts`: Share, MemberRole, TabComment, memberTabVisibility 등 | ✅ | 2026-05-23 | |
+| `lib/shares.ts` — 스냅샷 모델 (nanoid shareId, 무기한 지원) | ✅ | 2026-05-23 | |
+| `lib/membership.ts` — 멤버 CRUD, 이메일 prefix 검색, listSharedWithMe | ✅ | 2026-05-23 | |
+| `lib/comments.ts` — 탭 댓글 CRUD, 스레드 빌더, resolved 토글 | ✅ | 2026-05-23 | |
+| `firestore.rules` — 멤버 기반 읽기, 탭 가시성 분기, tab_comments 전용 매치 | ✅ | 2026-05-23 | catch-all에서 tab_comments 제외 |
+| `app/shared/[shareId]/page.tsx` — 비로그인 뷰어 페이지 (탭 전환·작성자 표시·만료 처리) | ✅ | 2026-05-23 | |
+| SharePanel (인라인) — 웹 공개 / 멤버 공유 / 탭 가시성 통합 | ✅ | 2026-05-23 | ProblemView 우측 사이드바 펼침형 |
+| 사이드바 "공유 받은 문항" 특수 폴더 | ✅ | 2026-05-23 | `SHARED_WITH_ME_FOLDER_ID` |
+| FolderView 카드 그리드 + 우측 패널 제거 | ✅ | 2026-05-23 | `repeat(auto-fill, 35em)` + center |
+| ProblemView 우측 사이드바 정리: 문제정보 통합, 저자/생성/수정/원본인증 하단 묶음 | ✅ | 2026-05-23 | |
+| CommentPanel — 우측 슬라이드 + MiniMathToolbar + CommentEditor | ✅ | 2026-05-23 | 본문보다 2pt 작게, 톤다운, KaTeX `--text-primary` |
+| 사이드바 검색을 탭 본문까지 확장 | ✅ | 2026-05-23 | lazy 인덱스, 자동 무효화 |
+| 알림 (`notifications`) — 본인 문항 댓글 / 답글 / 멤버 초대 | ⬜ | | Phase 32에서 진행 |
+
+### Key Learnings
+
+- **스냅샷 vs 라이브 인가의 분리**: 웹 공개는 share 문서에 problem + tabBlocks 전체를 denormalize → 비로그인 단일 읽기로 완결. 멤버 공유는 라이브 problem 문서 직접 참조. 두 모델을 분리하니 Rules가 단순해지고 비용도 낮아짐.
+- **Firestore `list` 쿼리는 per-doc 조건이 있으면 사전 검증 불가**: 댓글 read 규칙에 `tabAllowedForMemberCmt(resource.data.tabId)` 같은 per-doc 조건을 걸자 `listAllComments` 쿼리가 전체 거부됨. 멤버 댓글 표시는 일부러 read 규칙을 단순화하고(`isMemberCmt()`만), create에서 탭 가시성 검증.
+- **`where(array-contains) + orderBy`는 복합 인덱스 필요**: `listSharedWithMe`에서 orderBy를 빼고 클라이언트 사이드 정렬로 전환 (인덱스 생성 회피).
+- **권한 거부된 탭은 폴백으로 처리**: 멤버가 숨겨진 탭의 블록 서브컬렉션을 읽으려 하면 전체 `getProblemWithBlocks` 실패 → 탭별 try/catch로 격리하고 빈 배열로 진행.
+- **카드 그리드 폭 고정 + auto-fill + center**: `repeat(auto-fill, minmax(35em, 1fr))`는 카드가 늘어남. `repeat(auto-fill, 35em)` + `justifyContent: center`로 카드 폭 고정·열 수만 반응형 조절.
+- **CSS 변수가 컴포넌트 경계를 넘는 유일한 통일성 도구**: 상단 바 높이 52px·본문 텍스트 톤 #6a6a6a·수식 색 `--text-primary` 등 세 영역에 동일 값을 강제하려면 매번 직접 하드코딩 또는 CSS 변수 활용 필수.
+- **친근한 UX 디테일이 패널 인지의 핵심**: "변경완료" 토스트 위치, 댓글 패널 X 버튼과 토글 분리, 본문이 패널 폭만큼 자동 시프트 등의 소소한 정렬이 "툴이 제대로 만들어졌다"는 인상을 결정.
