@@ -19,6 +19,8 @@ import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSu
 // ===== 특수 폴더 상수 =====
 export const TRASH_FOLDER_ID = '__trash__';
 export const UNASSIGNED_FOLDER_ID = '__unassigned__';
+// Stage 2: 멤버 공유로 받은 문항 가상 폴더
+export const SHARED_WITH_ME_FOLDER_ID = '__shared_with_me__';
 
 // ===== Problem CRUD =====
 

@@ -32,6 +32,12 @@ function toDateSafe(v: any, fallback?: Date): Date {
   return fallback || new Date();
 }
 
+/** 만료 시각이 null이거나 undefined이면 null 반환, 아니면 Date로 변환 */
+function toDateOrNull(v: any): Date | null {
+  if (v === null || v === undefined) return null;
+  return toDateSafe(v);
+}
+
 // 공유 문서에 저장하는 스냅샷 — 뷰어가 읽는 데이터 원천 (P7: 비로그인도 접근 가능)
 export interface ShareSnapshot {
   title: string;
@@ -57,7 +63,7 @@ export interface ShareWithSnapshot extends Share {
 export interface CreateShareInput {
   problemId: string;
   ownerUid: string;
-  expiryHours: number;
+  expiryHours: number | null;   // null = 무기한
   tabVisibility: ShareTabVisibility;
 }
 
@@ -107,7 +113,9 @@ export async function createShare(input: CreateShareInput): Promise<ShareWithSna
 
   const shareId = generateShareId();
   const now = new Date();
-  const expiresAt = new Date(now.getTime() + input.expiryHours * 60 * 60 * 1000);
+  const expiresAt: Date | null = input.expiryHours == null
+    ? null
+    : new Date(now.getTime() + input.expiryHours * 60 * 60 * 1000);
   const snapshot = stripUndefinedDeep(pickSnapshot(problem));
 
   const ref = doc(db, 'shares', shareId);
@@ -116,7 +124,7 @@ export async function createShare(input: CreateShareInput): Promise<ShareWithSna
     ownerUid: input.ownerUid,
     tabVisibility: input.tabVisibility,
     createdAt: serverTimestamp(),
-    expiresAt: Timestamp.fromDate(expiresAt),
+    expiresAt: expiresAt ? Timestamp.fromDate(expiresAt) : null,
     snapshot,
     ownerDisplayName: ownerProfile?.displayName || '',
     ownerPhotoURL: ownerProfile?.photoURL || '',
@@ -144,7 +152,7 @@ export async function getShare(shareId: string): Promise<ShareWithSnapshot | nul
     problemId: data.problemId,
     ownerUid: data.ownerUid,
     createdAt: toDateSafe(data.createdAt),
-    expiresAt: toDateSafe(data.expiresAt),
+    expiresAt: toDateOrNull(data.expiresAt),
     tabVisibility: data.tabVisibility || {},
     snapshot: data.snapshot || { title: '', tabs: [], tabBlocks: {} },
     ownerDisplayName: data.ownerDisplayName || '',
@@ -157,6 +165,7 @@ export async function revokeShare(shareId: string): Promise<void> {
 }
 
 export function isShareExpired(share: Share, now: Date = new Date()): boolean {
+  if (share.expiresAt === null) return false; // 무기한
   return share.expiresAt.getTime() <= now.getTime();
 }
 
@@ -179,7 +188,7 @@ export async function getShareByProblem(
     problemId: data.problemId,
     ownerUid: data.ownerUid,
     createdAt: toDateSafe(data.createdAt),
-    expiresAt: toDateSafe(data.expiresAt),
+    expiresAt: toDateOrNull(data.expiresAt),
     tabVisibility: data.tabVisibility || {},
     snapshot: data.snapshot || { title: '', tabs: [], tabBlocks: {} },
     ownerDisplayName: data.ownerDisplayName || '',

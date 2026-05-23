@@ -68,7 +68,9 @@ export default function SharedPage() {
             {share.snapshot.title || '제목 없음'}
           </div>
           <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>
-            만료: {share.expiresAt.toLocaleString('ko-KR')} · 공유 스냅샷
+            {share.expiresAt === null
+              ? '공개 기간: 무기한 · 공유 스냅샷'
+              : `만료: ${share.expiresAt.toLocaleString('ko-KR')} · 공유 스냅샷`}
           </div>
         </div>
         <OwnerBadge

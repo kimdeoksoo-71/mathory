@@ -19,7 +19,13 @@ export interface Problem {
   blockchain?: BlockchainField | null;
   // Stage 0 (공유 기능 기반): 공개 범위
   visibility?: Visibility;
+  // Stage 2 (멤버 공유)
+  members?: Record<string, MemberRole>;       // uid → role
+  memberUids?: string[];                       // array-contains 쿼리용 (members.keys()와 동기화)
+  memberTabVisibility?: Record<string, boolean>; // tabId → 공개 여부 (없으면 전부 공개)
 }
+
+export type MemberRole = 'viewer' | 'commenter';
 
 export type Visibility = 'private' | 'link' | 'public';
 
@@ -93,7 +99,7 @@ export interface Share {
   problemId: string;
   ownerUid: string;
   createdAt: Date;
-  expiresAt: Date;                     // 필수 (기본 72h, 최대 30일)
+  expiresAt: Date | null;              // null = 무기한
   tabVisibility: ShareTabVisibility;   // 탭 id → 공개 여부
 }
 

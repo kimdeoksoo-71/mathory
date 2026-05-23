@@ -6,9 +6,9 @@ import { Problem, Folder } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
-  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox,
+  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare,
 } from '../ui/Icons';
-import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID } from '../../lib/firestore';
+import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -410,6 +410,8 @@ export interface SidebarProps {
   trashCount: number;
   onSelectUnassigned: () => void;
   unassignedCount: number;
+  onSelectSharedWithMe: () => void;
+  sharedCount: number;
 }
 
 export default function Sidebar({
@@ -436,6 +438,8 @@ export default function Sidebar({
   trashCount,
   onSelectUnassigned,
   unassignedCount,
+  onSelectSharedWithMe,
+  sharedCount,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [recentOpen, setRecentOpen] = useState(true);
@@ -657,6 +661,37 @@ export default function Sidebar({
             </button>
           )}
 
+          {/* 공유 받은 문항 (Stage 2) */}
+          {!collapsed && foldersOpen && (
+            <button
+              onClick={onSelectSharedWithMe}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                width: '100%', padding: '8px 12px', paddingLeft: 34,
+                border: 'none', borderRadius: 8, cursor: 'pointer',
+                background: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                color: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
+                fontSize: 13.5,
+                fontWeight: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 600 : 400,
+                fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
+              }}
+              onMouseEnter={(e) => { if (activeFolderId !== SHARED_WITH_ME_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { if (activeFolderId !== SHARED_WITH_ME_FOLDER_ID) e.currentTarget.style.background = 'transparent'; }}
+            >
+              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 1 : 0.75 }}>
+                <IconShare size={16} />
+              </span>
+              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                공유 받은 문항
+              </span>
+              {sharedCount > 0 && (
+                <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)', borderRadius: 10, padding: '1px 7px' }}>
+                  {sharedCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* 휴지통 (항상 맨 아래, 드래그 불가) */}
           {!collapsed && foldersOpen && (
             <button
@@ -766,11 +801,77 @@ export default function Sidebar({
       </DndContext>
 
       {/* ═══ Footer: Auth ═══ */}
-      <div style={{ borderTop: '1px solid var(--border-primary)', padding: collapsed ? '8px 8px' : '8px 12px' }}>
-        {user ? (
-          <SidebarItem icon={<IconUser />} label="로그아웃" collapsed={collapsed} onClick={onLogout} />
-        ) : (
-          <SidebarItem icon={<IconGoogle />} label="Google 로그인" collapsed={collapsed} onClick={onLogin} />
+      <div style={{
+        borderTop: '1px solid var(--border-primary)',
+        padding: collapsed ? '10px 4px' : '10px 12px',
+        display: 'flex', alignItems: 'center',
+        justifyContent: collapsed ? 'center' : 'flex-start',
+        gap: 8,
+      }}>
+        {user ? (() => {
+          const idOnly = (user.email || '').split('@')[0] || user.displayName || '';
+          const photo = user.photoURL;
+          const avatar = photo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={photo} alt={idOnly} referrerPolicy="no-referrer"
+              style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+          ) : (
+            <div style={{
+              width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+              background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 600, color: '#666',
+            }}>{(idOnly || '?').charAt(0).toUpperCase()}</div>
+          );
+          return collapsed ? (
+            <button onClick={onLogout} title={idOnly || '로그아웃'}
+              style={{
+                border: 'none', background: 'transparent', cursor: 'pointer',
+                padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '50%',
+              }}>
+              {avatar}
+            </button>
+          ) : (
+            <>
+              {avatar}
+              <span style={{
+                flex: 1, minWidth: 0,
+                fontSize: 12, color: 'var(--text-secondary)',
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                fontFamily: 'var(--font-ui)',
+              }}>
+                {idOnly || '로그인됨'}
+              </span>
+              <button onClick={onLogout}
+                style={{
+                  flexShrink: 0,
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  fontSize: 11, color: 'var(--text-muted)', padding: '2px 0',
+                  fontFamily: 'var(--font-ui)',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+              >
+                로그아웃
+              </button>
+            </>
+          );
+        })() : (
+          <button onClick={onLogin}
+            title={collapsed ? 'Google 로그인' : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: collapsed ? 8 : '8px 14px', border: '1px solid var(--border-light)',
+              borderRadius: 8, background: 'transparent', cursor: 'pointer',
+              fontSize: 13, color: 'var(--text-primary)',
+              fontFamily: 'var(--font-ui)',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+          >
+            <IconGoogle size={14} />
+            {!collapsed && <span>Google 로그인</span>}
+          </button>
         )}
       </div>
     </aside>

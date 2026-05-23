@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Problem, Block, Folder } from '../../types/problem';
-import { getQuestionBlocks, updateProblem, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID } from '../../lib/firestore';
+import { getQuestionBlocks, updateProblem, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -95,9 +95,11 @@ export default function FolderView({
 
   const isTrash = folder.id === TRASH_FOLDER_ID;
   const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
+  const isSharedWithMe = folder.id === SHARED_WITH_ME_FOLDER_ID;
 
   const folderProblems = problems
     .filter((p) => {
+      if (isSharedWithMe) return true; // problems prop이 이미 공유받은 문항만 들어옴
       if (isTrash) return p.folder_id === TRASH_FOLDER_ID;
       if (isUnassigned) return !p.folder_id || p.folder_id === '';
       return p.folder_id === folder.id;
@@ -206,6 +208,9 @@ export default function FolderView({
     ...(isTrash ? [
       { label: '복원', icon: <IconCopy size={14} />, action: () => { onProblemAction('restore', selectedProblem); setRightOpen(false); } },
       { label: '영구 삭제', icon: <IconTrash size={14} />, action: () => { onProblemAction('delete', selectedProblem); setRightOpen(false); }, danger: true },
+    ] : isSharedWithMe ? [
+      { label: '보기', icon: <IconChevron size={14} />, action: () => onView(selectedProblem) },
+      { label: '공유 받기 해제', icon: <IconTrash size={14} />, action: () => { onProblemAction('leave_shared', selectedProblem); setRightOpen(false); }, danger: true },
     ] : [
       { label: '보기', icon: <IconChevron size={14} />, action: () => onView(selectedProblem) },
       { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit(selectedProblem) },
@@ -243,7 +248,7 @@ export default function FolderView({
             display: 'flex', alignItems: 'center', gap: 8,
           }}>
             <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
-              {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : <IconFolder size={18} />}
+              {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : isSharedWithMe ? <IconChevron size={18} /> : <IconFolder size={18} />}
             </span>
             <span>{folder.name}</span>
             <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
@@ -268,7 +273,7 @@ export default function FolderView({
           )}
           {!blocksLoading && folderProblems.length === 0 && (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
-              {isTrash ? '휴지통이 비어 있습니다.' : '이 폴더에 문항이 없습니다.'}
+              {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
             </div>
           )}
 
@@ -366,7 +371,7 @@ export default function FolderView({
               ))}
             </div>
 
-            {!isTrash && (
+            {!isTrash && !isSharedWithMe && (
               <>
                 <div style={metaRowStyle}>
                   <div style={metaLabelStyle}>폴더</div>

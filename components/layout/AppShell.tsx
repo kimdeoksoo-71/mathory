@@ -13,8 +13,9 @@ import {
   getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
   getProblemWithBlocks,
   duplicateProblem, moveToTrash, emptyTrash,
-  TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID,
+  TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID,
 } from '../../lib/firestore';
+import { listSharedWithMe } from '../../lib/membership';
 
 import Sidebar from '../layout/Sidebar';
 import SearchOverlay from '../layout/SearchOverlay';
@@ -75,6 +76,7 @@ export default function AppShell() {
   const [folderCounts, setFolderCounts] = useState<Record<string, number>>({});
   const [allProblems, setAllProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
+  const [sharedProblems, setSharedProblems] = useState<Problem[]>([]);
 
   const [view, setView] = useState<ViewState>({ type: 'home' });
   const [problemViewNonce, setProblemViewNonce] = useState(0);
@@ -83,16 +85,19 @@ export default function AppShell() {
     if (!user) {
       setAllProblems([]);
       setRecentProblems([]);
+      setSharedProblems([]);
       setFolders([]);
       setFolderCounts({});
       return;
     }
     try {
-      const [problems, recent] = await Promise.all([
+      const [problems, recent, shared] = await Promise.all([
         listProblems(user.uid),
         listRecentProblems(user.uid, 10),
+        listSharedWithMe(user.uid).catch(() => [] as Problem[]),
       ]);
       setAllProblems(problems);
+      setSharedProblems(shared);
       // 최근 문항에서 휴지통 문항 제외
       setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
@@ -103,9 +108,9 @@ export default function AppShell() {
         for (const f of userFolders) {
           counts[f.id] = problems.filter((p) => p.folder_id === f.id).length;
         }
-        // 휴지통 카운트
         counts[TRASH_FOLDER_ID] = problems.filter((p) => p.folder_id === TRASH_FOLDER_ID).length;
         counts[UNASSIGNED_FOLDER_ID] = problems.filter((p) => !p.folder_id || p.folder_id === '').length;
+        counts[SHARED_WITH_ME_FOLDER_ID] = shared.length;
         setFolderCounts(counts);
       }
     } catch (error) {
@@ -158,6 +163,9 @@ export default function AppShell() {
   };
   const handleSelectTrash = () => {
     setView({ type: 'folder', folder: { id: TRASH_FOLDER_ID, name: '휴지통', user_id: '', order: 99999 } });
+  };
+  const handleSelectSharedWithMe = () => {
+    setView({ type: 'folder', folder: { id: SHARED_WITH_ME_FOLDER_ID, name: '공유 받은 문항', user_id: '', order: 99997 } });
   };
   const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); setCollapsed(true); };
   const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
@@ -289,6 +297,19 @@ export default function AppShell() {
         }
         break;
       }
+      case 'leave_shared': {
+        if (!user) break;
+        if (!confirm(`"${problem.title}" 공유 받기를 해제하시겠습니까?`)) break;
+        try {
+          const { leaveAsMember } = await import('../../lib/membership');
+          await leaveAsMember(problem.id, user.uid);
+          await loadData();
+        } catch (error) {
+          console.error('공유 해제 에러:', error);
+          alert('공유 해제에 실패했습니다.');
+        }
+        break;
+      }
       case 'move': {
         const folderOptions = folders.map((f) => `${f.name}`).join(', ');
         const target = prompt(`이동할 폴더 이름 (${folderOptions}):`);
@@ -385,6 +406,8 @@ export default function AppShell() {
         trashCount={folderCounts[TRASH_FOLDER_ID] ?? 0}
         onSelectUnassigned={handleSelectUnassigned}
         unassignedCount={folderCounts[UNASSIGNED_FOLDER_ID] ?? 0}
+        onSelectSharedWithMe={handleSelectSharedWithMe}
+        sharedCount={folderCounts[SHARED_WITH_ME_FOLDER_ID] ?? 0}
       />
 
       <main style={{
@@ -397,7 +420,10 @@ export default function AppShell() {
       }}>
         {view.type === 'home' && <HomeView />}
         {view.type === 'folder' && (
-          <FolderView folder={view.folder} problems={allProblems} folders={folders}
+          <FolderView
+            folder={view.folder}
+            problems={view.folder.id === SHARED_WITH_ME_FOLDER_ID ? sharedProblems : allProblems}
+            folders={folders}
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
             onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()} />
         )}

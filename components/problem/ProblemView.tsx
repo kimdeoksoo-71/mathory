@@ -11,8 +11,9 @@ import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
+import SharePanel from '../editor/SharePanel';
 import {
-  IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload,
+  IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
   IconChevron, IconChevronLeft,
 } from '../ui/Icons';
 
@@ -58,6 +59,7 @@ export default function ProblemView({
   const [openTabs, setOpenTabs] = useState<Record<string, boolean>>({});
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -229,7 +231,13 @@ export default function ProblemView({
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>문제를 찾을 수 없습니다.</div>;
   }
 
-  const tabs = problem.tabs || DEFAULT_TABS;
+  const allTabs = problem.tabs || DEFAULT_TABS;
+  // Stage 2: 멤버는 memberTabVisibility에 따라 일부 탭만 봄. 오너는 항상 모두.
+  const isOwnerView = !!user && (!problem.authorUid || user.uid === problem.authorUid);
+  const tabs = isOwnerView
+    ? allTabs
+    : allTabs.filter((t) => problem.memberTabVisibility?.[t.id] !== false);
+  const isMemberView = !isOwnerView && !!user && (problem.memberUids?.includes(user.uid) ?? false);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -259,13 +267,27 @@ export default function ProblemView({
   };
   const metaRowStyle: React.CSSProperties = { marginBottom: 14 };
 
-  const menuItems = [
+  interface MenuItem {
+    label: string;
+    icon: React.ReactNode;
+    action: () => void;
+    danger?: boolean;
+    /** 공유 항목 — 클릭 시 모달 대신 인라인 펼침. 좌측 chevron 아이콘으로 표시. */
+    kind?: 'share';
+  }
+
+  const menuItems: MenuItem[] = isOwnerView ? [
     { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit?.(problem) },
+    { label: '공유', icon: <IconShare size={14} />, action: () => setShareOpen((v) => !v), kind: 'share' },
     { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onDuplicate?.(problem) },
     { label: '이름 변경', icon: <IconRename size={14} />, action: () => onRename?.(problem) },
     { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
     { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
     { label: '휴지통', icon: <IconTrash size={14} />, action: () => onTrash?.(problem), danger: true },
+  ] : [
+    // 멤버 / 공유받은 사용자: 편집 관련 메뉴 제거. 다운로드는 허용.
+    { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
+    { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
   ];
 
   return (
@@ -335,13 +357,13 @@ export default function ProblemView({
                     </div>
                   </div>
                   <h1
-                    onClick={() => onEdit?.(problem)}
+                    onClick={() => { if (isOwnerView) onEdit?.(problem); }}
                     style={{
                       ...mainColStyle,
                       fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
                       margin: 0, lineHeight: 1.2,
                       fontFamily: 'var(--font-ui)',
-                      cursor: 'pointer', transition: 'color 0.15s',
+                      cursor: isOwnerView ? 'pointer' : 'default', transition: 'color 0.15s',
                       display: 'flex', alignItems: 'center',
                     }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
@@ -474,39 +496,67 @@ export default function ProblemView({
         {/* 메뉴 모음 */}
         <div style={{ marginBottom: 24 }}>
           <div style={{ ...metaLabelStyle, marginBottom: 8 }}>메뉴</div>
-          {menuItems.map((item, i) =>
-            item.label === 'divider' ? (
-              <div key={i} style={{ height: 1, background: 'var(--border-light)', margin: '8px 0' }} />
-            ) : (
-              <button
-                key={i}
-                onClick={item.action}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '7px 10px',
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: 13, fontFamily: 'var(--font-ui)',
-                  color: item.danger ? 'var(--accent-danger)' : 'var(--text-primary)',
-                  borderRadius: 6, textAlign: 'left',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = item.danger
-                    ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))'
-                    : 'var(--bg-hover)';
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.background = 'none';
-                }}
-              >
-                <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
-                {item.label}
-              </button>
-            )
-          )}
+          {menuItems.map((item, i) => {
+            if (item.label === 'divider') {
+              return <div key={i} style={{ height: 1, background: 'var(--border-light)', margin: '8px 0' }} />;
+            }
+            const isShare = item.kind === 'share';
+            const isExpanded = isShare && shareOpen;
+            return (
+              <div key={i}>
+                <button
+                  onClick={item.action}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: '100%', padding: '7px 10px',
+                    border: 'none', background: 'none',
+                    cursor: 'pointer',
+                    fontSize: 13, fontFamily: 'var(--font-ui)',
+                    color: item.danger ? 'var(--accent-danger)' : 'var(--text-primary)',
+                    borderRadius: 6, textAlign: 'left',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = item.danger
+                      ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))'
+                      : 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLElement).style.background = 'none';
+                  }}
+                >
+                  {isShare ? (
+                    <span style={{
+                      width: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: 'var(--text-muted)',
+                      transition: 'transform 0.15s',
+                      transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                    }}>
+                      <IconChevron size={12} />
+                    </span>
+                  ) : (
+                    <span style={{ opacity: 0.7, display: 'flex' }}>{item.icon}</span>
+                  )}
+                  {item.label}
+                </button>
+                {isShare && isExpanded && user && (
+                  <div style={{
+                    marginLeft: 4, padding: '6px 10px 10px',
+                    borderLeft: '2px solid var(--border-light)',
+                  }}>
+                    <SharePanel
+                      problemId={problem.id}
+                      ownerUid={user.uid}
+                      tabs={allTabs}
+                    />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {/* 메타 데이터 */}
+        {/* 메타 데이터 — 멤버는 read-only */}
         <div style={metaRowStyle}>
           <div style={metaLabelStyle}>폴더</div>
           <select
@@ -514,7 +564,8 @@ export default function ProblemView({
             onChange={(e) => updateField({ folder_id: e.target.value || undefined } as any)}
             onFocus={inputFocus}
             onBlur={inputBlur}
-            style={{ ...inputStyle, cursor: 'pointer' }}
+            disabled={!isOwnerView}
+            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
           >
             <option value="">미분류</option>
             {folders.map((f) => (
@@ -530,7 +581,8 @@ export default function ProblemView({
             onChange={(e) => updateField({ category: e.target.value, subject: e.target.value } as any)}
             onFocus={inputFocus}
             onBlur={inputBlur}
-            style={{ ...inputStyle, cursor: 'pointer' }}
+            disabled={!isOwnerView}
+            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
           >
             <option value="">선택</option>
             {CATEGORY_OPTIONS.map((opt) => (
@@ -546,7 +598,8 @@ export default function ProblemView({
             onChange={(e) => updateField({ difficulty: Number(e.target.value) } as any)}
             onFocus={inputFocus}
             onBlur={inputBlur}
-            style={{ ...inputStyle, cursor: 'pointer' }}
+            disabled={!isOwnerView}
+            style={{ ...inputStyle, cursor: isOwnerView ? 'pointer' : 'default' }}
           >
             {DIFFICULTIES.map((d) => (
               <option key={d.value} value={d.value}>{d.label}</option>
@@ -562,6 +615,7 @@ export default function ProblemView({
             onBlur={(e) => { inputBlur(e); updateField({ answer: e.target.value } as any); }}
             onFocus={inputFocus}
             placeholder="정답"
+            disabled={!isOwnerView}
             style={inputStyle}
           />
         </div>
@@ -592,6 +646,7 @@ export default function ProblemView({
         onConfirm={handlePdfConfirm}
         isPrinting={isPrinting}
       />
+
     </div>
   );
 }
