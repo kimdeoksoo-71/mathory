@@ -97,7 +97,7 @@ export default function SharedPage() {
             {/* 탭 바 */}
             {visibleTabs.length > 1 && (
               <div style={{
-                width: '35em',
+                width: 'calc(35em + 72px)',
                 display: 'flex', gap: 4, marginBottom: 12,
                 borderBottom: '1px solid #ddd',
               }}>
@@ -124,7 +124,7 @@ export default function SharedPage() {
 
             {/* 활성 탭 본문 */}
             <div style={{
-              width: '35em',
+              width: 'calc(35em + 72px)',
               background: '#fff', borderRadius: 8, padding: '32px 36px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               boxSizing: 'border-box',
