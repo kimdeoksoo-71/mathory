@@ -192,6 +192,25 @@ export async function getQuestionBlocks(problemId: string): Promise<Block[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
 }
 
+/** 카드 미리보기용 — 첫 비어있지 않은 탭의 블록을 반환 (question 비면 solution → 그다음 탭…). */
+export async function getPreviewBlocks(problemId: string, tabs: TabMeta[]): Promise<Block[]> {
+  const ordered = (tabs && tabs.length > 0) ? tabs : DEFAULT_TABS;
+  for (const tab of ordered) {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'problems', problemId, tabSubcollection(tab.id)), orderBy('order'))
+      );
+      const blocks = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+      // 실제 내용이 있는 블록이 하나라도 있으면 채택
+      const hasContent = blocks.some((b) => (b.raw_text || '').trim() !== '');
+      if (hasContent) return blocks;
+    } catch {
+      // 권한 거부 등은 건너뛰고 다음 탭으로
+    }
+  }
+  return [];
+}
+
 async function saveBlock(
   problemId: string,
   subcollection: string,

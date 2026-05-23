@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Problem, Block, Folder } from '../../types/problem';
-import { getQuestionBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
+import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -117,7 +117,7 @@ export default function FolderView({
       const map: Record<string, Block[]> = {};
       await Promise.all(
         folderProblems.map(async (p) => {
-          try { map[p.id] = await getQuestionBlocks(p.id); } catch { map[p.id] = []; }
+          try { map[p.id] = await getPreviewBlocks(p.id, p.tabs || []); } catch { map[p.id] = []; }
         })
       );
       setQuestionBlocksMap(map);
