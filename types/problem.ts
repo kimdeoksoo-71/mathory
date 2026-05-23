@@ -27,6 +27,19 @@ export interface Problem {
 
 export type MemberRole = 'viewer' | 'commenter';
 
+// ═══ Stage 3: 탭 단위 댓글 ═══
+
+export interface TabComment {
+  id: string;
+  tabId: string;                       // 'question', 'solution', 'extra_0', ...
+  authorUid: string;
+  content: string;                     // markdown + KaTeX (인라인 수식)
+  parentCommentId: string | null;      // null = 최상위, 값 = 답글
+  resolved: boolean;                   // 오너 또는 작성자가 토글
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export type Visibility = 'private' | 'link' | 'public';
 
 export interface UserProfile {

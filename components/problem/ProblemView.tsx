@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
@@ -12,8 +12,11 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import SharePanel from '../editor/SharePanel';
+import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
-import { UserProfile } from '../../types/problem';
+import { listAllComments, countByTab } from '../../lib/comments';
+import { canComment as canCommentOnProblem } from '../../lib/membership';
+import { UserProfile, TabComment } from '../../types/problem';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
   IconDocLines,
@@ -118,6 +121,13 @@ export default function ProblemView({
   };
   // 저자 프로필
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
+  // 댓글 — 패널 열림 여부, 활성 탭, 카운트
+  const [commentPanelTab, setCommentPanelTab] = useState<string | null>(null);
+  const [allComments, setAllComments] = useState<TabComment[]>([]);
+  const commentCounts = useMemo(
+    () => countByTab(allComments, { unresolvedOnly: true }),
+    [allComments],
+  );
   const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -136,6 +146,8 @@ export default function ProblemView({
       if (data.authorUid) {
         getUserProfile(data.authorUid).then(setAuthorProfile).catch(() => setAuthorProfile(null));
       }
+      // 댓글 카운트용 로드 (실패는 무시 — 권한 없으면 빈 배열)
+      listAllComments(problemId).then(setAllComments).catch(() => setAllComments([]));
     }
     setLoading(false);
   }, [problemId]);
@@ -370,10 +382,13 @@ export default function ProblemView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 (sticky 호환을 위해 비-flex) ═══ */}
+      {/* 댓글 패널이 열리면 우측 패딩으로 본문이 패널 폭(380px)만큼 + 여백을 두고 왼쪽으로 시프트 */}
       <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
         overflow: 'auto',
         background: 'var(--bg-primary, #FAF9F7)',
+        paddingRight: commentPanelTab ? 408 : 0,
+        transition: 'padding-right 0.18s ease',
       }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
@@ -401,13 +416,13 @@ export default function ProblemView({
 
             return (
               <>
-                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정 */}
+                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정. 사이드바·댓글 상단바와 같은 52px */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: LABEL_GAP,
                   marginBottom: 24,
                   position: 'sticky', top: 0, zIndex: 5,
                   background: 'var(--bg-primary, #FAF9F7)',
-                  paddingTop: 32, paddingBottom: 16,
+                  minHeight: 52, boxSizing: 'border-box',
                   borderBottom: '1px solid var(--border-light)',
                 }}>
                   <div style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-start' }}>
@@ -489,6 +504,27 @@ export default function ProblemView({
                         >
                           {tab.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({count})</span>
                         </span>
+                        {/* 댓글 버튼 — 로그인했고 본인 문항 OR 멤버일 때만 표시 */}
+                        {user && (isOwnerView || isMemberView) && (
+                          <button
+                            onClick={() => setCommentPanelTab((cur) => cur === tab.id ? null : tab.id)}
+                            title="댓글 열기"
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 2,
+                              border: 'none', background: 'none', cursor: 'pointer',
+                              padding: '2px 4px', borderRadius: 4,
+                              fontSize: 11, color: commentPanelTab === tab.id ? 'var(--accent-primary)' : 'var(--text-faint)',
+                              fontFamily: 'var(--font-ui)',
+                              transition: 'color 0.15s',
+                            }}
+                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                            onMouseLeave={(e) => {
+                              if (commentPanelTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+                            }}
+                          >
+                            💬{commentCounts[tab.id] ? ` ${commentCounts[tab.id]}` : ''}
+                          </button>
+                        )}
                       </div>
                       {isOpen && (
                         <div style={{
@@ -746,6 +782,20 @@ export default function ProblemView({
         isPrinting={isPrinting}
       />
 
+      {/* 댓글 패널 — 우측 슬라이드 */}
+      {commentPanelTab && user && (
+        <CommentPanel
+          problemId={problem.id}
+          ownerUid={problem.authorUid || ''}
+          tabs={tabs}
+          activeTabId={commentPanelTab}
+          currentUid={user.uid}
+          canComment={canCommentOnProblem(problem, user.uid)}
+          bodyFontSize={contentFontSize}
+          onClose={() => setCommentPanelTab(null)}
+          onCommentsChange={setAllComments}
+        />
+      )}
     </div>
   );
 }

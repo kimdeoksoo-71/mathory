@@ -56,7 +56,8 @@ service cloud.firestore {
       allow update: if isOwner() || isMemberSelfLeave();
       allow delete: if isOwner();
 
-      // ===== problems/{id}/* 모든 서브컬렉션 =====
+      // ===== problems/{id}/* 일반 서브컬렉션 (블록, 기타) =====
+      // tab_comments는 아래 별도 match에서 처리하므로 여기서 명시적으로 제외.
       match /{subcollection}/{docId} {
         function parentData() {
           return get(/databases/$(database)/documents/problems/$(problemId)).data;
@@ -71,25 +72,90 @@ service cloud.firestore {
           return isSignedIn()
             && (request.auth.uid in parentData().get('memberUids', []));
         }
-        // subcollection 이름이 'xxx_blocks' 형태면 tabId 추출, 아니면 빈 문자열
         function tabIdFromSubcol() {
           return subcollection.split('_blocks')[0];
         }
         function isBlocksSubcol() {
           return subcollection.matches('.*_blocks');
         }
-        // 멤버 탭 가시성: memberTabVisibility 없거나 해당 tabId가 true면 허용
         function tabAllowedForMember() {
           return parentData().get('memberTabVisibility', {})
             .get(tabIdFromSubcol(), true) == true;
         }
+        function isCommentsCol() {
+          return subcollection == 'tab_comments';
+        }
 
         // 탭 블록(xxx_blocks): 멤버는 해당 탭이 공개일 때만 읽기
-        allow read: if parentOwner()
+        // tab_comments는 별도 매치에서 처리하므로 여기선 항상 false
+        allow read: if !isCommentsCol() && (
+          parentOwner()
           || parentIsPublic()
-          || (parentIsMember() && (!isBlocksSubcol() || tabAllowedForMember()));
-        // 쓰기는 오너만 (Stage 3 댓글은 별도 규칙으로 추후 분리)
-        allow write: if parentOwner();
+          || (parentIsMember() && (!isBlocksSubcol() || tabAllowedForMember()))
+        );
+        // 쓰기는 오너만 (tab_comments 제외)
+        allow write: if !isCommentsCol() && parentOwner();
+      }
+
+      // ===== problems/{id}/tab_comments/{commentId} (Stage 3) =====
+      // 권한 정책:
+      //   - read: 오너 OR 멤버 (단, 멤버는 해당 탭이 공개일 때만)
+      //   - create: 오너 또는 commenter 역할 멤버 (author는 본인)
+      //   - update content: 작성 본인만 (content + updatedAt만 변경)
+      //   - update resolved: 작성자 또는 오너 (resolved + updatedAt만 변경)
+      //   - delete: 작성 본인만 (오너도 남의 댓글 삭제 불가, resolve로 정리)
+      match /tab_comments/{commentId} {
+        function parentData() {
+          return get(/databases/$(database)/documents/problems/$(problemId)).data;
+        }
+        function isOwnerCmt() {
+          return isSignedIn() && parentData().authorUid == request.auth.uid;
+        }
+        function isMemberCmt() {
+          return isSignedIn()
+            && (request.auth.uid in parentData().get('memberUids', []));
+        }
+        function memberRole() {
+          return parentData().get('members', {}).get(request.auth.uid, '');
+        }
+        function isCommenter() {
+          return memberRole() == 'commenter';
+        }
+        function tabAllowedForMemberCmt(tabId) {
+          return parentData().get('memberTabVisibility', {}).get(tabId, true) == true;
+        }
+        function changedKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys();
+        }
+
+        // 읽기: 오너 OR 멤버.
+        // (탭별 가시성을 read에 걸면 Firestore list 쿼리가 사전 검증 불가하여
+        //  멤버가 댓글 목록을 못 받는 문제가 생기므로, 읽기는 멤버 여부만 검사.
+        //  create 시점에는 탭 가시성·역할을 그대로 검증한다.)
+        allow read: if isOwnerCmt() || isMemberCmt();
+
+        // 생성: 오너 OR commenter 역할. author 본인. 해당 탭 가시성 통과.
+        allow create: if request.resource.data.authorUid == request.auth.uid
+          && request.resource.data.resolved == false
+          && (
+            isOwnerCmt()
+            || (isMemberCmt() && isCommenter()
+                && tabAllowedForMemberCmt(request.resource.data.tabId))
+          );
+
+        // 수정:
+        //  (a) 본인이 content 수정 — content/updatedAt만
+        //  (b) 작성자 또는 오너가 resolved 토글 — resolved/updatedAt만
+        allow update: if (
+          resource.data.authorUid == request.auth.uid
+          && changedKeys().hasOnly(['content', 'updatedAt'])
+        ) || (
+          (resource.data.authorUid == request.auth.uid || isOwnerCmt())
+          && changedKeys().hasOnly(['resolved', 'updatedAt'])
+        );
+
+        // 삭제: 작성 본인만
+        allow delete: if resource.data.authorUid == request.auth.uid;
       }
     }
 
