@@ -1,21 +1,19 @@
 'use client';
 
+import { LatexInputEditorHandle } from './LatexInputEditor';
+
 /* 댓글 입력용 간소 수식 툴바
- * 클릭 시 textarea의 커서 위치에 LaTeX 토큰 삽입.
- * 토큰에 `|` 마커를 포함하면 삽입 후 그 위치로 커서 이동 + 선택 영역 지정.
+ * 클릭 시 LatexInputEditor의 커서 위치에 LaTeX 토큰 삽입.
+ * 토큰에 `|` 마커가 있으면 그 위치로 커서 이동.
  */
 
 interface MiniMathToolbarProps {
-  /** 대상 textarea ref */
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
-  /** 삽입 후 상태 동기화 */
-  onChange: (value: string) => void;
+  editorRef: React.RefObject<LatexInputEditorHandle>;
 }
 
 interface MathButton {
   label: string;
-  /** `|` 위치에 커서가 옴 (없으면 끝) */
-  insert: string;
+  insert: string;   // '|' 위치에 커서가 옴
   title: string;
 }
 
@@ -29,29 +27,14 @@ const BUTTONS: MathButton[] = [
   { label: '∑', insert: '$\\sum_{|}^{}$', title: '시그마' },
 ];
 
-export default function MiniMathToolbar({ textareaRef, onChange }: MiniMathToolbarProps) {
+export default function MiniMathToolbar({ editorRef }: MiniMathToolbarProps) {
   const handleClick = (btn: MathButton) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd;
-    const before = ta.value.slice(0, start);
-    const after = ta.value.slice(end);
-
-    let token = btn.insert;
-    const cursorMark = token.indexOf('|');
-    if (cursorMark >= 0) token = token.replace('|', '');
-
-    const next = before + token + after;
-    onChange(next);
-
-    requestAnimationFrame(() => {
-      const t = textareaRef.current;
-      if (!t) return;
-      t.focus();
-      const cursor = cursorMark >= 0 ? start + cursorMark : start + token.length;
-      t.setSelectionRange(cursor, cursor);
-    });
+    const ed = editorRef.current;
+    if (!ed) return;
+    let text = btn.insert;
+    const cursorMark = text.indexOf('|');
+    if (cursorMark >= 0) text = text.replace('|', '');
+    ed.insertAtCursor(text, cursorMark >= 0 ? cursorMark : undefined);
   };
 
   return (

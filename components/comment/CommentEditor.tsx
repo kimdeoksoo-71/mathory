@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import EditorPreview from '../editor/EditorPreview';
 import MiniMathToolbar from './MiniMathToolbar';
+import LatexInputEditor, { LatexInputEditorHandle } from './LatexInputEditor';
 
 interface CommentEditorProps {
   /** 초기 내용 (편집 모드 시) */
@@ -29,7 +30,7 @@ export default function CommentEditor({
   const [value, setValue] = useState(initialValue);
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<LatexInputEditorHandle>(null);
 
   const handleSubmit = async () => {
     const trimmed = value.trim();
@@ -37,7 +38,10 @@ export default function CommentEditor({
     setSubmitting(true);
     try {
       await onSubmit(trimmed);
-      if (clearOnSubmit) setValue('');
+      if (clearOnSubmit) {
+        setValue('');
+        editorRef.current?.setValue('');
+      }
       setShowPreview(false);
     } finally {
       setSubmitting(false);
@@ -51,11 +55,11 @@ export default function CommentEditor({
       background: 'var(--bg-card, #fff)',
       fontFamily: 'var(--font-ui)',
     }}>
-      <MiniMathToolbar textareaRef={textareaRef} onChange={setValue} />
+      <MiniMathToolbar editorRef={editorRef} />
 
       {showPreview ? (
         <div style={{
-          minHeight: 60, padding: 6, fontSize: 13,
+          minHeight: 120, padding: 6, fontSize: 13,
           border: '1px dashed var(--border-light, #ddd)', borderRadius: 4,
           background: 'var(--bg-input, #fafafa)',
         }}>
@@ -66,26 +70,15 @@ export default function CommentEditor({
           )}
         </div>
       ) : (
-        <textarea
-          ref={textareaRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+        <LatexInputEditor
+          ref={editorRef}
+          initialValue={initialValue}
+          fontSize={13}
+          minHeight={120}
           placeholder={placeholder}
           autoFocus={autoFocus}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-              e.preventDefault();
-              handleSubmit();
-            }
-          }}
-          style={{
-            width: '100%', minHeight: 120,
-            border: 'none', outline: 'none', resize: 'vertical',
-            fontSize: 13, lineHeight: 1.5,
-            fontFamily: 'var(--font-ui)',
-            color: 'var(--text-primary)', background: 'transparent',
-            padding: 4, boxSizing: 'border-box',
-          }}
+          onChange={setValue}
+          onSubmit={handleSubmit}
         />
       )}
 
