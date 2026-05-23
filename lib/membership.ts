@@ -131,15 +131,16 @@ export async function setMemberTabVisibility(
 // 멤버용 listing
 // ═══════════════════════════════════════════════════════
 
-/** 나에게 공유된 문항 — 받은 시각 최신순 정렬은 클라이언트 사이드 (E6) */
+/** 나에게 공유된 문항 — 받은 시각(updated_at) 최신순 정렬은 클라이언트 사이드 (E6).
+ *  주의: where('memberUids','array-contains') + orderBy를 함께 쓰면 Firestore 복합 인덱스가 필요하므로
+ *  orderBy는 클라이언트에서 처리한다. */
 export async function listSharedWithMe(uid: string): Promise<Problem[]> {
   const q = query(
     collection(db, 'problems'),
     where('memberUids', 'array-contains', uid),
-    orderBy('updated_at', 'desc'),
   );
   const snap = await getDocs(q);
-  return snap.docs.map((d) => {
+  const list = snap.docs.map((d) => {
     const data = d.data();
     return {
       id: d.id,
@@ -148,6 +149,8 @@ export async function listSharedWithMe(uid: string): Promise<Problem[]> {
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
     } as Problem;
   });
+  list.sort((a, b) => (b.updated_at?.getTime() || 0) - (a.updated_at?.getTime() || 0));
+  return list;
 }
 
 // ═══════════════════════════════════════════════════════

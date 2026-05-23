@@ -94,7 +94,10 @@ export default function AppShell() {
       const [problems, recent, shared] = await Promise.all([
         listProblems(user.uid),
         listRecentProblems(user.uid, 10),
-        listSharedWithMe(user.uid).catch(() => [] as Problem[]),
+        listSharedWithMe(user.uid).catch((err) => {
+          console.error('공유받은 문항 로드 실패:', err);
+          return [] as Problem[];
+        }),
       ]);
       setAllProblems(problems);
       setSharedProblems(shared);

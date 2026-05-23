@@ -158,14 +158,20 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
   // 탭 메타데이터 (없으면 기본 2탭)
   const tabs = problem.tabs || DEFAULT_TABS;
 
-  // 각 탭의 블록 로드
+  // 각 탭의 블록 로드 — 권한 거부(예: 멤버에게 숨겨진 탭)는 빈 배열로 처리하고 계속 진행
   const tabBlocks: Record<string, Block[]> = {};
   for (const tab of tabs) {
     const subcol = tabSubcollection(tab.id);
-    const snap = await getDocs(
-      query(collection(db, 'problems', problemId, subcol), orderBy('order'))
-    );
-    tabBlocks[tab.id] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'problems', problemId, subcol), orderBy('order'))
+      );
+      tabBlocks[tab.id] = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block));
+    } catch (err: any) {
+      // permission-denied는 정상 (해당 탭이 멤버에게 비공개) — 그 외 에러도 일단 비우고 계속
+      console.warn(`[getProblemWithBlocks] ${tab.id} 로드 스킵:`, err?.code || err?.message);
+      tabBlocks[tab.id] = [];
+    }
   }
 
   return {
