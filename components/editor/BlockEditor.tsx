@@ -179,14 +179,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
           border: '1px solid #ddd',
         }}
       >
-        <MathToolbar
-          onInsert={handleInsert}
-          snippets={snippets}
-          onSnippetInsert={handleSnippetInsert}
-          onSnippetAdd={addSnippet}
-          onSnippetEdit={editSnippet}
-          onSnippetDelete={removeSnippet}
-        />
+        <MathToolbar onInsert={handleInsert} />
       </div>
 
       {/* Split View */}

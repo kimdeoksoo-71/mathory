@@ -11,6 +11,7 @@ import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
+import UnifiedToolbar from '../editor/UnifiedToolbar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
@@ -27,6 +28,7 @@ import {
   IconLineSplit, IconCheck,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
+import { isInsideMath } from '../../lib/latex-completions';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent,
@@ -629,6 +631,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 활성 블록
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
+  // Phase 25 Step 1: 활성 블록 커서가 $...$ / $$...$$ 내부인지 (구분자 안쪽만)
+  const [cursorInMath, setCursorInMath] = useState(false);
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1301,13 +1305,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const ranges = buildMathIndex(content);
     const mathId = findMathIdAtCursor(ranges, info.offset);
     setActiveMathId(mathId);
-  }, []);
+    // Phase 25 Step 1: 활성 블록일 때만 수식 안/밖 갱신
+    if (info.blockId === activeBlockId) {
+      setCursorInMath(isInsideMath(content, info.offset));
+    }
+  }, [activeBlockId]);
 
   /* ─── 블록 포커스 진입 → 미리보기 동기화 (다른 블록 진입 시에만) ─── */
   const handleBlockFocus = useCallback((blockId: string) => {
     if (blockId !== activeBlockId) {
       setActiveBlockId(blockId);
       scrollPreviewToBlockTop(blockId);
+    }
+    // Phase 25 Step 1: 포커스 진입 시 즉시 수식 안/밖 갱신
+    const ref = editorRefs.current[blockId];
+    if (ref) {
+      setCursorInMath(isInsideMath(ref.getContent(), ref.getCursorPosition()));
     }
   }, [activeBlockId, scrollPreviewToBlockTop]);
 
@@ -1804,83 +1817,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
         gap: 4,
       }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          opacity: showToolbar ? 1 : 0.35,
-          pointerEvents: showToolbar ? 'auto' : 'none',
-          transition: 'opacity 0.15s',
-        }}>
-          <MathToolbar
-            onInsert={handleInsert}
-            snippets={snippets}
-            onSnippetInsert={handleSnippetInsert}
-            onSnippetAdd={addSnippet}
-            onSnippetEdit={editSnippet}
-            onSnippetDelete={removeSnippet}
-          />
-        </div>
-        <div style={{ width: 1, height: 24, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-        <button
-          onClick={() => setSearchOpen(!searchOpen)}
-          title="찾기 / 바꾸기 (Ctrl+F)"
-          style={{
-            width: 28, height: 28,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: searchOpen ? '1px solid var(--accent-primary)' : '1px solid transparent',
-            borderRadius: 6,
-            background: searchOpen ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
-            cursor: 'pointer',
-            color: searchOpen ? 'var(--accent-primary)' : 'var(--text-muted)',
-            fontSize: 16,
-            transition: 'all 0.15s',
-          }}
-        >
-          🔍
-        </button>
-
-        {/* ── 맞춤법 검사 (Phase 27) ── */}
-        <button
-          onClick={handleRunProofread}
-          disabled={proofreading}
-          title="맞춤법 검사 (현재 탭)"
-          style={{
-            width: 28, height: 28,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid transparent',
-            borderRadius: 6,
-            background: 'transparent',
-            cursor: proofreading ? 'wait' : 'pointer',
-            color: proofreading ? 'var(--accent-primary)' : 'var(--text-muted)',
-            transition: 'all 0.15s',
-          }}
-        >
-          {proofreading ? <IconLoader size={14} /> : <IconCheck size={14} />}
-        </button>
-
-        {/* ── OCR (Phase 28): 수식 이미지 → LaTeX ── */}
-        <button
-          onClick={handleOcrClick}
-          disabled={ocrLoading || !showToolbar}
-          title="이미지 OCR (Mathpix) — 수식/텍스트 혼합 이미지 업로드"
-          style={{
-            height: 28,
-            padding: '0 8px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-            border: '1px solid transparent',
-            borderRadius: 6,
-            background: 'transparent',
-            cursor: ocrLoading ? 'wait' : (showToolbar ? 'pointer' : 'default'),
-            color: ocrLoading ? 'var(--accent-primary)' : 'var(--text-muted)',
-            opacity: showToolbar ? 1 : 0.35,
-            fontSize: 12,
-            fontWeight: 600,
-            letterSpacing: 0.3,
-            transition: 'all 0.15s',
-          }}
-        >
-          {ocrLoading ? <IconLoader size={14} /> : null}
-          <span>OCR</span>
-        </button>
+        <UnifiedToolbar
+          cursorInMath={cursorInMath}
+          showToolbar={!!showToolbar}
+          onInsert={handleInsert}
+          snippets={snippets}
+          onSnippetInsert={handleSnippetInsert}
+          onSnippetAdd={addSnippet}
+          onSnippetEdit={editSnippet}
+          onSnippetDelete={removeSnippet}
+          searchOpen={searchOpen}
+          onToggleSearch={() => setSearchOpen(!searchOpen)}
+          proofreading={proofreading}
+          onRunProofread={handleRunProofread}
+          ocrLoading={ocrLoading}
+          onOcrClick={handleOcrClick}
+        />
         <input
           ref={ocrInputRef}
           type="file"

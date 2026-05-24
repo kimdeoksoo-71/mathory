@@ -1,0 +1,521 @@
+'use client';
+
+/**
+ * Phase 25 — Unified Toolbar
+ *
+ * 컨텍스트 가시화(수식 안/밖) + 단일 진입점.
+ * Step 2 (현재): 골격 + 기존 MathToolbar 분류 풀다운을 수식 안 상태에서만 노출.
+ * Step 3 이후: MathToolbar 의존 제거 → 커스터마이징 가능한 그룹 시스템으로 교체.
+ */
+
+import { useEffect, useRef, useState } from 'react';
+import { MathSnippet } from '../../types/snippet';
+import MathToolbar from './MathToolbar';
+import MathSnippetMenu from './MathSnippetMenu';
+import { IconLoader } from '../ui/Icons';
+
+// ═══════════════════════════════════════════════
+// SVG 아이콘 (viewBox 64×64, stroke=currentColor)
+// ═══════════════════════════════════════════════
+
+const ICON_SIZE = 22;
+const SVG_PROPS = {
+  width: ICON_SIZE,
+  height: ICON_SIZE,
+  viewBox: '0 0 64 64',
+  fill: 'none' as const,
+  stroke: 'currentColor',
+  strokeWidth: 3.5,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+  'aria-hidden': true,
+};
+
+const CORNER_BRACKETS = (
+  <>
+    <path d="M8 20 L8 8 L20 8" />
+    <path d="M44 8 L56 8 L56 20" />
+    <path d="M56 44 L56 56 L44 56" />
+    <path d="M20 56 L8 56 L8 44" />
+  </>
+);
+
+function InlineMathIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M32 16 L32 48" />
+      <path d="M38 22 C38 22 36 19 32 19 C28 19 25 21 25 24.5 C25 28 28 29.5 32 31 C36 32.5 39 34.5 39 38.5 C39 42 36 45 32 45 C28 45 26 42 26 42" />
+    </svg>
+  );
+}
+
+function BlockMathIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M23 16 L23 48" />
+      <path d="M29 22 C29 22 27.5 19 23 19 C19 19 17 21.5 17 24.5 C17 28 19.5 29.5 23 31 C26.5 32.5 29 34.5 29 38.5 C29 42 27 45 23 45 C19 45 17 42 17 42" />
+      <path d="M41 16 L41 48" />
+      <path d="M47 22 C47 22 45.5 19 41 19 C37 19 35 21.5 35 24.5 C35 28 37.5 29.5 41 31 C44.5 32.5 47 34.5 47 38.5 C47 42 45 45 41 45 C37 45 35 42 35 42" />
+    </svg>
+  );
+}
+
+function SearchReplaceIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <circle cx="29" cy="28" r="11" />
+      <path d="M37 36 L44 43" />
+    </svg>
+  );
+}
+
+function SnippetIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M25 20 C25 20 22 20 22 24 L22 29 C22 32 18 32 18 32 C18 32 22 32 22 35 L22 40 C22 44 25 44 25 44" />
+      <path d="M39 20 C39 20 42 20 42 24 L42 29 C42 32 46 32 46 32 C46 32 42 32 42 35 L42 40 C42 44 39 44 39 44" />
+      <circle cx="27" cy="32" r="1.8" fill="currentColor" stroke="none" />
+      <circle cx="32" cy="32" r="1.8" fill="currentColor" stroke="none" />
+      <circle cx="37" cy="32" r="1.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function OcrIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <text
+        x="32" y="38"
+        textAnchor="middle"
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontWeight="700"
+        fontSize="18"
+        fill="currentColor"
+        stroke="none"
+        letterSpacing="1"
+      >OCR</text>
+    </svg>
+  );
+}
+
+function ProofreadIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M18 20 L46 20" />
+      <path d="M18 28 L44 28" />
+      <path d="M18 36 L40 36" />
+      <path d="M18 44 L34 44" />
+      <path d="M38 42 L43 48 L52 36" />
+    </svg>
+  );
+}
+
+function SpecialCharIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <circle cx="32" cy="32" r="14" />
+      <text
+        x="32" y="38"
+        textAnchor="middle"
+        fontFamily="Arial, Helvetica, sans-serif"
+        fontWeight="700"
+        fontSize="20"
+        fill="currentColor"
+        stroke="none"
+      >1</text>
+    </svg>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// 특수문자 그룹 (원문자 등) — Step 5에서 사용자 커스터마이징 지원 예정
+// ═══════════════════════════════════════════════
+
+interface SpecialCharGroup {
+  name: string;
+  items: { char: string; title: string }[];
+}
+
+const SPECIAL_CHAR_GROUPS: SpecialCharGroup[] = [
+  {
+    name: '원문자',
+    items: [
+      { char: '①', title: '원문자 1' },
+      { char: '②', title: '원문자 2' },
+      { char: '③', title: '원문자 3' },
+      { char: '④', title: '원문자 4' },
+      { char: '⑤', title: '원문자 5' },
+    ],
+  },
+  {
+    name: '검정원문자',
+    items: [
+      { char: '❶', title: '검정 1' },
+      { char: '❷', title: '검정 2' },
+      { char: '❸', title: '검정 3' },
+      { char: '❹', title: '검정 4' },
+      { char: '❺', title: '검정 5' },
+    ],
+  },
+  {
+    name: '한글원문자',
+    items: [
+      { char: '㉠', title: '한글 ㄱ' },
+      { char: '㉡', title: '한글 ㄴ' },
+      { char: '㉢', title: '한글 ㄷ' },
+      { char: '㉣', title: '한글 ㄹ' },
+      { char: '㉤', title: '한글 ㅁ' },
+      { char: '㉥', title: '한글 ㅂ' },
+      { char: '㉦', title: '한글 ㅅ' },
+      { char: '㉧', title: '한글 ㅇ' },
+    ],
+  },
+];
+
+// ═══════════════════════════════════════════════
+// Props & 공통 스타일
+// ═══════════════════════════════════════════════
+
+interface UnifiedToolbarProps {
+  cursorInMath: boolean;
+  showToolbar: boolean;
+  onInsert: (template: string, cursorOffset: number) => void;
+  snippets: MathSnippet[];
+  onSnippetInsert: (content: string) => void;
+  onSnippetAdd: (data: { name: string; shortcutIndex: number; content: string }) => void;
+  onSnippetEdit: (snippetId: string, data: Partial<{ name: string; shortcutIndex: number; content: string }>) => void;
+  onSnippetDelete: (snippetId: string) => void;
+  searchOpen: boolean;
+  onToggleSearch: () => void;
+  proofreading: boolean;
+  onRunProofread: () => void;
+  ocrLoading: boolean;
+  onOcrClick: () => void;
+}
+
+const ICON_BTN_BASE: React.CSSProperties = {
+  width: 32, height: 32,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  border: '1px solid transparent',
+  borderRadius: 6,
+  background: 'transparent',
+  cursor: 'pointer',
+  color: 'var(--text-muted)',
+  transition: 'all 0.15s',
+  padding: 0,
+};
+
+const TOOLTIP_DELAY_MS = 600;
+
+function IconButton({
+  title, onClick, active, disabled, children, buttonRef,
+}: {
+  title: string;
+  onClick: () => void;
+  active?: boolean;
+  disabled?: boolean;
+  children: React.ReactNode;
+  buttonRef?: React.Ref<HTMLButtonElement>;
+}) {
+  const [tipVisible, setTipVisible] = useState(false);
+  const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showTip = () => {
+    if (tipTimer.current) clearTimeout(tipTimer.current);
+    tipTimer.current = setTimeout(() => setTipVisible(true), TOOLTIP_DELAY_MS);
+  };
+  const hideTip = () => {
+    if (tipTimer.current) clearTimeout(tipTimer.current);
+    tipTimer.current = null;
+    setTipVisible(false);
+  };
+
+  useEffect(() => () => {
+    if (tipTimer.current) clearTimeout(tipTimer.current);
+  }, []);
+
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        ref={buttonRef}
+        onClick={() => { hideTip(); onClick(); }}
+        disabled={disabled}
+        aria-label={title}
+        style={{
+          ...ICON_BTN_BASE,
+          border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
+          background: active ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
+          color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
+          cursor: disabled ? 'wait' : 'pointer',
+        }}
+        onMouseEnter={(e) => {
+          if (!active && !disabled) e.currentTarget.style.background = 'var(--bg-hover, #f0f0f0)';
+          showTip();
+        }}
+        onMouseLeave={(e) => {
+          if (!active) e.currentTarget.style.background = 'transparent';
+          hideTip();
+        }}
+        onFocus={showTip}
+        onBlur={hideTip}
+      >
+        {children}
+      </button>
+      {tipVisible && (
+        <span
+          role="tooltip"
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 6px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            padding: '4px 8px',
+            background: 'rgba(33, 33, 33, 0.92)',
+            color: '#fff',
+            fontSize: 11,
+            fontWeight: 500,
+            fontFamily: 'var(--font-ui, sans-serif)',
+            borderRadius: 4,
+            whiteSpace: 'nowrap',
+            pointerEvents: 'none',
+            zIndex: 2000,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        >
+          {title}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// 특수문자 풀다운
+// ═══════════════════════════════════════════════
+
+function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursorOffset: number) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <IconButton title="특수문자" onClick={() => setOpen((v) => !v)} active={open}>
+        <SpecialCharIcon />
+      </IconButton>
+
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: 4,
+            backgroundColor: '#fff',
+            border: '1px solid #ddd',
+            borderRadius: 8,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+            zIndex: 1000,
+            padding: 8,
+            minWidth: 200,
+          }}
+        >
+          {SPECIAL_CHAR_GROUPS.map((group, gi) => (
+            <div key={group.name} style={{ marginTop: gi > 0 ? 8 : 0 }}>
+              <div
+                style={{
+                  padding: '0 2px 4px',
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: '#999',
+                  letterSpacing: 0.5,
+                  fontFamily: 'var(--font-ui, sans-serif)',
+                }}
+              >
+                {group.name}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 3 }}>
+                {group.items.map((it) => (
+                  <button
+                    key={it.char}
+                    title={it.title}
+                    onClick={() => {
+                      onInsert(it.char, it.char.length);
+                      setOpen(false);
+                    }}
+                    style={{
+                      padding: '6px',
+                      fontSize: 16,
+                      backgroundColor: '#fff',
+                      border: '1px solid #eee',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                      lineHeight: 1,
+                      textAlign: 'center',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f0f0f0'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
+                  >
+                    {it.char}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// 메인
+// ═══════════════════════════════════════════════
+
+export default function UnifiedToolbar({
+  cursorInMath,
+  showToolbar,
+  onInsert,
+  snippets,
+  onSnippetInsert,
+  onSnippetAdd,
+  onSnippetEdit,
+  onSnippetDelete,
+  searchOpen,
+  onToggleSearch,
+  proofreading,
+  onRunProofread,
+  ocrLoading,
+  onOcrClick,
+}: UnifiedToolbarProps) {
+  const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
+  const snippetBtnRef = useRef<HTMLButtonElement>(null);
+
+  const insertInlineMath = () => onInsert('$$', 1);
+  const insertBlockMath = () => onInsert('$$\n\n$$', 3);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        opacity: showToolbar ? 1 : 0.35,
+        pointerEvents: showToolbar ? 'auto' : 'none',
+        transition: 'opacity 0.15s',
+        flex: 1,
+        minWidth: 0,
+      }}
+    >
+      {/* ── 좌측: 컨텍스트 영역 ── */}
+      {cursorInMath ? (
+        <>
+          {/* '수식' 배지 */}
+          <div
+            style={{
+              display: 'flex', alignItems: 'center',
+              height: 28, padding: '0 12px',
+              borderRadius: 0,
+              background: 'rgba(229, 57, 53, 0.08)',
+              border: '1px solid rgba(229, 57, 53, 0.25)',
+              color: '#c62828',
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: 'var(--font-ui)',
+              whiteSpace: 'nowrap',
+            }}
+            title="커서가 수식 안에 있습니다"
+          >
+            LaTeX
+          </div>
+
+          {/* Step 2 임시: 기존 MathToolbar(분류 풀다운) 재사용.
+              Step 3에서 새 그룹 UI로 교체. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <MathToolbar onInsert={onInsert} />
+          </div>
+        </>
+      ) : (
+        <>
+          <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
+            <InlineMathIcon />
+          </IconButton>
+          <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
+            <BlockMathIcon />
+          </IconButton>
+        </>
+      )}
+
+      {/* ── 가운데 구분선 ── */}
+      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+
+      {/* ── Snippet ── */}
+      <IconButton
+        title="상용구"
+        onClick={() => setSnippetMenuOpen((v) => !v)}
+        active={snippetMenuOpen}
+        buttonRef={snippetBtnRef}
+      >
+        <SnippetIcon />
+      </IconButton>
+      {snippetMenuOpen && (
+        <MathSnippetMenu
+          snippets={snippets}
+          onInsert={onSnippetInsert}
+          onAdd={onSnippetAdd}
+          onEdit={onSnippetEdit}
+          onDelete={onSnippetDelete}
+          anchorRef={snippetBtnRef}
+          onClose={() => setSnippetMenuOpen(false)}
+        />
+      )}
+
+      {/* ── 특수문자 ── */}
+      <SpecialCharDropdown onInsert={onInsert} />
+
+      {/* ── 이미지인식 (OCR) ── */}
+      <IconButton
+        title="수식 읽기"
+        onClick={onOcrClick}
+        disabled={ocrLoading}
+      >
+        {ocrLoading ? <IconLoader size={14} /> : <OcrIcon />}
+      </IconButton>
+
+      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+
+      {/* ── 문법검사 ── */}
+      <IconButton
+        title="맞춤법 검사 (현재 탭)"
+        onClick={onRunProofread}
+        disabled={proofreading}
+      >
+        {proofreading ? <IconLoader size={14} /> : <ProofreadIcon />}
+      </IconButton>
+
+      {/* ── 찾기/바꾸기 ── */}
+      <IconButton
+        title="찾기 / 바꾸기 (Ctrl+F)"
+        onClick={onToggleSearch}
+        active={searchOpen}
+      >
+        <SearchReplaceIcon />
+      </IconButton>
+    </div>
+  );
+}

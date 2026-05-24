@@ -1,17 +1,15 @@
 'use client';
 
+/**
+ * 수식 카테고리 풀다운만 렌더. (Phase 25 Step 2)
+ * 진입 버튼($, $$), Snippet, 원문자 등 부가 항목은 UnifiedToolbar가 담당.
+ * Step 3에서 커스터마이징 가능한 그룹 시스템으로 교체될 예정 — 그 시점에 이 파일 제거.
+ */
+
 import { useState, useRef, useEffect } from 'react';
-import { MathSnippet } from '../../types/snippet';
-import MathSnippetMenu from './MathSnippetMenu';
 
 interface MathToolbarProps {
   onInsert: (template: string, cursorOffset: number) => void;
-  // 상용구 관련 props (optional — 없으면 상용구 버튼 숨김)
-  snippets?: MathSnippet[];
-  onSnippetInsert?: (content: string) => void;
-  onSnippetAdd?: (data: { name: string; shortcutIndex: number; content: string }) => void;
-  onSnippetEdit?: (snippetId: string, data: Partial<{ name: string; shortcutIndex: number; content: string }>) => void;
-  onSnippetDelete?: (snippetId: string) => void;
 }
 
 interface ToolbarItem {
@@ -101,42 +99,8 @@ const CATEGORIES: ToolbarCategory[] = [
       { label: '∵', title: '왜냐하면', template: '\\because ', cursorOffset: 9 },
       { label: '⊥', title: '수직', template: '\\perp ', cursorOffset: 6 },
       { label: '∠', title: '각도', template: '\\angle ', cursorOffset: 7 },
-      
     ],
   },
-  {
-    name: '원문자',
-    icon: '①',
-    items: [
-      { label: '①', title: '원문자 1', template: '①', cursorOffset: 1 },
-      { label: '②', title: '원문자 2', template: '②', cursorOffset: 1 },
-      { label: '③', title: '원문자 3', template: '③', cursorOffset: 1 },
-      { label: '④', title: '원문자 4', template: '④', cursorOffset: 1 },
-      { label: '⑤', title: '원문자 5', template: '⑤', cursorOffset: 1 },
-      { label: '---', title: '', template: '', cursorOffset: 0 },
-      { label: '❶', title: '검정 1', template: '❶', cursorOffset: 1 },
-      { label: '❷', title: '검정 2', template: '❷', cursorOffset: 1 },
-      { label: '❸', title: '검정 3', template: '❸', cursorOffset: 1 },
-      { label: '❹', title: '검정 4', template: '❹', cursorOffset: 1 },
-      { label: '❺', title: '검정 5', template: '❺', cursorOffset: 1 },
-      { label: '---', title: '', template: '', cursorOffset: 0 },
-      { label: '㉠', title: '한글 ㄱ', template: '㉠', cursorOffset: 1 },
-      { label: '㉡', title: '한글 ㄴ', template: '㉡', cursorOffset: 1 },
-      { label: '㉢', title: '한글 ㄷ', template: '㉢', cursorOffset: 1 },
-      { label: '㉣', title: '한글 ㄹ', template: '㉣', cursorOffset: 1 },
-      { label: '㉤', title: '한글 ㅁ', template: '㉤', cursorOffset: 1 },
-      { label: '㉥', title: '한글 ㅂ', template: '㉥', cursorOffset: 1 },
-      { label: '㉦', title: '한글 ㅅ', template: '㉦', cursorOffset: 1 },
-      { label: '㉧', title: '한글 ㅇ', template: '㉧', cursorOffset: 1 },
-    ],
-  },
- 
-];
-
-// ═══ 수식 모드 진입 버튼 (항상 표시) ═══
-const MODE_BUTTONS: ToolbarItem[] = [
-  { label: '$', title: '인라인 수식', template: '$$', cursorOffset: 1 },
-  { label: '$$', title: '블록 수식', template: '$$\n\n$$', cursorOffset: 3 },
 ];
 
 // ═══ 풀다운 메뉴 컴포넌트 ═══
@@ -160,8 +124,6 @@ function DropdownCategory({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
-
-  const isGrid = category.name === '원문자';
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -205,7 +167,7 @@ function DropdownCategory({
             borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             zIndex: 1000,
-            minWidth: isGrid ? 'auto' : 160,
+            minWidth: 160,
             padding: '4px 0',
             animation: 'fadeIn 0.1s ease',
           }}
@@ -223,124 +185,49 @@ function DropdownCategory({
             {category.name}
           </div>
 
-          {isGrid ? (
-            <div style={{ padding: '0 8px 8px' }}>
-              {(() => {
-                const groups: ToolbarItem[][] = [];
-                let current: ToolbarItem[] = [];
-                category.items.forEach((item) => {
-                  if (item.label === '---') {
-                    if (current.length > 0) groups.push(current);
-                    current = [];
-                  } else {
-                    current.push(item);
-                  }
-                });
-                if (current.length > 0) groups.push(current);
-
-                return groups.map((group, gi) => (
-                  <div key={gi}>
-                    {gi > 0 && (
-                      <div style={{ height: 1, backgroundColor: '#eee', margin: '6px 0' }} />
-                    )}
-                    <div
-                      style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(5, 1fr)',
-                        gap: 3,
-                      }}
-                    >
-                      {group.map((item, idx) => (
-                        <button
-                          key={idx}
-                          title={item.title}
-                          onClick={() => {
-                            onInsert(item.template, item.cursorOffset);
-                            setOpen(false);
-                          }}
-                          style={{
-                            padding: '6px',
-                            fontSize: 16,
-                            backgroundColor: '#fff',
-                            border: '1px solid #eee',
-                            borderRadius: 4,
-                            cursor: 'pointer',
-                            lineHeight: 1,
-                            textAlign: 'center',
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = '#f0f0f0';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = '#fff';
-                          }}
-                        >
-                          {item.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ));
-              })()}
-            </div>
-          ) : (
-            category.items.map((item, idx) =>
-              item.label === '---' ? (
-                <div
-                  key={idx}
-                  style={{ height: 1, backgroundColor: '#eee', margin: '4px 8px' }}
-                />
-              ) : (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    onInsert(item.template, item.cursorOffset);
-                    setOpen(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    width: '100%',
-                    padding: '6px 12px',
-                    border: 'none',
-                    background: 'none',
-                    cursor: 'pointer',
-                    fontSize: 13,
-                    fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
-                    color: '#333',
-                    textAlign: 'left',
-                    whiteSpace: 'nowrap',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f5f5f5';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <span
-                    style={{
-                      minWidth: 32,
-                      fontSize: 14,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 11,
-                      color: '#999',
-                      fontFamily: 'var(--font-ui, sans-serif)',
-                    }}
-                  >
-                    {item.title}
-                  </span>
-                </button>
-              )
-            )
-          )}
+          {category.items.map((item, idx) => (
+            <button
+              key={idx}
+              onClick={() => {
+                onInsert(item.template, item.cursorOffset);
+                setOpen(false);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '6px 12px',
+                border: 'none',
+                background: 'none',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+                color: '#333',
+                textAlign: 'left',
+                whiteSpace: 'nowrap',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = '#f5f5f5';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+            >
+              <span style={{ minWidth: 32, fontSize: 14, textAlign: 'center' }}>
+                {item.label}
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  color: '#999',
+                  fontFamily: 'var(--font-ui, sans-serif)',
+                }}
+              >
+                {item.title}
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -348,24 +235,7 @@ function DropdownCategory({
 }
 
 // ═══ 메인 툴바 ═══
-export default function MathToolbar({
-  onInsert,
-  snippets,
-  onSnippetInsert,
-  onSnippetAdd,
-  onSnippetEdit,
-  onSnippetDelete,
-}: MathToolbarProps) {
-  const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
-  const snippetBtnRef = useRef<HTMLButtonElement>(null);
-
-  const hasSnippetSupport =
-    snippets !== undefined &&
-    onSnippetInsert !== undefined &&
-    onSnippetAdd !== undefined &&
-    onSnippetEdit !== undefined &&
-    onSnippetDelete !== undefined;
-
+export default function MathToolbar({ onInsert }: MathToolbarProps) {
   return (
     <div
       style={{
@@ -375,113 +245,9 @@ export default function MathToolbar({
         alignItems: 'center',
       }}
     >
-      {/* 카테고리별 풀다운 */}
       {CATEGORIES.map((cat) => (
-        <DropdownCategory
-          key={cat.name}
-          category={cat}
-          onInsert={onInsert}
-        />
+        <DropdownCategory key={cat.name} category={cat} onInsert={onInsert} />
       ))}
-
-      {/* 구분선 */}
-      <div
-        style={{
-          width: 1,
-          height: 24,
-          backgroundColor: '#ddd',
-          margin: '0 4px',
-        }}
-      />
-
-      {/* 수식 모드 진입 버튼 (항상 표시) */}
-      {MODE_BUTTONS.map((btn) => (
-        <button
-          key={btn.template}
-          title={btn.title}
-          onClick={() => onInsert(btn.template, btn.cursorOffset)}
-          style={{
-            padding: '4px 10px',
-            fontSize: '14px',
-            fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
-            backgroundColor: '#fff',
-            border: '1px solid #ccc',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            minWidth: '36px',
-            lineHeight: '1.4',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#e8e8e8';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = '#fff';
-          }}
-        >
-          {btn.label}
-        </button>
-      ))}
-
-      {/* ─── 수식 상용구 버튼 (맨 마지막) ─── */}
-      {hasSnippetSupport && (
-        <>
-          <div style={{ width: 1, height: 24, backgroundColor: '#ddd', margin: '0 4px' }} />
-          <button
-            ref={snippetBtnRef}
-            title="수식 상용구"
-            onClick={() => setSnippetMenuOpen((prev) => !prev)}
-            style={{
-              padding: '4px 8px',
-              fontSize: '13px',
-              fontFamily: 'var(--font-ui, sans-serif)',
-              backgroundColor: snippetMenuOpen ? '#e0e0e0' : '#fff',
-              border: '1px solid #ccc',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              lineHeight: '1.4',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px',
-              whiteSpace: 'nowrap',
-            }}
-            onMouseEnter={(e) => {
-              if (!snippetMenuOpen) e.currentTarget.style.backgroundColor = '#f0f0f0';
-            }}
-            onMouseLeave={(e) => {
-              if (!snippetMenuOpen) e.currentTarget.style.backgroundColor = '#fff';
-            }}
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-            </svg>
-            상용구
-          </button>
-
-          {snippetMenuOpen && (
-            <MathSnippetMenu
-              snippets={snippets}
-              onInsert={onSnippetInsert}
-              onAdd={onSnippetAdd}
-              onEdit={onSnippetEdit}
-              onDelete={onSnippetDelete}
-              anchorRef={snippetBtnRef}
-              onClose={() => setSnippetMenuOpen(false)}
-            />
-          )}
-        </>
-      )}
     </div>
   );
 }
