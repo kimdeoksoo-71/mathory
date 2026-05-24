@@ -66,7 +66,7 @@ function BottomRow({ label, children }: { label: string; children: React.ReactNo
       marginBottom: 6, fontSize: 11, color: 'var(--text-muted)',
       fontFamily: 'var(--font-ui)',
     }}>
-      <span style={{ color: 'var(--text-faint)', width: 36, flexShrink: 0 }}>{label}</span>
+      <span style={{ color: 'var(--text-faint)', width: 52, flexShrink: 0 }}>{label}</span>
       {children}
     </div>
   );
@@ -741,7 +741,7 @@ export default function ProblemView({
         }}>
           {/* 저자 / 생성 / 수정 — 라벨 width 동일하게 맞춰 값 시작 x 정렬 */}
           {problem.authorUid && (
-            <BottomRow label="저자">
+            <BottomRow label="Writer">
               {authorProfile?.photoURL ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={authorProfile.photoURL} alt={authorProfile.displayName}
@@ -761,8 +761,8 @@ export default function ProblemView({
               </span>
             </BottomRow>
           )}
-          <BottomRow label="생성">{formatDateTime(problem.created_at)}</BottomRow>
-          <BottomRow label="수정">{formatDateTime(problem.updated_at)}</BottomRow>
+          <BottomRow label="Created">{formatDateTime(problem.created_at)}</BottomRow>
+          <BottomRow label="Modified">{formatDateTime(problem.updated_at)}</BottomRow>
           <div style={{ height: 10 }} />
           {/* 원본인증 */}
           <CopyrightPanel
