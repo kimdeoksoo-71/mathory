@@ -57,7 +57,7 @@ function SidebarItem({
         background: active ? 'var(--bg-active)' : hovered ? 'var(--bg-hover)' : 'transparent',
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         fontSize: 13.5,
-        fontWeight: active ? 600 : 400,
+        fontWeight: active ? 700 : 500,
         fontFamily: 'var(--font-ui)',
         transition: 'all var(--transition-fast)',
         position: 'relative',
@@ -188,10 +188,26 @@ function SortableFolderItem({
     <>
       <div
         ref={setNodeRef}
-        style={style}
+        style={{ ...style, position: 'relative' }}
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
+        {/* 드래그 핸들 — position:absolute로 흐름에서 빼서 들여쓰기 영향 제거 */}
+        <span
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute', left: -2, top: '50%', transform: 'translateY(-50%)',
+            cursor: 'grab', display: 'flex', padding: '2px 0',
+            opacity: hovered ? 0.6 : 0,
+            transition: 'opacity 0.15s',
+            zIndex: 1,
+          }}
+          title="드래그하여 순서 변경"
+        >
+          <IconGrip size={12} />
+        </span>
         <button
           onClick={onSelect}
           style={{
@@ -208,29 +224,11 @@ function SortableFolderItem({
               : active ? 'var(--bg-active)' : hovered ? 'var(--bg-hover)' : 'transparent',
             color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
             fontSize: 13.5,
-            fontWeight: active ? 600 : 400,
+            fontWeight: active ? 700 : 500,
             fontFamily: 'var(--font-ui)',
             transition: 'all 0.15s',
           }}
         >
-          {/* 드래그 핸들 */}
-          <span
-            {...attributes}
-            {...listeners}
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              cursor: 'grab',
-              display: 'flex',
-              padding: '2px 0',
-              flexShrink: 0,
-              opacity: hovered ? 0.6 : 0,
-              transition: 'opacity 0.15s',
-            }}
-            title="드래그하여 순서 변경"
-          >
-            <IconGrip size={12} />
-          </span>
-
           <span style={{ flexShrink: 0, display: 'flex', opacity: active ? 1 : 0.75 }}>
             <IconFolder />
           </span>
@@ -247,25 +245,24 @@ function SortableFolderItem({
             {count}
           </span>
 
-          {/* 3-dot 메뉴 버튼 */}
-          {hovered && !isDropTarget && (
-            <span
-              onClick={(e) => {
-                e.stopPropagation();
-                setMenuPos({ x: e.clientX, y: e.clientY });
-              }}
-              style={{
-                cursor: 'pointer',
-                display: 'flex',
-                padding: '2px 4px',
-                borderRadius: 4,
-                color: 'var(--text-muted)',
-                flexShrink: 0,
-              }}
-            >
-              <IconDots />
-            </span>
-          )}
+          {/* 3-dot 메뉴 버튼 — 항상 자리 확보, hover 시만 보임 → 레이아웃 흔들림 방지 */}
+          <span
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuPos({ x: e.clientX, y: e.clientY });
+            }}
+            style={{
+              cursor: 'pointer',
+              display: 'flex',
+              padding: '2px 4px',
+              borderRadius: 4,
+              color: 'var(--text-muted)',
+              flexShrink: 0,
+              visibility: hovered && !isDropTarget ? 'visible' : 'hidden',
+            }}
+          >
+            <IconDots />
+          </span>
         </button>
       </div>
 
@@ -442,6 +439,7 @@ export default function Sidebar({
   sharedCount,
 }: SidebarProps) {
   const [foldersOpen, setFoldersOpen] = useState(true);
+  const [myHeaderHovered, setMyHeaderHovered] = useState(false);
   const [recentOpen, setRecentOpen] = useState(true);
 
   // DnD 상태
@@ -572,45 +570,65 @@ export default function Sidebar({
         onDragCancel={handleDragCancel}
       >
         {/* ═══ Section 2: Folders ═══ */}
-        <div style={{ padding: collapsed ? '8px 8px' : '8px 12px', borderBottom: '1px solid var(--border-primary)', overflow: 'auto' }}>
+        <div
+          style={{ padding: collapsed ? '8px 8px' : '8px 12px', borderBottom: '1px solid var(--border-primary)', overflow: 'auto' }}
+          onMouseEnter={() => setMyHeaderHovered(true)}
+          onMouseLeave={() => setMyHeaderHovered(false)}
+        >
           <div style={{
             display: 'flex', alignItems: 'center',
             justifyContent: collapsed ? 'center' : 'space-between',
             marginBottom: 4,
+            gap: 4,
           }}>
             {!collapsed ? (
-              <button
-                onClick={() => setFoldersOpen(!foldersOpen)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
-                  letterSpacing: 0.3, textTransform: 'uppercase' as const,
-                  fontFamily: 'var(--font-ui)', padding: '4px 0',
-                }}
-              >
-                <span style={{
-                  transform: foldersOpen ? 'rotate(90deg)' : 'rotate(0)',
-                  transition: 'transform var(--transition-fast)', display: 'flex',
-                }}>
-                  <IconChevron />
-                </span>
-                폴더
-              </button>
+              <>
+                <button
+                  onClick={() => setFoldersOpen(!foldersOpen)}
+                  style={{
+                    flex: 1,
+                    display: 'flex', alignItems: 'center',
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)',
+                    letterSpacing: 0.3,
+                    fontFamily: 'var(--font-ui)', padding: '4px 0',
+                    textAlign: 'left',
+                  }}
+                >
+                  My
+                </button>
+                {/* + 버튼: My 헤더 hover 시에만 노출 */}
+                <button
+                  onClick={onNewFolder}
+                  style={{
+                    border: 'none', background: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
+                    visibility: myHeaderHovered ? 'visible' : 'hidden',
+                  }}
+                  title="새 폴더"
+                >
+                  <IconPlus size={16} />
+                </button>
+                {/* 펼침 토글: + 버튼 우측 */}
+                <button
+                  onClick={() => setFoldersOpen(!foldersOpen)}
+                  style={{
+                    border: 'none', background: 'none', cursor: 'pointer',
+                    color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
+                  }}
+                  title={foldersOpen ? '접기' : '펼치기'}
+                >
+                  <span style={{
+                    transform: foldersOpen ? 'rotate(90deg)' : 'rotate(0)',
+                    transition: 'transform var(--transition-fast)', display: 'flex',
+                  }}>
+                    <IconChevron />
+                  </span>
+                </button>
+              </>
             ) : (
-              <SidebarItem icon={<IconFolder />} label="폴더" collapsed={collapsed} onClick={() => {}} />
-            )}
-            {!collapsed && (
-              <button
-                onClick={onNewFolder}
-                style={{
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
-                }}
-                title="새 폴더"
-              >
-                <IconPlus size={16} />
-              </button>
+              <SidebarItem icon={<IconFolder />} label="My" collapsed={collapsed} onClick={() => {}} />
             )}
           </div>
 
@@ -636,12 +654,12 @@ export default function Sidebar({
               onClick={onSelectUnassigned}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '8px 12px', paddingLeft: 34,
+                width: '100%', padding: '8px 12px',
                 border: 'none', borderRadius: 8, cursor: 'pointer',
                 background: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
                 color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontSize: 13.5,
-                fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 600 : 400,
+                fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 700 : 500,
                 fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
               }}
               onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
@@ -667,12 +685,12 @@ export default function Sidebar({
               onClick={onSelectSharedWithMe}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '8px 12px', paddingLeft: 34,
+                width: '100%', padding: '8px 12px',
                 border: 'none', borderRadius: 8, cursor: 'pointer',
                 background: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
                 color: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontSize: 13.5,
-                fontWeight: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 600 : 400,
+                fontWeight: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 700 : 500,
                 fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
               }}
               onMouseEnter={(e) => { if (activeFolderId !== SHARED_WITH_ME_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
@@ -709,7 +727,7 @@ export default function Sidebar({
                 background: activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
                 color: activeFolderId === TRASH_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontSize: 13.5,
-                fontWeight: activeFolderId === TRASH_FOLDER_ID ? 600 : 400,
+                fontWeight: activeFolderId === TRASH_FOLDER_ID ? 700 : 500,
                 fontFamily: 'var(--font-ui)',
                 transition: 'all 0.15s',
                 marginTop: 4,
