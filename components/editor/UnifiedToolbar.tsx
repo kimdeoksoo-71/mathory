@@ -652,7 +652,8 @@ function buildMarkdownTable(r: number, c: number): string {
   const align = '|' + Array(c).fill(':---:').join(' | ') + ' |';
   const bodyRows = Math.max(0, r - 1);
   const body = bodyRows > 0 ? Array(bodyRows).fill(empty).join('\n') + '\n' : '';
-  return `\n${empty}\n${align}\n${body}`;
+  // GFM 표는 앞뒤에 blank line 필요 → 양쪽에 \n\n 보장
+  return `\n\n${empty}\n${align}\n${body}\n`;
 }
 
 // ═══════════════════════════════════════════════

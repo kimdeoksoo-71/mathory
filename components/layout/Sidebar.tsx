@@ -347,22 +347,22 @@ function DraggableProblemItem({
               }}>
                 {problem.title}
               </span>
-              {hovered && !isDragging && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setMenuPos({ x: e.clientX, y: e.clientY });
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  style={{
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    padding: '2px 4px', borderRadius: 4, color: 'var(--text-muted)',
-                    display: 'flex', flexShrink: 0,
-                  }}
-                >
-                  <IconDots />
-                </button>
-              )}
+              {/* ⋮ 버튼 — 항상 자리 확보, hover 시만 보임 → 레이아웃 흔들림 방지 */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMenuPos({ x: e.clientX, y: e.clientY });
+                }}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  padding: '2px 4px', borderRadius: 4, color: 'var(--text-muted)',
+                  display: 'flex', flexShrink: 0,
+                  visibility: hovered && !isDragging ? 'visible' : 'hidden',
+                }}
+              >
+                <IconDots />
+              </button>
             </>
           )}
         </div>
