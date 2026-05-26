@@ -294,17 +294,30 @@ function IconButton({
   children: React.ReactNode;
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
-  const [tipVisible, setTipVisible] = useState(false);
+  const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null);
   const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const innerBtnRef = useRef<HTMLButtonElement | null>(null);
+
+  // 외부 buttonRef와 내부 ref 동시 할당
+  const setBtnRef = (el: HTMLButtonElement | null) => {
+    innerBtnRef.current = el;
+    if (typeof buttonRef === 'function') buttonRef(el);
+    else if (buttonRef) (buttonRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
+  };
 
   const showTip = () => {
     if (tipTimer.current) clearTimeout(tipTimer.current);
-    tipTimer.current = setTimeout(() => setTipVisible(true), TOOLTIP_DELAY_MS);
+    tipTimer.current = setTimeout(() => {
+      const el = innerBtnRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      setTipPos({ top: r.bottom + 6, left: r.left + r.width / 2 });
+    }, TOOLTIP_DELAY_MS);
   };
   const hideTip = () => {
     if (tipTimer.current) clearTimeout(tipTimer.current);
     tipTimer.current = null;
-    setTipVisible(false);
+    setTipPos(null);
   };
 
   useEffect(() => () => {
@@ -312,9 +325,9 @@ function IconButton({
   }, []);
 
   return (
-    <span style={{ position: 'relative', display: 'inline-flex' }}>
+    <>
       <button
-        ref={buttonRef}
+        ref={setBtnRef}
         onClick={() => { hideTip(); onClick(); }}
         disabled={disabled}
         aria-label={title}
@@ -338,13 +351,13 @@ function IconButton({
       >
         {children}
       </button>
-      {tipVisible && (
+      {tipPos && (
         <span
           role="tooltip"
           style={{
-            position: 'absolute',
-            top: 'calc(100% + 6px)',
-            left: '50%',
+            position: 'fixed',
+            top: tipPos.top,
+            left: tipPos.left,
             transform: 'translateX(-50%)',
             padding: '4px 8px',
             background: 'rgba(33, 33, 33, 0.92)',
@@ -355,14 +368,14 @@ function IconButton({
             borderRadius: 4,
             whiteSpace: 'nowrap',
             pointerEvents: 'none',
-            zIndex: 2000,
+            zIndex: 9999,
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           }}
         >
           {title}
         </span>
       )}
-    </span>
+    </>
   );
 }
 

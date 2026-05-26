@@ -22,7 +22,7 @@ import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
 import {
-  IconChevronLeft, IconSave, IconGrip, IconPlus,
+  IconChevronLeft, IconGrip, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
   IconRename, IconLoader,
   IconCheck,
@@ -585,6 +585,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const tabLabelInputRef = useRef<HTMLInputElement>(null);
 
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
+  const skipDirtyRef = useRef(true);
   const [status, setStatus] = useState('');
 
   // 메타 편집
@@ -641,6 +644,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setContentFontSize(size);
     document.documentElement.style.setProperty('--content-font-size', size + 'px');
   }, []);
+
+  /* ─── dirty 추적: 블록/메타 변경 시 setDirty(true) ─── */
+  useEffect(() => {
+    if (!problem) return; // load 전 무시
+    if (skipDirtyRef.current) {
+      skipDirtyRef.current = false;
+      return;
+    }
+    setDirty(true);
+  }, [problem, allBlocks, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId]);
 
   const handleFontSizeChange = (delta: number) => {
     setContentFontSize((prev) => {
@@ -1575,6 +1588,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setProofreadResults({});
       }
 
+      // 저장 성공: dirty 해제. setAllBlocks가 effect를 다시 트리거할 수 있으므로
+      // skipDirtyRef로 그 한 번을 무시.
+      skipDirtyRef.current = true;
+      setDirty(false);
+
       if (!silent) {
         setStatus('저장 완료');
         setTimeout(() => setStatus(''), 2000);
@@ -1715,15 +1733,27 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }}>{status}</span>
         )}
 
-        {/* 저장 버튼 */}
-        <button onClick={() => handleSave()} disabled={saving} style={{
-          display: 'flex', alignItems: 'center', gap: 6, padding: '6px 16px',
-          background: saving ? 'var(--text-faint)' : 'var(--accent-primary)',
-          color: '#fff', border: 'none', borderRadius: 8,
-          cursor: saving ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: 500,
-          fontFamily: 'var(--font-ui)', transition: 'background var(--transition-fast)',
-        }}>
-          <IconSave /> {saving ? '저장 중...' : '저장'}
+        {/* 저장 버튼 — 아이콘만. dirty면 빨강, 저장 완료면 회색. */}
+        <button
+          onClick={() => handleSave()}
+          disabled={saving}
+          title={saving ? '저장 중...' : dirty ? '변경사항 저장' : '저장됨'}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', padding: 4,
+            cursor: saving ? 'wait' : (dirty ? 'pointer' : 'default'),
+            color: dirty ? '#e53935' : 'var(--text-faint)',
+            transition: 'color 0.2s',
+          }}
+        >
+          {saving ? <IconLoader size={20} /> : (
+            <svg width="22" height="22" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+              strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" />
+              <rect x="18" y="6" width="22" height="16" rx="1" fill="none" stroke="currentColor" />
+              <circle cx="34" cy="42" r="9" fill="currentColor" stroke="none" />
+            </svg>
+          )}
         </button>
 
         {/* ─── 글꼴 크기 조절 ─── */}
