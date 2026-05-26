@@ -8,7 +8,7 @@
  * Step 3 이후: MathToolbar 의존 제거 → 커스터마이징 가능한 그룹 시스템으로 교체.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MathSnippet } from '../../types/snippet';
 import MathToolbar from './MathToolbar';
 import MathSnippetMenu from './MathSnippetMenu';
@@ -657,6 +657,75 @@ function buildMarkdownTable(r: number, c: number): string {
 }
 
 // ═══════════════════════════════════════════════
+// OverflowItems — 가용 폭 부족 시 우측 끝부터 display:none
+// ═══════════════════════════════════════════════
+
+function OverflowItems({
+  items, leftWidth, rootRef,
+}: {
+  items: { key: string; node: React.ReactNode }[];
+  leftWidth: number;
+  rootRef: React.RefObject<HTMLDivElement>;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const cachedWidthsRef = useRef<number[]>([]);
+  const [hideCount, setHideCount] = useState(0);
+
+  // children 폭 캐싱 (모두 보일 때 한 번)
+  useLayoutEffect(() => {
+    if (cachedWidthsRef.current.length === items.length) return;
+    const widths = itemRefs.current.map((r) => r?.offsetWidth || 0);
+    if (widths.every((w) => w > 0)) {
+      cachedWidthsRef.current = widths;
+    }
+  });
+
+  // root 폭 변화 + leftWidth 변화 시 hideCount 재계산
+  useLayoutEffect(() => {
+    if (!rootRef.current) return;
+    const root = rootRef.current;
+
+    const recalc = () => {
+      const widths = cachedWidthsRef.current;
+      if (widths.length === 0) return;
+      const rootW = root.clientWidth;
+      const gap = 4;
+      const padding = 16; // 여유 + 가운데 구분선
+      const available = rootW - leftWidth - padding;
+      let total = widths.reduce((a, b) => a + b + gap, -gap);
+      let hide = 0;
+      while (total > available && hide < widths.length) {
+        total -= widths[widths.length - 1 - hide] + gap;
+        hide++;
+      }
+      setHideCount(hide);
+    };
+
+    recalc();
+    const ro = new ResizeObserver(recalc);
+    ro.observe(root);
+    return () => ro.disconnect();
+  }, [leftWidth, rootRef, items.length]);
+
+  const visibleEnd = items.length - hideCount;
+
+  return (
+    <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+      {items.map((it, i) => (
+        <div
+          key={it.key}
+          ref={(el) => { itemRefs.current[i] = el; }}
+          style={{ display: i < visibleEnd ? 'flex' : 'none', alignItems: 'center' }}
+        >
+          {it.node}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
 // 메인
 // ═══════════════════════════════════════════════
 
@@ -696,8 +765,123 @@ export default function UnifiedToolbar({
     setTableDialogOpen(false);
   };
 
+  const rootRef = useRef<HTMLDivElement>(null);
+  const leftRef = useRef<HTMLDivElement>(null);
+  const [leftWidth, setLeftWidth] = useState(0);
+
+  // 좌측 폭 측정 — cursorInMath / MathToolbar 펼침 등 변화 모두 감지
+  useLayoutEffect(() => {
+    if (!leftRef.current) return;
+    const el = leftRef.current;
+    const update = () => setLeftWidth(el.offsetWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [cursorInMath]);
+
+  // 우측 도구 — 좌→우 순서. 끝부터 우선 hide.
+  const divider = (key: string) => (
+    <div key={key} style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+  );
+
+  const rightItems: { key: string; node: React.ReactNode }[] = [
+    {
+      key: 'snippet',
+      node: (
+        <>
+          <IconButton
+            title="상용구"
+            onClick={() => setSnippetMenuOpen((v) => !v)}
+            active={snippetMenuOpen}
+            buttonRef={snippetBtnRef}
+          >
+            <SnippetIcon />
+          </IconButton>
+          {snippetMenuOpen && (
+            <MathSnippetMenu
+              snippets={snippets}
+              onInsert={onSnippetInsert}
+              onAdd={onSnippetAdd}
+              onEdit={onSnippetEdit}
+              onDelete={onSnippetDelete}
+              anchorRef={snippetBtnRef}
+              onClose={() => setSnippetMenuOpen(false)}
+            />
+          )}
+        </>
+      ),
+    },
+    { key: 'special', node: <SpecialCharDropdown onInsert={onInsert} /> },
+    {
+      key: 'table',
+      node: (
+        <IconButton title="표 삽입" onClick={() => setTableDialogOpen(true)}>
+          <TableAddIcon />
+        </IconButton>
+      ),
+    },
+    {
+      key: 'ocr',
+      node: (
+        <IconButton title="수식 읽기" onClick={onOcrClick} disabled={ocrLoading}>
+          {ocrLoading ? <IconLoader size={14} /> : <OcrIcon />}
+        </IconButton>
+      ),
+    },
+    { key: 'd1', node: divider('d1') },
+    {
+      key: 'proofread',
+      node: (
+        <IconButton title="맞춤법 검사 (현재 탭)" onClick={onRunProofread} disabled={proofreading}>
+          {proofreading ? <IconLoader size={14} /> : <ProofreadIcon />}
+        </IconButton>
+      ),
+    },
+    {
+      key: 'search',
+      node: (
+        <IconButton title="찾기 / 바꾸기 (Ctrl+F)" onClick={onToggleSearch} active={searchOpen}>
+          <SearchReplaceIcon />
+        </IconButton>
+      ),
+    },
+    { key: 'd2', node: divider('d2') },
+    {
+      key: 'addBlock',
+      node: (
+        <BlockAddDropdown blockTypes={blockTypes} onAddBlock={onAddBlock} disabled={!showToolbar} />
+      ),
+    },
+    {
+      key: 'splitBlock',
+      node: (
+        <IconButton title="블록 분할 (⌘B)" onClick={onSplitBlock} disabled={!canSplitBlock}>
+          <BlockSplitIcon />
+        </IconButton>
+      ),
+    },
+    {
+      key: 'splitMath',
+      node: (
+        <IconButton title="수식행 분할 (⌘⇧L)" onClick={onSplitMathLines}>
+          <FormulaSplitIcon />
+        </IconButton>
+      ),
+    },
+    {
+      key: 'ai',
+      node: (
+        <IconButton title="AI 완성 (⌘J)" onClick={onAIComplete} disabled={aiLoading}>
+          {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
+        </IconButton>
+      ),
+    },
+  ];
+
   return (
     <div
+      ref={rootRef}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -707,143 +891,54 @@ export default function UnifiedToolbar({
         transition: 'opacity 0.15s',
         flex: 1,
         minWidth: 0,
+        overflow: 'hidden',
       }}
     >
-      {/* ── 좌측: 컨텍스트 영역 ── */}
-      {cursorInMath ? (
-        <>
-          {/* '수식' 배지 */}
-          <div
-            style={{
-              display: 'flex', alignItems: 'center',
-              height: 28, padding: '0 12px',
-              borderRadius: 0,
-              background: 'rgba(229, 57, 53, 0.08)',
-              border: '1px solid rgba(229, 57, 53, 0.25)',
-              color: '#c62828',
-              fontSize: 12,
-              fontWeight: 600,
-              fontFamily: 'var(--font-ui)',
-              whiteSpace: 'nowrap',
-            }}
-            title="커서가 수식 안에 있습니다"
-          >
-            LaTeX
-          </div>
+      {/* ── 좌측: 컨텍스트 영역 (항상 보임, 자기 폭 유지) ── */}
+      <div ref={leftRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+        {cursorInMath ? (
+          <>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center',
+                height: 28, padding: '0 12px',
+                borderRadius: 0,
+                background: 'rgba(229, 57, 53, 0.08)',
+                border: '1px solid rgba(229, 57, 53, 0.25)',
+                color: '#c62828',
+                fontSize: 12,
+                fontWeight: 600,
+                fontFamily: 'var(--font-ui)',
+                whiteSpace: 'nowrap',
+              }}
+              title="커서가 수식 안에 있습니다"
+            >
+              LaTeX
+            </div>
+            {/* MathToolbar: 임시 분류 풀다운 (Step 3에서 교체).
+                내부 flex-wrap을 nowrap으로 강제. */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
+              <MathToolbar onInsert={onInsert} />
+            </div>
+          </>
+        ) : (
+          <>
+            <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
+              <InlineMathIcon />
+            </IconButton>
+            <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
+              <BlockMathIcon />
+            </IconButton>
+          </>
+        )}
+        {/* 가운데 구분선 */}
+        <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+      </div>
 
-          {/* Step 2 임시: 기존 MathToolbar(분류 풀다운) 재사용.
-              Step 3에서 새 그룹 UI로 교체. */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            <MathToolbar onInsert={onInsert} />
-          </div>
-        </>
-      ) : (
-        <>
-          <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
-            <InlineMathIcon />
-          </IconButton>
-          <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
-            <BlockMathIcon />
-          </IconButton>
-        </>
-      )}
+      {/* ── 우측: overflow 처리 ── */}
+      <OverflowItems items={rightItems} leftWidth={leftWidth} rootRef={rootRef} />
 
-      {/* ── 가운데 구분선 ── */}
-      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-
-      {/* ── Snippet ── */}
-      <IconButton
-        title="상용구"
-        onClick={() => setSnippetMenuOpen((v) => !v)}
-        active={snippetMenuOpen}
-        buttonRef={snippetBtnRef}
-      >
-        <SnippetIcon />
-      </IconButton>
-      {snippetMenuOpen && (
-        <MathSnippetMenu
-          snippets={snippets}
-          onInsert={onSnippetInsert}
-          onAdd={onSnippetAdd}
-          onEdit={onSnippetEdit}
-          onDelete={onSnippetDelete}
-          anchorRef={snippetBtnRef}
-          onClose={() => setSnippetMenuOpen(false)}
-        />
-      )}
-
-      {/* ── 특수문자 ── */}
-      <SpecialCharDropdown onInsert={onInsert} />
-
-      {/* ── 표 삽입 ── */}
-      <IconButton
-        title="표 삽입"
-        onClick={() => setTableDialogOpen(true)}
-      >
-        <TableAddIcon />
-      </IconButton>
-
-      {/* ── 이미지인식 (OCR) ── */}
-      <IconButton
-        title="수식 읽기"
-        onClick={onOcrClick}
-        disabled={ocrLoading}
-      >
-        {ocrLoading ? <IconLoader size={14} /> : <OcrIcon />}
-      </IconButton>
-
-      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-
-      {/* ── 문법검사 ── */}
-      <IconButton
-        title="맞춤법 검사 (현재 탭)"
-        onClick={onRunProofread}
-        disabled={proofreading}
-      >
-        {proofreading ? <IconLoader size={14} /> : <ProofreadIcon />}
-      </IconButton>
-
-      {/* ── 찾기/바꾸기 ── */}
-      <IconButton
-        title="찾기 / 바꾸기 (Ctrl+F)"
-        onClick={onToggleSearch}
-        active={searchOpen}
-      >
-        <SearchReplaceIcon />
-      </IconButton>
-
-      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
-
-      {/* ═══ 블록 영역 ═══
-          텍스트 기반 블록 활성(showToolbar)일 때만 진하게, 그 외 흐릿하게.
-          showToolbar 전체 영역 opacity가 이미 0.35이므로 추가 처리 없음. */}
-      <BlockAddDropdown
-        blockTypes={blockTypes}
-        onAddBlock={onAddBlock}
-        disabled={!showToolbar}
-      />
-      <IconButton
-        title="블록 분할 (⌘B)"
-        onClick={onSplitBlock}
-        disabled={!canSplitBlock}
-      >
-        <BlockSplitIcon />
-      </IconButton>
-      <IconButton
-        title="수식행 분할 (⌘⇧L)"
-        onClick={onSplitMathLines}
-      >
-        <FormulaSplitIcon />
-      </IconButton>
-      <IconButton
-        title="AI 완성 (⌘J)"
-        onClick={onAIComplete}
-        disabled={aiLoading}
-      >
-        {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
-      </IconButton>
-
-      {/* 표 삽입 다이얼로그 (포털 대신 fixed overlay) */}
+      {/* 표 삽입 다이얼로그 (fixed overlay) */}
       <TableInsertDialog
         open={tableDialogOpen}
         onClose={() => setTableDialogOpen(false)}

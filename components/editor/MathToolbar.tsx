@@ -240,7 +240,7 @@ export default function MathToolbar({ onInsert }: MathToolbarProps) {
     <div
       style={{
         display: 'flex',
-        flexWrap: 'wrap',
+        flexWrap: 'nowrap',
         gap: '4px',
         alignItems: 'center',
       }}

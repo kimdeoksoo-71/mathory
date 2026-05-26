@@ -273,6 +273,32 @@ export default function EditorPreview({
         h3: ({ children, ...props }) => (
           <h3 style={{ fontSize: '1.15em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h3>
         ),
+        table: ({ children, ...props }) => (
+          <table style={{
+            borderCollapse: 'collapse',
+            margin: '1em 0',
+            width: '100%',
+            lineHeight: 1.4,
+          }} {...props}>{children}</table>
+        ),
+        thead: ({ children, ...props }) => (
+          <thead style={{ background: '#f5f5f5' }} {...props}>{children}</thead>
+        ),
+        th: ({ children, style, ...props }) => (
+          <th style={{
+            border: '1px solid #999',
+            padding: '6px 10px',
+            fontWeight: 600,
+            ...(style || {}),
+          }} {...props}>{children}</th>
+        ),
+        td: ({ children, style, ...props }) => (
+          <td style={{
+            border: '1px solid #999',
+            padding: '6px 10px',
+            ...(style || {}),
+          }} {...props}>{children}</td>
+        ),
       }}
     >
       {processed}

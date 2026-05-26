@@ -1803,8 +1803,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           style={{ display: 'none' }}
         />
 
-        <div style={{ flex: 1 }} />
-
         {tabs.map((tab, tabIdx) => (
           <div key={tab.id} style={{
             display: 'flex', alignItems: 'center', gap: 2,
