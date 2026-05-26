@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
+import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import 'katex/dist/katex.min.css';
@@ -256,7 +257,7 @@ export default function EditorPreview({
 
   const markdownElement = useMemo(() => (
     <ReactMarkdown
-      remarkPlugins={[remarkMath]}
+      remarkPlugins={[remarkMath, remarkGfm]}
       rehypePlugins={[
         rehypeRaw,
         [rehypeKatex, { strict: false, trust: true, macros: { "\\arraystretch": "1.8" } }],

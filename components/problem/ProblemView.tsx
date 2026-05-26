@@ -465,7 +465,6 @@ export default function ProblemView({
                 {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글 */}
                 {tabs.map((tab, tabIdx) => {
                   const blocks = problem.tabBlocks[tab.id] || [];
-                  const count = blocks.length;
                   const isOpen = !!openTabs[tab.id];
                   const isQuestion = tab.id === 'question';
                   return (
@@ -502,7 +501,7 @@ export default function ProblemView({
                           }}
                           title={isOpen ? '탭 접기' : '탭 펼치기'}
                         >
-                          {tab.label} <span style={{ color: 'var(--text-faint)', fontWeight: 400 }}>({count})</span>
+                          {tab.label}
                         </span>
                         {/* 댓글 버튼 — 로그인했고 본인 문항 OR 멤버일 때만 표시 */}
                         {user && (isOwnerView || isMemberView) && (

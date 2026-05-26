@@ -1879,7 +1879,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   fontFamily: 'var(--font-ui)', transition: 'all var(--transition-fast)',
                 }}
               >
-                {`${tab.label} (${(allBlocks[tab.id] || []).length})`}
+                {tab.label}
               </button>
             )}
 
@@ -1952,10 +1952,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <div style={{
             padding: '8px 16px 4px', fontSize: 11, color: 'var(--text-muted)',
             fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
-            display: 'flex', alignItems: 'center',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           }}>
-            편집
-            <div style={{ flex: 1 }} />
             {/* ── 블록 추가 드롭다운 ── */}
             <div ref={addBlockDropdownRef} style={{ position: 'relative' }}>
               <span
@@ -2070,12 +2068,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div style={{
-            padding: '8px 64px 4px', fontSize: 11, color: 'var(--text-muted)',
-            fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
-          }}>
-            미리보기
-          </div>
           <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 100vh 64px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
             <div style={activeTab === 'question' ? {
               background: '#ffffff', padding: '20px 24px', borderRadius: 8,
