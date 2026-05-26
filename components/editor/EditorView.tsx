@@ -1731,7 +1731,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             transition: 'color 0.2s',
           }}
         >
-          {saving ? <IconLoader size={16} /> : (
+          {saving ? <IconLoader size={16} /> : dirty ? (
+            // 활성: 외곽 채움(빨강) + 라벨/허브를 비워서 반전 효과
+            <svg width="18" height="18" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+              strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" fill="currentColor" />
+              <rect x="18" y="6" width="22" height="16" rx="1" fill="#fff" stroke="none" />
+              <circle cx="34" cy="42" r="9" fill="#fff" stroke="none" />
+            </svg>
+          ) : (
+            // 기본(회색): 외곽 비움 + 허브 채움
             <svg width="18" height="18" viewBox="0 0 64 64" fill="none" stroke="currentColor"
               strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" />
