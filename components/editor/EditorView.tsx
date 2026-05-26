@@ -1669,21 +1669,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     e.target.style.background = 'transparent';
   };
 
-  /* ─── 글꼴 크기 버튼 스타일 ─── */
-  const fontBtnStyle: React.CSSProperties = {
-    border: '1px solid var(--border-light, #ddd)',
-    background: 'var(--bg-hover, #f5f5f5)',
-    cursor: 'pointer',
-    borderRadius: 4,
-    width: 24, height: 24,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontSize: 14, fontWeight: 700,
-    color: 'var(--text-secondary)',
-    fontFamily: 'var(--font-ui)',
-    padding: 0,
-    lineHeight: 1,
-  };
-
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -1746,8 +1731,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             transition: 'color 0.2s',
           }}
         >
-          {saving ? <IconLoader size={20} /> : (
-            <svg width="22" height="22" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+          {saving ? <IconLoader size={16} /> : (
+            <svg width="18" height="18" viewBox="0 0 64 64" fill="none" stroke="currentColor"
               strokeWidth={3.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
               <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" />
               <rect x="18" y="6" width="22" height="16" rx="1" fill="none" stroke="currentColor" />
@@ -1756,43 +1741,62 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           )}
         </button>
 
-        {/* ─── 글꼴 크기 조절 ─── */}
+        {/* ─── 글꼴 크기 조절: 숫자 + 위/아래 꺾쇠 ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           marginLeft: 4,
           borderLeft: '1px solid var(--border-light, #ddd)',
           paddingLeft: 8,
         }}>
-          <button
-            onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
-            disabled={contentFontSize <= FONT_SIZE_MIN}
-            style={{
-              ...fontBtnStyle,
-              opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
-              cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
-            }}
-            title="글꼴 축소"
-          >
-            A-
-          </button>
           <span style={{
-            fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
-            minWidth: 28, textAlign: 'center',
+            fontSize: 13.5,
+            fontFamily: 'var(--font-ui)',
+            fontWeight: 500,
+            color: 'var(--text-secondary)',
+            minWidth: 22,
+            textAlign: 'right',
+            userSelect: 'none',
           }}>
             {contentFontSize}
           </span>
-          <button
-            onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
-            disabled={contentFontSize >= FONT_SIZE_MAX}
-            style={{
-              ...fontBtnStyle,
-              opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
-              cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
-            }}
-            title="글꼴 확대"
-          >
-            A+
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <button
+              onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
+              disabled={contentFontSize >= FONT_SIZE_MAX}
+              title="글꼴 확대"
+              style={{
+                border: 'none', background: 'transparent', padding: 0,
+                width: 14, height: 11,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
+                color: 'var(--text-muted)',
+                opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
+              }}
+            >
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1 5 L5 1 L9 5" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
+              disabled={contentFontSize <= FONT_SIZE_MIN}
+              title="글꼴 축소"
+              style={{
+                border: 'none', background: 'transparent', padding: 0,
+                width: 14, height: 11,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
+                color: 'var(--text-muted)',
+                opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
+              }}
+            >
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1 1 L5 5 L9 1" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
