@@ -22,10 +22,10 @@ import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
 import {
-  IconChevronLeft, IconSave, IconGrip, IconSplit, IconPlus,
+  IconChevronLeft, IconSave, IconGrip, IconPlus,
   IconChevron, IconChevronDown, IconTrash,
-  IconRename, IconSparkle, IconLoader,
-  IconLineSplit, IconCheck,
+  IconRename, IconLoader,
+  IconCheck,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
@@ -515,37 +515,6 @@ function SortableEditorBlock({
 
         <div style={{ flex: 1 }} />
 
-        {isTextBased && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onSplitMathLines?.(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              border: 'none', background: 'none', cursor: 'pointer',
-              padding: 2, display: 'flex', color: 'var(--text-faint)',
-            }}
-            title="수식행 분할 (⌘⇧L) — 커서가 위치한 $$...$$ 의 \\ 행을 각각 독립행 수식으로 분리"
-          >
-            <IconLineSplit size={12} />
-          </button>
-        )}
-
-        {isTextBased && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onAIComplete?.(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            disabled={aiLoading}
-            style={{
-              border: 'none', background: 'none',
-              cursor: aiLoading ? 'wait' : 'pointer',
-              padding: 2, display: 'flex',
-              color: aiLoading ? 'var(--accent-primary)' : 'var(--text-faint)',
-            }}
-            title="AI 완성 (⌘J)"
-          >
-            {aiLoading ? <IconLoader size={12} /> : <IconSparkle size={12} />}
-          </button>
-        )}
-
         {canDelete && (
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); }}
@@ -646,8 +615,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const ocrInputRef = useRef<HTMLInputElement>(null);
 
   // 블록 추가 드롭다운
-  const [addBlockDropdownOpen, setAddBlockDropdownOpen] = useState(false);
-  const addBlockDropdownRef = useRef<HTMLDivElement>(null);
 
   // 미리보기 활성 수식 인덱스
   const [activeMathId, setActiveMathId] = useState<number>(-1);
@@ -1422,18 +1389,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => window.removeEventListener('keydown', handler);
   }, [handleSplitBlock, handleAIComplete, handleSplitMathLines]);
 
-  // 블록 추가 드롭다운 외부 클릭 닫기
-  useEffect(() => {
-    if (!addBlockDropdownOpen) return;
-    const handleClick = (e: MouseEvent) => {
-      if (addBlockDropdownRef.current && !addBlockDropdownRef.current.contains(e.target as Node)) {
-        setAddBlockDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [addBlockDropdownOpen]);
-
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
     // 다음 "풀이N" 번호 계산
@@ -1832,6 +1787,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onRunProofread={handleRunProofread}
           ocrLoading={ocrLoading}
           onOcrClick={handleOcrClick}
+          blockTypes={BLOCK_TYPES.map((t) => ({ type: t, label: BLOCK_TYPE_LABELS[t] }))}
+          onAddBlock={(type) => handleAddBlock(type as Block['type'])}
+          onSplitBlock={handleSplitBlock}
+          canSplitBlock={!!activeBlock && SPLITTABLE_TYPES.has(activeBlock.type)}
+          onSplitMathLines={() => handleSplitMathLines()}
+          onAIComplete={() => handleAIComplete()}
+          aiLoading={aiLoadingBlockId !== null}
         />
         <input
           ref={ocrInputRef}
@@ -1949,66 +1911,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           flex: 1, minWidth: 420, borderRight: '1px solid var(--border-light)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
         }}>
-          <div style={{
-            padding: '8px 16px 4px', fontSize: 11, color: 'var(--text-muted)',
-            fontWeight: 600, letterSpacing: 0.5, flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
-          }}>
-            {/* ── 블록 추가 드롭다운 ── */}
-            <div ref={addBlockDropdownRef} style={{ position: 'relative' }}>
-              <span
-                onClick={() => setAddBlockDropdownOpen((v) => !v)}
-                style={{
-                  cursor: 'pointer', fontSize: 11, color: 'var(--text-muted)',
-                  fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
-                }}
-              >
-                + 블록 추가
-              </span>
-              {addBlockDropdownOpen && (
-                <div style={{
-                  position: 'absolute', top: '100%', right: 0, zIndex: 100,
-                  marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-                  borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-                  minWidth: 140, overflow: 'hidden',
-                }}>
-                  {BLOCK_TYPES.map((t) => (
-                    <div
-                      key={t}
-                      onClick={() => {
-                        handleAddBlock(t);
-                        setAddBlockDropdownOpen(false);
-                      }}
-                      style={{
-                        padding: '7px 14px', fontSize: 12, cursor: 'pointer',
-                        color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-                        transition: 'background 0.1s',
-                      }}
-                      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                      onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
-                    >
-                      {BLOCK_TYPE_LABELS[t]}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            <span style={{ margin: '0 10px', color: 'var(--border-light)' }}>|</span>
-            {/* ── 블록 분할 ── */}
-            <span
-              onClick={activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? handleSplitBlock : undefined}
-              style={{
-                cursor: activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? 'pointer' : 'default',
-                fontSize: 11, color: 'var(--text-muted)',
-                fontWeight: 600, letterSpacing: 0.5, userSelect: 'none',
-                opacity: activeBlock && SPLITTABLE_TYPES.has(activeBlock.type) ? 1 : 0.35,
-                display: 'inline-flex', alignItems: 'center', gap: 3,
-              }}
-            >
-              <IconSplit size={12} /> 블록 분할
-            </span>
-          </div>
-
           {/* ── 찾기/바꾸기 패널 ── */}
           <FindReplacePanel
             open={searchOpen}

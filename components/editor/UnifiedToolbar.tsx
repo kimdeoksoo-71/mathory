@@ -134,6 +134,63 @@ function SpecialCharIcon() {
   );
 }
 
+function TableAddIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <rect x="20" y="20" width="24" height="24" rx="1" />
+      <path d="M32 20 L32 44" />
+      <path d="M20 32 L44 32" />
+    </svg>
+  );
+}
+
+function BlockAddIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M32 20 L32 44" />
+      <path d="M20 32 L44 32" />
+    </svg>
+  );
+}
+
+function BlockSplitIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M18 32 L46 32" />
+      <path d="M24 26 L18 32 L24 38" />
+      <path d="M40 26 L46 32 L40 38" />
+    </svg>
+  );
+}
+
+function FormulaSplitIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M18 27 L36 27" />
+      <path d="M18 37 L36 37" />
+      <circle cx="42" cy="27" r="2.5" fill="currentColor" stroke="none" />
+      <circle cx="42" cy="37" r="2.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function AiMathGenIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path
+        d="M32 16 C32 16 34 28 44 32 C34 36 32 48 32 48 C32 48 30 36 20 32 C30 28 32 16 32 16Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
 // ═══════════════════════════════════════════════
 // 특수문자 그룹 (원문자 등) — Step 5에서 사용자 커스터마이징 지원 예정
 // ═══════════════════════════════════════════════
@@ -183,6 +240,11 @@ const SPECIAL_CHAR_GROUPS: SpecialCharGroup[] = [
 // Props & 공통 스타일
 // ═══════════════════════════════════════════════
 
+export interface BlockTypeOption {
+  type: string;
+  label: string;
+}
+
 interface UnifiedToolbarProps {
   cursorInMath: boolean;
   showToolbar: boolean;
@@ -198,6 +260,14 @@ interface UnifiedToolbarProps {
   onRunProofread: () => void;
   ocrLoading: boolean;
   onOcrClick: () => void;
+  // 블록 영역
+  blockTypes: BlockTypeOption[];
+  onAddBlock: (type: string) => void;
+  onSplitBlock: () => void;
+  canSplitBlock: boolean;
+  onSplitMathLines: () => void;
+  onAIComplete: () => void;
+  aiLoading: boolean;
 }
 
 const ICON_BTN_BASE: React.CSSProperties = {
@@ -384,6 +454,208 @@ function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursor
 }
 
 // ═══════════════════════════════════════════════
+// 블록 추가 풀다운
+// ═══════════════════════════════════════════════
+
+function BlockAddDropdown({
+  blockTypes, onAddBlock, disabled,
+}: {
+  blockTypes: BlockTypeOption[];
+  onAddBlock: (type: string) => void;
+  disabled: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <IconButton
+        title="블록 추가"
+        onClick={() => setOpen((v) => !v)}
+        active={open}
+        disabled={disabled}
+      >
+        <BlockAddIcon />
+      </IconButton>
+      {open && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            marginTop: 4,
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-light)',
+            borderRadius: 8,
+            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            zIndex: 1000,
+            minWidth: 140,
+            overflow: 'hidden',
+          }}
+        >
+          {blockTypes.map((bt) => (
+            <div
+              key={bt.type}
+              onClick={() => {
+                onAddBlock(bt.type);
+                setOpen(false);
+              }}
+              style={{
+                padding: '7px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-ui)',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {bt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════
+// 표 삽입 다이얼로그
+// ═══════════════════════════════════════════════
+
+function TableInsertDialog({
+  open, onClose, onConfirm,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (rows: number, cols: number) => void;
+}) {
+  const [rows, setRows] = useState(3);
+  const [cols, setCols] = useState(3);
+
+  useEffect(() => {
+    if (open) {
+      setRows(3);
+      setCols(3);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  const submit = () => {
+    const r = Math.max(1, Math.min(50, Math.floor(rows)));
+    const c = Math.max(1, Math.min(20, Math.floor(cols)));
+    onConfirm(r, c);
+  };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.3)',
+        zIndex: 3000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#fff',
+          borderRadius: 8,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
+          padding: '20px 24px',
+          minWidth: 260,
+          fontFamily: 'var(--font-ui)',
+        }}
+      >
+        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
+          표 삽입
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-primary)' }}>
+            <span style={{ width: 28 }}>행</span>
+            <input
+              type="number" min={1} max={50}
+              value={rows}
+              onChange={(e) => setRows(Number(e.target.value) || 1)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+              autoFocus
+              style={{
+                width: 64, padding: '4px 8px', fontSize: 13,
+                border: '1px solid var(--border-light)', borderRadius: 4,
+                fontFamily: 'var(--font-ui)',
+              }}
+            />
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-primary)' }}>
+            <span style={{ width: 28 }}>열</span>
+            <input
+              type="number" min={1} max={20}
+              value={cols}
+              onChange={(e) => setCols(Number(e.target.value) || 1)}
+              onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+              style={{
+                width: 64, padding: '4px 8px', fontSize: 13,
+                border: '1px solid var(--border-light)', borderRadius: 4,
+                fontFamily: 'var(--font-ui)',
+              }}
+            />
+          </label>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+          <button
+            onClick={onClose}
+            style={{
+              padding: '6px 14px', fontSize: 13,
+              border: '1px solid var(--border-light)', background: '#fff',
+              borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--font-ui)',
+              color: 'var(--text-primary)',
+            }}
+          >취소</button>
+          <button
+            onClick={submit}
+            style={{
+              padding: '6px 14px', fontSize: 13,
+              border: '1px solid var(--accent-primary)',
+              background: 'var(--accent-primary)',
+              color: '#fff',
+              borderRadius: 4, cursor: 'pointer', fontFamily: 'var(--font-ui)',
+              fontWeight: 600,
+            }}
+          >확인</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 행 r, 열 c의 가운데 정렬 markdown 표 문자열 생성.
+ * 1행은 헤더(빈 셀), 2행은 정렬 구분자(`:---:`), 이후 r-1개의 빈 본문 행.
+ */
+function buildMarkdownTable(r: number, c: number): string {
+  const empty = '|' + Array(c).fill('   ').join(' | ') + ' |';
+  const align = '|' + Array(c).fill(':---:').join(' | ') + ' |';
+  const bodyRows = Math.max(0, r - 1);
+  const body = bodyRows > 0 ? Array(bodyRows).fill(empty).join('\n') + '\n' : '';
+  return `\n${empty}\n${align}\n${body}`;
+}
+
+// ═══════════════════════════════════════════════
 // 메인
 // ═══════════════════════════════════════════════
 
@@ -402,12 +674,26 @@ export default function UnifiedToolbar({
   onRunProofread,
   ocrLoading,
   onOcrClick,
+  blockTypes,
+  onAddBlock,
+  onSplitBlock,
+  canSplitBlock,
+  onSplitMathLines,
+  onAIComplete,
+  aiLoading,
 }: UnifiedToolbarProps) {
   const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
   const snippetBtnRef = useRef<HTMLButtonElement>(null);
+  const [tableDialogOpen, setTableDialogOpen] = useState(false);
 
   const insertInlineMath = () => onInsert('$$', 1);
   const insertBlockMath = () => onInsert('$$\n\n$$', 3);
+
+  const insertTable = (rows: number, cols: number) => {
+    const md = buildMarkdownTable(rows, cols);
+    onInsert(md, md.length);
+    setTableDialogOpen(false);
+  };
 
   return (
     <div
@@ -488,6 +774,14 @@ export default function UnifiedToolbar({
       {/* ── 특수문자 ── */}
       <SpecialCharDropdown onInsert={onInsert} />
 
+      {/* ── 표 삽입 ── */}
+      <IconButton
+        title="표 삽입"
+        onClick={() => setTableDialogOpen(true)}
+      >
+        <TableAddIcon />
+      </IconButton>
+
       {/* ── 이미지인식 (OCR) ── */}
       <IconButton
         title="수식 읽기"
@@ -516,6 +810,44 @@ export default function UnifiedToolbar({
       >
         <SearchReplaceIcon />
       </IconButton>
+
+      <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
+
+      {/* ═══ 블록 영역 ═══
+          텍스트 기반 블록 활성(showToolbar)일 때만 진하게, 그 외 흐릿하게.
+          showToolbar 전체 영역 opacity가 이미 0.35이므로 추가 처리 없음. */}
+      <BlockAddDropdown
+        blockTypes={blockTypes}
+        onAddBlock={onAddBlock}
+        disabled={!showToolbar}
+      />
+      <IconButton
+        title="블록 분할 (⌘B)"
+        onClick={onSplitBlock}
+        disabled={!canSplitBlock}
+      >
+        <BlockSplitIcon />
+      </IconButton>
+      <IconButton
+        title="수식행 분할 (⌘⇧L)"
+        onClick={onSplitMathLines}
+      >
+        <FormulaSplitIcon />
+      </IconButton>
+      <IconButton
+        title="AI 완성 (⌘J)"
+        onClick={onAIComplete}
+        disabled={aiLoading}
+      >
+        {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
+      </IconButton>
+
+      {/* 표 삽입 다이얼로그 (포털 대신 fixed overlay) */}
+      <TableInsertDialog
+        open={tableDialogOpen}
+        onClose={() => setTableDialogOpen(false)}
+        onConfirm={insertTable}
+      />
     </div>
   );
 }
