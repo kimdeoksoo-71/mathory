@@ -9,6 +9,8 @@ export interface PdfPrintTab {
     type: Block['type'];
     raw_text: string;
     imageWidth?: number;
+    svg_initial_view?: { scale: number; positionX: number; positionY: number } | null;
+    svg_height?: number;
   }>;
 }
 

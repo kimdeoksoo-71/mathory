@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "http://localhost:3000",
+      "https://mathory.vercel.app",
+      "https://*.vercel.app"
+    ],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type"]
+  }
+]

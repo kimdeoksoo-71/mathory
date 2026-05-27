@@ -67,14 +67,24 @@ export interface BlockchainField {
   latest: BlockchainRecord;
 }
 
+export interface SvgInitialView {
+  scale: number;
+  positionX: number;
+  positionY: number;
+}
+
 export interface Block {
   id: string;
   order: number;
-  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image';
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg';
   raw_text: string;
   step_label?: string;
   title?: string;
   imageWidth?: number;
+  /** SVG 블록 전용: 편집자가 저장한 초기 뷰 transform (없으면 fit-to-container) */
+  svg_initial_view?: SvgInitialView | null;
+  /** SVG 블록 전용: 표시 높이(px). 기본 300 */
+  svg_height?: number;
 }
 
 /** 탭 메타데이터 */

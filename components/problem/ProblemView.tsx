@@ -6,6 +6,7 @@ import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
+import SvgViewer from '../viewer/SvgViewer';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -242,6 +243,7 @@ export default function ProblemView({
           label: t.label,
           blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
             id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
+            svg_initial_view: b.svg_initial_view, svg_height: b.svg_height,
           })),
         }));
       await printProblemPdf({ title: problem.title, tabs: printTabs });
@@ -269,6 +271,22 @@ export default function ProblemView({
               }} />
             ) : (
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
+            )}
+          </div>
+        );
+      }
+      if (block.type === 'svg') {
+        return (
+          <div key={block.id} style={{ margin: '0.8em 0' }}>
+            {block.raw_text ? (
+              <SvgViewer
+                url={block.raw_text}
+                initialView={block.svg_initial_view}
+                height={block.svg_height || 300}
+                enableFullscreen
+              />
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(SVG 없음)</div>
             )}
           </div>
         );

@@ -16,7 +16,9 @@ import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
-import { uploadImage } from '../../lib/storage';
+import { uploadImage, uploadSvg } from '../../lib/storage';
+import SvgViewer from '../viewer/SvgViewer';
+import ImageTypeSelectModal, { ImageMediaKind } from './ImageTypeSelectModal';
 import { computeContentHash } from '../../lib/copyright';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
@@ -46,6 +48,8 @@ interface LocalBlock extends Block {
   imageWidth?: number;
 }
 
+const SVG_BLOCK_HEIGHT = 300;
+
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
   heading: '제목',
@@ -54,8 +58,10 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   box: '글상자',
   choices: '선택지',
   image: '그림',
+  svg: 'SVG',
 };
 
+/** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
 const BLOCK_TYPES: Block['type'][] = [
   'text', 'heading', 'gana', 'roman', 'box', 'choices', 'image',
 ];
@@ -69,6 +75,7 @@ const BLOCK_PRESETS: Record<string, string> = {
   box: '',
   choices: '',
   image: '',
+  svg: '',
 };
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
@@ -197,30 +204,161 @@ function setStoredFontSize(size: number) {
   document.documentElement.style.setProperty('--content-font-size', size + 'px');
 }
 
-/* ═══ ImageBlockContent ═══ */
+/* ═══ EmptyBlockChips: 빈 텍스트 블록에 그림/선택지 빠른 전환 칩 ═══ */
 
-function ImageBlockContent({
+function EmptyBlockChips({ onPick }: { onPick: (type: Block['type']) => void }) {
+  const CHIPS: Array<{ type: Block['type']; label: string }> = [
+    { type: 'heading', label: '제목' },
+    { type: 'image', label: '그림' },
+    { type: 'gana', label: '(가)(나)(다)' },
+  ];
+  return (
+    <div style={{ display: 'flex', gap: 3, marginLeft: 4, alignItems: 'center' }}>
+      {CHIPS.map((c) => (
+        <button
+          key={c.type}
+          onClick={(e) => { e.stopPropagation(); onPick(c.type); }}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            padding: '0 6px', height: 16, fontSize: 10, lineHeight: '14px',
+            background: 'var(--bg-hover, #efefef)',
+            border: '1px solid var(--border-light, #ddd)',
+            borderRadius: 8, cursor: 'pointer',
+            color: 'var(--text-secondary, #666)',
+            fontFamily: 'var(--font-ui)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* ═══ MediaBlockContent (image + svg 통합) ═══ */
+
+const ACCEPT_BY_KIND: Record<ImageMediaKind, string> = {
+  raster: 'image/png,image/jpeg,image/gif,image/webp',
+  svg: 'image/svg+xml,.svg',
+  ggb: '.ggb',
+};
+
+function MediaBlockContent({
   block,
-  onImageUpload,
+  onMediaUpload,
   onImageWidthChange,
+  onSaveSvgInitialView,
+  onSvgHeightChange,
   problemId,
 }: {
   block: LocalBlock;
-  onImageUpload: (file: File, blockId: string) => Promise<void>;
+  onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
+  onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
+  onSvgHeightChange: (blockId: string, height: number) => void;
   problemId: string;
 }) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [showTypeModal, setShowTypeModal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pendingKindRef = useRef<ImageMediaKind | null>(null);
   const imgWidth = block.imageWidth || 400;
 
-  if (block.raw_text) {
+  const openTypeModal = () => setShowTypeModal(true);
+  const cancelTypeModal = () => setShowTypeModal(false);
+
+  const handleTypeSelected = (kind: ImageMediaKind) => {
+    setShowTypeModal(false);
+    if (kind === 'ggb') return;
+    pendingKindRef.current = kind;
+    // input의 accept를 동적으로 변경한 뒤 click
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = ACCEPT_BY_KIND[kind];
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const kind = pendingKindRef.current;
+    pendingKindRef.current = null;
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    if (!file || !kind) return;
+    setUploading(true);
+    setError('');
+    try {
+      await onMediaUpload(file, kind, block.id);
+    } catch (err: any) {
+      setError(`업로드 실패: ${err.message || err}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ─── SVG 블록 ───
+  if (block.type === 'svg' && block.raw_text) {
+    const svgHeight = block.svg_height || SVG_BLOCK_HEIGHT;
+    return (
+      <div style={{ padding: 8 }}>
+        <SvgViewer
+          url={block.raw_text}
+          initialView={block.svg_initial_view}
+          height={svgHeight}
+          onSaveInitialView={(v) => onSaveSvgInitialView(block.id, v)}
+        />
+        <div style={{
+          marginTop: 6, display: 'flex', justifyContent: 'center',
+          alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--text-muted)',
+        }}>
+          <span>높이</span>
+          <input
+            type="range"
+            min={150}
+            max={800}
+            step={20}
+            value={svgHeight}
+            onChange={(e) => onSvgHeightChange(block.id, Number(e.target.value))}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{ width: 140, cursor: 'pointer' }}
+          />
+          <span>{svgHeight}px</span>
+          <button
+            onClick={openTypeModal}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              padding: '4px 12px', fontSize: 12,
+              background: 'var(--bg-hover, #f0f0f0)',
+              border: '1px solid var(--border-light, #ddd)',
+              borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            그림 변경
+          </button>
+        </div>
+        {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4, textAlign: 'center' }}>{error}</div>}
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: 'none' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onChange={handleFileChange}
+        />
+        {showTypeModal && (
+          <ImageTypeSelectModal onSelect={handleTypeSelected} onCancel={cancelTypeModal} />
+        )}
+      </div>
+    );
+  }
+
+  // ─── 일반 이미지 블록 ───
+  if (block.type === 'image' && block.raw_text) {
     const srcMatch = block.raw_text.match(/src="([^"]+)"/);
     const src = srcMatch?.[1] || '';
-    const maxW = 600; // 에디터 패널 내 최대 폭 기준
+    const maxW = 600;
     return (
-      <div ref={containerRef} style={{ padding: 8, textAlign: 'center' }}>
+      <div style={{ padding: 8, textAlign: 'center' }}>
         <img src={src} alt="" style={{ width: Math.min(imgWidth, maxW), maxWidth: '90%', borderRadius: 8 }} />
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -240,40 +378,34 @@ function ImageBlockContent({
           <span>{imgWidth}px</span>
         </div>
         <div style={{ marginTop: 6 }}>
-          <label
+          <button
+            onClick={openTypeModal}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
-              display: 'inline-block', padding: '4px 12px',
-              fontSize: 12, background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
+              padding: '4px 12px', fontSize: 12,
+              background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
               borderRadius: 6, cursor: 'pointer',
             }}
           >
             그림 변경
-            <input
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setUploading(true);
-                setError('');
-                try {
-                  await onImageUpload(file, block.id);
-                } catch (err: any) {
-                  setError(`업로드 실패: ${err.message || err}`);
-                } finally {
-                  setUploading(false);
-                }
-              }}
-            />
-          </label>
+          </button>
         </div>
         {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4 }}>{error}</div>}
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: 'none' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onChange={handleFileChange}
+        />
+        {showTypeModal && (
+          <ImageTypeSelectModal onSelect={handleTypeSelected} onCancel={cancelTypeModal} />
+        )}
       </div>
     );
   }
 
+  // ─── 빈 그림 블록 ───
   return (
     <div style={{
       padding: 24, textAlign: 'center',
@@ -284,38 +416,31 @@ function ImageBlockContent({
       ) : (
         <>
           <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 8 }}>
-            이미지를 선택하세요
+            그림을 추가하세요
           </div>
-          <label
+          <button
+            onClick={openTypeModal}
+            onPointerDown={(e) => e.stopPropagation()}
             style={{
-              display: 'inline-block', padding: '6px 16px',
-              fontSize: 13, background: 'var(--accent-primary)', color: '#fff',
-              borderRadius: 6, cursor: 'pointer',
+              padding: '6px 16px', fontSize: 13,
+              background: 'var(--accent-primary)', color: '#fff',
+              border: 'none', borderRadius: 6, cursor: 'pointer',
             }}
           >
             파일 선택
-            <input
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onChange={async (e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                setUploading(true);
-                setError('');
-                try {
-                  await onImageUpload(file, block.id);
-                } catch (err: any) {
-                  setError(`업로드 실패: ${err.message || err}`);
-                } finally {
-                  setUploading(false);
-                }
-              }}
-            />
-          </label>
+          </button>
           {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 8 }}>{error}</div>}
         </>
+      )}
+      <input
+        ref={fileInputRef}
+        type="file"
+        style={{ display: 'none' }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onChange={handleFileChange}
+      />
+      {showTypeModal && (
+        <ImageTypeSelectModal onSelect={handleTypeSelected} onCancel={cancelTypeModal} />
       )}
     </div>
   );
@@ -429,8 +554,10 @@ function SortableEditorBlock({
   onTitleChange,
   onDelete,
   onToggleCollapse,
-  onImageUpload,
+  onMediaUpload,
   onImageWidthChange,
+  onSaveSvgInitialView,
+  onSvgHeightChange,
   problemId,
   onSnippetShortcut,
   onCursorActivity,
@@ -449,8 +576,10 @@ function SortableEditorBlock({
   onTitleChange: (title: string) => void;
   onDelete: () => void;
   onToggleCollapse: () => void;
-  onImageUpload: (file: File, blockId: string) => Promise<void>;
+  onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
+  onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
+  onSvgHeightChange: (blockId: string, height: number) => void;
   problemId: string;
   onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number; blockId: string }) => void;
@@ -511,7 +640,15 @@ function SortableEditorBlock({
           {BLOCK_TYPES.map((t) => (
             <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
           ))}
+          {/* 기존 svg 블록은 옵션 목록에 없으므로 현재 값 보존용으로 표시 */}
+          {block.type === 'svg' && (
+            <option value="svg">{BLOCK_TYPE_LABELS.svg}</option>
+          )}
         </select>
+
+        {block.type === 'text' && !block.raw_text && (
+          <EmptyBlockChips onPick={onTypeChange} />
+        )}
 
         <div style={{ flex: 1 }} />
 
@@ -532,12 +669,14 @@ function SortableEditorBlock({
 
       {/* ── Block Content ── */}
       {!block.collapsed && (
-        <div style={{ padding: block.type === 'image' ? 0 : '0' }} onClick={onFocus}>
-          {block.type === 'image' ? (
-            <ImageBlockContent
+        <div style={{ padding: 0 }} onClick={onFocus}>
+          {(block.type === 'image' || block.type === 'svg') ? (
+            <MediaBlockContent
               block={block}
-              onImageUpload={onImageUpload}
+              onMediaUpload={onMediaUpload}
               onImageWidthChange={onImageWidthChange}
+              onSaveSvgInitialView={onSaveSvgInitialView}
+              onSvgHeightChange={onSvgHeightChange}
               problemId={problemId}
             />
           ) : (
@@ -766,9 +905,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 교정 (Phase 27) ─── */
   // 자동 수정 대상에서 제외할 타입 (image는 텍스트 없음)
-  const AUTOFIX_EXCLUDED_TYPES = useMemo(() => new Set(['image']), []);
+  const AUTOFIX_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg']), []);
   // Claude API 교정 대상에서 제외할 타입 (choices는 ①②③④⑤ 라벨이 오탈자로 오인됨)
-  const API_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'choices']), []);
+  const API_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg', 'choices']), []);
 
   const callProofreadApi = useCallback(async (
     targets: { id: string; rawText: string }[],
@@ -1062,6 +1201,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }
         } else if (type === 'image' && b.type !== 'image') {
           raw_text = '';
+        } else if (type === 'svg' && b.type !== 'svg') {
+          raw_text = '';
         } else if (type !== b.type && BLOCK_PRESETS[type] !== undefined && !TEXT_BASED_TYPES.has(b.type)) {
           // 이미지→텍스트 계열 전환 시 프리셋 적용
           raw_text = BLOCK_PRESETS[type];
@@ -1167,20 +1308,47 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 50);
   }, [activeBlockId, currentBlocks, setCurrentBlocks]);
 
-  /* ─── 이미지 업로드 ─── */
-  const handleBlockImageUpload = useCallback(async (file: File, blockId: string) => {
+  /* ─── 미디어 업로드 (image | svg) ─── */
+  const handleBlockMediaUpload = useCallback(async (file: File, kind: ImageMediaKind, blockId: string) => {
     const pid = problemId || `temp-${Date.now()}`;
     try {
-      const url = await uploadImage(file, pid);
-      const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
-      setCurrentBlocks((prev) =>
-        prev.map((b) => (b.id === blockId ? { ...b, raw_text: markdownImage } : b))
-      );
+      if (kind === 'svg') {
+        const url = await uploadSvg(file, pid);
+        setCurrentBlocks((prev) =>
+          prev.map((b) => (b.id === blockId
+            ? { ...b, type: 'svg', raw_text: url, svg_initial_view: null }
+            : b))
+        );
+      } else {
+        const url = await uploadImage(file, pid);
+        const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
+        setCurrentBlocks((prev) =>
+          prev.map((b) => (b.id === blockId
+            ? { ...b, type: 'image', raw_text: markdownImage }
+            : b))
+        );
+      }
     } catch (err: any) {
-      console.error('[ImageUpload] 에러:', err);
+      console.error('[MediaUpload] 에러:', err);
       throw err;
     }
   }, [problemId, setCurrentBlocks]);
+
+  /* ─── SVG 초기뷰 저장 ─── */
+  const handleSaveSvgInitialView = useCallback(
+    (blockId: string, view: { scale: number; positionX: number; positionY: number }) => {
+      setCurrentBlocks((prev) =>
+        prev.map((b) => (b.id === blockId ? { ...b, svg_initial_view: view } : b))
+      );
+    },
+    [setCurrentBlocks]
+  );
+
+  const handleSvgHeightChange = useCallback((blockId: string, height: number) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, svg_height: height } : b))
+    );
+  }, [setCurrentBlocks]);
 
   /* ─── DnD ─── */
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -1536,6 +1704,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           };
           if (b.type === 'image' && b.imageWidth) {
             saveData.imageWidth = b.imageWidth;
+          }
+          if (b.type === 'svg' && b.svg_initial_view) {
+            saveData.svg_initial_view = b.svg_initial_view;
+          }
+          if (b.type === 'svg' && b.svg_height) {
+            saveData.svg_height = b.svg_height;
           }
           await saveTabBlock(problem.id, tab.id, saveData as any);
         }
@@ -1979,8 +2153,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onTitleChange={(title) => handleBlockTitleChange(block.id, title)}
                     onDelete={() => handleDeleteBlock(block.id)}
                     onToggleCollapse={() => handleToggleCollapse(block.id)}
-                    onImageUpload={handleBlockImageUpload}
+                    onMediaUpload={handleBlockMediaUpload}
                     onImageWidthChange={handleImageWidthChange}
+                    onSaveSvgInitialView={handleSaveSvgInitialView}
+                    onSvgHeightChange={handleSvgHeightChange}
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
                     onCursorActivity={handleCursorActivity}
@@ -2035,6 +2211,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                         />
                       ) : (
                         <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
+                      )}
+                    </div>
+                  ) : block.type === 'svg' ? (
+                    <div>
+                      {block.raw_text ? (
+                        <SvgViewer
+                          url={block.raw_text}
+                          initialView={block.svg_initial_view}
+                          height={block.svg_height || SVG_BLOCK_HEIGHT}
+                          interactive={false}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(SVG 없음)</div>
                       )}
                     </div>
                   ) : isBordered ? (

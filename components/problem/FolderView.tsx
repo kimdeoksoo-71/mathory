@@ -5,6 +5,7 @@ import { Problem, Block, Folder } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
+import SvgViewer from '../viewer/SvgViewer';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
@@ -162,6 +163,15 @@ export default function FolderView({
         return (
           <div key={block.id || `img-${i}`} style={{ textAlign: 'center', margin: '0.8em 0' }}>
             {src ? <img src={src} alt="" style={{ width: block.imageWidth || 400, maxWidth: '90%', height: 'auto' }} /> : null}
+          </div>
+        );
+      }
+      if (block.type === 'svg') {
+        return (
+          <div key={block.id || `svg-${i}`} style={{ margin: '0.8em 0' }}>
+            {block.raw_text ? (
+              <SvgViewer url={block.raw_text} initialView={block.svg_initial_view} height={200} interactive={false} />
+            ) : null}
           </div>
         );
       }

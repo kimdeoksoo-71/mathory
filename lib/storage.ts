@@ -1,5 +1,6 @@
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { app } from './firebase';
+import { sanitizeSvg } from './svg-sanitizer';
 
 const storage = getStorage(app);
 
@@ -102,4 +103,26 @@ export async function uploadImage(file: File, problemId: string): Promise<string
   const url = await getDownloadURL(storageRef);
   console.log('[uploadImage] URL 획득 완료');
   return url;
+}
+
+/**
+ * SVG 업로드: 클라이언트에서 sanitize한 후 Storage에 저장.
+ * 저장본은 이미 정제된 상태이므로 런타임 sanitize 부담을 줄임.
+ */
+export async function uploadSvg(file: File, problemId: string): Promise<string> {
+  const rawText = await file.text();
+  const sanitized = sanitizeSvg(rawText);
+  if (!sanitized.includes('<svg')) {
+    throw new Error('유효한 SVG 파일이 아닙니다.');
+  }
+
+  const blob = new Blob([sanitized], { type: 'image/svg+xml' });
+  const timestamp = Date.now();
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const fileName = `${timestamp}-${baseName}.svg`;
+  const path = `problems/${problemId}/${fileName}`;
+  const storageRef = ref(storage, path);
+
+  await uploadBytes(storageRef, blob, { contentType: 'image/svg+xml' });
+  return await getDownloadURL(storageRef);
 }

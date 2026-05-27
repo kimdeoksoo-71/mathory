@@ -14,6 +14,8 @@ export interface PrintBlock {
   type: string;
   raw_text: string;
   imageWidth?: number;
+  svg_initial_view?: { scale: number; positionX: number; positionY: number } | null;
+  svg_height?: number;
 }
 
 export interface PrintTab {
@@ -51,6 +53,8 @@ export default function PrintableContent({
                   <PrintChoicesBlock content={block.raw_text} locale={locale} />
                 ) : block.type === 'image' ? (
                   <PrintImageBlock content={block.raw_text} imageWidth={block.imageWidth} />
+                ) : block.type === 'svg' ? (
+                  <PrintSvgBlock url={block.raw_text} initialView={block.svg_initial_view} height={block.svg_height} />
                 ) : BORDERED_TYPES_PRINT.has(block.type) ? (
                   <div className="print-bordered-block">
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
@@ -113,6 +117,44 @@ function PrintChoicesBlock({ content, locale }: { content: string; locale: Local
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * SVG 인쇄 블록: 저장된 초기뷰가 있으면 transform 으로 적용.
+ * 인쇄 컨테이너는 100% width × 300px 고정 (편집기 뷰어와 동일).
+ * positionX/Y 는 편집 당시 컨테이너 크기 기준이라 print 컬럼 폭이 다르면 오차 발생.
+ */
+function PrintSvgBlock({
+  url, initialView, height = 300,
+}: {
+  url: string;
+  initialView?: { scale: number; positionX: number; positionY: number } | null;
+  height?: number;
+}) {
+  if (!url) return null;
+  const wrapperStyle: React.CSSProperties = {
+    width: '100%', height, overflow: 'hidden', position: 'relative',
+    background: '#fff', border: '1px solid #ddd',
+  };
+  if (initialView) {
+    const innerStyle: React.CSSProperties = {
+      width: '100%', height: '100%',
+      transform: `translate(${initialView.positionX}px, ${initialView.positionY}px) scale(${initialView.scale})`,
+      transformOrigin: '0 0',
+    };
+    return (
+      <div style={wrapperStyle}>
+        <div style={innerStyle}>
+          <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div style={wrapperStyle}>
+      <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
     </div>
   );
 }
