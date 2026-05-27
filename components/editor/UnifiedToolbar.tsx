@@ -724,7 +724,7 @@ function OverflowItems({
   const visibleEnd = items.length - hideCount;
 
   return (
-    <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+    <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0 }}>
       {items.map((it, i) => (
         <div
           key={it.key}
@@ -904,7 +904,6 @@ export default function UnifiedToolbar({
         transition: 'opacity 0.15s',
         flex: 1,
         minWidth: 0,
-        overflow: 'hidden',
       }}
     >
       {/* ── 좌측: 컨텍스트 영역 (항상 보임, 자기 폭 유지) ── */}
