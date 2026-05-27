@@ -815,3 +815,48 @@ problems/{id}
 - **카드 그리드 폭 고정 + auto-fill + center**: `repeat(auto-fill, minmax(35em, 1fr))`는 카드가 늘어남. `repeat(auto-fill, 35em)` + `justifyContent: center`로 카드 폭 고정·열 수만 반응형 조절.
 - **CSS 변수가 컴포넌트 경계를 넘는 유일한 통일성 도구**: 상단 바 높이 52px·본문 텍스트 톤 #6a6a6a·수식 색 `--text-primary` 등 세 영역에 동일 값을 강제하려면 매번 직접 하드코딩 또는 CSS 변수 활용 필수.
 - **친근한 UX 디테일이 패널 인지의 핵심**: "변경완료" 토스트 위치, 댓글 패널 X 버튼과 토글 분리, 본문이 패널 폭만큼 자동 시프트 등의 소소한 정렬이 "툴이 제대로 만들어졌다"는 인상을 결정.
+
+---
+
+## Phase 32: SVG 블록 시스템 + 줌/팬 뷰어 ✅
+
+**완료일**: 2026-05-27 **커밋**: `3080057`
+
+### 32-A: 목표
+
+- HWP 대체 워크플로우에서 이미지 종류를 명확히 구분 (일반 비트맵 vs SVG)
+- SVG: 벡터 보존, 인쇄 시 무손실, 줌/팬으로 부분 확대 가능
+- 편집자가 "보여주고 싶은 초기 뷰"를 저장하여 열람자에게 강조점 전달
+- 향후 GeoGebra 등 동적 그림 도구 확장 경로 확보 (UI 자리만 마련)
+
+### 32-B: 결정사항
+
+| 항목 | 결정 | 이유 |
+|------|------|------|
+| 그림 종류 진입 경로 | 툴바 X, 블록 내부 "파일 선택" → 종류 모달 | 툴바를 "블록 추가/분할"만 담는 invariant 유지. 발견성은 placeholder 칩(빈 텍스트 블록 헤더)으로 보강 |
+| 인쇄 시 SVG 뷰 | 저장된 초기뷰로 transform 적용 | 저자 의도 존중. 단, positionX/Y는 편집 당시 컨테이너 폭 기준이라 인쇄 컬럼 폭이 다르면 오차 — 후속 개선 |
+| 초기뷰 저장 버튼 위치 | 우상단 floating, 편집모드에만 노출 | 빈도 낮은 액션이라 눈에 띄지 않게 |
+| SVG sanitize 시점 | 업로드 직전 1회 → Storage엔 정제본만 | 런타임 부담 0 |
+| 활성화 UX | 클릭 시에만 줌/팬 활성, 외부 클릭 시 해제, FolderView 동일 그림자 | 의도치 않은 줌/팬 방지 |
+| GGB | 모달에 비활성 노출만 | 자리만 확보 |
+
+### 32-C: 구현
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| `types/problem.ts`: `svg` 타입, `svg_initial_view`, `svg_height` | ✅ | |
+| `lib/svg-sanitizer.ts` — DOMPurify + viewBox 자동생성 | ✅ | width/height 픽셀값에서 viewBox 추론 |
+| `lib/storage.ts` `uploadSvg` — sanitize 후 업로드 | ✅ | |
+| `components/viewer/SvgViewer.tsx` — react-zoom-pan-pinch 래퍼 | ✅ | 클릭 활성화, 초기뷰 저장, 전체화면 |
+| `components/editor/ImageTypeSelectModal.tsx` — 일반/SVG/GGB 모달 | ✅ | |
+| `EditorView`: MediaBlockContent 통합, 헤더 placeholder 칩(제목/그림/(가)(나)(다)), 미리보기 분기 | ✅ | |
+| `ProblemView` / `FolderView` / `PrintableContent` 분기 | ✅ | |
+| Firebase Storage CORS 설정 + 문서 | ✅ | `cors.json`, `docs/Firebase Storage CORS 설정.md` |
+
+### Key Learnings
+
+- **`react-zoom-pan-pinch`의 `disabled: true`는 `setTransform`도 차단**: 라이브러리 소스(`setTransform` line 1027)에서 `setup.disabled`면 early return. 미리보기 화면이 편집창 초기뷰 저장에 반응 안 하는 원인이었음. 전체 `disabled` 대신 `wheel/panning/pinch/doubleClick` 각각 `disabled` 처리로 해결.
+- **viewBox 없는 SVG는 `width:100%`로 바꿔도 잘림**: SVG가 `<svg width="800" height="600">`만 있고 viewBox 없으면 내부 좌표가 픽셀 절대값이라 컨테이너에 안 맞춤. 정규화 시 width/height 픽셀값에서 `viewBox="0 0 W H"` 자동 생성 필수.
+- **라이브러리 CSS 모듈은 inline style을 이길 수 있다**: `react-zoom-pan-pinch`가 wrapper/content를 `width: fit-content`로 강제. 인라인 style이 같은 specificity로 충돌 → 호스트 클래스에서 `!important`로 override 필요.
+- **클릭 vs 드래그 구분**: 4px 미만 이동을 클릭으로 판정. mousedown 위치 저장 → mouseup에서 delta 비교. 라이브러리의 `onPanning*` 콜백에 의존하지 않는 단순한 방식이 디버깅 쉬움.
+- **빈 블록 placeholder 칩의 가치**: 툴바를 단순하게 유지하면서 발견성을 보강하는 패턴. 헤더 행 안에 16px 높이로 들어가서 시각적 부하 최소.
