@@ -2273,13 +2273,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 64px) ─── */}
+        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ─── */}
         <div style={{
-          width: `calc(35em + 128px)`, flexShrink: 0,
+          width: `calc(35em + 64px)`, flexShrink: 0,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 64px 100vh 64px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
             <div style={activeTab === 'question' ? {
               background: '#ffffff', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
