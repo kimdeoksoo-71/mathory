@@ -69,16 +69,21 @@ export async function releaseSession(uid: string): Promise<void> {
 /** sessions/{uid} 문서 감시. 다른 sessionId가 덮어쓰면 onKicked 호출 후 signOut */
 export function watchSession(uid: string, onKicked: () => void): Unsubscribe {
   const mySessionId = getTabSessionId();
+  // 자기 write가 snapshot에 한 번이라도 반영된 뒤에만 kick 판정
+  // (claim 직후 race로 상대 write가 먼저 보이는 일시적 불일치를 무시)
+  let sawMyWrite = false;
   return onSnapshot(
     doc(db, 'sessions', uid),
     (snap) => {
       const data = snap.data();
-      // 문서 부재는 무시 (외부 삭제 등 — 다음 로그인이 덮어씀)
-      if (!data) return;
-      if (data.sessionId !== mySessionId) {
-        onKicked();
-        signOut(auth).catch((e) => console.error('강제 signOut 실패:', e));
+      if (!data) return; // 문서 부재 무시
+      if (data.sessionId === mySessionId) {
+        sawMyWrite = true;
+        return;
       }
+      if (!sawMyWrite) return; // 아직 내 write가 반영되기 전 → 다음 snapshot 대기
+      onKicked();
+      signOut(auth).catch((e) => console.error('강제 signOut 실패:', e));
     },
     (err) => console.error('watchSession 오류:', err)
   );
