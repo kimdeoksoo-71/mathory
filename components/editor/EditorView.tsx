@@ -660,12 +660,14 @@ function SortableEditorBlock({
     transition,
     opacity: isDragging ? 0.5 : 1,
     marginBottom: 6,
-    border: isActive
-      ? '1.5px solid var(--accent-primary)'
-      : '1px solid var(--border-light)',
-    borderRadius: 10,
+    border: 'none',
+    borderRadius: 12,
     background: 'var(--bg-card)',
     overflow: 'hidden',
+    // inset shadow를 테두리로 사용 — transform 위에서도 균일·선명
+    boxShadow: isActive
+      ? 'inset 0 0 0 1px var(--border-primary), 0 6px 20px rgba(0,0,0,0.14)'
+      : 'inset 0 0 0 1px var(--border-primary)',
   };
 
   const isTextBased = TEXT_BASED_TYPES.has(block.type);
@@ -680,6 +682,9 @@ function SortableEditorBlock({
           padding: '4px 8px', background: 'var(--bg-secondary)',
           cursor: 'grab', fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
+          borderTop: '1px solid var(--border-primary)',
+          borderLeft: '1px solid var(--border-primary)',
+          borderRight: '1px solid var(--border-primary)',
         }}
         {...listeners}
       >

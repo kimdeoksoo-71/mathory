@@ -613,6 +613,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-gutters': {
               backgroundColor: '#f8f9fa',
               borderRight: '1px solid #e0e0e0',
+              // 블록 inset 테두리(좌·모서리)가 가려지지 않도록:
+              // - 좌측 1px 선을 거터 안쪽에 같은 색으로 직접 그림
+              // - 좌측 모서리는 블록 borderRadius와 동일하게 라운드 → 모서리에서 블록 inset 라인 노출
+              boxShadow: 'inset 1px 0 0 var(--border-primary)',
+              borderTopLeftRadius: 12,
+              borderBottomLeftRadius: 12,
+            },
+            // 줄 번호 영역: 2자리까지 폭 통일, 3자리 이상부터 자연 확장
+            // CodeMirror가 셀 폭을 인라인으로 강제하므로 !important 필요
+            '.cm-lineNumbers .cm-gutterElement': {
+              minWidth: '1.8em !important',
+              textAlign: 'right',
             },
             // 코드 접힘(fold) 화살표 숨김
             '.cm-foldGutter': {
