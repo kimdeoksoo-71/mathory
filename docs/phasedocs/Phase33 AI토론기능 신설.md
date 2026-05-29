@@ -110,13 +110,17 @@ AI에게 매 턴 전달되는 프롬프트 구조:
 
 ### 3.2 모델 라인업 (확정)
 
-| # | 표시명 | modelId | provider | apiModelName | 입력/출력 ($/1M) | 비고 |
-|---|--------|---------|----------|--------------|------------------|------|
-| 1 | Gemini 3.1 Pro | `gemini-3.1-pro` | google | `gemini-3.1-pro-preview` | $2 / $12 | 수학 벤치 최상위 |
-| 2 | Gemini 3.5 Flash | `gemini-3.5-flash` | google | `gemini-3.5-flash` | ~$1.5 / $9 | 사용자 검증 완료 |
-| 3 | DeepSeek V4 Pro | `deepseek-v4-pro` | deepseek | `deepseek-v4-pro` | $0.435 / $0.87 | 최저가, HMMT 95.2% |
-| 4 | GPT-5.4 | `gpt-5.4` | openai | `gpt-5.4-2026-03-05` | $2.50 / $15 | 체계적 설명 |
-| 5 | Grok 4.3 | `grok-4.3` | xai | `grok-4.3` | $1.25 / $2.50 | reasoning 기본 활성 |
+| # | 표시명 | 닉네임 | modelId | provider | apiModelName | 입력/출력 ($/1M) | 비고 |
+|---|--------|--------|---------|----------|--------------|------------------|------|
+| 1 | Gemini 3.1 Pro | **민** | `gemini-3.1-pro` | google | `gemini-3.1-pro-preview` | $2 / $12 | 수학 벤치 최상위 |
+| 2 | Gemini 3.5 Flash | **섬** | `gemini-3.5-flash` | google | `gemini-3.5-flash` | ~$1.5 / $9 | 사용자 검증 완료 |
+| 3 | DeepSeek V4 Pro | **식** | `deepseek-v4-pro` | deepseek | `deepseek-v4-pro` | $0.435 / $0.87 | 최저가, HMMT 95.2% |
+| 4 | GPT-5.4 | **쳇** | `gpt-5.4` | openai | `gpt-5.4-2026-03-05` | $2.50 / $15 | 체계적 설명 |
+| 5 | Grok 4.3 | **락** | `grok-4.3` | xai | `grok-4.3` | $1.25 / $2.50 | reasoning 기본 활성 |
+
+**닉네임 사용 정책**: AI들이 서로를 언급할 때 닉네임으로 호명 (예: "민의 지적은 타당하지만 쳇의 대안이 더 깔끔함"). 토론 패널 UI에서도 닉네임을 메시지 헤더에 표시하고 전체 모델명은 툴팁으로.
+
+**예약 닉네임 (인간 사용 금지)**: 위 5개 닉네임(민/섬/식/쳇/락)은 사람이 자신의 닉네임으로 설정할 수 없음. `ai_models.nickname` 필드의 모든 값을 동적 예약 목록으로 간주(하드코딩 X) → 모델 추가/변경 시 자동 확장. 검증은 `lib/users.ts`의 `updateNickname()`에서 수행, 비교 시 trim 처리. 이는 **사람이 AI인 척하는 1차 UX 방어**이며, 클라이언트 조작으로 `authorType: 'ai'` 레코드 자체를 위조하는 시나리오는 별개로 [[project_phase29_auth_followup]] 트랙(Admin SDK 전환)에서 처리.
 
 ### 3.3 탭별 컨텍스트 규칙 (v2 확정)
 
@@ -143,6 +147,10 @@ AI에게 매 턴 전달되는 프롬프트 구조:
 7. "AI로서", "제 생각에는" 같은 메타 표현은 쓰지 마세요. 바로 본론으로 들어가세요.
 8. 곱셈 기호는 \times, 분수에서는 \dfrac를 사용하세요.
 9. \tag{}, \ref{} 등 Mathory 전용 매크로는 사용하지 마세요. 표준 KaTeX만 사용하세요.
+10. 다른 토론자를 언급할 때는 **닉네임(한 음절)** 으로 부르세요. 참여 중인 토론자 닉네임은 아래에 명시됩니다. "Gemini 3.1 Pro가 말한 것처럼"이 아니라 "민이 말한 것처럼"으로.
+
+참여 토론자: {참여자 닉네임 목록을 매 요청 시 동적으로 주입 — 예: "민(Gemini 3.1 Pro), 쳇(GPT-5.4), 식(DeepSeek V4 Pro)"}
+당신의 닉네임: {요청받은 모델의 닉네임}
 ```
 
 ### 3.5 모델별 부록 (appendPrompt)
@@ -168,7 +176,7 @@ export interface UserProfile {
   displayName: string;
   email: string;
   photoURL: string;
-  nickname?: string;          // 🆕 사용자 설정 닉네임 (기본값 'KDS')
+  nickname?: string;          // 🆕 사용자 설정 닉네임 (기본값 'KDS'). AI 예약 닉네임(ai_models.nickname 전체) 사용 불가 — updateNickname()에서 검증
   createdAt: Date;
 }
 ```
@@ -201,6 +209,7 @@ export interface TabComment {
 export interface AIModelConfig {
   modelId: string;
   displayName: string;
+  nickname: string;             // 🆕 한 음절 토론자 호칭 (예: '민', '쳇', '식', '섬', '락')
   provider: 'google' | 'openai' | 'deepseek' | 'xai';
   apiModelName: string;
   enabled: boolean;
@@ -368,7 +377,7 @@ class OpenAICompatProvider implements AIProvider {
 
 | Step | 파일 | 작업 |
 |------|------|------|
-| D-1 | `lib/users.ts` | upsertUserProfile()에 nickname 보존, updateNickname() 추가, 신규 사용자 기본값 'KDS' |
+| D-1 | `lib/users.ts` | upsertUserProfile()에 nickname 보존, updateNickname() 추가 (입력값 trim 후 ai_models.nickname 예약 목록과 대조 → 충돌 시 "'쳇'은 AI 토론자 이름이라 사용할 수 없습니다" 에러), 신규 사용자 기본값 'KDS' |
 | D-2 | `app/settings/page.tsx` (신규) | 개인설정 페이지 (닉네임 편집만, 나중에 확장) |
 | D-3 | `components/layout/Sidebar.tsx` | 사이드바 하단 구글 아바타 클릭 → `/settings`로 이동 |
 | D-4 | 수동 테스트 | 닉네임 변경 → 새로고침 → 유지 확인 |
@@ -522,6 +531,8 @@ class OpenAICompatProvider implements AIProvider {
 - Grok 4.3: 3300 × $1.25 + 1024 × $2.5 = $0.0067
 
 **총합 ≈ $0.066 / 턴** (5개 모델 전부 사용 시).
+
+> **컨텍스트 한도 메모**: 모든 모델이 1M 컨텍스트 지원 → 입력 토큰 한도는 실질적 제약 아님 (우리 사용량은 0.3% 수준). 단 **Gemini 3.1 Pro는 200K 초과 시 단가 2배** ($2/$12 → $4/$18). `max_tokens`(출력)이 실제 제약이며 모델별 `ai_models.maxTokens`로 조정. Rate limit은 실사용 후 문제 시 대응.
 
 ### 9.3 ai_models 캐싱 전략
 
