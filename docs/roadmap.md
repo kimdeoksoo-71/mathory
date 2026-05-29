@@ -881,8 +881,10 @@ problems/{id}
 | 라이브러리 로딩 | 클릭 활성화 시점 lazy load | 5MB 부담 최소화 |
 | 비활성 표시 | 단순 빈 박스 + "▶ GGB 활성화" | poster는 후속 |
 | UI 옵션 | 고정값 (툴바·메뉴 false, shift-drag-zoom true) | 단순화 |
-| 초기 뷰 저장 | `getCoordSystem` / `setCoordSystem` | SVG 패턴과 일관 |
-| 활성화 UX | SVG와 동일 (클릭 활성, 외부 클릭 비활성, 그림자) | 다중 인스턴스 메모리 보호 |
+| 초기 뷰 저장 | `getViewProperties(1)` 파싱 → `setCoordSystem` 적용 (반복) | getXmin류 API 미노출 .ggb에서 폴백 |
+| 활성화 UX | placeholder 클릭만 활성화. 내부 클릭은 토글 X (GGB 내부 버튼 보존) | SVG와 미세하게 다름 |
+| Fullscreen | 자체 오버레이 (position:fixed) | Browser Fullscreen API는 Mac OS 메뉴바까지 가려 부적절 |
+| 잔존 nav bar 빈 공간 | iframe을 컨테이너보다 50px 크게 + overflow:hidden | GGB가 nav 제거 후 공간 재분배 안 함 |
 | 미리보기·썸네일 | 인스턴스 X, 정적 박스 | 5MB 메모리 보호 |
 | 인쇄 | "GGB 인쇄 미지원" 안내 박스 | PNG export 자동화는 후속 |
 
@@ -906,8 +908,13 @@ problems/{id}
 ### Key Learnings
 
 - **외부 5MB 자산은 활성화 시점 lazy load + 모듈 캐시 promise가 정답**: 페이지에 GGB 블록이 여러 개 있어도 deployggb.js는 한 번만 다운로드. 활성화하지 않으면 다운로드 자체가 없음.
-- **applet inject DOM ID는 인스턴스마다 유일해야 함**: counter 기반 nanoid 패턴으로 충돌 회피. SSR 영향을 받지 않도록 ref에 보존.
+- **applet inject DOM ID는 인스턴스마다 유일해야 함**: counter 기반 ID 패턴으로 충돌 회피. SSR 영향 안 받도록 ref에 보존.
 - **`applet.remove()` 실패 대비 컨테이너 DOM 직접 비우기**: GGB 버전·iframe 상태에 따라 remove가 실패할 수 있어 `container.innerHTML = ''` 폴백.
-- **`getCoordSystem` 반환 형태가 버전마다 다름**: 배열 `[xMin, xMax, yMin, yMax]` / 객체 / 개별 getter 셋 다 시도하는 폴백 체인이 안전.
-- **활성화 UX는 GGB 같은 무거운 임베드에서 필수**: Phase 32에서 도입한 클릭 활성 패턴이 메모리·CPU 보호에 결정적. 페이지에 GGB 블록 5개 있어도 활성화한 것만 인스턴스 생성.
+- **GGB API 노출 메서드는 `.ggb` 파일/버전마다 다름**: `getXmin/getXmax/getYmin/getYmax`가 없는 경우가 흔함. `getViewProperties(viewId)`가 더 일관적 — JSON으로 `{xMin, yMin, width, height, invXscale, invYscale}` 반환. `xMax = xMin + width * invXscale`로 계산.
+- **`Corner()` 명령은 .ggb 파일 컨텍스트가 안 맞으면 GGB 자체 에러 다이얼로그를 띄움** — 사용자 화면에 떠서 매우 거슬림. evalCommand 폴백은 신중히.
+- **`setup.disabled === true`는 setCoordSystem까지 차단** (Phase 32와 동일 함정): 프로그래밍 transform 유지하려면 wheel/panning/pinch 각각 disabled로.
+- **활성화 UX는 GGB 같은 무거운 임베드에서 필수**: 메모리·CPU 보호에 결정적. 단, GGB는 SVG와 달리 내부에 버튼(home/zoom 등)이 있어 "내부 클릭으로 비활성화" 패턴이 부적절 — placeholder 클릭만 활성화, 외부/ESC만 비활성화.
+- **Browser Fullscreen API는 Mac OS에서 메뉴바까지 가려서 부적절**: 자체 `position:fixed inset:0` 오버레이가 깔끔 + 리사이즈 제어도 쉬움.
+- **`display:none`으로 GGB nav bar를 숨겨도 graphics view가 공간을 회수 못함**: GGB가 내부 레이아웃을 재계산 안 함. `api.setSize` 호출해도 안 됨. **iframe을 컨테이너보다 EXTRA_BOTTOM(50px) 크게 만들고 overflow:hidden으로 잘라내는 트릭**이 가장 안정적.
+- **광범위 selector(`[class*="navbar"]`)는 위험**: GGB의 home/zoom 버튼 panel도 클래스에 "navbar"를 포함할 수 있어 같이 가려짐. 정확한 클래스(`.consProtNav` 같은)를 DevTools로 찾아 좁게 타깃해야 안전.
 - **인쇄 한계의 정직한 표시**: GGB가 인쇄에 안 찍히는 건 알려진 한계 — 박스에 명시적으로 "인쇄 미지원" 표시가 침묵의 빈 박스보다 사용자에게 친절.
