@@ -175,6 +175,23 @@ export default function FolderView({
           </div>
         );
       }
+      if (block.type === 'ggb') {
+        return (
+          <div key={block.id || `ggb-${i}`} style={{
+            margin: '0.8em 0', height: 200,
+            background: '#fafafa',
+            border: '1px solid var(--border-light, #e0e0e0)',
+            borderRadius: 6,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'var(--text-muted, #888)', fontSize: 12, fontFamily: 'var(--font-ui)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 14 }}>📐</span>
+              <span>GeoGebra</span>
+            </div>
+          </div>
+        );
+      }
       if (isBordered) {
         return (
           <div key={block.id || `b-${i}`} style={{ border: '1.5px solid var(--text-muted, #888)', borderRadius: 0, padding: '12px 16px', margin: '1.2em 0' }}>

@@ -16,6 +16,8 @@ export interface PrintBlock {
   imageWidth?: number;
   svg_initial_view?: { scale: number; positionX: number; positionY: number } | null;
   svg_height?: number;
+  ggb_initial_coords?: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
+  ggb_height?: number;
 }
 
 export interface PrintTab {
@@ -55,6 +57,8 @@ export default function PrintableContent({
                   <PrintImageBlock content={block.raw_text} imageWidth={block.imageWidth} />
                 ) : block.type === 'svg' ? (
                   <PrintSvgBlock url={block.raw_text} initialView={block.svg_initial_view} height={block.svg_height} />
+                ) : block.type === 'ggb' ? (
+                  <PrintGgbBlock height={block.ggb_height} />
                 ) : BORDERED_TYPES_PRINT.has(block.type) ? (
                   <div className="print-bordered-block">
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
@@ -155,6 +159,26 @@ function PrintSvgBlock({
   return (
     <div style={wrapperStyle}>
       <img src={url} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+    </div>
+  );
+}
+
+/**
+ * GeoGebra 인쇄 블록: 이번 Phase는 인쇄 미지원.
+ * "GeoGebra 블록은 인쇄에서 미지원" 안내 박스만 출력.
+ */
+function PrintGgbBlock({ height = 350 }: { height?: number }) {
+  return (
+    <div style={{
+      width: '100%', height,
+      background: '#fafafa', border: '1px dashed #ccc',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#666', fontSize: 12,
+    }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 16 }}>📐 GeoGebra</div>
+        <div style={{ marginTop: 4 }}>인쇄 미지원 — 화면에서 확인하세요</div>
+      </div>
     </div>
   );
 }

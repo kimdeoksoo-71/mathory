@@ -407,6 +407,8 @@ export async function duplicateProblem(problemId: string, authorUid?: string): P
         imageWidth: block.imageWidth,
         svg_initial_view: block.svg_initial_view,
         svg_height: block.svg_height,
+        ggb_initial_coords: block.ggb_initial_coords,
+        ggb_height: block.ggb_height,
       }) as any);
     }
   }

@@ -7,6 +7,7 @@ import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import SvgViewer from '../viewer/SvgViewer';
+import GgbViewer from '../viewer/GgbViewer';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -244,6 +245,7 @@ export default function ProblemView({
           blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
             id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
             svg_initial_view: b.svg_initial_view, svg_height: b.svg_height,
+            ggb_initial_coords: b.ggb_initial_coords, ggb_height: b.ggb_height,
           })),
         }));
       await printProblemPdf({ title: problem.title, tabs: printTabs });
@@ -287,6 +289,21 @@ export default function ProblemView({
               />
             ) : (
               <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(SVG 없음)</div>
+            )}
+          </div>
+        );
+      }
+      if (block.type === 'ggb') {
+        return (
+          <div key={block.id} style={{ margin: '0.8em 0' }}>
+            {block.raw_text ? (
+              <GgbViewer
+                url={block.raw_text}
+                initialCoords={block.ggb_initial_coords}
+                height={block.ggb_height || 350}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(GeoGebra 없음)</div>
             )}
           </div>
         );

@@ -16,8 +16,9 @@ import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
-import { uploadImage, uploadSvg } from '../../lib/storage';
+import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import SvgViewer from '../viewer/SvgViewer';
+import GgbViewer from '../viewer/GgbViewer';
 import ImageTypeSelectModal, { ImageMediaKind } from './ImageTypeSelectModal';
 import { computeContentHash } from '../../lib/copyright';
 import '../print/PrintStyles.css';
@@ -49,6 +50,7 @@ interface LocalBlock extends Block {
 }
 
 const SVG_BLOCK_HEIGHT = 300;
+const GGB_BLOCK_HEIGHT = 350;
 
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
@@ -59,6 +61,7 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   choices: '선택지',
   image: '그림',
   svg: 'SVG',
+  ggb: 'GeoGebra',
 };
 
 /** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
@@ -76,6 +79,7 @@ const BLOCK_PRESETS: Record<string, string> = {
   choices: '',
   image: '',
   svg: '',
+  ggb: '',
 };
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
@@ -250,6 +254,8 @@ function MediaBlockContent({
   onImageWidthChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
+  onSaveGgbInitialView,
+  onGgbHeightChange,
   problemId,
 }: {
   block: LocalBlock;
@@ -257,6 +263,8 @@ function MediaBlockContent({
   onImageWidthChange: (blockId: string, width: number) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
+  onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
+  onGgbHeightChange: (blockId: string, height: number) => void;
   problemId: string;
 }) {
   const [uploading, setUploading] = useState(false);
@@ -271,7 +279,6 @@ function MediaBlockContent({
 
   const handleTypeSelected = (kind: ImageMediaKind) => {
     setShowTypeModal(false);
-    if (kind === 'ggb') return;
     pendingKindRef.current = kind;
     // input의 accept를 동적으로 변경한 뒤 click
     if (fileInputRef.current) {
@@ -324,6 +331,61 @@ function MediaBlockContent({
             style={{ width: 140, cursor: 'pointer' }}
           />
           <span>{svgHeight}px</span>
+          <button
+            onClick={openTypeModal}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              padding: '4px 12px', fontSize: 12,
+              background: 'var(--bg-hover, #f0f0f0)',
+              border: '1px solid var(--border-light, #ddd)',
+              borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            그림 변경
+          </button>
+        </div>
+        {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4, textAlign: 'center' }}>{error}</div>}
+        <input
+          ref={fileInputRef}
+          type="file"
+          style={{ display: 'none' }}
+          onPointerDown={(e) => e.stopPropagation()}
+          onChange={handleFileChange}
+        />
+        {showTypeModal && (
+          <ImageTypeSelectModal onSelect={handleTypeSelected} onCancel={cancelTypeModal} />
+        )}
+      </div>
+    );
+  }
+
+  // ─── GGB 블록 ───
+  if (block.type === 'ggb' && block.raw_text) {
+    const ggbHeight = block.ggb_height || GGB_BLOCK_HEIGHT;
+    return (
+      <div style={{ padding: 8 }}>
+        <GgbViewer
+          url={block.raw_text}
+          initialCoords={block.ggb_initial_coords}
+          height={ggbHeight}
+          onSaveInitialView={(c) => onSaveGgbInitialView(block.id, c)}
+        />
+        <div style={{
+          marginTop: 6, display: 'flex', justifyContent: 'center',
+          alignItems: 'center', gap: 12, fontSize: 11, color: 'var(--text-muted)',
+        }}>
+          <span>높이</span>
+          <input
+            type="range"
+            min={200}
+            max={800}
+            step={20}
+            value={ggbHeight}
+            onChange={(e) => onGgbHeightChange(block.id, Number(e.target.value))}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{ width: 140, cursor: 'pointer' }}
+          />
+          <span>{ggbHeight}px</span>
           <button
             onClick={openTypeModal}
             onPointerDown={(e) => e.stopPropagation()}
@@ -558,6 +620,8 @@ function SortableEditorBlock({
   onImageWidthChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
+  onSaveGgbInitialView,
+  onGgbHeightChange,
   problemId,
   onSnippetShortcut,
   onCursorActivity,
@@ -580,6 +644,8 @@ function SortableEditorBlock({
   onImageWidthChange: (blockId: string, width: number) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
+  onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
+  onGgbHeightChange: (blockId: string, height: number) => void;
   problemId: string;
   onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number; blockId: string }) => void;
@@ -640,9 +706,12 @@ function SortableEditorBlock({
           {BLOCK_TYPES.map((t) => (
             <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
           ))}
-          {/* 기존 svg 블록은 옵션 목록에 없으므로 현재 값 보존용으로 표시 */}
+          {/* 기존 svg/ggb 블록은 옵션 목록에 없으므로 현재 값 보존용으로 표시 */}
           {block.type === 'svg' && (
             <option value="svg">{BLOCK_TYPE_LABELS.svg}</option>
+          )}
+          {block.type === 'ggb' && (
+            <option value="ggb">{BLOCK_TYPE_LABELS.ggb}</option>
           )}
         </select>
 
@@ -670,13 +739,15 @@ function SortableEditorBlock({
       {/* ── Block Content ── */}
       {!block.collapsed && (
         <div style={{ padding: 0 }} onClick={onFocus}>
-          {(block.type === 'image' || block.type === 'svg') ? (
+          {(block.type === 'image' || block.type === 'svg' || block.type === 'ggb') ? (
             <MediaBlockContent
               block={block}
               onMediaUpload={onMediaUpload}
               onImageWidthChange={onImageWidthChange}
               onSaveSvgInitialView={onSaveSvgInitialView}
               onSvgHeightChange={onSvgHeightChange}
+              onSaveGgbInitialView={onSaveGgbInitialView}
+              onGgbHeightChange={onGgbHeightChange}
               problemId={problemId}
             />
           ) : (
@@ -905,9 +976,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 교정 (Phase 27) ─── */
   // 자동 수정 대상에서 제외할 타입 (image는 텍스트 없음)
-  const AUTOFIX_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg']), []);
+  const AUTOFIX_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg', 'ggb']), []);
   // Claude API 교정 대상에서 제외할 타입 (choices는 ①②③④⑤ 라벨이 오탈자로 오인됨)
-  const API_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg', 'choices']), []);
+  const API_EXCLUDED_TYPES = useMemo(() => new Set(['image', 'svg', 'ggb', 'choices']), []);
 
   const callProofreadApi = useCallback(async (
     targets: { id: string; rawText: string }[],
@@ -1203,6 +1274,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           raw_text = '';
         } else if (type === 'svg' && b.type !== 'svg') {
           raw_text = '';
+        } else if (type === 'ggb' && b.type !== 'ggb') {
+          raw_text = '';
         } else if (type !== b.type && BLOCK_PRESETS[type] !== undefined && !TEXT_BASED_TYPES.has(b.type)) {
           // 이미지→텍스트 계열 전환 시 프리셋 적용
           raw_text = BLOCK_PRESETS[type];
@@ -1319,6 +1392,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             ? { ...b, type: 'svg', raw_text: url, svg_initial_view: null }
             : b))
         );
+      } else if (kind === 'ggb') {
+        const url = await uploadGgb(file, pid);
+        setCurrentBlocks((prev) =>
+          prev.map((b) => (b.id === blockId
+            ? { ...b, type: 'ggb', raw_text: url, ggb_initial_coords: null }
+            : b))
+        );
       } else {
         const url = await uploadImage(file, pid);
         const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
@@ -1347,6 +1427,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleSvgHeightChange = useCallback((blockId: string, height: number) => {
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, svg_height: height } : b))
+    );
+  }, [setCurrentBlocks]);
+
+  /* ─── GGB 초기뷰 저장 ─── */
+  const handleSaveGgbInitialView = useCallback(
+    (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => {
+      setCurrentBlocks((prev) =>
+        prev.map((b) => (b.id === blockId ? { ...b, ggb_initial_coords: coords } : b))
+      );
+    },
+    [setCurrentBlocks]
+  );
+
+  const handleGgbHeightChange = useCallback((blockId: string, height: number) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, ggb_height: height } : b))
     );
   }, [setCurrentBlocks]);
 
@@ -1710,6 +1806,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }
           if (b.type === 'svg' && b.svg_height) {
             saveData.svg_height = b.svg_height;
+          }
+          if (b.type === 'ggb' && b.ggb_initial_coords) {
+            saveData.ggb_initial_coords = b.ggb_initial_coords;
+          }
+          if (b.type === 'ggb' && b.ggb_height) {
+            saveData.ggb_height = b.ggb_height;
           }
           await saveTabBlock(problem.id, tab.id, saveData as any);
         }
@@ -2157,6 +2259,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onImageWidthChange={handleImageWidthChange}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
                     onSvgHeightChange={handleSvgHeightChange}
+                    onSaveGgbInitialView={handleSaveGgbInitialView}
+                    onGgbHeightChange={handleGgbHeightChange}
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
                     onCursorActivity={handleCursorActivity}
@@ -2224,6 +2328,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                         />
                       ) : (
                         <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(SVG 없음)</div>
+                      )}
+                    </div>
+                  ) : block.type === 'ggb' ? (
+                    <div>
+                      {block.raw_text ? (
+                        <GgbViewer
+                          url={block.raw_text}
+                          initialCoords={block.ggb_initial_coords}
+                          height={block.ggb_height || GGB_BLOCK_HEIGHT}
+                          interactive={false}
+                        />
+                      ) : (
+                        <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(GeoGebra 없음)</div>
                       )}
                     </div>
                   ) : isBordered ? (

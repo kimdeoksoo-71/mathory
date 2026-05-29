@@ -11,6 +11,8 @@ export interface PdfPrintTab {
     imageWidth?: number;
     svg_initial_view?: { scale: number; positionX: number; positionY: number } | null;
     svg_height?: number;
+    ggb_initial_coords?: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
+    ggb_height?: number;
   }>;
 }
 

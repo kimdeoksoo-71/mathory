@@ -73,10 +73,17 @@ export interface SvgInitialView {
   positionY: number;
 }
 
+export interface GgbInitialCoords {
+  xMin: number;
+  xMax: number;
+  yMin: number;
+  yMax: number;
+}
+
 export interface Block {
   id: string;
   order: number;
-  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg';
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
   raw_text: string;
   step_label?: string;
   title?: string;
@@ -85,6 +92,10 @@ export interface Block {
   svg_initial_view?: SvgInitialView | null;
   /** SVG 블록 전용: 표시 높이(px). 기본 300 */
   svg_height?: number;
+  /** GGB 블록 전용: 편집자가 저장한 초기 좌표 영역 (없으면 .ggb 파일 기본 뷰) */
+  ggb_initial_coords?: GgbInitialCoords | null;
+  /** GGB 블록 전용: 표시 높이(px). 기본 350 */
+  ggb_height?: number;
 }
 
 /** 탭 메타데이터 */

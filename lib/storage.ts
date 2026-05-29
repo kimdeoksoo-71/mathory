@@ -126,3 +126,21 @@ export async function uploadSvg(file: File, problemId: string): Promise<string> 
   await uploadBytes(storageRef, blob, { contentType: 'image/svg+xml' });
   return await getDownloadURL(storageRef);
 }
+
+/**
+ * GeoGebra(.ggb) 파일 업로드.
+ * .ggb은 zip 컨테이너이므로 코드 실행 위험은 없음 (GGB 내부에서 sandbox 처리).
+ */
+export async function uploadGgb(file: File, problemId: string): Promise<string> {
+  if (!/\.ggb$/i.test(file.name)) {
+    throw new Error('GGB 파일(.ggb)만 업로드할 수 있습니다.');
+  }
+  const timestamp = Date.now();
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  const fileName = `${timestamp}-${baseName}.ggb`;
+  const path = `problems/${problemId}/${fileName}`;
+  const storageRef = ref(storage, path);
+
+  await uploadBytes(storageRef, file, { contentType: 'application/vnd.geogebra.file' });
+  return await getDownloadURL(storageRef);
+}

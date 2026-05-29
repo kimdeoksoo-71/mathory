@@ -12,7 +12,7 @@ interface Props {
 const OPTIONS: { kind: ImageMediaKind; label: string; desc: string; disabled?: boolean }[] = [
   { kind: 'raster', label: '일반 이미지', desc: 'PNG · JPG · GIF · WebP' },
   { kind: 'svg', label: 'SVG', desc: '벡터 그림 (확대·축소·패닝 지원)' },
-  { kind: 'ggb', label: 'GeoGebra', desc: '추후 지원 예정', disabled: true },
+  { kind: 'ggb', label: 'GeoGebra', desc: '동적 기하·그래프 (.ggb)' },
 ];
 
 export default function ImageTypeSelectModal({ onSelect, onCancel }: Props) {

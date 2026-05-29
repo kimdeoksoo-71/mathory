@@ -860,3 +860,54 @@ problems/{id}
 - **라이브러리 CSS 모듈은 inline style을 이길 수 있다**: `react-zoom-pan-pinch`가 wrapper/content를 `width: fit-content`로 강제. 인라인 style이 같은 specificity로 충돌 → 호스트 클래스에서 `!important`로 override 필요.
 - **클릭 vs 드래그 구분**: 4px 미만 이동을 클릭으로 판정. mousedown 위치 저장 → mouseup에서 delta 비교. 라이브러리의 `onPanning*` 콜백에 의존하지 않는 단순한 방식이 디버깅 쉬움.
 - **빈 블록 placeholder 칩의 가치**: 툴바를 단순하게 유지하면서 발견성을 보강하는 패턴. 헤더 행 안에 16px 높이로 들어가서 시각적 부하 최소.
+
+---
+
+## Phase 34: GGB(GeoGebra) 블록 ✅
+
+**완료일**: 2026-05-29
+
+### 34-A: 목표
+
+- `.ggb` 파일 업로드 → 인터랙티브 GeoGebra 임베드 (점·도형 끌기, 슬라이더 조작)
+- SVG가 못 다루는 동적 변화 영역을 채움
+- Phase 32 인프라(그림 종류 모달, 활성화 UX, 초기뷰 저장)를 최대한 재사용
+
+### 34-B: 결정사항
+
+| 항목 | 결정 | 이유 |
+|------|------|------|
+| 렌더링 방식 | `deployggb.js` 인라인 임베드 | 통제력·UI 통일성 |
+| 라이브러리 로딩 | 클릭 활성화 시점 lazy load | 5MB 부담 최소화 |
+| 비활성 표시 | 단순 빈 박스 + "▶ GGB 활성화" | poster는 후속 |
+| UI 옵션 | 고정값 (툴바·메뉴 false, shift-drag-zoom true) | 단순화 |
+| 초기 뷰 저장 | `getCoordSystem` / `setCoordSystem` | SVG 패턴과 일관 |
+| 활성화 UX | SVG와 동일 (클릭 활성, 외부 클릭 비활성, 그림자) | 다중 인스턴스 메모리 보호 |
+| 미리보기·썸네일 | 인스턴스 X, 정적 박스 | 5MB 메모리 보호 |
+| 인쇄 | "GGB 인쇄 미지원" 안내 박스 | PNG export 자동화는 후속 |
+
+### 34-C: 구현
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| `types/problem.ts`: `ggb` 타입, `ggb_initial_coords`, `ggb_height` | ✅ | |
+| `lib/ggb-loader.ts` — deployggb.js 모듈 캐시 lazy loader | ✅ | |
+| `lib/storage.ts` `uploadGgb` — .ggb 검증 + Storage 업로드 | ✅ | |
+| `components/viewer/GgbViewer.tsx` — applet inject + cleanup + 활성화 | ✅ | |
+| `ImageTypeSelectModal` — GGB 옵션 활성화 | ✅ | |
+| `EditorView` MediaBlockContent ggb 분기 + 핸들러 + 저장 | ✅ | |
+| `EditorView` 미리보기 정적 박스 (interactive=false) | ✅ | |
+| `ProblemView` ggb 분기 (interactive) | ✅ | |
+| `FolderView` 정적 박스 | ✅ | |
+| `PrintableContent` "인쇄 미지원" 박스 | ✅ | |
+| BLOCK_TYPES에서 ggb 제외, 기존 ggb 블록 옵션 보존 | ✅ | |
+| `firestore.ts` duplicate ggb 필드 | ✅ | |
+
+### Key Learnings
+
+- **외부 5MB 자산은 활성화 시점 lazy load + 모듈 캐시 promise가 정답**: 페이지에 GGB 블록이 여러 개 있어도 deployggb.js는 한 번만 다운로드. 활성화하지 않으면 다운로드 자체가 없음.
+- **applet inject DOM ID는 인스턴스마다 유일해야 함**: counter 기반 nanoid 패턴으로 충돌 회피. SSR 영향을 받지 않도록 ref에 보존.
+- **`applet.remove()` 실패 대비 컨테이너 DOM 직접 비우기**: GGB 버전·iframe 상태에 따라 remove가 실패할 수 있어 `container.innerHTML = ''` 폴백.
+- **`getCoordSystem` 반환 형태가 버전마다 다름**: 배열 `[xMin, xMax, yMin, yMax]` / 객체 / 개별 getter 셋 다 시도하는 폴백 체인이 안전.
+- **활성화 UX는 GGB 같은 무거운 임베드에서 필수**: Phase 32에서 도입한 클릭 활성 패턴이 메모리·CPU 보호에 결정적. 페이지에 GGB 블록 5개 있어도 활성화한 것만 인스턴스 생성.
+- **인쇄 한계의 정직한 표시**: GGB가 인쇄에 안 찍히는 건 알려진 한계 — 박스에 명시적으로 "인쇄 미지원" 표시가 침묵의 빈 박스보다 사용자에게 친절.
