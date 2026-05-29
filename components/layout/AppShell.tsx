@@ -17,6 +17,7 @@ import {
   getProblemSearchText,
 } from '../../lib/firestore';
 import { listSharedWithMe } from '../../lib/membership';
+import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
 import Sidebar from '../layout/Sidebar';
 import SearchOverlay from '../layout/SearchOverlay';
@@ -107,6 +108,33 @@ export default function AppShell() {
   const [view, setView] = useState<ViewState>({ type: 'home' });
   const [problemViewNonce, setProblemViewNonce] = useState(0);
 
+  // ─── 단일 활성 세션 (다른 곳에서 로그인 시 자동 로그아웃) ───
+  const [kicked, setKicked] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let unsub: (() => void) | null = null;
+    let cancelled = false;
+    (async () => {
+      const ok = await claimSession(user.uid);
+      if (cancelled) return;
+      if (!ok) {
+        // 재시도 실패 → 미등록 상태 작업 차단 위해 강제 로그아웃
+        await signOut(auth).catch(() => {});
+        return;
+      }
+      setKicked(false);
+      unsub = watchSession(user.uid, () => {
+        setKicked(true);
+        setView({ type: 'home' });
+      });
+    })();
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, [user]);
+
   const loadData = useCallback(async () => {
     if (!user) {
       setAllProblems([]);
@@ -157,8 +185,11 @@ export default function AppShell() {
   };
 
   const handleLogout = async () => {
-    try { await signOut(auth); setView({ type: 'home' }); }
-    catch (error) { console.error('로그아웃 에러:', error); }
+    try {
+      if (user) await releaseSession(user.uid);
+      await signOut(auth);
+      setView({ type: 'home' });
+    } catch (error) { console.error('로그아웃 에러:', error); }
   };
 
   const handleNewProblem = async () => {
@@ -447,6 +478,30 @@ export default function AppShell() {
         flexDirection: 'column',
         minHeight: 0,
       }}>
+        {kicked && !user && (
+          <div style={{
+            padding: '10px 16px',
+            background: '#fdecea',
+            borderBottom: '1px solid #f5c6cb',
+            color: '#721c24',
+            fontSize: 13,
+            fontFamily: 'var(--font-ui)',
+            display: 'flex', alignItems: 'center', gap: 8,
+            flexShrink: 0,
+          }}>
+            <span style={{ flex: 1 }}>
+              다른 곳에서 로그인되어 이 탭의 세션이 종료되었습니다. 다시 로그인하세요.
+            </span>
+            <button
+              onClick={() => setKicked(false)}
+              style={{
+                border: 'none', background: 'transparent', color: '#721c24',
+                cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1,
+              }}
+              title="닫기"
+            >✕</button>
+          </div>
+        )}
         {view.type === 'home' && <HomeView />}
         {view.type === 'folder' && (
           <FolderView

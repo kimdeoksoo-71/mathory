@@ -918,3 +918,32 @@ problems/{id}
 - **`display:none`으로 GGB nav bar를 숨겨도 graphics view가 공간을 회수 못함**: GGB가 내부 레이아웃을 재계산 안 함. `api.setSize` 호출해도 안 됨. **iframe을 컨테이너보다 EXTRA_BOTTOM(50px) 크게 만들고 overflow:hidden으로 잘라내는 트릭**이 가장 안정적.
 - **광범위 selector(`[class*="navbar"]`)는 위험**: GGB의 home/zoom 버튼 panel도 클래스에 "navbar"를 포함할 수 있어 같이 가려짐. 정확한 클래스(`.consProtNav` 같은)를 DevTools로 찾아 좁게 타깃해야 안전.
 - **인쇄 한계의 정직한 표시**: GGB가 인쇄에 안 찍히는 건 알려진 한계 — 박스에 명시적으로 "인쇄 미지원" 표시가 침묵의 빈 박스보다 사용자에게 친절.
+
+
+## Phase 35: 단일 활성 세션 ✅
+
+동일 계정으로 다른 탭/브라우저/기기에서 새로 로그인하면 기존 세션을 자동 로그아웃.
+
+### 구현
+
+| 항목 | 상태 |
+|------|------|
+| `lib/session.ts` — sessionStorage 탭 ID + claim/watch/release | ✅ |
+| `AppShell` 통합: user 변경 시 claim → watch, 명시적 로그아웃 시 release | ✅ |
+| 강제 로그아웃 배너 (홈 메인 영역 상단) | ✅ |
+| `firestore.rules`에 `sessions/{uid}` 본인 R/W 규칙 추가 | ✅ |
+
+### 정책
+
+- 범위: **탭 단위**. 같은 브라우저의 다른 탭도 기존 탭을 밀어냄 (sessionStorage 격리)
+- F5 시 자기 자신을 밀어내지 않음 (sessionStorage가 새로고침에 보존)
+- 저장 안 된 변경 보호: 하지 않음. 블록 단위 자동저장이 대부분 이미 반영하므로 마지막 입력 정도만 손실
+- 강제 로그아웃 UX: A안 — 즉시 로그인 화면 + 상단 배너 안내
+- 명시적 로그아웃 시 `sessions/{uid}` 삭제 (정합성)
+- `claimSession` 3회 재시도 후 실패하면 강제 로그아웃 (미등록 상태 작업 차단)
+- `sessions/{uid}` 문서 부재는 무시 (외부 삭제로 멀쩡한 세션 끊지 않음)
+
+### 제외
+
+- 문서 단위 편집 잠금: 단일 세션이 보장되므로 동일 사용자 충돌 자체 발생 안 함
+- 다른 탭에서 실시간 반영: 별개 기능

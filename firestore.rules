@@ -181,6 +181,14 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    // ===== sessions 컬렉션 (단일 활성 세션) =====
+    // sessions/{uid}: { sessionId, updatedAt }
+    // 본인만 자기 문서 R/W. 다른 탭/기기에서 로그인하면 이 문서가 덮어써져
+    // 기존 탭의 onSnapshot이 sessionId 불일치를 감지하여 자동 로그아웃됨.
+    match /sessions/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // ===== folders 컬렉션 =====
     // 본인 폴더만 R/W
     match /folders/{folderId} {
