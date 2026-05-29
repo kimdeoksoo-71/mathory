@@ -26,7 +26,7 @@ import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
 import {
   IconChevronLeft, IconGrip, IconPlus,
-  IconChevron, IconChevronDown, IconTrash,
+  IconTrash,
   IconRename, IconLoader,
   IconCheck,
 } from '../ui/Icons';
@@ -615,7 +615,6 @@ function SortableEditorBlock({
   onTypeChange,
   onTitleChange,
   onDelete,
-  onToggleCollapse,
   onMediaUpload,
   onImageWidthChange,
   onSaveSvgInitialView,
@@ -639,7 +638,6 @@ function SortableEditorBlock({
   onTypeChange: (type: Block['type']) => void;
   onTitleChange: (title: string) => void;
   onDelete: () => void;
-  onToggleCollapse: () => void;
   onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
@@ -674,7 +672,8 @@ function SortableEditorBlock({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} data-editor-block-id={block.id}>
-      {/* ── Block Header ── */}
+      {/* ── Block Header — 활성 블록만 표시 ── */}
+      {isActive && (
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
@@ -685,13 +684,6 @@ function SortableEditorBlock({
         {...listeners}
       >
         <IconGrip size={12} />
-
-        <button onClick={onToggleCollapse} style={{
-          border: 'none', background: 'none', cursor: 'pointer', padding: 2,
-          display: 'flex', color: 'var(--text-muted)',
-        }}>
-          {block.collapsed ? <IconChevron size={12} /> : <IconChevronDown size={12} />}
-        </button>
 
         <select
           value={block.type}
@@ -735,6 +727,7 @@ function SortableEditorBlock({
           </button>
         )}
       </div>
+      )}
 
       {/* ── Block Content ── */}
       {!block.collapsed && (
@@ -1289,12 +1282,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleBlockTitleChange = useCallback((blockId: string, title: string) => {
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, title } : b))
-    );
-  }, [setCurrentBlocks]);
-
-  const handleToggleCollapse = useCallback((blockId: string) => {
-    setCurrentBlocks((prev) =>
-      prev.map((b) => (b.id === blockId ? { ...b, collapsed: !b.collapsed } : b))
     );
   }, [setCurrentBlocks]);
 
@@ -2237,6 +2224,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           />
 
           <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '100vh', minHeight: 0 }}>
+            <div style={{ maxWidth: `calc(35em + 128px)`, margin: '0 auto' }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => {
@@ -2254,7 +2242,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                     onTitleChange={(title) => handleBlockTitleChange(block.id, title)}
                     onDelete={() => handleDeleteBlock(block.id)}
-                    onToggleCollapse={() => handleToggleCollapse(block.id)}
                     onMediaUpload={handleBlockMediaUpload}
                     onImageWidthChange={handleImageWidthChange}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
@@ -2282,6 +2269,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 })}
               </SortableContext>
             </DndContext>
+            </div>
           </div>
         </div>
 
