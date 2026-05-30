@@ -965,6 +965,7 @@ problems/{id}
 - **등록처**: Vercel Domains
 - **결제**: 연간 자동 연장
 - **DNS/SSL**: Vercel 자동 관리 (Let's Encrypt)
+- **Firebase Auth 승인 도메인(Authorized domains)**: `mathory.app`, `mathory.net` 모두 등록 — Google OAuth 팝업이 양쪽 도메인 모두에서 정상 작동
 
 ### 메모
 
