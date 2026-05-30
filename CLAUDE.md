@@ -13,6 +13,7 @@ Mathory는 한국 수학 문제 편집/관리 웹 플랫폼. 아래한글(HWP)�
 - **렌더링**: ReactMarkdown + KaTeX (rehype-katex, remark-math, remark-gfm, rehype-raw)
 - **드래그앤드롭**: dnd-kit
 - **배포**: Vercel (main 브랜치 push 시 자동 배포)
+- **도메인**: `mathory.app` (메인), `mathory.net` → `mathory.app` 리다이렉트. Vercel 등록, 연간 자동 연장
 - **GitHub**: kimdeoksoo-71/mathory (public)
 
 ## 핵심 파일 구조
