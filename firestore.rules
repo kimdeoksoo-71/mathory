@@ -187,6 +187,43 @@ service cloud.firestore {
         allow delete: if resource.data.get('authorType', 'human') == 'human'
           && resource.data.authorUid == request.auth.uid;
       }
+
+      // ===== problems/{id}/discussion_sessions/{sid} (Phase 37) =====
+      // 권한 정책:
+      //   - read: 오너 OR 멤버
+      //   - create: 오너 OR 멤버. type='normal'만. createdBy=본인. aiEnabled=true 강제.
+      //     ('public' 타입은 Phase 38에서 Admin SDK 기반 서버 라우트로만 생성)
+      //   - update: type='normal'만. 생성자 본인 OR 오너. name/updatedAt만 변경.
+      //   - delete: type='normal'만. 생성자 본인 OR 오너.
+      match /discussion_sessions/{sessionId} {
+        function pData() {
+          return get(/databases/$(database)/documents/problems/$(problemId)).data;
+        }
+        function isOwnerSess() {
+          return isSignedIn() && pData().authorUid == request.auth.uid;
+        }
+        function isMemberSess() {
+          return isSignedIn()
+            && (request.auth.uid in pData().get('memberUids', []));
+        }
+        function sessChangedKeys() {
+          return request.resource.data.diff(resource.data).affectedKeys();
+        }
+
+        allow read: if isOwnerSess() || isMemberSess();
+
+        allow create: if request.resource.data.type == 'normal'
+          && request.resource.data.aiEnabled == true
+          && request.resource.data.createdBy == request.auth.uid
+          && (isOwnerSess() || isMemberSess());
+
+        allow update: if resource.data.type == 'normal'
+          && (resource.data.createdBy == request.auth.uid || isOwnerSess())
+          && sessChangedKeys().hasOnly(['name', 'updatedAt']);
+
+        allow delete: if resource.data.type == 'normal'
+          && (resource.data.createdBy == request.auth.uid || isOwnerSess());
+      }
     }
 
     // ===== shares 컬렉션 (Stage 1: 공유 링크 — 스냅샷 모델) =====
