@@ -3,7 +3,7 @@ import {
   query, where, orderBy, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { TabComment } from '../types/problem';
+import { TabComment, AIUsage } from '../types/problem';
 
 function toDateSafe(v: any, fallback?: Date): Date {
   if (!v) return fallback || new Date();
@@ -25,6 +25,13 @@ function commentDoc(problemId: string, commentId: string) {
 
 function mapDoc(d: any): TabComment {
   const data = d.data();
+  const aiUsage: AIUsage | undefined = data.aiUsage
+    ? {
+        inputTokens: Number(data.aiUsage.inputTokens ?? 0),
+        outputTokens: Number(data.aiUsage.outputTokens ?? 0),
+        costUsd: Number(data.aiUsage.costUsd ?? 0),
+      }
+    : undefined;
   return {
     id: d.id,
     tabId: data.tabId,
@@ -34,6 +41,13 @@ function mapDoc(d: any): TabComment {
     resolved: !!data.resolved,
     createdAt: toDateSafe(data.createdAt),
     updatedAt: toDateSafe(data.updatedAt),
+    // Phase 37: AI 토론
+    authorType: data.authorType === 'ai' ? 'ai' : 'human',
+    modelId: typeof data.modelId === 'string' ? data.modelId : undefined,
+    discussionSessionId:
+      typeof data.discussionSessionId === 'string' ? data.discussionSessionId : undefined,
+    invokedModelIds: Array.isArray(data.invokedModelIds) ? data.invokedModelIds : undefined,
+    aiUsage,
   };
 }
 
@@ -43,18 +57,32 @@ export interface AddCommentInput {
   authorUid: string;
   content: string;
   parentCommentId?: string | null;
+  // Phase 37: AI 토론
+  authorType?: 'human' | 'ai';
+  modelId?: string;
+  discussionSessionId?: string;
+  invokedModelIds?: string[];
+  aiUsage?: AIUsage;
 }
 
 export async function addComment(input: AddCommentInput): Promise<string> {
-  const ref = await addDoc(commentsCol(input.problemId), {
+  const payload: Record<string, unknown> = {
     tabId: input.tabId,
     authorUid: input.authorUid,
+    authorType: input.authorType ?? 'human',
     content: input.content,
     parentCommentId: input.parentCommentId ?? null,
     resolved: false,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-  });
+  };
+  if (input.modelId) payload.modelId = input.modelId;
+  if (input.discussionSessionId) payload.discussionSessionId = input.discussionSessionId;
+  if (input.invokedModelIds && input.invokedModelIds.length > 0) {
+    payload.invokedModelIds = input.invokedModelIds;
+  }
+  if (input.aiUsage) payload.aiUsage = input.aiUsage;
+  const ref = await addDoc(commentsCol(input.problemId), payload);
   return ref.id;
 }
 

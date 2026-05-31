@@ -134,28 +134,58 @@ service cloud.firestore {
         //  create 시점에는 탭 가시성·역할을 그대로 검증한다.)
         allow read: if isOwnerCmt() || isMemberCmt();
 
-        // 생성: 오너 OR commenter 역할. author 본인. 해당 탭 가시성 통과.
-        allow create: if request.resource.data.authorUid == request.auth.uid
-          && request.resource.data.resolved == false
-          && (
-            isOwnerCmt()
-            || (isMemberCmt() && isCommenter()
-                && tabAllowedForMemberCmt(request.resource.data.tabId))
-          );
+        // 생성:
+        //  (a) 인간 댓글: 오너 OR commenter 역할. author 본인. 해당 탭 가시성 통과.
+        //  (b) AI 댓글 (Phase 37): 오너만 가능. authorUid='ai:*', authorType='ai'.
+        allow create: if (
+          // 인간 댓글
+          (
+            request.resource.data.get('authorType', 'human') == 'human'
+            && request.resource.data.authorUid == request.auth.uid
+            && request.resource.data.resolved == false
+            && (
+              isOwnerCmt()
+              || (isMemberCmt() && isCommenter()
+                  && tabAllowedForMemberCmt(request.resource.data.tabId))
+            )
+          )
+          ||
+          // AI 댓글
+          (
+            request.resource.data.authorType == 'ai'
+            && request.resource.data.authorUid.matches('^ai:.*')
+            && request.resource.data.resolved == false
+            && isOwnerCmt()
+          )
+        );
 
         // 수정:
-        //  (a) 본인이 content 수정 — content/updatedAt만
-        //  (b) 작성자 또는 오너가 resolved 토글 — resolved/updatedAt만
+        //  (a) 인간 댓글 본인이 content 수정 — content/updatedAt만
+        //  (b) 인간 댓글 작성자 또는 오너가 resolved 토글 — resolved/updatedAt만
+        //  (c) AI 댓글은 오너만 resolved 토글 가능. content 수정 불가.
         allow update: if (
-          resource.data.authorUid == request.auth.uid
-          && changedKeys().hasOnly(['content', 'updatedAt'])
+          resource.data.get('authorType', 'human') == 'human'
+          && (
+            (
+              resource.data.authorUid == request.auth.uid
+              && changedKeys().hasOnly(['content', 'updatedAt'])
+            )
+            || (
+              (resource.data.authorUid == request.auth.uid || isOwnerCmt())
+              && changedKeys().hasOnly(['resolved', 'updatedAt'])
+            )
+          )
         ) || (
-          (resource.data.authorUid == request.auth.uid || isOwnerCmt())
+          resource.data.authorType == 'ai'
+          && isOwnerCmt()
           && changedKeys().hasOnly(['resolved', 'updatedAt'])
         );
 
-        // 삭제: 작성 본인만
-        allow delete: if resource.data.authorUid == request.auth.uid;
+        // 삭제:
+        //  - 인간 댓글: 작성 본인만
+        //  - AI 댓글: 불가 (resolved 토글로만 정리)
+        allow delete: if resource.data.get('authorType', 'human') == 'human'
+          && resource.data.authorUid == request.auth.uid;
       }
     }
 
