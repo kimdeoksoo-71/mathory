@@ -197,5 +197,11 @@ service cloud.firestore {
       allow create: if request.auth != null
         && request.resource.data.user_id == request.auth.uid;
     }
+
+    // Phase 37: AI 모델 레지스트리 — 비밀이 아닌 공개 설정. 콘솔에서만 관리
+    match /ai_models/{modelId} {
+      allow read: if true;
+      allow write: if false;
+    }
   }
 }

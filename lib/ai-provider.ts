@@ -42,25 +42,36 @@ class GeminiProvider implements AIProvider {
 class OpenAICompatProvider implements AIProvider {
   private client: OpenAI;
   private modelName: string;
+  /** GPT-5 계열은 max_tokens 미지원, max_completion_tokens 사용 */
+  private useCompletionTokens: boolean;
 
-  constructor(apiKey: string, baseURL: string, modelName: string) {
+  constructor(apiKey: string, baseURL: string, modelName: string, useCompletionTokens: boolean) {
     this.client = new OpenAI({ apiKey, baseURL });
     this.modelName = modelName;
+    this.useCompletionTokens = useCompletionTokens;
   }
 
   async complete(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<AIProviderResult> {
-    const res = await this.client.chat.completions.create({
+    const params: Record<string, unknown> = {
       model: this.modelName,
-      max_tokens: maxTokens,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
       ],
-    });
+    };
+    if (this.useCompletionTokens) {
+      params.max_completion_tokens = maxTokens;
+    } else {
+      params.max_tokens = maxTokens;
+    }
+    const res = await this.client.chat.completions.create(params as unknown as Parameters<typeof this.client.chat.completions.create>[0]);
+    // DeepSeek 등 일부 모델은 reasoning에 토큰을 소비하고 content가 빌 수 있음 — reasoning_content 폴백
+    const choice = (res as { choices: Array<{ message: { content?: string | null; reasoning_content?: string | null } }> }).choices[0];
+    const content = choice?.message?.content || choice?.message?.reasoning_content || '';
     return {
-      content: res.choices[0]?.message?.content ?? '',
-      inputTokens: res.usage?.prompt_tokens ?? 0,
-      outputTokens: res.usage?.completion_tokens ?? 0,
+      content,
+      inputTokens: (res as { usage?: { prompt_tokens?: number } }).usage?.prompt_tokens ?? 0,
+      outputTokens: (res as { usage?: { completion_tokens?: number } }).usage?.completion_tokens ?? 0,
     };
   }
 }
@@ -93,7 +104,9 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
   }
 
   const baseURL = PROVIDER_BASE_URLS[config.provider];
-  return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName);
+  // GPT-5 계열은 max_completion_tokens 필수. DeepSeek/xAI는 max_tokens 사용
+  const useCompletionTokens = config.provider === 'openai';
+  return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName, useCompletionTokens);
 }
 
 // ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
