@@ -68,8 +68,8 @@ ${previousContext}
 ${body.currentText}`;
 
     const provider = getAIProvider();
-    let completion = await provider.complete(SYSTEM_PROMPT, userPrompt);
-    completion = completion.trim();
+    const result = await provider.complete(SYSTEM_PROMPT, userPrompt);
+    let completion = result.content.trim();
 
     // "생각: ..." 등 메타 텍스트 블록 제거
     completion = completion.replace(/^생각:[\s\S]*?\n\n/, '');

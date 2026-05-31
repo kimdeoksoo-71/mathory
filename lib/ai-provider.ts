@@ -1,8 +1,18 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
+import type { AIModelConfig } from '../types/problem';
+
+export interface AIProviderResult {
+  content: string;
+  inputTokens: number;
+  outputTokens: number;
+}
 
 export interface AIProvider {
-  complete(systemPrompt: string, userPrompt: string): Promise<string>;
+  complete(systemPrompt: string, userPrompt: string, maxTokens?: number): Promise<AIProviderResult>;
 }
+
+// ═══ 기존 단일 모델 호환 (Phase 23 AI 풀이 자동완성에서 사용) ═══
 
 class GeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI;
@@ -13,23 +23,88 @@ class GeminiProvider implements AIProvider {
     this.modelName = modelName;
   }
 
-  async complete(systemPrompt: string, userPrompt: string): Promise<string> {
+  async complete(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<AIProviderResult> {
     const model = this.genAI.getGenerativeModel({
       model: this.modelName,
       systemInstruction: systemPrompt,
+      generationConfig: { maxOutputTokens: maxTokens },
     });
-
     const result = await model.generateContent(userPrompt);
-    return result.response.text();
+    const usage = result.response.usageMetadata;
+    return {
+      content: result.response.text(),
+      inputTokens: usage?.promptTokenCount ?? 0,
+      outputTokens: usage?.candidatesTokenCount ?? 0,
+    };
   }
 }
 
+class OpenAICompatProvider implements AIProvider {
+  private client: OpenAI;
+  private modelName: string;
+
+  constructor(apiKey: string, baseURL: string, modelName: string) {
+    this.client = new OpenAI({ apiKey, baseURL });
+    this.modelName = modelName;
+  }
+
+  async complete(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<AIProviderResult> {
+    const res = await this.client.chat.completions.create({
+      model: this.modelName,
+      max_tokens: maxTokens,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    });
+    return {
+      content: res.choices[0]?.message?.content ?? '',
+      inputTokens: res.usage?.prompt_tokens ?? 0,
+      outputTokens: res.usage?.completion_tokens ?? 0,
+    };
+  }
+}
+
+// ═══ Phase 37: 모델 설정 기반 provider 디스패치 ═══
+
+const PROVIDER_BASE_URLS: Record<'openai' | 'deepseek' | 'xai', string> = {
+  openai: 'https://api.openai.com/v1',
+  deepseek: 'https://api.deepseek.com/v1',
+  xai: 'https://api.x.ai/v1',
+};
+
+const PROVIDER_ENV_KEYS: Record<AIModelConfig['provider'], string> = {
+  google: 'GEMINI_API_KEY',
+  openai: 'OPENAI_API_KEY',
+  deepseek: 'DEEPSEEK_API_KEY',
+  xai: 'XAI_API_KEY',
+};
+
+/** AIModelConfig 기반 provider 인스턴스 생성 */
+export function getProviderForModel(config: AIModelConfig): AIProvider {
+  const envKey = PROVIDER_ENV_KEYS[config.provider];
+  const apiKey = process.env[envKey];
+  if (!apiKey) {
+    throw new Error(`${envKey} 환경변수가 설정되지 않았습니다 (모델: ${config.modelId})`);
+  }
+
+  if (config.provider === 'google') {
+    return new GeminiProvider(apiKey, config.apiModelName);
+  }
+
+  const baseURL = PROVIDER_BASE_URLS[config.provider];
+  return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName);
+}
+
+// ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
+
 class ClaudeProvider implements AIProvider {
-  async complete(): Promise<string> {
+  async complete(): Promise<AIProviderResult> {
     throw new Error('ClaudeProvider not implemented');
   }
 }
 
+/** 레거시 호환: AI 풀이 자동완성 등에서 사용. 단일 provider 환경변수 기반 */
 export function getAIProvider(): AIProvider {
   const provider = process.env.AI_PROVIDER || 'gemini';
 

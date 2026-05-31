@@ -32,12 +32,24 @@ export type MemberRole = 'viewer' | 'commenter';
 export interface TabComment {
   id: string;
   tabId: string;                       // 'question', 'solution', 'extra_0', ...
-  authorUid: string;
+  authorUid: string;                   // human: Firebase uid, AI: 'ai:{modelId}'
   content: string;                     // markdown + KaTeX (인라인 수식)
   parentCommentId: string | null;      // null = 최상위, 값 = 답글
   resolved: boolean;                   // 오너 또는 작성자가 토글
   createdAt: Date;
   updatedAt: Date;
+  // Phase 37: AI 토론
+  authorType?: 'human' | 'ai';         // 미설정은 'human'으로 간주 (마이그레이션 호환)
+  modelId?: string;                     // authorType === 'ai'일 때 모델 ID
+  discussionSessionId?: string;         // discussion_sessions/{id} 참조
+  invokedModelIds?: string[];           // 사용자 메시지가 호출한 AI 목록
+  aiUsage?: AIUsage;                    // AI 메시지에만 채워짐
+}
+
+export interface AIUsage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
 }
 
 export type Visibility = 'private' | 'link' | 'public';
@@ -48,6 +60,36 @@ export interface UserProfile {
   email: string;
   photoURL: string;
   createdAt: Date;
+  // Phase 37: 토론용 닉네임. 기본값 'KDS'. AI 예약 닉네임(ai_models.nickname 전체) 사용 불가 — updateNickname()에서 검증
+  nickname?: string;
+}
+
+// ═══ Phase 37: AI 토론 ═══
+
+export interface AIModelConfig {
+  modelId: string;                     // 'gemini-3.1-pro'
+  displayName: string;                  // 'Gemini 3.1 Pro'
+  nickname: string;                     // '민' (한 음절, 인간 사용 금지 예약어)
+  provider: 'google' | 'openai' | 'deepseek' | 'xai';
+  apiModelName: string;                 // 실제 API 호출 모델명
+  enabled: boolean;
+  maxTokens: number;
+  appendPrompt: string;                 // 모델별 부록 프롬프트
+  order: number;
+  avatarEmoji: string;
+  inputCostPerMillion: number;          // $/1M input tokens
+  outputCostPerMillion: number;         // $/1M output tokens
+}
+
+export interface DiscussionSession {
+  id: string;
+  problemId: string;
+  type: 'public' | 'normal';            // 'public' = 공개토론(자동/잠금), 'normal' = 일반(사용자 생성)
+  name: string;                          // 'public'은 '공개토론' 고정, 'normal'은 사용자 입력
+  aiEnabled: boolean;                    // public=false, normal=true (Phase 38에서 문제 가시성 추가 체크)
+  createdBy: string;                     // 생성자 uid, 'public' 타입은 'system'
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface CopyrightField {
