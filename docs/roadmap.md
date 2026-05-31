@@ -972,3 +972,52 @@ problems/{id}
 - 도메인 만료 알림은 Vercel 계정 이메일로 전송
 - Vercel 결제 수단(카드) 만료 시 자동 갱신 실패 가능 — 카드 갱신 시 결제 정보 업데이트 필요
 - 향후 이메일/서브도메인 추가 시 Vercel DNS 패널에서 처리
+
+
+## Phase 37: AI 토론 기능 ✅
+
+기존 댓글 패널을 '토론' 패널로 확장. 사용자와 복수 AI 모델(민/섬/식/쳇/락)이 수학 풀이에 대해 비판적으로 토론. 계획서: `docs/phasedocs/Phase37 AI토론기능 신설.md` (v3 확정).
+
+### 구현 (Phase 37-A ~ 37-I)
+
+| 항목 | 상태 |
+|------|------|
+| 데이터 모델: TabComment에 authorType/modelId/discussionSessionId/invokedModelIds/aiUsage 추가, AIModelConfig/DiscussionSession/UserProfile.nickname 신규 | ✅ |
+| `lib/ai-models.ts` — Firestore `ai_models` 컬렉션 로더 + 메모리 캐시 + 예약 닉네임 헬퍼 | ✅ |
+| `lib/ai-provider.ts` — OpenAICompatProvider 추가 (OpenAI/DeepSeek/xAI 공통), getProviderForModel 디스패치. GPT-5 계열 `max_completion_tokens`, DeepSeek reasoning_content 폴백 | ✅ |
+| `app/api/discuss/route.ts` — 단일 메시지를 지정 AI에 전달, 토큰 사용량 + 비용 반환. 60초 타임아웃, 시스템 프롬프트에 LaTeX 강제 + 닉네임 호명 규칙 | ✅ |
+| `lib/comments.ts` 확장 — AI 메시지 저장·조회. firestore.rules에 AI 댓글 create/update/delete 분기 (오너만 생성, resolved 토글만 update, 삭제 불가) | ✅ |
+| `lib/discussion-sessions.ts` (신규) — 세션 CRUD. `ensurePublicSession` 시그니처만 정의 (Phase 38에서 구현) | ✅ |
+| `lib/users.ts` 닉네임 — `updateNickname()` + AI 예약어 검증, 기본값 'KDS' 백필 | ✅ |
+| `app/settings/page.tsx` (신규) — 개인설정 페이지 (닉네임 편집) | ✅ |
+| `components/layout/Sidebar.tsx` — 푸터 아바타·이름 클릭 → /settings 진입 | ✅ |
+| `components/comment/CommentPanel.tsx` 대폭 재작성 (416줄 → 870줄) — 세션 탭 바, 메시지 단위 AI 칩, 병렬 호출, 도착순 렌더, "생각 중…" 인디케이터, 재시도/닫기, 세션 누적 비용 표시 | ✅ |
+
+### AI 모델 라인업
+
+| # | 표시명 | 닉네임 | provider | 입력/출력 ($/1M) |
+|---|--------|--------|----------|------------------|
+| 1 | Gemini 3.1 Pro | 민 | google | $2 / $12 |
+| 2 | Gemini 3.5 Flash | 섬 | google | ~$1.5 / $9 |
+| 3 | DeepSeek V4 Pro | 식 | deepseek | $0.435 / $0.87 |
+| 4 | GPT-5.4 | 쳇 | openai | $2.50 / $15 |
+| 5 | Grok 4.3 | 락 | xai | $1.25 / $2.50 |
+
+모델 등록은 Firestore `ai_models` 컬렉션에 콘솔로 직접 관리. 관리자 UI는 추후.
+
+### 핵심 설계 결정
+
+- **세션**: 별도 컬렉션 `problems/{pid}/discussion_sessions`. `public`(자동 생성, Phase 38) + `normal`(사용자 생성). 기존 댓글은 "💬 댓글" 가상 세션으로 노출 (백워드 호환).
+- **AI 호출**: 메시지 단위 칩 토글. 한 메시지에 0~5명 자유 선택. 0명이면 메모로만 저장.
+- **닉네임**: 한 음절 (민/섬/식/쳇/락). 사람이 동일 닉네임 사용 불가 (`ai_models.nickname` 전체가 예약어).
+- **컨텍스트**: 활성 탭에 따라 차등 — `question`만 / `question`+`solution` / `question`+`extra_N`. 최근 5메시지 히스토리.
+- **보안**: AI 댓글은 클라이언트가 `authorUid: 'ai:{modelId}'`로 직접 쓰기. 위조 가능성 있으나 1인 사용 환경에선 무해. 오픈소스 공개 전 Admin SDK 전환 TODO ([[project_phase29_auth_followup]] 트랙과 합류).
+- **공유/공개 시스템**: Phase 38로 분리. Phase 37은 비공개 문제 단독으로 동작 가능하도록 설계, Phase 38 합류 시 공개토론 자동 생성 + AI 활성 게이트 통합.
+
+### 메모
+
+- Gemini 3.1 Pro / DeepSeek V4 Pro는 reasoning 모델이라 `maxTokens` 4096 권장 (1024는 추론에 다 소진됨)
+- Grok 4.3은 LaTeX 사용을 자주 빠뜨려 시스템 프롬프트 상단에 LaTeX 강제 규칙(3중 강조 + 예시) 배치
+- DeepSeek은 `reasoning_content` 필드 폴백 — content가 비어있을 때 reasoning이라도 표시
+- GPT-5 계열은 `max_tokens` 미지원, `max_completion_tokens` 필수
+- 응답 1턴 5모델 비용 추정 ≈ $0.066. 컨텍스트 한도(1M 토큰)는 우리 사용량(0.3%)에 비해 실질적 제약 아님
