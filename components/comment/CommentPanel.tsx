@@ -48,6 +48,8 @@ interface PendingAI {
   modelId: string;
   nickname: string;
   emoji: string;
+  /** 이 호출이 시작된 세션 ID — 다른 세션으로 전환해도 알림은 원래 세션에서만 보여야 함 */
+  sessionId: string;
   error?: string;
   /** 재시도 시 사용할 원본 호출 컨텍스트 */
   retryContext?: DiscussRequestContext;
@@ -161,6 +163,12 @@ export default function CommentPanel({
   const sessionCostUsd = useMemo(() => {
     return visibleComments.reduce((sum, c) => sum + (c.aiUsage?.costUsd || 0), 0);
   }, [visibleComments]);
+
+  /** 현재 세션에서 진행 중/실패한 AI 알림만 표시 */
+  const visiblePendingAI = useMemo(
+    () => pendingAI.filter((p) => p.sessionId === activeSessionId),
+    [pendingAI, activeSessionId],
+  );
 
   // ─── displayInfo 헬퍼 ───
   const getDisplayInfo = useCallback(
@@ -351,12 +359,14 @@ export default function CommentPanel({
           },
         });
         await refreshComments();
-        setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
+        setPendingAI((prev) =>
+          prev.filter((p) => !(p.modelId === model.modelId && p.sessionId === sessionId)),
+        );
       } catch (err) {
         console.error(`[discuss] ${model.modelId} 실패:`, err);
         setPendingAI((prev) =>
           prev.map((p) =>
-            p.modelId === model.modelId
+            p.modelId === model.modelId && p.sessionId === sessionId
               ? {
                   ...p,
                   error: err instanceof Error ? err.message : '응답 실패',
@@ -391,10 +401,11 @@ export default function CommentPanel({
       .map((id) => aiModels.find((m) => m.modelId === id))
       .filter((m): m is AIModelConfig => !!m);
 
-    // 선택된 AI가 있으면 닉네임 호출 접두사를 사용자 메시지 앞에 붙임
-    // (저장본·AI 전달본 동일 — 사용자가 누구에게 말하는지 메시지 자체에서 보이도록)
+    // 선택된 AI가 있으면 호명 접두사를 사용자 메시지 앞에 붙임 — "민, 쳇에게 물을게."
+    // (저장본·AI 전달본 동일 — 누구에게 말하는지 메시지 자체에서 분명히 보이도록.
+    //  단순 콤마 나열보다 의도를 명시해 AI가 메시지 일부로 오해하지 않게 함)
     const mentionPrefix = invokedModels.length > 0
-      ? `${invokedModels.map((m) => m.nickname).join(', ')} `
+      ? `${invokedModels.map((m) => m.nickname).join(', ')}에게 물을게. `
       : '';
     const finalContent = mentionPrefix + content;
 
@@ -423,37 +434,47 @@ export default function CommentPanel({
       currentMessage: finalContent,
     };
 
-    // 4. pending 상태 (오류 시 사용할 context 동봉)
-    setPendingAI(
-      invokedModels.map((m) => ({
+    // 4. pending 상태 — 동일 (sessionId, modelId) 중복 제거 후 신규 추가
+    //    다른 세션의 pending은 그대로 보존 (세션별 격리)
+    const sessionAtSend = activeSessionId;
+    setPendingAI((prev) => [
+      ...prev.filter(
+        (p) => !(p.sessionId === sessionAtSend
+          && invokedModels.some((m) => m.modelId === p.modelId)),
+      ),
+      ...invokedModels.map((m) => ({
         modelId: m.modelId,
         nickname: m.nickname,
         emoji: m.avatarEmoji,
+        sessionId: sessionAtSend,
       })),
-    );
+    ]);
 
     // 5. 각 AI 호출 — 도착순으로 Firestore 저장
-    const sessionAtSend = activeSessionId;
     await Promise.allSettled(
       invokedModels.map((model) => invokeOneAI(model, baseContext, sessionAtSend)),
     );
   };
 
   // ─── 에러 재시도 ───
-  const handleRetryAI = async (modelId: string) => {
-    const pending = pendingAI.find((p) => p.modelId === modelId);
+  const handleRetryAI = async (modelId: string, sessionId: string) => {
+    const pending = pendingAI.find((p) => p.modelId === modelId && p.sessionId === sessionId);
     if (!pending || !pending.retryContext) return;
     const model = aiModels.find((m) => m.modelId === modelId);
     if (!model) return;
-    // error 표시 제거, pending 다시
+    // error 표시 제거, pending 상태로 되돌림
     setPendingAI((prev) =>
-      prev.map((p) => (p.modelId === modelId ? { modelId: p.modelId, nickname: p.nickname, emoji: p.emoji } : p)),
+      prev.map((p) =>
+        p.modelId === modelId && p.sessionId === sessionId
+          ? { modelId: p.modelId, nickname: p.nickname, emoji: p.emoji, sessionId: p.sessionId }
+          : p,
+      ),
     );
-    await invokeOneAI(model, pending.retryContext, activeSessionId);
+    await invokeOneAI(model, pending.retryContext, sessionId);
   };
 
-  const handleDismissError = (modelId: string) => {
-    setPendingAI((prev) => prev.filter((p) => p.modelId !== modelId));
+  const handleDismissError = (modelId: string, sessionId: string) => {
+    setPendingAI((prev) => prev.filter((p) => !(p.modelId === modelId && p.sessionId === sessionId)));
   };
 
   return (
@@ -558,7 +579,7 @@ export default function CommentPanel({
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             불러오는 중…
           </div>
-        ) : visibleThreads.length === 0 && pendingAI.length === 0 ? (
+        ) : visibleThreads.length === 0 && visiblePendingAI.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             {activeSessionId === LEGACY_SESSION_ID
               ? '댓글이 없습니다.'
@@ -586,12 +607,12 @@ export default function CommentPanel({
                 onResolve={handleResolve}
               />
             ))}
-            {pendingAI.map((p) => (
+            {visiblePendingAI.map((p) => (
               <PendingAIBubble
-                key={p.modelId}
+                key={`${p.sessionId}:${p.modelId}`}
                 pending={p}
-                onRetry={p.error && p.retryContext ? () => handleRetryAI(p.modelId) : undefined}
-                onDismiss={p.error ? () => handleDismissError(p.modelId) : undefined}
+                onRetry={p.error && p.retryContext ? () => handleRetryAI(p.modelId, p.sessionId) : undefined}
+                onDismiss={p.error ? () => handleDismissError(p.modelId, p.sessionId) : undefined}
               />
             ))}
           </>

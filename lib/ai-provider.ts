@@ -31,8 +31,14 @@ class GeminiProvider implements AIProvider {
     });
     const result = await model.generateContent(userPrompt);
     const usage = result.response.usageMetadata;
+    let content = result.response.text();
+    // 토큰 한도로 잘렸으면 사용자에게 표시
+    const finishReason = result.response.candidates?.[0]?.finishReason;
+    if (finishReason === 'MAX_TOKENS') {
+      content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
+    }
     return {
-      content: result.response.text(),
+      content,
       inputTokens: usage?.promptTokenCount ?? 0,
       outputTokens: usage?.candidatesTokenCount ?? 0,
     };
@@ -66,8 +72,12 @@ class OpenAICompatProvider implements AIProvider {
     }
     const res = await this.client.chat.completions.create(params as unknown as Parameters<typeof this.client.chat.completions.create>[0]);
     // DeepSeek 등 일부 모델은 reasoning에 토큰을 소비하고 content가 빌 수 있음 — reasoning_content 폴백
-    const choice = (res as { choices: Array<{ message: { content?: string | null; reasoning_content?: string | null } }> }).choices[0];
-    const content = choice?.message?.content || choice?.message?.reasoning_content || '';
+    const choice = (res as { choices: Array<{ message: { content?: string | null; reasoning_content?: string | null }; finish_reason?: string }> }).choices[0];
+    let content = choice?.message?.content || choice?.message?.reasoning_content || '';
+    // 토큰 한도로 잘렸으면 사용자에게 표시
+    if (choice?.finish_reason === 'length') {
+      content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
+    }
     return {
       content,
       inputTokens: (res as { usage?: { prompt_tokens?: number } }).usage?.prompt_tokens ?? 0,

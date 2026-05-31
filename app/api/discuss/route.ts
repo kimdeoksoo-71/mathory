@@ -10,7 +10,9 @@ import { getModelConfig } from '../../../lib/ai-models';
 import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
 
 export const runtime = 'nodejs';
-export const maxDuration = 90;
+// Vercel: Hobby 최대 60s, Pro 최대 300s. DeepSeek(reasoning)이 자주 60s 초과
+// → 3분(180s)으로 확장. 운영은 Vercel Pro 플랜 필요.
+export const maxDuration = 200;
 
 interface DiscussionMessage {
   role: 'human' | 'ai';
@@ -37,7 +39,7 @@ interface DiscussSuccess {
   costUsd: number;
 }
 
-const TIMEOUT_MS = 60_000;
+const TIMEOUT_MS = 180_000;
 
 const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참여하는 전문가입니다.
 
@@ -61,11 +63,17 @@ const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참�
 2. 다른 참여자의 의견에 동의하면 그 이유를, 반대하면 논리적 근거를 명확히 제시하세요.
 3. 풀이의 논리적 결함, 비약, 계산 오류를 예리하게 지적하세요.
 4. 대안적 풀이 방법이 있다면 제시하세요.
-5. 답변은 간결하게 핵심만 전달하세요 (800자 이내 권장).
+5. **답변 길이 엄수**: 한국어 기준 **500자 이내**. 결론을 먼저 한 문장으로 제시하고, 그 근거만 짧게 덧붙이세요. 장황한 사례 나열, 교과서적 부연, 동일 결론 반복, 일반론 서론 금지. "또한", "추가로", "참고로"로 시작하는 단락이 나오면 그 단락은 잘라내세요.
 6. "AI로서", "제 생각에는" 같은 메타 표현은 쓰지 마세요. 바로 본론으로 들어가세요.
 7. 곱셈 기호는 \\times, 분수에서는 \\dfrac를 사용하세요. \\cdot, \\frac는 쓰지 마세요.
 8. \\tag{}, \\ref{} 등 Mathory 전용 매크로는 사용하지 마세요. 표준 KaTeX만 사용하세요.
-9. 다른 토론자를 언급할 때는 닉네임(한 음절)으로 부르세요. "Gemini 3.1 Pro가 말한 것처럼"이 아니라 "민이 말한 것처럼"으로.`;
+9. 다른 토론자를 언급할 때는 닉네임(한 음절)으로 부르세요. "Gemini 3.1 Pro가 말한 것처럼"이 아니라 "민이 말한 것처럼"으로.
+10. **세션 독립성**: 아래 "토론 히스토리"에 명시적으로 나오지 않은 내용은 절대 참조하지 마세요. "앞서 논의한 대로", "이전에 말씀드렸듯이" 같은 표현으로 히스토리에 없는 가공의 맥락을 만들지 마세요. 히스토리가 비어있으면 첫 발언으로 간주하고 처음부터 답하세요.
+11. **답변 전 의무 검산**: 결론을 출력하기 전 반드시 다음을 머릿속으로 확인:
+    (a) 수식 변형의 각 단계가 등가인가? (예: 인수분해, 완전제곱, 양변 조작)
+    (b) 숫자 대입과 산술이 정확한가? (간단한 계산도 한 번 더)
+    (c) 도출한 결론이 문제의 모든 조건을 만족하는가? (정의역·치역·부호 조건 등)
+    검산에서 오류 발견 시 즉시 수정. 자신 없으면 "검토 필요"라고 명시하세요. **추측·직관만으로 단정짓지 마세요.**`;
 
 function buildSystemPrompt(args: {
   appendPrompt: string;
@@ -129,7 +137,7 @@ function calcCost(
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (60초)')), ms);
+    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (3분)')), ms);
   });
   try {
     return await Promise.race([promise, timeout]);
