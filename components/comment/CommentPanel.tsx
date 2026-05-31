@@ -387,9 +387,20 @@ export default function CommentPanel({
 
     // 2. 일반 세션 — AI 호출 가능
     const invokedIds = isAISession ? [...selectedModelIds] : [];
+    const invokedModels = invokedIds
+      .map((id) => aiModels.find((m) => m.modelId === id))
+      .filter((m): m is AIModelConfig => !!m);
+
+    // 선택된 AI가 있으면 닉네임 호출 접두사를 사용자 메시지 앞에 붙임
+    // (저장본·AI 전달본 동일 — 사용자가 누구에게 말하는지 메시지 자체에서 보이도록)
+    const mentionPrefix = invokedModels.length > 0
+      ? `${invokedModels.map((m) => m.nickname).join(', ')} `
+      : '';
+    const finalContent = mentionPrefix + content;
+
     await addComment({
       problemId, tabId: activeTabId, authorUid: currentUid,
-      content, parentCommentId: null,
+      content: finalContent, parentCommentId: null,
       authorType: 'human',
       discussionSessionId: activeSessionId,
       invokedModelIds: invokedIds.length > 0 ? invokedIds : undefined,
@@ -401,9 +412,6 @@ export default function CommentPanel({
     // 3. 컨텍스트 조립
     const ctx = await buildContext();
     const history = buildHistory();
-    const invokedModels = invokedIds
-      .map((id) => aiModels.find((m) => m.modelId === id))
-      .filter((m): m is AIModelConfig => !!m);
     const participantNicknames = [myNickname, ...invokedModels.map((m) => m.nickname)];
 
     const baseContext: Omit<DiscussRequestContext, 'currentMessage'> & { currentMessage: string } = {
@@ -412,7 +420,7 @@ export default function CommentPanel({
       currentTabLabel: ctx.currentTabLabel,
       discussionHistory: history,
       participantNicknames,
-      currentMessage: content,
+      currentMessage: finalContent,
     };
 
     // 4. pending 상태 (오류 시 사용할 context 동봉)
