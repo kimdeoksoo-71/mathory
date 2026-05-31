@@ -1,51 +1,96 @@
-# Phase 33: AI 토론 기능 (v2)
+# Phase 37: AI 토론 기능 (v3)
 
 > **목표**: 기존 댓글 패널을 '토론' 패널로 확장하여, 사용자와 복수 AI 모델이 수학 풀이에 대해 비판적으로 토론하는 기능
-> **상태**: 설계 확정 (v2), 구현 대기
-> **이전 버전**: v1 (사전 점검 회의 결과 반영하여 v2로 개정)
+> **상태**: 설계 확정 (v3), 구현 대기
+> **이전 버전**: v2 → v3에서 세션 구조 / AI 호출 방식 / 공유 시스템 연계 보완
+> **연계 Phase**: 공개 등급/공유 시스템은 **Phase 38**로 분리. Phase 37은 비공개 문제 단독으로 동작 가능하도록 설계, Phase 38에서 공유 게이트 통합.
 
 ---
 
-## 0. v1 대비 주요 변경사항
+## 0. 변경 이력
+
+### v2 → v3 변경사항 (현재)
+
+| # | 항목 | v2 | v3 |
+|---|------|-----|-----|
+| 1 | 세션 구조 | 단일 흐름, "새 토론 시작" 버튼으로 세션 갱신 | **세션 = 별도 컬렉션**. 공개토론(공유 문제만, AI 불가) + 일반 토론(이름 필수, AI 가능) 분리 |
+| 2 | AI 호출 방식 | 패널 상단에서 참여 AI 토글 → 매 질문 시 전원 자동 응답 | **메시지 단위 선택**. 입력창 위 AI 칩을 켜고 보내면 그 메시지만 해당 AI들에게 전송 (한 명 호출도 가능) |
+| 3 | AI 토론 활성 조건 | 모든 문제에서 가능 | **비공개/팀 공유 문제만**. 공개 문제(Phase 38 도입)는 AI 토론 불가 |
+| 4 | 닉네임 닉 충돌 방지 | 미정 | AI 5개 닉네임(민/섬/식/쳇/락) **예약어** — 사람이 사용 불가 |
+| 5 | 닉네임 호명 규칙 | 미정 | AI는 서로/사용자를 **닉네임 한 음절**로 호명 |
+
+### v1 → v2 변경사항
 
 | # | 항목 | v1 | v2 |
 |---|------|-----|----|
-| 1 | AI 모델 라인업 | Grok 4.1 Fast | **Grok 4.3** (4.1 Fast deprecated 2026-05-15) |
-| 2 | 모델 API ID | `gemini-3.1-pro-latest` 등 추정값 | **공식 ID로 확정** (WebSearch 검증) |
-| 3 | 토론 세션 | 없음 (영구 누적) | **`discussionSessionId` 도입 + "새 토론 시작" 버튼** |
-| 4 | turnIndex 필드 | 도입 | **제거** (createdAt만 사용) |
-| 5 | 컨텍스트 히스토리 | 최근 10턴 | **최근 5턴** (조정 가능) |
-| 6 | 탭별 컨텍스트 | "question + 현재 탭" 일률 적용 | **탭 종류별 차등** (아래 §3.3) |
-| 7 | 닉네임 UI | 토론 패널/설정 메뉴 | **개인설정 페이지 신설** (사이드바 아바타 클릭) |
-| 8 | 비용 추적 | 미정 | **세션별 누적 토큰 + 비용 표시 + 추적 버튼** |
-| 9 | 보안 모델 | Admin SDK 권장 | **클라이언트 직접 쓰기 유지**, 오픈소스 공개 전 Admin SDK 전환 TODO |
+| 1 | AI 모델 라인업 | Grok 4.1 Fast | Grok 4.3 (4.1 Fast deprecated 2026-05-15) |
+| 2 | 모델 API ID | `gemini-3.1-pro-latest` 등 추정값 | 공식 ID로 확정 (WebSearch 검증) |
+| 3 | 토론 세션 | 없음 (영구 누적) | `discussionSessionId` 도입 |
+| 4 | turnIndex 필드 | 도입 | 제거 (createdAt만 사용) |
+| 5 | 컨텍스트 히스토리 | 최근 10턴 | 최근 5턴 (조정 가능) |
+| 6 | 탭별 컨텍스트 | "question + 현재 탭" 일률 적용 | 탭 종류별 차등 (§3.3) |
+| 7 | 닉네임 UI | 토론 패널/설정 메뉴 | 개인설정 페이지 신설 |
+| 8 | 비용 추적 | 미정 | 세션별 누적 토큰 + 비용 표시 |
+| 9 | 보안 모델 | Admin SDK 권장 | 클라이언트 직접 쓰기, 공개 전 전환 TODO |
 
 ---
 
 ## 1. 기능 개요
 
-### 1.1 사용자 시나리오
+### 1.1 사용자 시나리오 (v3 개정)
 
-1. 사용자가 특정 탭(예: 풀이)에서 토론 패널을 열고 AI 모델 1~5개를 참여시킨다.
-2. 사용자가 "이 풀이의 3번째 줄 논리가 맞는지 검토해줘"라고 입력.
-3. 참여 중인 AI 모델들에게 동시에 요청이 전송됨.
-4. 각 AI의 응답이 **도착 순서대로** 토론 창에 표시됨 (각 AI별 "생각 중..." 인디케이터).
-5. 사용자가 결과를 읽고 후속 질문 결정 ("방금 Gemini가 준 아이디어에 대해 어떻게 생각해?").
-6. 다음 턴에서 AI들은 이전 토론 맥락을 포함하여 응답.
-7. 새로운 주제로 토론하려면 "새 토론 시작" 버튼을 누름 → `discussionSessionId` 갱신, 이전 메시지는 접힘.
+1. 사용자가 토론 패널을 연다. **세션 목록**이 상단에 표시됨:
+   - **공개토론** (공유된 문제에만 자동 생성, 최상단 고정, AI 불가, 이름/삭제 불가)
+   - 일반 토론 세션들 (사용자가 만든 것, AI 가능)
+2. 사용자가 **+ 버튼**으로 일반 토론 세션을 생성 (예: "오답 검토", "별해 탐색"). 이름 필수 입력, 추후 변경/삭제 가능.
+3. 일반 세션에 진입 → 입력창 위에 **AI 칩 5개**(민/섬/식/쳇/락). 클릭으로 ON/OFF 토글. 이 칩 상태는 **이번 메시지에 호출할 AI**를 의미.
+4. 사용자가 메시지 입력 → 켜진 AI들에게만 (1명이든 5명이든) 동시 전송. 칩이 다 꺼져 있으면 AI 호출 없이 사람끼리의 메모/대화만 저장.
+5. AI 응답은 **도착 순서대로** 표시 (모델별 "생각 중..." 인디케이터). 응답 도착 전에도 사용자는 다음 메시지를 계속 보낼 수 있음.
+6. 다음 메시지를 보낼 때 AI 칩 선택을 바꿔도 됨 (예: 첫 메시지엔 민·쳇만, 두 번째엔 식만 호출).
 
-### 1.2 턴 기반 규칙
+### 1.2 메시지 호출 규칙 (v3 개정)
 
-- **한 턴 = 사용자 1회 질문 + 참여 AI 각 1회 응답**
-- 사용자가 질문하지 않으면 AI는 발언하지 않음 → 별도 종료 조건 불필요
-- 비용 예측 가능: `턴 수 × 참여 모델 수 × (컨텍스트 토큰 + 응답 토큰)`
+- v2의 "턴" 개념 제거. **메시지 단위로 AI 호출이 독립**.
+- 메시지 = "사용자 발화 1개 + 그 메시지가 호출한 AI들의 응답 N개"
+- AI 호출 여부는 사용자가 칩 토글로 명시적으로 결정 → 침묵하는 메시지(메모성) 가능
+- 비용 예측: `Σ(메시지별 호출 AI 수 × (컨텍스트 토큰 + 응답 토큰))`
 
-### 1.3 세션 (v2 신규)
+### 1.3 세션 구조 (v3 개정)
 
-- 한 문제에 여러 차례 다른 주제로 토론할 수 있도록 **세션 단위로 묶음**.
-- 각 메시지에 `discussionSessionId: string` (UUID) 포함.
-- "새 토론 시작" 버튼 → 새 UUID 발급, 이전 세션은 회색으로 접힘(클릭 시 펼침 가능, 단 AI 컨텍스트엔 포함되지 않음).
-- 처음 토론 시작 시 자동으로 첫 세션 ID 생성.
+**두 종류의 세션**:
+
+| 종류 | 자동 생성 | AI 참여 | 이름 변경 | 삭제 | 권한 |
+|------|-----------|---------|-----------|------|------|
+| 공개토론 | 공유 문제(Team/Public)만 자동 생성, 최상단 고정 | ❌ 불가 | ❌ 불가 | ❌ 불가 | 문제 접근 가능자 전원 |
+| 일반 토론 | 사용자가 + 버튼으로 생성 (이름 필수) | ✅ 가능 (단 비공개/Team 문제만) | ✅ 가능 | ✅ 가능 | 비공개=소유자만, Team=팀원 |
+
+- 비공개 문제: 공개토론 세션은 생성되지 않음. 일반 토론 세션만 존재.
+- Phase 37 단독 동작 시점에는 모든 문제가 비공개 취급 → 일반 토론 세션만 구현/테스트.
+- Phase 38 합류 후 공개토론 세션 자동 생성 로직과 AI 활성 게이트를 동시에 켬.
+
+### 1.4 컨텍스트 구성
+
+AI에게 한 메시지 호출 시 전달되는 프롬프트 구조:
+
+```
+[System] 공통 기본 규칙 프롬프트 + 모델별 부록 + 참여 토론자 닉네임 목록 + 본인 닉네임
+
+[User]
+## 문제:
+{question 탭 전체 블록 내용}
+
+## 현재 풀이 (탭: {활성 탭 이름}):
+{컨텍스트 규칙에 따른 탭 내용 — §3.3 참조}
+
+## 토론 히스토리 (현재 세션, 최근 5메시지):
+[KDS] 이 풀이의 논리적 결함을 지적해줘
+[민] ...이전 응답...
+[쳇] ...이전 응답...
+[KDS] 방금 민이 준 아이디어에 대해 어떻게 생각해?
+
+## 현재 메시지:
+{사용자의 새 입력}
+```
 
 ### 1.4 컨텍스트 구성
 
@@ -80,13 +125,14 @@ AI에게 매 턴 전달되는 프롬프트 구조:
 | UI 명칭 | "댓글" → "토론" (헤더 텍스트, 버튼 툴팁 일괄 변경) |
 | 패널 폭 | 380px → `35em` (콘텐츠 창과 동일) |
 | 응답 순서 | 도착순 표시 (병렬 요청, 먼저 오는 것부터 렌더) |
-| 턴 구조 | 사용자 1질문 → AI 각 1응답 (AI끼리 자동 대화 없음) |
+| 호출 단위 | **메시지 단위** AI 칩 토글 (한 메시지에 1~5명 자유 선택, 0명도 가능) |
 | 프롬프트 설계 | 공통 기본규칙 + 모델별 부록 |
 | 닉네임 | `users/{uid}.nickname` 필드, 기본값 'KDS', 개인설정 페이지에서 수정 |
 | AI 식별 | `authorType: 'human' \| 'ai'`, `modelId` 필드 분리 |
 | 모델 관리 | 초기엔 Firestore 콘솔에서 직접 관리, 관리자 UI는 추후 |
 | 탭 참조 | **탭 종류별 차등** (§3.3) |
-| 세션 관리 | `discussionSessionId` 필드 + "새 토론 시작" 버튼 |
+| 세션 관리 | **별도 컬렉션** `discussion_sessions`. 공개토론(자동/잠금) + 일반 토론(사용자 생성/편집) |
+| AI 활성 조건 | 비공개·Team 공유 문제만 (공개 문제는 Phase 38에서 차단) |
 | turnIndex | **사용 안 함** (createdAt만 사용, 필요해지면 추가) |
 | 컨텍스트 히스토리 | 현재 세션의 최근 5턴 (이후 사용 경험 보고 조정) |
 | 비용 관리 | 출력 가이드 프롬프트 + 세션별 누적 토큰/비용 실시간 표시 + 누적 비용 페이지 |
@@ -196,13 +242,36 @@ export interface TabComment {
   resolved: boolean;
   createdAt: Date;
   updatedAt: Date;
-  // 🆕 토론 세션 관리
-  discussionSessionId?: string;        // 🆕 같은 토론 세션 묶음 (UUID)
+  // 🆕 토론 세션 관리 (v3: 별도 컬렉션 참조)
+  discussionSessionId?: string;        // 🆕 discussion_sessions/{id} 참조
+  // 🆕 메시지가 호출한 AI 목록 (사용자 메시지에만 채워짐, AI 메시지는 빈 배열)
+  invokedModelIds?: string[];          // 🆕 예: ['gemini-3.1-pro', 'gpt-5.4']
   // turnIndex는 v2에서 제거 — createdAt으로 순서 표현
 }
 ```
 
-### 4.3 AIModelConfig (신규)
+### 4.3 DiscussionSession (v3 신규)
+
+```typescript
+// Firestore: problems/{problemId}/discussion_sessions/{sessionId}
+export interface DiscussionSession {
+  id: string;
+  problemId: string;
+  type: 'public' | 'normal';    // 'public' = 공개토론, 'normal' = 일반 토론
+  name: string;                  // 'public' 타입은 '공개토론' 고정, 'normal'은 사용자 입력
+  aiEnabled: boolean;            // public=false, normal=true (Phase 38에서 문제 가시성 체크 추가)
+  createdBy: string;             // 생성자 uid (public 타입은 'system')
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+**규칙**:
+- `type === 'public'` 세션은 시스템이 자동 생성 (Phase 38에서 공유 문제 생성/공유 시점에). 이름 변경/삭제 불가.
+- `type === 'normal'` 세션은 사용자가 생성, 이름 변경/삭제 가능.
+- 한 문제에 `type === 'public'` 세션은 최대 1개.
+
+### 4.5 AIModelConfig (신규)
 
 ```typescript
 // Firestore: ai_models/{modelId}
@@ -223,7 +292,7 @@ export interface AIModelConfig {
 }
 ```
 
-### 4.4 Firestore 보안 규칙
+### 4.6 Firestore 보안 규칙
 
 ```javascript
 // tab_comments create 규칙 확장
@@ -254,6 +323,21 @@ allow update: if (
 match /ai_models/{modelId} {
   allow read: if request.auth != null;
   allow write: if false;  // 콘솔에서만 관리
+}
+
+// discussion_sessions 컬렉션 (v3 신규)
+match /problems/{pid}/discussion_sessions/{sid} {
+  // 읽기: 문제 접근 권한과 동일 (Phase 38에서 가시성 규칙 통합)
+  allow read: if isProblemAccessible(pid);
+  // 생성: 'normal' 타입은 사용자가, 'public' 타입은 시스템 경로(서버)에서만
+  allow create: if request.resource.data.type == 'normal'
+                && request.resource.data.aiEnabled == true
+                && request.resource.data.createdBy == request.auth.uid
+                && isProblemAccessible(pid);
+  // 수정/삭제: 'public' 타입은 불가, 'normal'은 생성자 또는 문제 소유자만
+  allow update, delete: if resource.data.type == 'normal'
+                        && (resource.data.createdBy == request.auth.uid
+                            || isProblemOwner(pid));
 }
 ```
 
@@ -317,19 +401,19 @@ class OpenAICompatProvider implements AIProvider {
 - API 응답에서 토큰 사용량 추출 (`usage.input_tokens`, `usage.output_tokens`)
 - Firestore에 `tab_comments.aiUsage: { inputTokens, outputTokens, costUsd }` 필드로 저장
 - 토론 패널 헤더에 **현재 세션 누적 비용** 표시 (예: "이 세션: $0.012")
-- 개인설정 페이지에 **전체 누적 비용** 추가 (Phase 33.5에서 구현)
+- 개인설정 페이지에 **전체 누적 비용** 추가 (Phase 37.5에서 구현)
 
 ---
 
 ## 6. 단계별 작업 계획
 
-### 📌 Phase 33-A: 데이터 모델 + AI 모델 인프라 (반나절)
+### 📌 Phase 37-A: 데이터 모델 + AI 모델 인프라 (반나절)
 
 **목표**: 코드/UI 변경 없이 백엔드 기반만 깔기. 끝나면 단위 테스트 가능.
 
 | Step | 파일 | 작업 |
 |------|------|------|
-| A-1 | `types/problem.ts` | UserProfile, TabComment 확장 + AIModelConfig 신규 |
+| A-1 | `types/problem.ts` | UserProfile, TabComment 확장 + AIModelConfig + **DiscussionSession** 신규 |
 | A-2 | `lib/ai-models.ts` (신규) | Firestore ai_models 컬렉션 CRUD + 메모리 캐시 |
 | A-3 | `lib/ai-provider.ts` | OpenAICompatProvider 추가, getProviderForModel() |
 | A-4 | `package.json` | `openai` 패키지 추가, `npm install` |
@@ -341,7 +425,7 @@ class OpenAICompatProvider implements AIProvider {
 
 ---
 
-### 📌 Phase 33-B: 토론 API 라우트 (반나절)
+### 📌 Phase 37-B: 토론 API 라우트 (반나절)
 
 **목표**: HTTP로 토론 요청을 보내면 AI 응답이 돌아오는 단계.
 
@@ -356,13 +440,13 @@ class OpenAICompatProvider implements AIProvider {
 
 ---
 
-### 📌 Phase 33-C: 댓글 → 토론 데이터 레이어 (반나절)
+### 📌 Phase 37-C: 댓글 → 토론 데이터 레이어 (반나절)
 
 **목표**: 기존 댓글 시스템에 AI/세션 필드를 얹기. UI는 미변경.
 
 | Step | 파일 | 작업 |
 |------|------|------|
-| C-1 | `lib/comments.ts` | mapDoc()에 authorType/modelId/discussionSessionId/aiUsage 매핑 |
+| C-1 | `lib/comments.ts` | mapDoc()에 authorType/modelId/discussionSessionId/invokedModelIds/aiUsage 매핑 |
 | C-2 | `lib/comments.ts` | AddCommentInput 확장, addComment()에 새 필드 저장 로직 |
 | C-3 | `firestore.rules` | AI 댓글 create 규칙 + AI 댓글 update 제한 + ai_models 읽기 전용 |
 | C-4 | 배포 | `firebase deploy --only firestore:rules` |
@@ -371,82 +455,104 @@ class OpenAICompatProvider implements AIProvider {
 
 ---
 
-### 📌 Phase 33-D: 닉네임 + 개인설정 페이지 (반나절)
+### 📌 Phase 37-D: 토론 세션 관리 레이어 (반나절) — v3 신규
+
+**목표**: 세션 CRUD 라이브러리 + 보안 규칙. UI 미변경.
+
+| Step | 파일 | 작업 |
+|------|------|------|
+| D-1 | `lib/discussion-sessions.ts` (신규) | `createNormalSession(problemId, name)`, `renameSession(id, name)`, `deleteSession(id)`, `listSessions(problemId)` |
+| D-2 | 동 파일 | `ensurePublicSession(problemId)` — Phase 37 단계엔 호출 안 함 (Phase 38에서 공유 문제 생성 훅에 연결). 함수 시그니처만 정의 |
+| D-3 | `firestore.rules` | `discussion_sessions` 컬렉션 규칙 추가 (§4.6 참고) |
+| D-4 | 수동 테스트 | 콘솔에서 normal 세션 생성/이름변경/삭제 |
+
+**완료 기준**: 한 문제에 대해 normal 세션 2개 생성 → 이름변경 → 삭제까지 클라이언트에서 가능.
+
+---
+
+### 📌 Phase 37-E: 닉네임 + 개인설정 페이지 (반나절)
 
 **목표**: 토론 UI에 앞서 닉네임 인프라부터 완성.
 
 | Step | 파일 | 작업 |
 |------|------|------|
-| D-1 | `lib/users.ts` | upsertUserProfile()에 nickname 보존, updateNickname() 추가 (입력값 trim 후 ai_models.nickname 예약 목록과 대조 → 충돌 시 "'쳇'은 AI 토론자 이름이라 사용할 수 없습니다" 에러), 신규 사용자 기본값 'KDS' |
-| D-2 | `app/settings/page.tsx` (신규) | 개인설정 페이지 (닉네임 편집만, 나중에 확장) |
-| D-3 | `components/layout/Sidebar.tsx` | 사이드바 하단 구글 아바타 클릭 → `/settings`로 이동 |
-| D-4 | 수동 테스트 | 닉네임 변경 → 새로고침 → 유지 확인 |
+| E-1 | `lib/users.ts` | upsertUserProfile()에 nickname 보존, updateNickname() 추가 (입력값 trim 후 ai_models.nickname 예약 목록과 대조 → 충돌 시 "'쳇'은 AI 토론자 이름이라 사용할 수 없습니다" 에러), 신규 사용자 기본값 'KDS' |
+| E-2 | `app/settings/page.tsx` (신규) | 개인설정 페이지 (닉네임 편집만, 나중에 확장) |
+| E-3 | `components/layout/Sidebar.tsx` | 사이드바 하단 구글 아바타 클릭 → `/settings`로 이동 |
+| E-4 | 수동 테스트 | 닉네임 변경 → 새로고침 → 유지 확인 |
 
 **완료 기준**: 사이드바 아바타 클릭 → 설정 페이지 진입 → 닉네임 수정 가능.
 
 ---
 
-### 📌 Phase 33-E: 토론 패널 UI - 기본 골격 (하루)
+### 📌 Phase 37-F: 토론 패널 UI - 세션 + 메시지 (1.5일) — v3 개정
 
-**목표**: 기존 CommentPanel을 토론 모드로 확장. AI 응답 수신 + 표시.
+**목표**: 기존 CommentPanel을 토론 패널로 확장. 세션 목록 + 메시지 단위 AI 칩.
 
 | Step | 파일 | 작업 |
 |------|------|------|
-| E-1 | `components/comment/CommentPanel.tsx` | 헤더 "댓글" → "토론", 패널 폭 380 → 35em |
-| E-2 | 동 파일 | 상단에 AI 모델 선택 칩 토글 UI (ai_models 캐시에서 로드) |
-| E-3 | 동 파일 | "새 토론 시작" 버튼 + `discussionSessionId` 상태 관리 |
-| E-4 | 동 파일 | `handleDiscussionSubmit()` — 병렬 fetch /api/discuss + 도착순 Firestore 저장 |
-| E-5 | 동 파일 | "생각 중..." 인디케이터 (모델별 메시지 영역의 스켈레톤) |
-| E-6 | `components/comment/CommentItem` 부분 | authorType==='ai'일 때 모델 아바타/이름/배지 + 수정/삭제 버튼 숨김 |
-| E-7 | KaTeX 렌더링 확인 | AI 응답의 수식이 기존 댓글 KaTeX 파이프라인에서 렌더링되는지 검증 |
+| F-1 | `components/comment/CommentPanel.tsx` | 헤더 "댓글" → "토론", 패널 폭 380 → 35em |
+| F-2 | 동 파일 | **세션 목록 영역**: 상단에 세션 탭/리스트 UI. 공개토론 세션이 있으면 최상단 고정·아이콘 강조, 일반 세션들 나열, + 버튼 |
+| F-3 | 동 파일 | + 버튼 → 이름 입력 모달 → `createNormalSession()` 호출, 활성 세션으로 전환 |
+| F-4 | 동 파일 | 일반 세션 이름변경/삭제 컨텍스트 메뉴 (생성자 또는 문제 소유자만) |
+| F-5 | 동 파일 | **메시지 입력창 위에 AI 칩 5개** — ai_models 캐시 기반, 클릭으로 ON/OFF 토글. 칩 상태는 컴포넌트 로컬 상태(보내고 나서도 유지) |
+| F-6 | 동 파일 | `handleSendMessage()` — 사용자 메시지 저장(`invokedModelIds` 포함) → 칩이 켜진 AI들에게 병렬 `/api/discuss` → 도착순 Firestore 저장 |
+| F-7 | 동 파일 | "생각 중..." 인디케이터 — 호출된 AI별로 스켈레톤 메시지 |
+| F-8 | 동 파일 | 응답 대기 중에도 사용자가 새 메시지 보낼 수 있도록 입력창 잠금 X (각 응답은 독립적으로 도착) |
+| F-9 | `components/comment/CommentItem` | authorType==='ai'일 때 닉네임/아바타/모델명 툴팁 + 수정·삭제 버튼 숨김 |
+| F-10 | KaTeX 렌더링 확인 | AI 응답 수식이 기존 댓글 KaTeX 파이프라인에서 렌더링되는지 검증 |
 
-**완료 기준**: 모델 2개 선택 → 질문 입력 → 양쪽 응답 도착순 표시 → 새로고침 후에도 보존.
+**완료 기준**: 일반 세션 2개 생성/이름변경/삭제 → 세션 진입 → AI 2개 선택 후 메시지 전송 → 도착순 응답 확인 → 다음 메시지에선 AI 1개만 선택 → 새로고침 후 보존.
+
+**보류**: 공개토론 세션 UI는 Phase 38에서 활성화 (지금은 자동 생성되지 않으므로 화면에 안 보임).
 
 ---
 
-### 📌 Phase 33-F: 컨텍스트 조립 로직 (반나절)
+### 📌 Phase 37-G: 컨텍스트 조립 로직 (반나절)
 
-**목표**: 탭별 차등 규칙(§3.3) + 세션 히스토리 5턴 컷오프 구현.
+**목표**: 탭별 차등 규칙(§3.3) + 세션 히스토리 5메시지 컷오프 + 닉네임 주입 구현.
 
 | Step | 작업 |
 |------|------|
-| F-1 | `CommentPanel.tsx` 내 `buildContext()` 헬퍼 — 활성 탭에 따라 question/solution/extra_N 조합 |
-| F-2 | `buildHistory()` 헬퍼 — 현재 세션의 최근 5턴 메시지 추출 (createdAt asc) |
-| F-3 | `/api/discuss` 요청 페이로드에 위 두 값 포함 |
-| F-4 | 시나리오별 수동 테스트: question 탭/solution 탭/extra 탭 각각 토론 |
+| G-1 | `CommentPanel.tsx` 내 `buildContext()` 헬퍼 — 활성 탭에 따라 question/solution/extra_N 조합 |
+| G-2 | `buildHistory()` 헬퍼 — 현재 세션의 최근 5메시지 추출 (createdAt asc) |
+| G-3 | `/api/discuss` 요청 페이로드에 위 두 값 + 호출되는 AI들의 닉네임 목록(시스템 프롬프트용) 포함 |
+| G-4 | 시나리오별 수동 테스트: question 탭/solution 탭/extra 탭 각각 토론 |
 
-**완료 기준**: solution 탭에서 토론 시 AI가 question 내용을 인지하고 응답.
+**완료 기준**: solution 탭에서 토론 시 AI가 question 내용을 인지하고 응답, 응답 내에서 다른 AI를 닉네임으로 호명.
 
 ---
 
-### 📌 Phase 33-G: 비용 표시 + 폴리싱 (반나절)
+### 📌 Phase 37-H: 비용 표시 + 폴리싱 (반나절)
 
 | Step | 작업 |
 |------|------|
-| G-1 | 토론 패널 헤더에 "이 세션: $X.XXX" 실시간 표시 (현재 세션 메시지의 `aiUsage.costUsd` 합산) |
-| G-2 | 에러 메시지 UI ("Gemini 응답 실패 — 재시도" 버튼) |
-| G-3 | 모델별 아바타 이모지, 배경색 미세 차이로 인간/AI 시각 구분 |
-| G-4 | 빈 상태 ("AI 모델을 선택하고 질문을 입력하세요") UI |
-| G-5 | 이전 세션 접힘/펼침 UI ("이전 토론 보기" 토글) |
+| H-1 | 토론 패널 헤더에 "이 세션: $X.XXX" 실시간 표시 (현재 세션 메시지의 `aiUsage.costUsd` 합산) |
+| H-2 | 에러 메시지 UI ("Gemini 응답 실패 — 재시도" 버튼) |
+| H-3 | 모델별 아바타 이모지, 배경색 미세 차이로 인간/AI 시각 구분 |
+| H-4 | 빈 상태 ("AI를 선택하고 메시지를 입력하세요") UI |
+| H-5 | 세션 전환 시 칩 선택 초기화 정책 결정/구현 (기본: 전 세션의 칩 상태 유지) |
 
-**완료 기준**: 한 문제에 대해 2개 세션 만들고, 각 세션 비용 확인, 이전 세션 접힘 동작.
+**완료 기준**: 한 문제에 대해 2개 세션 만들고, 각 세션 비용 확인.
 
 ---
 
-### 📌 Phase 33-H: 최종 통합 테스트 + roadmap.md 업데이트 (반나절)
+### 📌 Phase 37-I: 최종 통합 테스트 + roadmap.md 업데이트 (반나절)
 
 | 시나리오 | 확인 |
 |----------|------|
-| 1 | 5개 모델 동시 선택 → 질문 → 모두 도착 |
+| 1 | AI 칩 5개 모두 선택 → 메시지 → 5개 응답 도착순 표시 |
 | 2 | 한 모델 API 키 의도적 오설정 → 그 모델만 에러, 나머지 정상 |
-| 3 | 후속 질문 → AI가 이전 맥락 참조 |
-| 4 | "새 토론 시작" → 이전 세션 접힘, 새 세션 비용 0 |
-| 5 | extra 탭 토론 시 solution 내용 누락 확인 |
-| 6 | 닉네임 변경 → AI 프롬프트에 반영 |
-| 7 | KaTeX 수식 정상 렌더링 |
-| 8 | 모바일/태블릿 반응형 (35em 패널 폭 적정성) |
+| 3 | AI 칩 0개로 메시지 → AI 호출 없이 메시지만 저장 (메모) |
+| 4 | AI 응답 대기 중 다음 메시지 전송 가능 확인 |
+| 5 | 일반 세션 생성/이름변경/삭제 정상 동작 |
+| 6 | 후속 메시지 → AI가 같은 세션의 이전 맥락 참조, 다른 세션 내용은 무시 |
+| 7 | extra 탭 토론 시 solution 내용 누락 확인 |
+| 8 | 닉네임 변경 → AI 프롬프트에 반영, 예약어("쳇") 시도 → 거부 |
+| 9 | KaTeX 수식 정상 렌더링 |
+| 10 | 모바일/태블릿 반응형 (35em 패널 폭 적정성) |
 
-마지막: `docs/roadmap.md`에 Phase 33 완료 추가.
+마지막: `docs/roadmap.md`에 Phase 37 완료 추가. Phase 38 시작 시 공개토론 세션 자동 생성 및 AI 활성 게이트 통합.
 
 ---
 
@@ -458,14 +564,15 @@ class OpenAICompatProvider implements AIProvider {
 | 2 | ai-models.ts | lib/ai-models.ts | **신규** |
 | 3 | ai-provider.ts | lib/ai-provider.ts | 수정 — OpenAICompatProvider 추가 |
 | 4 | route.ts | app/api/discuss/route.ts | **신규** |
-| 5 | comments.ts | lib/comments.ts | 수정 — 신규 필드 매핑 |
-| 6 | users.ts | lib/users.ts | 수정 — 닉네임 CRUD |
-| 7 | settings/page.tsx | app/settings/page.tsx | **신규** |
-| 8 | Sidebar.tsx | components/layout/Sidebar.tsx | 수정 — 아바타 클릭 라우팅 |
-| 9 | CommentPanel.tsx | components/comment/CommentPanel.tsx | **대폭 수정** — 토론 UI |
-| 10 | firestore.rules | firestore.rules | 수정 — AI 댓글 규칙 |
-| 11 | package.json | package.json | 수정 — openai 패키지 |
-| 12 | .env.local | .env.local | 수정 — 3개 API 키 추가 |
+| 5 | comments.ts | lib/comments.ts | 수정 — 신규 필드 매핑 (invokedModelIds 포함) |
+| 6 | discussion-sessions.ts | lib/discussion-sessions.ts | **신규** — 세션 CRUD |
+| 7 | users.ts | lib/users.ts | 수정 — 닉네임 CRUD + 예약어 검증 |
+| 8 | settings/page.tsx | app/settings/page.tsx | **신규** |
+| 9 | Sidebar.tsx | components/layout/Sidebar.tsx | 수정 — 아바타 클릭 라우팅 |
+| 10 | CommentPanel.tsx | components/comment/CommentPanel.tsx | **대폭 수정** — 세션 목록 + 토론 UI |
+| 11 | firestore.rules | firestore.rules | 수정 — AI 댓글 + discussion_sessions 규칙 |
+| 12 | package.json | package.json | 수정 — openai 패키지 |
+| 13 | .env.local | .env.local | 수정 — 3개 API 키 추가 |
 
 ---
 
@@ -473,7 +580,7 @@ class OpenAICompatProvider implements AIProvider {
 
 | 항목 | 옵션 | 추천 |
 |------|------|------|
-| 모델 선택 UI | A. 칩 토글 / B. 드롭다운 체크박스 | A (시각적, 즉시 ON/OFF) |
+| AI 칩 위치 | A. 입력창 바로 위 / B. 패널 최상단 | A (메시지 단위 선택이라 입력창과 인접해야 자연스러움) |
 | "생각 중..." 표시 | A. 메시지 영역 스켈레톤 / B. 모델명 옆 스피너 | A (위치 일관성) |
 | 토론/댓글 모드 전환 | A. 탭으로 분리 / B. 하나의 타임라인에 공존 | B (단순) |
 | Gemini 3.5 Flash API 모델명 | 사용자가 현재 사용 중인 정확한 ID 확인 | 구현 직전 확인 |
