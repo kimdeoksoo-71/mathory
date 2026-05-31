@@ -49,6 +49,17 @@ interface PendingAI {
   nickname: string;
   emoji: string;
   error?: string;
+  /** 재시도 시 사용할 원본 호출 컨텍스트 */
+  retryContext?: DiscussRequestContext;
+}
+
+interface DiscussRequestContext {
+  problemContent: string;
+  currentTabContent?: string;
+  currentTabLabel?: string;
+  discussionHistory: Array<{ role: 'human' | 'ai'; nickname: string; content: string }>;
+  participantNicknames: string[];
+  currentMessage: string;
 }
 
 export default function CommentPanel({
@@ -115,12 +126,16 @@ export default function CommentPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemId, currentUid]);
 
-  // 세션이 로드되면 첫 normal 세션을 자동 선택 (없으면 legacy)
+  // 초기 1회만 자동 선택: 세션이 있으면 첫 normal 세션, 없으면 legacy 유지
+  const initialSelectionDoneRef = useRef(false);
   useEffect(() => {
-    if (activeSessionId === LEGACY_SESSION_ID && sessions.length > 0) {
+    if (initialSelectionDoneRef.current) return;
+    if (loading) return;
+    if (sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
     }
-  }, [sessions, activeSessionId]);
+    initialSelectionDoneRef.current = true;
+  }, [loading, sessions]);
 
   // ─── 필터 ───
   const visibleComments = useMemo(() => {
@@ -141,6 +156,11 @@ export default function CommentPanel({
     [sessions, activeSessionId],
   );
   const isAISession = !!activeSession && activeSession.aiEnabled;
+
+  /** 현재 세션의 누적 비용 (USD) */
+  const sessionCostUsd = useMemo(() => {
+    return visibleComments.reduce((sum, c) => sum + (c.aiUsage?.costUsd || 0), 0);
+  }, [visibleComments]);
 
   // ─── displayInfo 헬퍼 ───
   const getDisplayInfo = useCallback(
@@ -294,6 +314,62 @@ export default function CommentPanel({
     });
   }, [visibleComments, getDisplayInfo]);
 
+  // ─── 단일 AI 호출 (전송 + 재시도에서 공유) ───
+  const invokeOneAI = useCallback(
+    async (model: AIModelConfig, context: DiscussRequestContext, sessionId: string) => {
+      try {
+        const res = await fetch('/api/discuss', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            modelId: model.modelId,
+            problemContent: context.problemContent,
+            currentTabContent: context.currentTabContent,
+            currentTabLabel: context.currentTabLabel,
+            discussionHistory: context.discussionHistory,
+            participantNicknames: context.participantNicknames,
+            myNickname: model.nickname,
+            currentMessage: context.currentMessage,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        await addComment({
+          problemId, tabId: activeTabId,
+          authorUid: `ai:${model.modelId}`,
+          content: data.content || '(빈 응답)',
+          parentCommentId: null,
+          authorType: 'ai',
+          modelId: model.modelId,
+          discussionSessionId: sessionId,
+          aiUsage: {
+            inputTokens: data.inputTokens || 0,
+            outputTokens: data.outputTokens || 0,
+            costUsd: data.costUsd || 0,
+          },
+        });
+        await refreshComments();
+        setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
+      } catch (err) {
+        console.error(`[discuss] ${model.modelId} 실패:`, err);
+        setPendingAI((prev) =>
+          prev.map((p) =>
+            p.modelId === model.modelId
+              ? {
+                  ...p,
+                  error: err instanceof Error ? err.message : '응답 실패',
+                  retryContext: context,
+                }
+              : p,
+          ),
+        );
+      }
+    },
+    [problemId, activeTabId, refreshComments],
+  );
+
   // ─── 메시지 전송 (Phase 37-F 핵심) ───
   const handleSendMessage = async (content: string) => {
     const myNickname = myProfile?.nickname || 'KDS';
@@ -323,73 +399,53 @@ export default function CommentPanel({
     if (invokedIds.length === 0) return;
 
     // 3. 컨텍스트 조립
-    const context = await buildContext();
+    const ctx = await buildContext();
     const history = buildHistory();
     const invokedModels = invokedIds
       .map((id) => aiModels.find((m) => m.modelId === id))
       .filter((m): m is AIModelConfig => !!m);
     const participantNicknames = [myNickname, ...invokedModels.map((m) => m.nickname)];
 
-    // 4. pending 상태
+    const baseContext: Omit<DiscussRequestContext, 'currentMessage'> & { currentMessage: string } = {
+      problemContent: ctx.problemContent,
+      currentTabContent: ctx.currentTabContent,
+      currentTabLabel: ctx.currentTabLabel,
+      discussionHistory: history,
+      participantNicknames,
+      currentMessage: content,
+    };
+
+    // 4. pending 상태 (오류 시 사용할 context 동봉)
     setPendingAI(
-      invokedModels.map((m) => ({ modelId: m.modelId, nickname: m.nickname, emoji: m.avatarEmoji })),
+      invokedModels.map((m) => ({
+        modelId: m.modelId,
+        nickname: m.nickname,
+        emoji: m.avatarEmoji,
+      })),
     );
 
     // 5. 각 AI 호출 — 도착순으로 Firestore 저장
+    const sessionAtSend = activeSessionId;
     await Promise.allSettled(
-      invokedModels.map(async (model) => {
-        try {
-          const res = await fetch('/api/discuss', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              modelId: model.modelId,
-              problemContent: context.problemContent,
-              currentTabContent: context.currentTabContent,
-              currentTabLabel: context.currentTabLabel,
-              discussionHistory: history,
-              participantNicknames,
-              myNickname: model.nickname,
-              currentMessage: content,
-            }),
-          });
-          const data = await res.json();
-          if (!res.ok || data.error) {
-            throw new Error(data.error || `HTTP ${res.status}`);
-          }
-          await addComment({
-            problemId, tabId: activeTabId,
-            authorUid: `ai:${model.modelId}`,
-            content: data.content || '(빈 응답)',
-            parentCommentId: null,
-            authorType: 'ai',
-            modelId: model.modelId,
-            discussionSessionId: activeSessionId,
-            aiUsage: {
-              inputTokens: data.inputTokens || 0,
-              outputTokens: data.outputTokens || 0,
-              costUsd: data.costUsd || 0,
-            },
-          });
-          await refreshComments();
-        } catch (err) {
-          console.error(`[discuss] ${model.modelId} 실패:`, err);
-          setPendingAI((prev) =>
-            prev.map((p) =>
-              p.modelId === model.modelId
-                ? { ...p, error: err instanceof Error ? err.message : '응답 실패' }
-                : p,
-            ),
-          );
-          // 에러는 5초 후 자동 제거
-          setTimeout(() => {
-            setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
-          }, 5000);
-          return;
-        }
-        setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
-      }),
+      invokedModels.map((model) => invokeOneAI(model, baseContext, sessionAtSend)),
     );
+  };
+
+  // ─── 에러 재시도 ───
+  const handleRetryAI = async (modelId: string) => {
+    const pending = pendingAI.find((p) => p.modelId === modelId);
+    if (!pending || !pending.retryContext) return;
+    const model = aiModels.find((m) => m.modelId === modelId);
+    if (!model) return;
+    // error 표시 제거, pending 다시
+    setPendingAI((prev) =>
+      prev.map((p) => (p.modelId === modelId ? { modelId: p.modelId, nickname: p.nickname, emoji: p.emoji } : p)),
+    );
+    await invokeOneAI(model, pending.retryContext, activeSessionId);
+  };
+
+  const handleDismissError = (modelId: string) => {
+    setPendingAI((prev) => prev.filter((p) => p.modelId !== modelId));
   };
 
   return (
@@ -441,6 +497,21 @@ export default function CommentPanel({
           {hideResolved ? '해결된 메시지 보이기' : '해결된 메시지 숨기기'}
         </button>
         <div style={{ flex: 1 }} />
+        {isAISession && sessionCostUsd > 0 && (
+          <span
+            title="이 세션의 AI 응답 누적 비용"
+            style={{
+              fontSize: 11, color: 'var(--text-muted)',
+              fontFamily: 'var(--font-ui)',
+              padding: '2px 6px',
+              border: '1px solid var(--border-light)',
+              borderRadius: 4,
+              cursor: 'help',
+            }}
+          >
+            이 세션: ${sessionCostUsd.toFixed(4)}
+          </span>
+        )}
         <button
           onClick={onClose}
           style={{
@@ -508,7 +579,12 @@ export default function CommentPanel({
               />
             ))}
             {pendingAI.map((p) => (
-              <PendingAIBubble key={p.modelId} pending={p} />
+              <PendingAIBubble
+                key={p.modelId}
+                pending={p}
+                onRetry={p.error && p.retryContext ? () => handleRetryAI(p.modelId) : undefined}
+                onDismiss={p.error ? () => handleDismissError(p.modelId) : undefined}
+              />
             ))}
           </>
         )}
@@ -812,7 +888,13 @@ function AIChipBar({
 /* ═══════════════════════════════════════════════════════ */
 /* PendingAIBubble                                          */
 /* ═══════════════════════════════════════════════════════ */
-function PendingAIBubble({ pending }: { pending: PendingAI }) {
+function PendingAIBubble({
+  pending, onRetry, onDismiss,
+}: {
+  pending: PendingAI;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+}) {
   return (
     <div
       className={pending.error ? '' : 'pending-ai'}
@@ -828,7 +910,33 @@ function PendingAIBubble({ pending }: { pending: PendingAI }) {
     >
       <span style={{ fontSize: 16 }}>{pending.emoji}</span>
       <span style={{ fontWeight: 600 }}>{pending.nickname}</span>
-      <span>{pending.error ? `응답 실패: ${pending.error}` : '생각 중…'}</span>
+      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {pending.error ? `응답 실패: ${pending.error}` : '생각 중…'}
+      </span>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          style={{
+            border: '1px solid #c44', background: 'transparent', color: '#c44',
+            borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
+            fontFamily: 'var(--font-ui)', flexShrink: 0,
+          }}
+        >
+          재시도
+        </button>
+      )}
+      {onDismiss && (
+        <button
+          onClick={onDismiss}
+          title="닫기"
+          style={{
+            border: 'none', background: 'transparent', color: '#c44',
+            fontSize: 14, lineHeight: 1, padding: 0, cursor: 'pointer',
+            width: 18, height: 18, flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >×</button>
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import { getModelConfig } from '../../../lib/ai-models';
 import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 90;
 
 interface DiscussionMessage {
   role: 'human' | 'ai';
@@ -37,21 +37,35 @@ interface DiscussSuccess {
   costUsd: number;
 }
 
-const TIMEOUT_MS = 30_000;
+const TIMEOUT_MS = 60_000;
 
 const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참여하는 전문가입니다.
 
+⚠️ 최우선 출력 규칙 (반드시 지킬 것, 위반 시 응답이 무효 처리됩니다):
+**모든 수식은 반드시 KaTeX 호환 LaTeX 문법으로 감싸세요.**
+- 인라인 수식: \`$...$\` (예: $f(x) = x^2$)
+- 블록 수식: \`$$...$$\` (예: $$\\int_0^1 x \\, dx = \\dfrac{1}{2}$$)
+- 일반 텍스트 안에 변수·식·숫자 계산이 들어가면 반드시 \`$\`로 감싸세요.
+
+좋은 예:
+  "이차함수 $f(x) = (x-2)^2 - 1$의 최솟값은 $-1$이다."
+나쁜 예 (절대 금지 — 이렇게 쓰지 마세요):
+  "이차함수 f(x) = (x-2)^2 - 1의 최솟값은 -1이다." (← \`$\` 없음)
+  "f(x)=x^2-4x+3" (← LaTeX 래핑 없이 본문에 식)
+  "x squared minus 4x plus 3" (← 자연어 수식)
+
+위 규칙은 모든 모델에 동일하게 적용되며 예외 없음. 짧은 변수 하나(예: $x$)라도 반드시 \`$\`로 감싸세요.
+
 토론 규칙:
-1. 수식은 KaTeX 호환 LaTeX로 작성하세요. 인라인: $...$, 블록: $$...$$
-2. 토론 히스토리의 모든 발언(사람, AI 구분 없이)을 전체 맥락으로 읽고, 비판적으로 평가하세요.
-3. 다른 참여자의 의견에 동의하면 그 이유를, 반대하면 논리적 근거를 명확히 제시하세요.
-4. 풀이의 논리적 결함, 비약, 계산 오류를 예리하게 지적하세요.
-5. 대안적 풀이 방법이 있다면 제시하세요.
-6. 답변은 간결하게 핵심만 전달하세요 (800자 이내 권장).
-7. "AI로서", "제 생각에는" 같은 메타 표현은 쓰지 마세요. 바로 본론으로 들어가세요.
-8. 곱셈 기호는 \\times, 분수에서는 \\dfrac를 사용하세요.
-9. \\tag{}, \\ref{} 등 Mathory 전용 매크로는 사용하지 마세요. 표준 KaTeX만 사용하세요.
-10. 다른 토론자를 언급할 때는 닉네임(한 음절)으로 부르세요. "Gemini 3.1 Pro가 말한 것처럼"이 아니라 "민이 말한 것처럼"으로.`;
+1. 토론 히스토리의 모든 발언(사람, AI 구분 없이)을 전체 맥락으로 읽고, 비판적으로 평가하세요.
+2. 다른 참여자의 의견에 동의하면 그 이유를, 반대하면 논리적 근거를 명확히 제시하세요.
+3. 풀이의 논리적 결함, 비약, 계산 오류를 예리하게 지적하세요.
+4. 대안적 풀이 방법이 있다면 제시하세요.
+5. 답변은 간결하게 핵심만 전달하세요 (800자 이내 권장).
+6. "AI로서", "제 생각에는" 같은 메타 표현은 쓰지 마세요. 바로 본론으로 들어가세요.
+7. 곱셈 기호는 \\times, 분수에서는 \\dfrac를 사용하세요. \\cdot, \\frac는 쓰지 마세요.
+8. \\tag{}, \\ref{} 등 Mathory 전용 매크로는 사용하지 마세요. 표준 KaTeX만 사용하세요.
+9. 다른 토론자를 언급할 때는 닉네임(한 음절)으로 부르세요. "Gemini 3.1 Pro가 말한 것처럼"이 아니라 "민이 말한 것처럼"으로.`;
 
 function buildSystemPrompt(args: {
   appendPrompt: string;
@@ -115,7 +129,7 @@ function calcCost(
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (30초)')), ms);
+    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (60초)')), ms);
   });
   try {
     return await Promise.race([promise, timeout]);
