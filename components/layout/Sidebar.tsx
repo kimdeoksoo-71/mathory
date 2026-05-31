@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { User } from 'firebase/auth';
 import { Problem, Folder } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
@@ -438,6 +439,7 @@ export default function Sidebar({
   onSelectSharedWithMe,
   sharedCount,
 }: SidebarProps) {
+  const router = useRouter();
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [myHeaderHovered, setMyHeaderHovered] = useState(false);
   const [recentOpen, setRecentOpen] = useState(true);
@@ -840,8 +842,9 @@ export default function Sidebar({
               fontSize: 11, fontWeight: 600, color: '#666',
             }}>{(idOnly || '?').charAt(0).toUpperCase()}</div>
           );
+          const openSettings = () => router.push('/settings');
           return collapsed ? (
-            <button onClick={onLogout} title={idOnly || '로그아웃'}
+            <button onClick={openSettings} title={`${idOnly || ''} — 개인 설정`}
               style={{
                 border: 'none', background: 'transparent', cursor: 'pointer',
                 padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -851,15 +854,26 @@ export default function Sidebar({
             </button>
           ) : (
             <>
-              {avatar}
-              <span style={{
-                flex: 1, minWidth: 0,
-                fontSize: 12, color: 'var(--text-secondary)',
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                fontFamily: 'var(--font-ui)',
-              }}>
+              <button onClick={openSettings} title="개인 설정"
+                style={{
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '50%',
+                }}>
+                {avatar}
+              </button>
+              <button onClick={openSettings} title="개인 설정"
+                style={{
+                  flex: 1, minWidth: 0,
+                  fontSize: 12, color: 'var(--text-secondary)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  fontFamily: 'var(--font-ui)',
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  textAlign: 'left', padding: 0,
+                }}
+              >
                 {idOnly || '로그인됨'}
-              </span>
+              </button>
               <button onClick={onLogout}
                 style={{
                   flexShrink: 0,
