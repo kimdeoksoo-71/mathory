@@ -1,33 +1,54 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { TabComment, TabMeta, UserProfile } from '../../types/problem';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+import {
+  TabComment, TabMeta, UserProfile, DiscussionSession, AIModelConfig, Block,
+  tabSubcollection,
+} from '../../types/problem';
+import { db } from '../../lib/firebase';
 import {
   listAllComments, addComment, editCommentContent, deleteComment,
   toggleResolved, buildThreads,
 } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
+import { getEnabledModels } from '../../lib/ai-models';
+import {
+  listSessions, createNormalSession, renameSession, deleteSession,
+} from '../../lib/discussion-sessions';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor from './CommentEditor';
+
+const LEGACY_SESSION_ID = '__legacy__';
+const HISTORY_LIMIT = 5;
 
 interface CommentPanelProps {
   problemId: string;
   ownerUid: string;
   tabs: TabMeta[];
   activeTabId: string;
-  /** 패널 사용자의 uid */
   currentUid: string;
-  /** 댓글 작성 가능? (owner OR commenter) */
   canComment: boolean;
-  /** 본문 폰트 크기 — 댓글은 이보다 2pt 작게 표시 */
   bodyFontSize?: number;
-  /** 사용자가 닫기 버튼 누르면 호출 */
   onClose: () => void;
-  /** 댓글 개수 변경 시 부모에 알림 (탭 헤더 뱃지 동기화) */
   onCommentsChange?: (comments: TabComment[]) => void;
-  /** 패널을 어느 탭으로 시작할지 */
   initialTabId?: string;
   onTabChange?: (tabId: string) => void;
+}
+
+interface DisplayInfo {
+  name: string;
+  emoji?: string;
+  photoURL?: string;
+  isAI: boolean;
+  modelDisplayName?: string;
+}
+
+interface PendingAI {
+  modelId: string;
+  nickname: string;
+  emoji: string;
+  error?: string;
 }
 
 export default function CommentPanel({
@@ -35,21 +56,39 @@ export default function CommentPanel({
   bodyFontSize = 15,
   onClose, onCommentsChange,
 }: CommentPanelProps) {
-  // 본문보다 2pt 작게 (최소 9px)
   const commentFontSize = Math.max(9, bodyFontSize - 2);
+  const isOwner = currentUid === ownerUid;
+
+  // ─── 데이터 ───
   const [comments, setComments] = useState<TabComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+  const [sessions, setSessions] = useState<DiscussionSession[]>([]);
+  const [aiModels, setAiModels] = useState<AIModelConfig[]>([]);
+  const [myProfile, setMyProfile] = useState<UserProfile | null>(null);
+
+  // ─── UI 상태 ───
+  const [activeSessionId, setActiveSessionId] = useState<string>(LEGACY_SESSION_ID);
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]); // AI 칩 토글
+  const [pendingAI, setPendingAI] = useState<PendingAI[]>([]); // 응답 대기 중
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [newSessionName, setNewSessionName] = useState('');
+  const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
+  const sessionSubmittingRef = useRef(false); // 한글 IME / blur 이중 호출 방지
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hideResolved, setHideResolved] = useState(false);
 
-  const refresh = useCallback(async () => {
+  // ─── 로드 ───
+  const refreshComments = useCallback(async () => {
     const all = await listAllComments(problemId);
     setComments(all);
     onCommentsChange?.(all);
-    // 모르는 uid의 프로필 로드
-    const unknownUids = Array.from(new Set(all.map((c) => c.authorUid))).filter((u) => !profiles[u]);
+    // 인간 작성자 프로필 백필
+    const unknownUids = Array.from(
+      new Set(all.filter((c) => c.authorType !== 'ai').map((c) => c.authorUid)),
+    ).filter((u) => !profiles[u]);
     if (unknownUids.length > 0) {
       const fetched = await Promise.all(unknownUids.map((u) => getUserProfile(u).catch(() => null)));
       const map: Record<string, UserProfile> = { ...profiles };
@@ -58,45 +97,305 @@ export default function CommentPanel({
     }
   }, [problemId, profiles, onCommentsChange]);
 
-  useEffect(() => {
-    setLoading(true);
-    refresh().catch((e) => console.error('댓글 로드 실패:', e)).finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const refreshSessions = useCallback(async () => {
+    const list = await listSessions(problemId);
+    setSessions(list);
   }, [problemId]);
 
-  const tabComments = useMemo(() => comments.filter((c) => c.tabId === activeTabId), [comments, activeTabId]);
-  const threads = useMemo(() => buildThreads(tabComments), [tabComments]);
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([
+      refreshComments(),
+      refreshSessions(),
+      getEnabledModels().then(setAiModels).catch(() => setAiModels([])),
+      getUserProfile(currentUid).then(setMyProfile).catch(() => null),
+    ])
+      .catch((e) => console.error('토론 패널 초기 로드 실패:', e))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problemId, currentUid]);
+
+  // 세션이 로드되면 첫 normal 세션을 자동 선택 (없으면 legacy)
+  useEffect(() => {
+    if (activeSessionId === LEGACY_SESSION_ID && sessions.length > 0) {
+      setActiveSessionId(sessions[0].id);
+    }
+  }, [sessions, activeSessionId]);
+
+  // ─── 필터 ───
+  const visibleComments = useMemo(() => {
+    return comments.filter((c) => {
+      if (c.tabId !== activeTabId) return false;
+      if (activeSessionId === LEGACY_SESSION_ID) {
+        return !c.discussionSessionId; // 세션 미할당 (legacy 댓글)
+      }
+      return c.discussionSessionId === activeSessionId;
+    });
+  }, [comments, activeTabId, activeSessionId]);
+
+  const threads = useMemo(() => buildThreads(visibleComments), [visibleComments]);
   const visibleThreads = hideResolved ? threads.filter((t) => !t.parent.resolved) : threads;
 
-  const isOwner = currentUid === ownerUid;
+  const activeSession = useMemo(
+    () => sessions.find((s) => s.id === activeSessionId) || null,
+    [sessions, activeSessionId],
+  );
+  const isAISession = !!activeSession && activeSession.aiEnabled;
 
-  const handleAdd = async (content: string, parentCommentId: string | null = null) => {
-    await addComment({ problemId, tabId: activeTabId, authorUid: currentUid, content, parentCommentId });
-    setReplyingTo(null);
-    await refresh();
-  };
+  // ─── displayInfo 헬퍼 ───
+  const getDisplayInfo = useCallback(
+    (c: TabComment): DisplayInfo => {
+      if (c.authorType === 'ai' && c.modelId) {
+        const model = aiModels.find((m) => m.modelId === c.modelId);
+        return {
+          name: model?.nickname || '?',
+          emoji: model?.avatarEmoji,
+          isAI: true,
+          modelDisplayName: model?.displayName,
+        };
+      }
+      const p = profiles[c.authorUid];
+      const name = p?.nickname || (p?.email || '').split('@')[0] || p?.displayName || '익명';
+      return { name, photoURL: p?.photoURL, isAI: false };
+    },
+    [aiModels, profiles],
+  );
 
+  // ─── 액션 ───
   const handleEdit = async (commentId: string, content: string) => {
     await editCommentContent(problemId, commentId, content);
     setEditingId(null);
-    await refresh();
+    await refreshComments();
   };
 
   const handleDelete = async (commentId: string) => {
-    if (!confirm('이 댓글을 삭제하시겠습니까?')) return;
+    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
     await deleteComment(problemId, commentId);
-    await refresh();
+    await refreshComments();
   };
 
   const handleResolve = async (comment: TabComment) => {
     await toggleResolved(problemId, comment.id, !comment.resolved);
-    await refresh();
+    await refreshComments();
+  };
+
+  const handleReplySubmit = async (parentCommentId: string, content: string) => {
+    await addComment({
+      problemId,
+      tabId: activeTabId,
+      authorUid: currentUid,
+      content,
+      parentCommentId,
+      authorType: 'human',
+      discussionSessionId:
+        activeSessionId === LEGACY_SESSION_ID ? undefined : activeSessionId,
+    });
+    setReplyingTo(null);
+    await refreshComments();
+  };
+
+  // ─── 세션 CRUD ───
+  const handleCreateSession = async () => {
+    if (sessionSubmittingRef.current) return;
+    const trimmed = newSessionName.trim();
+    if (!trimmed) {
+      setCreatingSession(false);
+      setNewSessionName('');
+      return;
+    }
+    sessionSubmittingRef.current = true;
+    try {
+      const id = await createNormalSession(problemId, trimmed, currentUid);
+      setNewSessionName('');
+      setCreatingSession(false);
+      await refreshSessions();
+      setActiveSessionId(id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '세션 생성 실패');
+    } finally {
+      sessionSubmittingRef.current = false;
+    }
+  };
+
+  const handleRenameSession = async (sessionId: string) => {
+    if (sessionSubmittingRef.current) return;
+    const trimmed = renameDraft.trim();
+    if (!trimmed) {
+      setRenamingSessionId(null);
+      return;
+    }
+    sessionSubmittingRef.current = true;
+    try {
+      await renameSession(problemId, sessionId, trimmed);
+      setRenamingSessionId(null);
+      await refreshSessions();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '이름 변경 실패');
+    } finally {
+      sessionSubmittingRef.current = false;
+    }
+  };
+
+  const handleDeleteSession = async (s: DiscussionSession) => {
+    if (s.type === 'public') return;
+    if (!confirm(`세션 "${s.name}"을(를) 삭제하시겠습니까?\n(메시지는 그대로 남되, 어느 세션에서도 보이지 않게 됩니다.)`)) return;
+    try {
+      await deleteSession(problemId, s.id);
+      await refreshSessions();
+      if (activeSessionId === s.id) {
+        setActiveSessionId(LEGACY_SESSION_ID);
+      }
+    } catch (e) {
+      alert(e instanceof Error ? e.message : '세션 삭제 실패');
+    }
+  };
+
+  // ─── 컨텍스트 조립 (Phase 37-G와 함께 구현) ───
+  const fetchTabBlocksText = useCallback(async (tabId: string): Promise<string> => {
+    try {
+      const snap = await getDocs(
+        query(collection(db, 'problems', problemId, tabSubcollection(tabId)), orderBy('order')),
+      );
+      const blocks = snap.docs.map((d) => d.data() as Block);
+      return blocks
+        .map((b) => {
+          const title = b.title ? `### ${b.title}\n` : '';
+          return title + (b.raw_text || '');
+        })
+        .filter(Boolean)
+        .join('\n\n');
+    } catch (e) {
+      console.warn('블록 로드 실패:', tabId, e);
+      return '';
+    }
+  }, [problemId]);
+
+  const buildContext = useCallback(async () => {
+    const problemContent = await fetchTabBlocksText('question');
+    if (activeTabId === 'question') {
+      return { problemContent, currentTabContent: undefined, currentTabLabel: undefined };
+    }
+    const currentTabContent = await fetchTabBlocksText(activeTabId);
+    const currentTabLabel = tabs.find((t) => t.id === activeTabId)?.label || activeTabId;
+    return { problemContent, currentTabContent, currentTabLabel };
+  }, [fetchTabBlocksText, activeTabId, tabs]);
+
+  const buildHistory = useCallback(() => {
+    // 최근 5개 메시지 (현재 visible 기준), 답글 제외
+    const tops = visibleComments.filter((c) => !c.parentCommentId);
+    const recent = tops.slice(-HISTORY_LIMIT);
+    return recent.map((c) => {
+      const info = getDisplayInfo(c);
+      return {
+        role: info.isAI ? ('ai' as const) : ('human' as const),
+        nickname: info.name,
+        content: c.content,
+      };
+    });
+  }, [visibleComments, getDisplayInfo]);
+
+  // ─── 메시지 전송 (Phase 37-F 핵심) ───
+  const handleSendMessage = async (content: string) => {
+    const myNickname = myProfile?.nickname || 'KDS';
+
+    // 1. 레거시 세션: AI 호출 없이 단순 댓글 추가
+    if (activeSessionId === LEGACY_SESSION_ID) {
+      await addComment({
+        problemId, tabId: activeTabId, authorUid: currentUid,
+        content, parentCommentId: null,
+        authorType: 'human',
+      });
+      await refreshComments();
+      return;
+    }
+
+    // 2. 일반 세션 — AI 호출 가능
+    const invokedIds = isAISession ? [...selectedModelIds] : [];
+    await addComment({
+      problemId, tabId: activeTabId, authorUid: currentUid,
+      content, parentCommentId: null,
+      authorType: 'human',
+      discussionSessionId: activeSessionId,
+      invokedModelIds: invokedIds.length > 0 ? invokedIds : undefined,
+    });
+    await refreshComments();
+
+    if (invokedIds.length === 0) return;
+
+    // 3. 컨텍스트 조립
+    const context = await buildContext();
+    const history = buildHistory();
+    const invokedModels = invokedIds
+      .map((id) => aiModels.find((m) => m.modelId === id))
+      .filter((m): m is AIModelConfig => !!m);
+    const participantNicknames = [myNickname, ...invokedModels.map((m) => m.nickname)];
+
+    // 4. pending 상태
+    setPendingAI(
+      invokedModels.map((m) => ({ modelId: m.modelId, nickname: m.nickname, emoji: m.avatarEmoji })),
+    );
+
+    // 5. 각 AI 호출 — 도착순으로 Firestore 저장
+    await Promise.allSettled(
+      invokedModels.map(async (model) => {
+        try {
+          const res = await fetch('/api/discuss', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              modelId: model.modelId,
+              problemContent: context.problemContent,
+              currentTabContent: context.currentTabContent,
+              currentTabLabel: context.currentTabLabel,
+              discussionHistory: history,
+              participantNicknames,
+              myNickname: model.nickname,
+              currentMessage: content,
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || data.error) {
+            throw new Error(data.error || `HTTP ${res.status}`);
+          }
+          await addComment({
+            problemId, tabId: activeTabId,
+            authorUid: `ai:${model.modelId}`,
+            content: data.content || '(빈 응답)',
+            parentCommentId: null,
+            authorType: 'ai',
+            modelId: model.modelId,
+            discussionSessionId: activeSessionId,
+            aiUsage: {
+              inputTokens: data.inputTokens || 0,
+              outputTokens: data.outputTokens || 0,
+              costUsd: data.costUsd || 0,
+            },
+          });
+          await refreshComments();
+        } catch (err) {
+          console.error(`[discuss] ${model.modelId} 실패:`, err);
+          setPendingAI((prev) =>
+            prev.map((p) =>
+              p.modelId === model.modelId
+                ? { ...p, error: err instanceof Error ? err.message : '응답 실패' }
+                : p,
+            ),
+          );
+          // 에러는 5초 후 자동 제거
+          setTimeout(() => {
+            setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
+          }, 5000);
+          return;
+        }
+        setPendingAI((prev) => prev.filter((p) => p.modelId !== model.modelId));
+      }),
+    );
   };
 
   return (
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: 380, maxWidth: '90vw',
+      width: '35em', maxWidth: '90vw',
       background: 'var(--bg-card, #fff)',
       borderLeft: '1px solid var(--border-light, #ddd)',
       boxShadow: '-4px 0 16px rgba(0,0,0,0.06)',
@@ -104,7 +403,6 @@ export default function CommentPanel({
       zIndex: 50,
       fontFamily: 'var(--font-ui)',
     }}>
-      {/* 댓글 본문 스타일: 고딕(UI 폰트) + 본문 폰트보다 2pt 작게 + 톤다운 */}
       <style>{`
         .comment-body > div {
           font-family: var(--font-ui, 'Pretendard', sans-serif) !important;
@@ -112,11 +410,17 @@ export default function CommentPanel({
           line-height: 1.8 !important;
         }
         .comment-body { color: #6a6a6a; }
-        /* 수식은 EditorView 미리보기와 동일하게 본문 기본색으로 */
+        .comment-body.ai-body { color: #4a4a4a; }
         .comment-body .katex,
         .comment-body .katex * { color: var(--text-primary); }
+        @keyframes pulse-pending {
+          0%, 100% { opacity: 0.55; }
+          50% { opacity: 0.95; }
+        }
+        .pending-ai { animation: pulse-pending 1.4s ease-in-out infinite; }
       `}</style>
-      {/* 헤더 — 사이드바·본문 상단바와 같은 52px */}
+
+      {/* ═══ 헤더 ═══ */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '0 16px',
@@ -124,21 +428,17 @@ export default function CommentPanel({
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-          댓글 — {tabs.find((t) => t.id === activeTabId)?.label || activeTabId}
+          토론 — {tabs.find((t) => t.id === activeTabId)?.label || activeTabId}
         </div>
-        {/* 토글 텍스트 (체크박스 제거, 글자 클릭으로 토글) */}
         <button
           onClick={() => setHideResolved((v) => !v)}
           style={{
             border: 'none', background: 'transparent', cursor: 'pointer',
             fontSize: 11, color: 'var(--text-muted)',
             fontFamily: 'var(--font-ui)', padding: '2px 4px',
-            transition: 'color 0.15s',
           }}
-          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary, #B8845C)'; }}
-          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
         >
-          {hideResolved ? '해결된 댓글 보이기' : '해결된 댓글 숨기기'}
+          {hideResolved ? '해결된 메시지 보이기' : '해결된 메시지 숨기기'}
         </button>
         <div style={{ flex: 1 }} />
         <button
@@ -147,51 +447,102 @@ export default function CommentPanel({
             border: 'none', background: 'transparent', cursor: 'pointer',
             color: 'var(--text-muted)', fontSize: 20, padding: 0, lineHeight: 1,
           }}
-          title="댓글 사이드바 닫기"
+          title="토론 사이드바 닫기"
         >×</button>
       </div>
 
-      {/* 댓글 리스트 */}
+      {/* ═══ 세션 바 ═══ */}
+      <SessionTabBar
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        currentUid={currentUid}
+        isOwner={isOwner}
+        creatingSession={creatingSession}
+        newSessionName={newSessionName}
+        renamingSessionId={renamingSessionId}
+        renameDraft={renameDraft}
+        onSelect={setActiveSessionId}
+        onStartCreate={() => { setCreatingSession(true); setNewSessionName(''); }}
+        onCancelCreate={() => { setCreatingSession(false); setNewSessionName(''); }}
+        onChangeNewName={setNewSessionName}
+        onSubmitCreate={handleCreateSession}
+        onStartRename={(s) => { setRenamingSessionId(s.id); setRenameDraft(s.name); }}
+        onCancelRename={() => setRenamingSessionId(null)}
+        onChangeRenameDraft={setRenameDraft}
+        onSubmitRename={handleRenameSession}
+        onDelete={handleDeleteSession}
+      />
+
+      {/* ═══ 메시지 리스트 ═══ */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             불러오는 중…
           </div>
-        ) : visibleThreads.length === 0 ? (
+        ) : visibleThreads.length === 0 && pendingAI.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-            {threads.length === 0 ? '아직 댓글이 없습니다.' : '표시할 댓글이 없습니다.'}
+            {activeSessionId === LEGACY_SESSION_ID
+              ? '댓글이 없습니다.'
+              : isAISession
+                ? 'AI를 선택하고 첫 메시지를 입력하세요.'
+                : '메시지가 없습니다.'}
           </div>
         ) : (
-          visibleThreads.map((thread) => (
-            <CommentThreadView
-              key={thread.parent.id}
-              thread={thread}
-              profiles={profiles}
-              currentUid={currentUid}
-              isOwner={isOwner}
-              canComment={canComment}
-              replyingToId={replyingTo}
-              editingId={editingId}
-              onSetReplying={setReplyingTo}
-              onSetEditing={setEditingId}
-              onReplySubmit={(content) => handleAdd(content, thread.parent.id)}
-              onEditSubmit={(commentId, content) => handleEdit(commentId, content)}
-              onDelete={handleDelete}
-              onResolve={handleResolve}
-            />
-          ))
+          <>
+            {visibleThreads.map((thread) => (
+              <CommentThreadView
+                key={thread.parent.id}
+                thread={thread}
+                getDisplayInfo={getDisplayInfo}
+                currentUid={currentUid}
+                isOwner={isOwner}
+                canComment={canComment}
+                replyingToId={replyingTo}
+                editingId={editingId}
+                onSetReplying={setReplyingTo}
+                onSetEditing={setEditingId}
+                onReplySubmit={(content) => handleReplySubmit(thread.parent.id, content)}
+                onEditSubmit={(commentId, content) => handleEdit(commentId, content)}
+                onDelete={handleDelete}
+                onResolve={handleResolve}
+              />
+            ))}
+            {pendingAI.map((p) => (
+              <PendingAIBubble key={p.modelId} pending={p} />
+            ))}
+          </>
         )}
       </div>
 
-      {/* 신규 댓글 입력 */}
+      {/* ═══ AI 칩 + 입력창 ═══ */}
       {canComment ? (
         <div style={{
-          padding: '12px 16px', borderTop: '1px solid var(--border-light, #eee)',
+          padding: '10px 16px 12px',
+          borderTop: '1px solid var(--border-light, #eee)',
           background: 'var(--bg-primary, #FAF9F7)',
         }}>
+          {isAISession && (
+            <AIChipBar
+              models={aiModels}
+              selectedIds={selectedModelIds}
+              onToggle={(modelId) =>
+                setSelectedModelIds((prev) =>
+                  prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
+                )
+              }
+            />
+          )}
           <CommentEditor
-            placeholder="댓글 작성... (Ctrl+Enter 전송, 수식: $...$)"
-            onSubmit={(content) => handleAdd(content, null)}
+            placeholder={
+              activeSessionId === LEGACY_SESSION_ID
+                ? '댓글 작성... (Ctrl+Enter 전송)'
+                : isAISession
+                  ? selectedModelIds.length === 0
+                    ? '메시지... (AI를 선택하지 않으면 메모로 저장됩니다)'
+                    : `메시지... (선택한 AI ${selectedModelIds.length}명에게 전송)`
+                  : '메시지...'
+            }
+            onSubmit={handleSendMessage}
           />
         </div>
       ) : (
@@ -199,22 +550,300 @@ export default function CommentPanel({
           padding: 12, borderTop: '1px solid var(--border-light, #eee)',
           fontSize: 11, color: 'var(--text-muted)', textAlign: 'center',
         }}>
-          댓글 작성 권한이 없습니다.
+          작성 권한이 없습니다.
         </div>
       )}
     </div>
   );
 }
 
-/* ─── 스레드 단위 렌더 ─── */
+/* ═══════════════════════════════════════════════════════ */
+/* SessionTabBar                                            */
+/* ═══════════════════════════════════════════════════════ */
+function SessionTabBar({
+  sessions, activeSessionId, currentUid, isOwner,
+  creatingSession, newSessionName, renamingSessionId, renameDraft,
+  onSelect, onStartCreate, onCancelCreate, onChangeNewName, onSubmitCreate,
+  onStartRename, onCancelRename, onChangeRenameDraft, onSubmitRename, onDelete,
+}: {
+  sessions: DiscussionSession[];
+  activeSessionId: string;
+  currentUid: string;
+  isOwner: boolean;
+  creatingSession: boolean;
+  newSessionName: string;
+  renamingSessionId: string | null;
+  renameDraft: string;
+  onSelect: (id: string) => void;
+  onStartCreate: () => void;
+  onCancelCreate: () => void;
+  onChangeNewName: (s: string) => void;
+  onSubmitCreate: () => void;
+  onStartRename: (s: DiscussionSession) => void;
+  onCancelRename: () => void;
+  onChangeRenameDraft: (s: string) => void;
+  onSubmitRename: (sessionId: string) => void;
+  onDelete: (s: DiscussionSession) => void;
+}) {
+  // public 세션이 있으면 항상 최상단 (Phase 37에선 없음, Phase 38에서 자동 생성)
+  const publicSession = sessions.find((s) => s.type === 'public');
+  const normalSessions = sessions.filter((s) => s.type === 'normal');
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '8px 12px',
+      borderBottom: '1px solid var(--border-light, #eee)',
+      background: 'var(--bg-primary, #FAF9F7)',
+      overflowX: 'auto',
+      flexShrink: 0,
+    }}>
+      {/* legacy "댓글" pseudo-session */}
+      <SessionPill
+        label="💬 댓글"
+        active={activeSessionId === LEGACY_SESSION_ID}
+        onClick={() => onSelect(LEGACY_SESSION_ID)}
+      />
+
+      {publicSession && (
+        <SessionPill
+          label={`📢 ${publicSession.name}`}
+          active={activeSessionId === publicSession.id}
+          onClick={() => onSelect(publicSession.id)}
+        />
+      )}
+
+      {normalSessions.map((s) => {
+        const canManage = isOwner || s.createdBy === currentUid;
+        const isRenaming = renamingSessionId === s.id;
+        const isActive = activeSessionId === s.id;
+        if (isRenaming) {
+          return (
+            <input
+              key={s.id}
+              autoFocus
+              value={renameDraft}
+              onChange={(e) => onChangeRenameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) return; // 한글 IME 조합 중 무시
+                if (e.key === 'Enter') onSubmitRename(s.id);
+                else if (e.key === 'Escape') onCancelRename();
+              }}
+              onBlur={() => onSubmitRename(s.id)}
+              style={{
+                padding: '4px 10px', fontSize: 12,
+                border: '1px solid var(--accent-primary, #B8845C)',
+                borderRadius: 14,
+                outline: 'none',
+                fontFamily: 'var(--font-ui)',
+                minWidth: 80,
+              }}
+            />
+          );
+        }
+        return (
+          <SessionPill
+            key={s.id}
+            label={s.name}
+            active={isActive}
+            onClick={() => onSelect(s.id)}
+            onDoubleClick={canManage ? () => onStartRename(s) : undefined}
+            onDelete={canManage ? () => onDelete(s) : undefined}
+          />
+        );
+      })}
+
+      {creatingSession ? (
+        <input
+          autoFocus
+          value={newSessionName}
+          onChange={(e) => onChangeNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return; // 한글 IME 조합 중 무시
+            if (e.key === 'Enter') onSubmitCreate();
+            else if (e.key === 'Escape') onCancelCreate();
+          }}
+          onBlur={onSubmitCreate}
+          placeholder="새 세션 이름"
+          style={{
+            padding: '4px 10px', fontSize: 12,
+            border: '1px solid var(--accent-primary, #B8845C)',
+            borderRadius: 14,
+            outline: 'none',
+            fontFamily: 'var(--font-ui)',
+            minWidth: 110,
+          }}
+        />
+      ) : (
+        <button
+          onClick={onStartCreate}
+          title="새 토론 세션 만들기"
+          style={{
+            border: '1px dashed var(--border-light)',
+            background: 'transparent',
+            borderRadius: 14,
+            padding: '4px 10px',
+            fontSize: 12,
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+            flexShrink: 0,
+          }}
+        >
+          + 새 토론
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SessionPill({
+  label, active, onClick, onDoubleClick, onDelete,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  onDoubleClick?: () => void;
+  onDelete?: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        position: 'relative', display: 'inline-flex', alignItems: 'center',
+        flexShrink: 0,
+      }}
+    >
+      <button
+        onClick={onClick}
+        onDoubleClick={onDoubleClick}
+        title={onDoubleClick ? `${label} (더블클릭: 이름 변경)` : label}
+        style={{
+          border: 'none',
+          background: active ? 'var(--text-primary)' : 'transparent',
+          color: active ? 'var(--bg-card, #fff)' : 'var(--text-secondary)',
+          padding: '4px 10px',
+          paddingRight: onDelete && hovered ? 24 : 10,
+          borderRadius: 14,
+          fontSize: 12,
+          fontWeight: active ? 600 : 500,
+          cursor: 'pointer',
+          fontFamily: 'var(--font-ui)',
+          whiteSpace: 'nowrap',
+          maxWidth: 180,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          transition: 'padding-right 0.12s',
+        }}
+      >
+        {label}
+      </button>
+      {onDelete && hovered && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          title="세션 삭제"
+          style={{
+            position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)',
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            color: active ? 'var(--bg-card, #fff)' : 'var(--text-muted)',
+            fontSize: 13, lineHeight: 1, padding: 0,
+            width: 16, height: 16,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}
+        >×</button>
+      )}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* AIChipBar                                                */
+/* ═══════════════════════════════════════════════════════ */
+function AIChipBar({
+  models, selectedIds, onToggle,
+}: {
+  models: AIModelConfig[];
+  selectedIds: string[];
+  onToggle: (modelId: string) => void;
+}) {
+  if (models.length === 0) {
+    return (
+      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+        AI 모델을 불러올 수 없습니다.
+      </div>
+    );
+  }
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8,
+    }}>
+      {models.map((m) => {
+        const on = selectedIds.includes(m.modelId);
+        return (
+          <button
+            key={m.modelId}
+            onClick={() => onToggle(m.modelId)}
+            title={`${m.displayName} (${m.nickname})`}
+            style={{
+              border: on ? '1px solid var(--accent-primary, #B8845C)' : '1px solid var(--border-light)',
+              background: on ? 'var(--accent-primary, #B8845C)' : 'var(--bg-card, #fff)',
+              color: on ? '#fff' : 'var(--text-secondary)',
+              borderRadius: 14,
+              padding: '3px 10px',
+              fontSize: 12,
+              fontWeight: on ? 600 : 500,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-ui)',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              transition: 'all 0.12s',
+            }}
+          >
+            <span style={{ fontSize: 13 }}>{m.avatarEmoji}</span>
+            <span>{m.nickname}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* PendingAIBubble                                          */
+/* ═══════════════════════════════════════════════════════ */
+function PendingAIBubble({ pending }: { pending: PendingAI }) {
+  return (
+    <div
+      className={pending.error ? '' : 'pending-ai'}
+      style={{
+        marginBottom: 12,
+        padding: 10,
+        borderRadius: 8,
+        border: pending.error ? '1px solid #e0a0a0' : '1px dashed var(--border-light)',
+        background: pending.error ? '#fff5f5' : 'transparent',
+        display: 'flex', alignItems: 'center', gap: 8,
+        fontSize: 12, color: pending.error ? '#c44' : 'var(--text-muted)',
+      }}
+    >
+      <span style={{ fontSize: 16 }}>{pending.emoji}</span>
+      <span style={{ fontWeight: 600 }}>{pending.nickname}</span>
+      <span>{pending.error ? `응답 실패: ${pending.error}` : '생각 중…'}</span>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* CommentThreadView                                        */
+/* ═══════════════════════════════════════════════════════ */
 function CommentThreadView({
-  thread, profiles, currentUid, isOwner, canComment,
+  thread, getDisplayInfo, currentUid, isOwner, canComment,
   replyingToId, editingId,
   onSetReplying, onSetEditing,
   onReplySubmit, onEditSubmit, onDelete, onResolve,
 }: {
   thread: { parent: TabComment; replies: TabComment[] };
-  profiles: Record<string, UserProfile>;
+  getDisplayInfo: (c: TabComment) => DisplayInfo;
   currentUid: string;
   isOwner: boolean;
   canComment: boolean;
@@ -228,18 +857,23 @@ function CommentThreadView({
   onResolve: (c: TabComment) => void;
 }) {
   const { parent, replies } = thread;
+  const parentIsAI = parent.authorType === 'ai';
   return (
     <div style={{
       marginBottom: 16,
       padding: 10,
       borderRadius: 8,
-      background: parent.resolved ? 'var(--bg-hover, #f5f5f5)' : 'transparent',
+      background: parent.resolved
+        ? 'var(--bg-hover, #f5f5f5)'
+        : parentIsAI ? 'rgba(184,132,92,0.04)' : 'transparent',
       opacity: parent.resolved ? 0.65 : 1,
-      border: parent.resolved ? '1px solid var(--border-light)' : '1px solid transparent',
+      border: parent.resolved
+        ? '1px solid var(--border-light)'
+        : parentIsAI ? '1px solid rgba(184,132,92,0.18)' : '1px solid transparent',
     }}>
       <CommentItem
         comment={parent}
-        profile={profiles[parent.authorUid]}
+        info={getDisplayInfo(parent)}
         currentUid={currentUid}
         isOwner={isOwner}
         canComment={canComment}
@@ -258,7 +892,7 @@ function CommentThreadView({
             <CommentItem
               key={r.id}
               comment={r}
-              profile={profiles[r.authorUid]}
+              info={getDisplayInfo(r)}
               currentUid={currentUid}
               isOwner={isOwner}
               canComment={canComment}
@@ -275,7 +909,6 @@ function CommentThreadView({
         </div>
       )}
 
-      {/* 답글 입력 폼 */}
       {replyingToId === parent.id && canComment && (
         <div style={{ marginLeft: 20, marginTop: 8 }}>
           <CommentEditor
@@ -291,15 +924,17 @@ function CommentThreadView({
   );
 }
 
-/* ─── 댓글 한 개 ─── */
+/* ═══════════════════════════════════════════════════════ */
+/* CommentItem                                              */
+/* ═══════════════════════════════════════════════════════ */
 function CommentItem({
-  comment, profile, currentUid, isOwner, canComment, isReply,
+  comment, info, currentUid, isOwner, canComment, isReply,
   isEditing, isReplying,
   onSetEditing, onSetReplying,
   onEditSubmit, onDelete, onResolve,
 }: {
   comment: TabComment;
-  profile?: UserProfile;
+  info: DisplayInfo;
   currentUid: string;
   isOwner: boolean;
   canComment: boolean;
@@ -312,30 +947,55 @@ function CommentItem({
   onDelete: () => void;
   onResolve: () => void;
 }) {
-  const isMine = comment.authorUid === currentUid;
-  const idOnly = (profile?.email || '').split('@')[0] || profile?.displayName || '익명';
+  const isMine = !info.isAI && comment.authorUid === currentUid;
 
   return (
     <div style={{ marginBottom: isReply ? 8 : 0 }}>
+      {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-        {profile?.photoURL ? (
+        {info.isAI ? (
+          <div
+            title={info.modelDisplayName}
+            style={{
+              width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+              background: 'rgba(184,132,92,0.18)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11,
+            }}
+          >
+            {info.emoji || '🤖'}
+          </div>
+        ) : info.photoURL ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={profile.photoURL} alt={idOnly} referrerPolicy="no-referrer"
+          <img src={info.photoURL} alt={info.name} referrerPolicy="no-referrer"
             style={{ width: 18, height: 18, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
         ) : (
           <div style={{
             width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
             background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 10, fontWeight: 600, color: '#666',
-          }}>{idOnly.charAt(0).toUpperCase()}</div>
+          }}>{info.name.charAt(0).toUpperCase()}</div>
         )}
-        <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}>{idOnly}</span>
+        <span
+          title={info.isAI ? info.modelDisplayName : undefined}
+          style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)' }}
+        >
+          {info.name}
+        </span>
+        {info.isAI && (
+          <span style={{
+            fontSize: 9, padding: '1px 5px', borderRadius: 8,
+            background: 'rgba(184,132,92,0.14)', color: 'var(--accent-primary, #B8845C)',
+            fontWeight: 600,
+          }}>AI</span>
+        )}
         <span style={{ fontSize: 10, color: 'var(--text-faint)' }}>
           {formatRelative(comment.createdAt)}
-          {comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000 && ' (수정됨)'}
+          {!info.isAI && comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000 && ' (수정됨)'}
         </span>
       </div>
 
+      {/* 본문 */}
       <div style={{ paddingLeft: 24 }}>
         {isEditing ? (
           <CommentEditor
@@ -347,19 +1007,20 @@ function CommentItem({
             onCancel={() => onSetEditing(false)}
           />
         ) : (
-          <div className="comment-body">
+          <div className={`comment-body ${info.isAI ? 'ai-body' : ''}`}>
             <EditorPreview content={comment.content} borderless autoHeight locale="ko" />
           </div>
         )}
       </div>
 
+      {/* 액션 */}
       {!isEditing && (
         <div style={{
           paddingLeft: 24, marginTop: 4,
           display: 'flex', gap: 12,
           fontSize: 11, color: 'var(--text-muted)',
         }}>
-          {!isReply && canComment && (
+          {!isReply && !info.isAI && canComment && (
             <button onClick={() => onSetReplying(!isReplying)} style={miniLinkStyle}>
               {isReplying ? '답글 취소' : '답글'}
             </button>
@@ -389,6 +1050,19 @@ function CommentItem({
               <button onClick={() => onSetEditing(true)} style={miniLinkStyle}>수정</button>
               <button onClick={onDelete} style={{ ...miniLinkStyle, color: 'var(--accent-danger)' }}>삭제</button>
             </>
+          )}
+          {/* AI 메시지엔 수정/삭제 버튼 없음 (보안 규칙도 차단) */}
+          {info.isAI && comment.aiUsage && (
+            <span
+              style={{
+                fontSize: 10, color: 'var(--text-faint)',
+                cursor: 'help',
+                borderBottom: '1px dotted var(--text-faint)',
+              }}
+              title={`입력 ${comment.aiUsage.inputTokens.toLocaleString()} 토큰 · 출력 ${comment.aiUsage.outputTokens.toLocaleString()} 토큰`}
+            >
+              ${comment.aiUsage.costUsd.toFixed(5)}
+            </span>
           )}
         </div>
       )}
