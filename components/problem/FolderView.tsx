@@ -11,6 +11,7 @@ import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
   IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare,
 } from '../ui/Icons';
+import { TwemojiImg } from '../editor/EmojiPickerPanel';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -228,8 +229,12 @@ export default function FolderView({
           fontFamily: 'var(--font-ui)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
-          <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}>
-            {isUnassigned ? <IconInbox size={18} /> : isTrash ? <IconTrash size={18} /> : isSharedWithMe ? <IconShare size={18} /> : <IconFolder size={18} />}
+          <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+            {isUnassigned ? <IconInbox size={18} />
+              : isTrash ? <IconTrash size={18} />
+              : isSharedWithMe ? <IconShare size={18} />
+              : folder.icon ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
+              : <IconFolder size={18} />}
           </span>
           <span>{folder.name}</span>
           <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
