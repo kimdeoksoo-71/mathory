@@ -106,13 +106,20 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침 (헤더 라벨 박스만 확장 → 제목 슬라이드)
+  // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침
+  // 레이아웃 폭은 절대 불변(라벨 박스 7em 고정) → 제목은 transform 슬라이드, 경로는 absolute 오버레이.
+  // (가운데 컨테이너가 width:fit-content + margin:auto라 폭이 커지면 좌측으로 재정렬되므로 폭 불변이 필수)
   const [folderPathHover, setFolderPathHover] = useState(false);
-  const folderPathRef = useRef<HTMLDivElement>(null);
-  const [folderPathWidth, setFolderPathWidth] = useState(0);
-  // 경로 폭 측정 (펼침 시 헤더 라벨 박스 목표 폭 = 경로 자연 폭)
+  const folderPathRef = useRef<HTMLDivElement>(null);   // 경로 자연폭 측정
+  const labelBoxRef = useRef<HTMLDivElement>(null);     // 라벨 박스(7em) 실폭 측정
+  const [titleSlide, setTitleSlide] = useState(0);      // 제목을 우측으로 밀 px
+  // 제목 슬라이드량 = 경로가 라벨 박스(7em)를 넘어서는 폭 (경로폭 - 라벨박스폭)
   useEffect(() => {
-    if (folderPathRef.current) setFolderPathWidth(folderPathRef.current.scrollWidth);
+    if (folderPathRef.current) {
+      const pathW = folderPathRef.current.scrollWidth;
+      const boxW = labelBoxRef.current?.offsetWidth ?? 0;
+      setTitleSlide(Math.max(0, pathW - boxW));
+    }
   }, [problem, folders]);
 
   // Phase 1.5: 문제정보 펼침 상태 (localStorage 기억, 기본 접힘)
@@ -475,17 +482,16 @@ export default function ProblemView({
                   background: 'var(--bg-primary, #FAF9F7)',
                   minHeight: 52, boxSizing: 'border-box',
                   borderBottom: '1px solid var(--border-light)',
-                  overflow: 'hidden', // 펼침 시 제목이 밀려도 가로 스크롤 방지 (이 행에만 영향)
                 }}>
-                  {/* 헤더 전용 라벨 박스 — 폭만 애니메이션(7em ↔ 경로 폭). 공유 labelColStyle 불변 → 탭/컨텐츠 행 위치 고정 */}
+                  {/* 헤더 라벨 박스 — 폭 7em 고정(레이아웃 불변). 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
                   <div
+                    ref={labelBoxRef}
                     onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
                     onMouseLeave={() => setFolderPathHover(false)}
                     style={{
-                      width: expanded ? folderPathWidth : '7em',
-                      flexShrink: 0, position: 'relative', height: '1.5em',
-                      fontFamily: 'var(--font-ui)',
-                      transition: 'width 0.25s ease',
+                      ...labelColStyle,
+                      position: 'relative', height: '1.5em',
+                      display: 'flex', alignItems: 'center',
                     }}
                   >
                     {/* 접힘: ‹ leaf 폴더명 */}
@@ -516,6 +522,7 @@ export default function ProblemView({
                           fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap',
                           opacity: expanded ? 1 : 0, pointerEvents: expanded ? 'auto' : 'none',
                           transition: 'opacity 0.2s',
+                          background: 'var(--bg-primary, #FAF9F7)', paddingRight: 8, zIndex: 2,
                         }}
                       >
                         {folderPath.map((seg, i) => (
@@ -545,8 +552,11 @@ export default function ProblemView({
                       fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
                       margin: 0, lineHeight: 1.2,
                       fontFamily: 'var(--font-ui)',
-                      cursor: isOwnerView ? 'pointer' : 'default', transition: 'color 0.15s',
+                      cursor: isOwnerView ? 'pointer' : 'default',
                       display: 'flex', alignItems: 'center',
+                      // 펼침 시 제목만 우측으로 슬라이드(레이아웃 불변 → 컨텐츠 행 위치 고정)
+                      transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
+                      transition: 'color 0.15s, transform 0.25s ease',
                     }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
