@@ -99,9 +99,12 @@ export default function FolderPathBar({
           type="button"
           onClick={() => toggle('root')}
           title="My (최상위 카테고리) — 바로 아래 폴더로 이동"
-          style={{ ...chipStyle, background: path.length === 0 ? 'var(--bg-active, #e8eaf6)' : 'var(--bg-hover)' }}
+          style={{
+            ...chipStyle,
+            fontWeight: 700, color: 'var(--text-secondary)',
+            background: path.length === 0 ? 'var(--bg-active, #e8eaf6)' : 'var(--bg-hover)',
+          }}
         >
-          <IconFolder size={13} />
           <span>My</span>
           <IconChevron size={10} />
         </button>
