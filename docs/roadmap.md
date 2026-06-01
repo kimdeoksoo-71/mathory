@@ -1104,3 +1104,13 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 - DragOverlay로 드래그 중 문항 제목 라벨 표시
 
 보류(B): FolderView → 사이드바 폴더 트리 드래그(= DndContext를 AppShell로 hoist하는 리팩터)
+
+### 40-C: 상위 폴더 경로 표시 (ProblemView hover / EditorView 인터랙티브 이동)
+
+- **ProblemView**: 폴더 라벨 hover 시 라벨 컬럼이 늘어나며 상위 폴더 전체 경로 노출(제목이 오른쪽으로 밀림). 각 폴더 클릭 → 해당 폴더로 이동(`onNavigateFolder` 재사용, 읽기 전용). 상위 폴더가 있을 때만 펼침
+- **EditorView**: 평면 폴더 select → `FolderPathBar`(신규) 경로 바로 교체
+  - 선두 홈 칩: 드롭다운 = 미분류 + 최상위 폴더 (최상위 이동/미분류 처리)
+  - 중간 세그먼트(비-마지막): 형제 폴더 드롭다운 (2-1)
+  - 마지막 세그먼트: 자식 폴더 드롭다운 (2-2), 없으면 "하위 폴더 없음"
+  - 선택 시 `setEditFolderId` → editFolderId는 dirty 추적 포함이라 기존 저장 흐름으로 이동 반영
+- `components/editor/FolderPathBar.tsx` (신규) — getFolderPath/getChildren 재사용, 칩별 드롭다운 + 외부클릭 닫기

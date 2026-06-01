@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
+import { getFolderPath } from '../../lib/folder-tree';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -105,6 +106,8 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
+  // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침
+  const [folderPathHover, setFolderPathHover] = useState(false);
   // Phase 1.5: 문제정보 펼침 상태 (localStorage 기억, 기본 접힘)
   const PROBLEM_INFO_KEY = 'mathory-problem-info-open';
   const [problemInfoOpen, setProblemInfoOpen] = useState(false);
@@ -440,10 +443,18 @@ export default function ProblemView({
               : (folders.find((f) => f.id === fid)?.name || '미분류');
             const targetId = isTrash ? TRASH_FOLDER_ID : (fid || '__unassigned__');
 
+            // Phase 40: 상위 폴더 경로 (휴지통/미분류 제외)
+            const folderPath = (!isTrash && fid) ? getFolderPath(folders, fid) : [];
+            const hasAncestors = folderPath.length > 1;
+            const expanded = folderPathHover && hasAncestors;
+
             const LABEL_GAP = 28; // 라벨↔본문 간격
             const labelColStyle: React.CSSProperties = {
-              width: '7em', flexShrink: 0,
+              width: expanded ? 'auto' : '7em',
+              maxWidth: expanded ? 'none' : '7em',
+              flexShrink: 0,
               textAlign: 'left', fontFamily: 'var(--font-ui)',
+              transition: 'width 0.15s',
             };
             const mainColStyle: React.CSSProperties = {
               width: '35em', flexShrink: 0,
@@ -460,23 +471,54 @@ export default function ProblemView({
                   minHeight: 52, boxSizing: 'border-box',
                   borderBottom: '1px solid var(--border-light)',
                 }}>
-                  <div style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-start' }}>
-                    <div
-                      onClick={() => onNavigateFolder?.(targetId)}
-                      style={{
+                  <div
+                    style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-start' }}
+                    onMouseEnter={() => setFolderPathHover(true)}
+                    onMouseLeave={() => setFolderPathHover(false)}
+                  >
+                    {expanded ? (
+                      // hover 시: 상위 폴더 전체 경로 노출 (각 폴더 클릭 → 이동)
+                      <div style={{
                         fontSize: 12, color: 'var(--text-muted)',
-                        cursor: 'pointer',
                         display: 'inline-flex', alignItems: 'center', gap: 2,
-                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        transition: 'color 0.15s',
-                      }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                      title="폴더로 이동"
-                    >
-                      <IconChevronLeft size={14} />
-                      {folderLabel}
-                    </div>
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {folderPath.map((seg, i) => (
+                          <span key={seg.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                            {i > 0 && <span style={{ color: 'var(--text-faint)' }}>/</span>}
+                            <span
+                              onClick={() => onNavigateFolder?.(seg.id)}
+                              style={{
+                                cursor: 'pointer', transition: 'color 0.15s',
+                                fontWeight: i === folderPath.length - 1 ? 600 : 400,
+                              }}
+                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                              title={`${seg.name}(으)로 이동`}
+                            >
+                              {seg.name}
+                            </span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <div
+                        onClick={() => onNavigateFolder?.(targetId)}
+                        style={{
+                          fontSize: 12, color: 'var(--text-muted)',
+                          cursor: 'pointer',
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          transition: 'color 0.15s',
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                        title={hasAncestors ? '폴더로 이동 (hover 시 전체 경로)' : '폴더로 이동'}
+                      >
+                        <IconChevronLeft size={14} />
+                        {folderLabel}
+                      </div>
+                    )}
                   </div>
                   <h1
                     onClick={() => { if (isOwnerView) onEdit?.(problem); }}

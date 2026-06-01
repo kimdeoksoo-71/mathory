@@ -12,6 +12,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import UnifiedToolbar from '../editor/UnifiedToolbar';
+import FolderPathBar from '../editor/FolderPathBar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
@@ -1967,13 +1968,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <IconChevronLeft />
         </button>
 
-        <select value={editFolderId} onChange={(e) => setEditFolderId(e.target.value)} style={{
-          ...metaInputStyle, fontSize: 12, color: 'var(--text-muted)',
-          background: 'var(--bg-hover)', cursor: 'pointer',
-        }}>
-          <option value="">미분류</option>
-          {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-        </select>
+        <FolderPathBar
+          folders={folders}
+          currentFolderId={editFolderId}
+          onMove={(folderId) => setEditFolderId(folderId || '')}
+        />
 
         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
           placeholder="문제 제목" onFocus={focusHandler} onBlur={blurHandler}
