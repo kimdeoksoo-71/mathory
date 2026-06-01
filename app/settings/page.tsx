@@ -162,6 +162,37 @@ export default function SettingsPage() {
           <p style={{ marginTop: 10, fontSize: 12.5, color: '#2a8' }}>저장되었습니다.</p>
         )}
       </section>
+
+      <section
+        style={{
+          border: '1px solid var(--border-primary)',
+          borderRadius: 10,
+          padding: 20,
+        }}
+      >
+        <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 8px' }}>정보 / 라이선스</h2>
+        <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
+          이모지 이미지는{' '}
+          <a
+            href="https://github.com/jdecked/twemoji"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--accent-primary, #4285f4)' }}
+          >
+            Twemoji
+          </a>
+          {' '}(jdecked/twemoji)를 사용하며,{' '}
+          <a
+            href="https://creativecommons.org/licenses/by/4.0/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--accent-primary, #4285f4)' }}
+          >
+            CC BY 4.0
+          </a>
+          {' '}라이선스로 배포됩니다.
+        </p>
+      </section>
     </main>
   );
 }

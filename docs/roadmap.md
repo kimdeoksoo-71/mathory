@@ -1021,3 +1021,34 @@ problems/{id}
 - DeepSeek은 `reasoning_content` 필드 폴백 — content가 비어있을 때 reasoning이라도 표시
 - GPT-5 계열은 `max_tokens` 미지원, `max_completion_tokens` 필수
 - 응답 1턴 5모델 비용 추정 ≈ $0.066. 컨텍스트 한도(1M 토큰)는 우리 사용량(0.3%)에 비해 실질적 제약 아님
+
+## Phase 39: 이모지(Twemoji) 입력 & 렌더 ✅
+
+에디터에서 이모지를 입력하고, 미리보기·PDF에서 **OS 무관 컬러 SVG(Twemoji)** 로 렌더. 저장은 순수 유니코드만(데이터 불변), 렌더 시점에만 변환 — `preprocessLocale`/`\tag`와 동일 철학.
+
+| 항목 | 구현 | 비고 |
+|------|------|------|
+| 저장 | 순수 유니코드만 Firestore raw_text에 (이미지 태그 X) | ✅ |
+| 렌더 | `@yuna0x0/rehype-twemoji` v0.1.4 (rehypeKatex 뒤 배치) | ✅ |
+| 에셋 | jsDelivr CDN `jdecked/twemoji@17.0.2`(최신 안정판), 번들 0 | ✅ |
+| 입력 UI | 커스텀 `EmojiPickerDropdown` (UnifiedToolbar 내장, SpecialChar 패턴) | ✅ |
+| 데이터 | `emojibase-data` (ko) 동적 import — 한글 검색 | ✅ |
+| 출처 표기 | 설정 페이지 "정보/라이선스" CC BY 4.0 | ✅ |
+
+### 신규/수정 파일
+
+- `lib/twemoji-url.ts` (신규) — 버전·URL·ignore 단일 소스. 렌더 플러그인(`source`)과 피커 미리보기(`twemojiSvgUrl`)가 동일 CDN 파일 가리킴
+- `lib/emoji-data.ts` (신규) — emojibase ko 로드 + 한글 검색 + 최근(localStorage)
+- `UnifiedToolbar.tsx` — `EmojiIcon` + `EmojiPickerDropdown`(검색/카테고리/최근/그리드) 내장, 툴바 등록
+- `EditorPreview.tsx` / `PrintableContent.tsx` — `rehypeTwemoji` 추가(동일 옵션)
+- `lib/pdfPrint.tsx` — `window.print()` 직전 `img.twemoji` decode 대기(최대 2초) → PDF 빈칸 방지
+- `app/globals.css` — `img.twemoji` 인라인 정렬 규칙
+- `app/settings/page.tsx` — CC BY 4.0 출처 표기
+
+### 검증 메모 (구현 전 코드 대조)
+
+- **URL 일치**: rehype-twemoji는 `${source}/assets/svg/{cp}.svg` 생성 → `twemojiSvgUrl`과 바이트 일치 확인
+- **코드포인트 규칙**: 라이브러리 = `ZWJ 없으면 FE0F 제거 후 변환`, `toTwemojiCodepoint`와 동일
+- **emojibase ko/data.json**: `label`(한글)·`tags`(한글)·`group`(0~9, 2=Component 제외)·`emoji`. messages.groups는 `order`→`message`
+- **충돌 방지**: `TWEMOJI_IGNORE`로 ©®™‼⁉ 등 타이포·수학 기호 텍스트 유지. 대부분 수식 기호는 VS16 없어 애초에 변환 대상 아님
+- **성능**: emojibase 동적 import(첫 오픈 시 1회) + `loading="lazy"` + 활성 그룹/검색 결과만 마운트 → 초기 번들 영향 0

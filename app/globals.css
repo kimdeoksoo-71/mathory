@@ -217,3 +217,12 @@ p:has(.marker-circled) {
 
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */
+/* ═══ Twemoji 인라인 이모지 (Phase 39) ═══ */
+/* 미리보기 + PDF/인쇄(동일 문서 window.print) 동시 적용 */
+img.twemoji {
+  height: 1em;
+  width: 1em;
+  margin: 0 0.05em;
+  vertical-align: -0.125em;
+  display: inline-block;
+}

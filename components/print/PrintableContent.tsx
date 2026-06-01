@@ -4,6 +4,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
+import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
+import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import './PrintStyles.css';
@@ -83,6 +85,13 @@ function PrintBlockRenderer({ content, locale }: { content: string; locale: Loca
       rehypePlugins={[
         rehypeRaw,
         [rehypeKatex, { strict: false, trust: true, fleqn: true, macros: { '\\arraystretch': '1.8' } }],
+        [rehypeTwemoji, {
+          format: 'svg',
+          source: TWEMOJI_BASE,
+          className: 'twemoji',
+          draggable: false,
+          ignore: TWEMOJI_IGNORE,
+        }],
       ]}
       components={{
         img: ({ src, alt, ...props }) => (

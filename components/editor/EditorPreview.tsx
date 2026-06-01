@@ -6,6 +6,8 @@ import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
+import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
+import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import 'katex/dist/katex.min.css';
 
 interface EditorPreviewProps {
@@ -261,6 +263,13 @@ export default function EditorPreview({
       rehypePlugins={[
         rehypeRaw,
         [rehypeKatex, { strict: false, trust: true, macros: { "\\arraystretch": "1.8" } }],
+        [rehypeTwemoji, {
+          format: 'svg',
+          source: TWEMOJI_BASE,
+          className: 'twemoji',
+          draggable: false,
+          ignore: TWEMOJI_IGNORE,
+        }],
       ]}
       components={{
         h1: ({ children, ...props }) => (
