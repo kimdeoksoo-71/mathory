@@ -106,8 +106,15 @@ export default function ProblemView({
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
-  // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침
+  // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침 (헤더 라벨 박스만 확장 → 제목 슬라이드)
   const [folderPathHover, setFolderPathHover] = useState(false);
+  const folderPathRef = useRef<HTMLDivElement>(null);
+  const [folderPathWidth, setFolderPathWidth] = useState(0);
+  // 경로 폭 측정 (펼침 시 헤더 라벨 박스 목표 폭 = 경로 자연 폭)
+  useEffect(() => {
+    if (folderPathRef.current) setFolderPathWidth(folderPathRef.current.scrollWidth);
+  }, [problem, folders]);
+
   // Phase 1.5: 문제정보 펼침 상태 (localStorage 기억, 기본 접힘)
   const PROBLEM_INFO_KEY = 'mathory-problem-info-open';
   const [problemInfoOpen, setProblemInfoOpen] = useState(false);
@@ -449,12 +456,10 @@ export default function ProblemView({
             const expanded = folderPathHover && hasAncestors;
 
             const LABEL_GAP = 28; // 라벨↔본문 간격
+            // 공유 스타일 — 헤더/탭 행 공통, 항상 7em 고정 (컨텐츠 행 위치 불변)
             const labelColStyle: React.CSSProperties = {
-              width: expanded ? 'auto' : '7em',
-              maxWidth: expanded ? 'none' : '7em',
-              flexShrink: 0,
+              width: '7em', flexShrink: 0,
               textAlign: 'left', fontFamily: 'var(--font-ui)',
-              transition: 'width 0.15s',
             };
             const mainColStyle: React.CSSProperties = {
               width: '35em', flexShrink: 0,
@@ -470,19 +475,49 @@ export default function ProblemView({
                   background: 'var(--bg-primary, #FAF9F7)',
                   minHeight: 52, boxSizing: 'border-box',
                   borderBottom: '1px solid var(--border-light)',
+                  overflow: 'hidden', // 펼침 시 제목이 밀려도 가로 스크롤 방지 (이 행에만 영향)
                 }}>
+                  {/* 헤더 전용 라벨 박스 — 폭만 애니메이션(7em ↔ 경로 폭). 공유 labelColStyle 불변 → 탭/컨텐츠 행 위치 고정 */}
                   <div
-                    style={{ ...labelColStyle, display: 'flex', justifyContent: 'flex-start' }}
-                    onMouseEnter={() => setFolderPathHover(true)}
+                    onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
                     onMouseLeave={() => setFolderPathHover(false)}
+                    style={{
+                      width: expanded ? folderPathWidth : '7em',
+                      flexShrink: 0, position: 'relative', height: '1.5em',
+                      fontFamily: 'var(--font-ui)',
+                      transition: 'width 0.25s ease',
+                    }}
                   >
-                    {expanded ? (
-                      // hover 시: 상위 폴더 전체 경로 노출 (각 폴더 클릭 → 이동)
-                      <div style={{
-                        fontSize: 12, color: 'var(--text-muted)',
+                    {/* 접힘: ‹ leaf 폴더명 */}
+                    <div
+                      onClick={() => onNavigateFolder?.(targetId)}
+                      style={{
+                        position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
                         display: 'inline-flex', alignItems: 'center', gap: 2,
-                        whiteSpace: 'nowrap',
-                      }}>
+                        fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer',
+                        opacity: expanded ? 0 : 1, pointerEvents: expanded ? 'none' : 'auto',
+                        transition: 'opacity 0.15s, color 0.15s',
+                        maxWidth: '7em', overflow: 'hidden', textOverflow: 'ellipsis',
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                      title={hasAncestors ? '폴더로 이동 (hover 시 전체 경로)' : '폴더로 이동'}
+                    >
+                      <IconChevronLeft size={14} />
+                      {folderLabel}
+                    </div>
+                    {/* 펼침: 전체 경로 (측정용으로 항상 렌더, 평소 opacity 0) */}
+                    {hasAncestors && (
+                      <div
+                        ref={folderPathRef}
+                        style={{
+                          position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap',
+                          opacity: expanded ? 1 : 0, pointerEvents: expanded ? 'auto' : 'none',
+                          transition: 'opacity 0.2s',
+                        }}
+                      >
                         {folderPath.map((seg, i) => (
                           <span key={seg.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
                             {i > 0 && <span style={{ color: 'var(--text-faint)' }}>/</span>}
@@ -500,23 +535,6 @@ export default function ProblemView({
                             </span>
                           </span>
                         ))}
-                      </div>
-                    ) : (
-                      <div
-                        onClick={() => onNavigateFolder?.(targetId)}
-                        style={{
-                          fontSize: 12, color: 'var(--text-muted)',
-                          cursor: 'pointer',
-                          display: 'inline-flex', alignItems: 'center', gap: 2,
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                          transition: 'color 0.15s',
-                        }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                        title={hasAncestors ? '폴더로 이동 (hover 시 전체 경로)' : '폴더로 이동'}
-                      >
-                        <IconChevronLeft size={14} />
-                        {folderLabel}
                       </div>
                     )}
                   </div>
