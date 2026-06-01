@@ -1052,3 +1052,13 @@ problems/{id}
 - **emojibase ko/data.json**: `label`(한글)·`tags`(한글)·`group`(0~9, 2=Component 제외)·`emoji`. messages.groups는 `order`→`message`
 - **충돌 방지**: `TWEMOJI_IGNORE`로 ©®™‼⁉ 등 타이포·수학 기호 텍스트 유지. 대부분 수식 기호는 VS16 없어 애초에 변환 대상 아님
 - **성능**: emojibase 동적 import(첫 오픈 시 1회) + `loading="lazy"` + 활성 그룹/검색 결과만 마운트 → 초기 번들 영향 0
+
+### 39-B: 폴더 아이콘 이모지
+
+사이드바 폴더 아이콘을 이모지로 교체 가능. `Folder.icon?`(순수 유니코드) 저장, 표시할 때만 Twemoji SVG로 변환.
+
+- `EmojiPickerPanel`(신규, `components/editor/EmojiPickerPanel.tsx`) — Phase 39 피커를 트리거/위치 무관 재사용 패널로 추출. `onSelect(emoji)` 콜백. 입력 툴바(`EmojiPickerDropdown`)와 폴더 아이콘 피커가 공유
+- `types/problem.ts` `Folder.icon?` 추가, `lib/firestore.ts` `updateFolder`에 `icon` 필드
+- `Sidebar.tsx` — 폴더 `⋯` 메뉴에 "아이콘 변경"/"기본 아이콘으로"(아이콘 있을 때만), 선택 시 `FolderIconPicker` 팝오버. 아이콘 있으면 `IconFolder` 대신 Twemoji SVG 렌더
+- `AppShell.tsx` `handleSetFolderIcon` → `updateFolder({icon})`. 아이콘 제거는 `''` 저장
+- 진입점 UX: ⋯ 메뉴 + 팝오버 (직접 클릭 아님)

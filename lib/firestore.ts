@@ -314,7 +314,7 @@ export async function listFolders(userId: string): Promise<Folder[]> {
   });
 }
 
-export async function updateFolder(folderId: string, data: { name?: string; order?: number }): Promise<void> {
+export async function updateFolder(folderId: string, data: { name?: string; order?: number; icon?: string }): Promise<void> {
   await updateDoc(doc(db, 'folders', folderId), {
     ...data,
     updated_at: serverTimestamp(),

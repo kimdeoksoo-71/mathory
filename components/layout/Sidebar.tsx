@@ -10,6 +10,7 @@ import {
   IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
+import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -83,14 +84,17 @@ function SidebarItem({
   );
 }
 
-// ─── Folder Menu (rename / delete) ───
+type FolderMenuAction = 'rename' | 'delete' | 'icon' | 'clearIcon';
+
+// ─── Folder Menu (icon / rename / delete) ───
 function FolderMenu({
-  x, y, onClose, onAction,
+  x, y, hasIcon, onClose, onAction,
 }: {
   x: number;
   y: number;
+  hasIcon: boolean;
   onClose: () => void;
-  onAction: (action: 'rename' | 'delete') => void;
+  onAction: (action: FolderMenuAction) => void;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -134,6 +138,24 @@ function FolderMenu({
     <div ref={menuRef} style={menuStyle}>
       <button
         style={itemStyle}
+        onClick={() => { onAction('icon'); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+      >
+        아이콘 변경
+      </button>
+      {hasIcon && (
+        <button
+          style={itemStyle}
+          onClick={() => { onAction('clearIcon'); onClose(); }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+        >
+          기본 아이콘으로
+        </button>
+      )}
+      <button
+        style={itemStyle}
         onClick={() => { onAction('rename'); onClose(); }}
         onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
@@ -160,6 +182,7 @@ function SortableFolderItem({
   isDropTarget,
   onSelect,
   onAction,
+  onSetIcon,
 }: {
   folder: Folder;
   count: number;
@@ -167,9 +190,11 @@ function SortableFolderItem({
   isDropTarget: boolean;
   onSelect: () => void;
   onAction: (action: 'rename' | 'delete', folder: Folder) => void;
+  onSetIcon: (folder: Folder, emoji: string | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  const [iconPickerPos, setIconPickerPos] = useState<{ x: number; y: number } | null>(null);
 
   const {
     attributes, listeners, setNodeRef,
@@ -230,8 +255,10 @@ function SortableFolderItem({
             transition: 'all 0.15s',
           }}
         >
-          <span style={{ flexShrink: 0, display: 'flex', opacity: active ? 1 : 0.75 }}>
-            <IconFolder />
+          <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', opacity: active ? 1 : 0.75 }}>
+            {folder.icon
+              ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
+              : <IconFolder />}
           </span>
           <span style={{
             flex: 1, textAlign: 'left', overflow: 'hidden',
@@ -271,11 +298,73 @@ function SortableFolderItem({
         <FolderMenu
           x={menuPos.x}
           y={menuPos.y}
+          hasIcon={!!folder.icon}
           onClose={() => setMenuPos(null)}
-          onAction={(action) => onAction(action, folder)}
+          onAction={(action) => {
+            if (action === 'icon') {
+              setIconPickerPos(menuPos);
+              setMenuPos(null);
+            } else if (action === 'clearIcon') {
+              onSetIcon(folder, null);
+            } else {
+              onAction(action, folder);
+            }
+          }}
+        />
+      )}
+
+      {iconPickerPos && (
+        <FolderIconPicker
+          x={iconPickerPos.x}
+          y={iconPickerPos.y}
+          onClose={() => setIconPickerPos(null)}
+          onSelect={(emoji) => { onSetIcon(folder, emoji); setIconPickerPos(null); }}
         />
       )}
     </>
+  );
+}
+
+// ─── Folder Icon Picker (fixed-position popover wrapping reusable panel) ───
+function FolderIconPicker({
+  x, y, onClose, onSelect,
+}: {
+  x: number;
+  y: number;
+  onClose: () => void;
+  onSelect: (emoji: string) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  // 화면 밖으로 넘치지 않게 우측/하단 보정
+  const PANEL = EMOJI_PANEL_WIDTH + 16;
+  const left = typeof window !== 'undefined' ? Math.min(x, window.innerWidth - PANEL - 8) : x;
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed',
+        left: Math.max(8, left),
+        top: y,
+        zIndex: 10000,
+        background: 'var(--bg-card, #fff)',
+        border: '1px solid var(--border-primary, #ddd)',
+        borderRadius: 8,
+        boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+        padding: 8,
+      }}
+    >
+      <EmojiPickerPanel onSelect={onSelect} />
+    </div>
   );
 }
 
@@ -397,6 +486,7 @@ export interface SidebarProps {
   onSelectFolder: (folder: Folder) => void;
   onNewFolder: () => void;
   onFolderAction: (action: 'rename' | 'delete', folder: Folder) => void;
+  onSetFolderIcon: (folder: Folder, emoji: string | null) => void;
   onFolderReorder: (reorderedFolders: Folder[]) => void;
   onMoveProblemToFolder: (problem: Problem, folder: Folder) => void;
   onViewProblem: (problem: Problem) => void;
@@ -425,6 +515,7 @@ export default function Sidebar({
   onSelectFolder,
   onNewFolder,
   onFolderAction,
+  onSetFolderIcon,
   onFolderReorder,
   onMoveProblemToFolder,
   onViewProblem,
@@ -645,6 +736,7 @@ export default function Sidebar({
                   isDropTarget={dragOverFolderId === f.id}
                   onSelect={() => onSelectFolder(f)}
                   onAction={onFolderAction}
+                  onSetIcon={onSetFolderIcon}
                 />
               ))}
             </SortableContext>

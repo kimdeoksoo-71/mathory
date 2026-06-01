@@ -282,6 +282,17 @@ export default function AppShell() {
     }
   };
 
+  // Phase 39: 폴더 아이콘(이모지) 설정 / 해제
+  const handleSetFolderIcon = async (folder: Folder, emoji: string | null) => {
+    try {
+      await updateFolder(folder.id, { icon: emoji ?? '' });
+      await loadData();
+      if (view.type === 'folder' && view.folder.id === folder.id) {
+        setView({ type: 'folder', folder: { ...folder, icon: emoji ?? '' } });
+      }
+    } catch (error) { console.error('폴더 아이콘 변경 에러:', error); }
+  };
+
   // Phase 10: 폴더 순서 변경 (드래그)
   const handleFolderReorder = async (reorderedFolders: Folder[]) => {
     setFolders(reorderedFolders);
@@ -455,6 +466,7 @@ export default function AppShell() {
         onSelectFolder={handleSelectFolder}
         onNewFolder={handleNewFolder}
         onFolderAction={handleFolderAction}
+        onSetFolderIcon={handleSetFolderIcon}
         onFolderReorder={handleFolderReorder}
         onMoveProblemToFolder={handleMoveProblemToFolder}
         onViewProblem={handleViewProblem}
