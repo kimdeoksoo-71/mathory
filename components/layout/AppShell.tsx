@@ -558,7 +558,8 @@ export default function AppShell() {
             folders={folders}
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
             onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
-            onSelectFolder={handleSelectFolder} />
+            onSelectFolder={handleSelectFolder}
+            onMoveProblemToFolder={handleMoveProblemToFolder} />
         )}
         {view.type === 'problem' && (
           <ProblemView

@@ -1,6 +1,11 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import {
+  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDraggable, useDroppable, closestCenter,
+  type DragStartEvent, type DragEndEvent,
+} from '@dnd-kit/core';
 import { Problem, Block, Folder } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
@@ -59,6 +64,28 @@ interface FolderViewProps {
   onEmptyTrash?: () => void;
   onUpdated?: () => void;
   onSelectFolder?: (folder: Folder) => void;
+  onMoveProblemToFolder?: (problem: Problem, folder: Folder) => void;
+}
+
+// ─── DnD 렌더프롭 래퍼 (문항 카드 드래그 / 하위 폴더 드롭) ───
+function Draggable({ id, data, disabled, children }: {
+  id: string;
+  data: Record<string, unknown>;
+  disabled?: boolean;
+  // attributes/listeners는 dnd-kit 내부 타입 → 스프레드용으로 느슨하게 받음
+  children: (p: { setNodeRef: (el: HTMLElement | null) => void; attributes: any; listeners: any; isDragging: boolean }) => React.ReactNode;
+}) {
+  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id, data, disabled });
+  return <>{children({ setNodeRef, attributes, listeners, isDragging })}</>;
+}
+
+function Droppable({ id, data, children }: {
+  id: string;
+  data: Record<string, unknown>;
+  children: (p: { setNodeRef: (el: HTMLElement | null) => void; isOver: boolean }) => React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id, data });
+  return <>{children({ setNodeRef, isOver })}</>;
 }
 
 function formatDate(d?: Date): string {
@@ -77,7 +104,7 @@ function formatDateTime(d?: Date): string {
 }
 
 export default function FolderView({
-  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder,
+  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder, onMoveProblemToFolder,
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
@@ -85,6 +112,10 @@ export default function FolderView({
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   // ⋮ 카드 메뉴
   const [cardMenu, setCardMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
+
+  // Phase 40: 문항 → 하위 폴더 드래그
+  const [draggingProblem, setDraggingProblem] = useState<Problem | null>(null);
+  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   useEffect(() => { setSort(loadSort()); }, []);
 
@@ -101,6 +132,21 @@ export default function FolderView({
   // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
   const breadcrumb = isSpecial ? [] : getFolderPath(folders, folder.id);
+
+  // 문항을 하위 폴더로 끌어 넣기: 하위 폴더가 있고, 이동 핸들러가 있을 때만 활성
+  const dndEnabled = !isSpecial && childFolders.length > 0 && !!onMoveProblemToFolder;
+
+  const handleDndStart = (e: DragStartEvent) => {
+    setDraggingProblem((e.active.data.current?.problem as Problem) ?? null);
+  };
+  const handleDndEnd = (e: DragEndEvent) => {
+    setDraggingProblem(null);
+    const problem = e.active.data.current?.problem as Problem | undefined;
+    const target = e.over?.data.current?.folder as Folder | undefined;
+    if (problem && target && problem.folder_id !== target.id) {
+      onMoveProblemToFolder?.(problem, target);
+    }
+  };
 
   const folderProblems = problems
     .filter((p) => {
@@ -219,6 +265,13 @@ export default function FolderView({
   };
 
   return (
+    <DndContext
+      sensors={dndSensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDndStart}
+      onDragEnd={handleDndEnd}
+      onDragCancel={() => setDraggingProblem(null)}
+    >
     <div style={{
       flex: 1, minHeight: 0, width: '100%',
       background: 'var(--bg-primary, #FAF9F7)',
@@ -226,12 +279,15 @@ export default function FolderView({
       overflow: 'auto', position: 'relative',
     }}>
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
-        {/* 폴더명 헤더 (sticky) */}
+        {/* 폴더명 헤더 + 하위 폴더 (sticky 고정 영역 — 스크롤해도 제자리, 드롭 타깃 유지) */}
         <div style={{
           position: 'sticky', top: 0, zIndex: 5,
-          background: 'var(--bg-primary, #FAF9F7)', padding: '24px 0 12px 0',
+          background: 'var(--bg-primary, #FAF9F7)',
           borderBottom: '1px solid var(--border-light)',
           marginBottom: 20,
+        }}>
+        <div style={{
+          padding: '24px 0 12px 0',
           fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
           fontFamily: 'var(--font-ui)',
           display: 'flex', alignItems: 'center', gap: 8,
@@ -282,35 +338,46 @@ export default function FolderView({
           )}
         </div>
 
-        {/* Phase 40: 하위 폴더 */}
+        {/* Phase 40: 하위 폴더 (sticky 영역 안 — 문항 드롭 타깃) */}
         {childFolders.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+          <div style={{
+            display: 'flex', flexWrap: 'wrap', gap: 8, paddingBottom: 12,
+            maxHeight: 120, overflowY: 'auto',
+          }}>
             {childFolders.map((cf) => {
               const cfCount = problems.filter((p) => p.folder_id === cf.id).length;
               return (
-                <button
-                  key={cf.id}
-                  onClick={() => onSelectFolder?.(cf)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 14px', borderRadius: 8,
-                    border: '1px solid var(--border-light)', background: 'var(--bg-card, #fff)',
-                    cursor: 'pointer', fontSize: 13.5, color: 'var(--text-primary)',
-                    fontFamily: 'var(--font-ui)', maxWidth: 240,
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-card, #fff)'; }}
-                >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
-                    {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={16} /> : <IconFolder size={16} />}
-                  </span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cf.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({cfCount})</span>
-                </button>
+                <Droppable key={cf.id} id={cf.id} data={{ folder: cf }}>
+                  {({ setNodeRef, isOver }) => (
+                    <button
+                      ref={setNodeRef}
+                      onClick={() => onSelectFolder?.(cf)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        padding: '8px 14px', borderRadius: 8,
+                        border: isOver ? '1px solid var(--accent-primary, #5b6abf)' : '1px solid var(--border-light)',
+                        background: isOver ? 'rgba(91, 106, 191, 0.12)' : 'var(--bg-card, #fff)',
+                        boxShadow: isOver ? '0 0 0 2px rgba(91,106,191,0.25)' : 'none',
+                        cursor: 'pointer', fontSize: 13.5, color: 'var(--text-primary)',
+                        fontFamily: 'var(--font-ui)', maxWidth: 240,
+                        transition: 'background 0.12s, border-color 0.12s',
+                      }}
+                      onMouseEnter={(e) => { if (!isOver) e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+                      onMouseLeave={(e) => { if (!isOver) e.currentTarget.style.background = 'var(--bg-card, #fff)'; }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+                        {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={16} /> : <IconFolder size={16} />}
+                      </span>
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cf.name}</span>
+                      <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({cfCount})</span>
+                    </button>
+                  )}
+                </Droppable>
               );
             })}
           </div>
         )}
+        </div>
 
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
@@ -333,8 +400,12 @@ export default function FolderView({
             {folderProblems.map((problem) => {
               const blocks = questionBlocksMap[problem.id] || [];
               return (
+                <Draggable key={problem.id} id={problem.id} data={{ problem }} disabled={!dndEnabled}>
+                  {({ setNodeRef, attributes, listeners, isDragging }) => (
                 <div
-                  key={problem.id}
+                  ref={setNodeRef}
+                  {...attributes}
+                  {...listeners}
                   onClick={() => onView(problem)}
                   style={{
                     background: '#ffffff',
@@ -343,7 +414,8 @@ export default function FolderView({
                     padding: '18px 22px',
                     height: 320,
                     overflow: 'hidden',
-                    cursor: 'pointer',
+                    cursor: dndEnabled ? 'grab' : 'pointer',
+                    opacity: isDragging ? 0.4 : 1,
                     position: 'relative',
                     transition: 'box-shadow 0.15s, transform 0.15s',
                     display: 'flex', flexDirection: 'column',
@@ -367,6 +439,7 @@ export default function FolderView({
                     </h2>
                     <BlockchainBadge problem={problem} size={13} />
                     <button
+                      onPointerDown={(e) => e.stopPropagation()}
                       onClick={(e) => openCardMenu(e, problem)}
                       title="더보기"
                       style={{
@@ -397,6 +470,8 @@ export default function FolderView({
                     }} />
                   </div>
                 </div>
+                  )}
+                </Draggable>
               );
             })}
           </div>
@@ -414,6 +489,22 @@ export default function FolderView({
         />
       )}
     </div>
+
+    <DragOverlay dropAnimation={null}>
+      {draggingProblem ? (
+        <div style={{
+          padding: '8px 14px', borderRadius: 8,
+          background: 'var(--accent-primary, #5b6abf)', color: '#fff',
+          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.25)', maxWidth: 280,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          cursor: 'grabbing',
+        }}>
+          {draggingProblem.title || '제목 없음'}
+        </div>
+      ) : null}
+    </DragOverlay>
+    </DndContext>
   );
 }
 

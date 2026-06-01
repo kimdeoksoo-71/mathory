@@ -1090,3 +1090,17 @@ problems/{id}
 - `Sidebar.tsx` — 트리 렌더(들여쓰기+chevron), `FolderMovePicker`, 형제 한정 재정렬, order를 폴더 자체 값으로 영속화
 - `AppShell.tsx` — handleNewSubfolder/handleMoveFolder(순환 가드)/삭제 메시지에 하위 개수
 - `FolderView.tsx` — 하위 폴더 카드 + 브레드크럼
+
+### 40-B: FolderView 문항 → 하위 폴더 드래그앤드롭
+
+FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 이동. 결정: **시나리오 A**(FolderView 자체 완결, 사이드바로의 크로스 영역 드래그는 보류).
+
+- FolderView 내부에 **독립 DndContext**(사이드바 DndContext와 무관, 공존 OK)
+- 렌더프롭 `Draggable`/`Droppable` 래퍼 — 문항 카드 draggable, 하위 폴더 카드 droppable
+- 드롭 시 기존 `handleMoveProblemToFolder(problem, folder)` 재사용
+- **하위 폴더 영역 sticky 고정**: 헤더+하위폴더를 한 sticky 컨테이너로 묶어 스크롤해도 제자리 → 목록 스크롤 중에도 드롭 가능 (maxHeight 120 + overflow)
+- 클릭(열기)·⋮메뉴 충돌 방지: PointerSensor `distance:8` + ⋮버튼 `onPointerDown` stopPropagation
+- 드래그 활성 조건(`dndEnabled`): 일반 폴더 + 하위 폴더 존재 시에만(없으면 `useDraggable disabled`)
+- DragOverlay로 드래그 중 문항 제목 라벨 표시
+
+보류(B): FolderView → 사이드바 폴더 트리 드래그(= DndContext를 AppShell로 hoist하는 리팩터)
