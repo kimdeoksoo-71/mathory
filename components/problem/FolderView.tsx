@@ -12,6 +12,7 @@ import {
   IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare,
 } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
+import { getChildren, getFolderPath } from '../../lib/folder-tree';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -57,6 +58,7 @@ interface FolderViewProps {
   onProblemAction: (action: string, problem: Problem) => void;
   onEmptyTrash?: () => void;
   onUpdated?: () => void;
+  onSelectFolder?: (folder: Folder) => void;
 }
 
 function formatDate(d?: Date): string {
@@ -75,7 +77,7 @@ function formatDateTime(d?: Date): string {
 }
 
 export default function FolderView({
-  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated,
+  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder,
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
@@ -94,6 +96,11 @@ export default function FolderView({
   const isTrash = folder.id === TRASH_FOLDER_ID;
   const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
   const isSharedWithMe = folder.id === SHARED_WITH_ME_FOLDER_ID;
+  const isSpecial = isTrash || isUnassigned || isSharedWithMe;
+
+  // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
+  const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
+  const breadcrumb = isSpecial ? [] : getFolderPath(folders, folder.id);
 
   const folderProblems = problems
     .filter((p) => {
@@ -236,6 +243,28 @@ export default function FolderView({
               : folder.icon ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
               : <IconFolder size={18} />}
           </span>
+          {breadcrumb.length > 1 && onSelectFolder && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>
+              {breadcrumb.slice(0, -1).map((f) => (
+                <span key={f.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                  <button
+                    onClick={() => onSelectFolder(f)}
+                    style={{
+                      border: 'none', background: 'none', cursor: 'pointer', padding: 0,
+                      fontSize: 14, fontWeight: 500, color: 'var(--text-muted)',
+                      fontFamily: 'var(--font-ui)', maxWidth: 160,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.textDecoration = 'underline'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.textDecoration = 'none'; }}
+                  >
+                    {f.name}
+                  </button>
+                  <span style={{ margin: '0 4px' }}>/</span>
+                </span>
+              ))}
+            </span>
+          )}
           <span>{folder.name}</span>
           <span style={{ fontSize: 13, fontWeight: 400, color: 'var(--text-muted)' }}>
             ({folderProblems.length})
@@ -253,10 +282,40 @@ export default function FolderView({
           )}
         </div>
 
+        {/* Phase 40: 하위 폴더 */}
+        {childFolders.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+            {childFolders.map((cf) => {
+              const cfCount = problems.filter((p) => p.folder_id === cf.id).length;
+              return (
+                <button
+                  key={cf.id}
+                  onClick={() => onSelectFolder?.(cf)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '8px 14px', borderRadius: 8,
+                    border: '1px solid var(--border-light)', background: 'var(--bg-card, #fff)',
+                    cursor: 'pointer', fontSize: 13.5, color: 'var(--text-primary)',
+                    fontFamily: 'var(--font-ui)', maxWidth: 240,
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--bg-card, #fff)'; }}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
+                    {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={16} /> : <IconFolder size={16} />}
+                  </span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cf.name}</span>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({cfCount})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
         )}
-        {!blocksLoading && folderProblems.length === 0 && (
+        {!blocksLoading && folderProblems.length === 0 && childFolders.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
             {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
           </div>

@@ -285,11 +285,12 @@ export async function deleteAllTabBlocks(problemId: string, tabId: string): Prom
 
 // ===== Folder CRUD (Phase 6) =====
 
-export async function createFolder(data: { name: string; user_id: string; order?: number }): Promise<string> {
+export async function createFolder(data: { name: string; user_id: string; order?: number; parent_id?: string | null }): Promise<string> {
   const docRef = await addDoc(collection(db, 'folders'), {
     name: data.name,
     user_id: data.user_id,
     order: data.order ?? 0,
+    parent_id: data.parent_id ?? null,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
@@ -314,7 +315,7 @@ export async function listFolders(userId: string): Promise<Folder[]> {
   });
 }
 
-export async function updateFolder(folderId: string, data: { name?: string; order?: number; icon?: string }): Promise<void> {
+export async function updateFolder(folderId: string, data: { name?: string; order?: number; icon?: string; parent_id?: string | null }): Promise<void> {
   await updateDoc(doc(db, 'folders', folderId), {
     ...data,
     updated_at: serverTimestamp(),
@@ -322,19 +323,42 @@ export async function updateFolder(folderId: string, data: { name?: string; orde
 }
 
 export async function deleteFolder(folderId: string, userId: string): Promise<void> {
-  // 폴더 삭제 시 해당 폴더의 문항들은 미분류로 변경
+  // Phase 40: 하위 폴더까지 함께 삭제. 대상 폴더 + 모든 자손의 문항은 미분류로 이동.
   // Stage 0: Rules가 authorUid 기반 인가 → 쿼리에도 명시
-  const q = query(
-    collection(db, 'problems'),
-    where('authorUid', '==', userId),
-    where('folder_id', '==', folderId)
-  );
-  const snapshot = await getDocs(q);
-  const updates = snapshot.docs.map((d) =>
-    updateDoc(d.ref, { folder_id: null, updated_at: serverTimestamp() })
-  );
-  await Promise.all(updates);
-  await deleteDoc(doc(db, 'folders', folderId));
+  const allFolders = await listFolders(userId);
+  const childrenOf = new Map<string, string[]>();
+  for (const f of allFolders) {
+    if (!f.parent_id) continue;
+    if (!childrenOf.has(f.parent_id)) childrenOf.set(f.parent_id, []);
+    childrenOf.get(f.parent_id)!.push(f.id);
+  }
+  // 삭제 대상(자기 + 자손) id 수집
+  const targetIds: string[] = [];
+  const stack = [folderId];
+  const seen = new Set<string>();
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    targetIds.push(id);
+    for (const childId of childrenOf.get(id) ?? []) stack.push(childId);
+  }
+
+  // 대상 폴더들의 문항을 미분류로 이동
+  await Promise.all(targetIds.map(async (id) => {
+    const q = query(
+      collection(db, 'problems'),
+      where('authorUid', '==', userId),
+      where('folder_id', '==', id)
+    );
+    const snapshot = await getDocs(q);
+    await Promise.all(snapshot.docs.map((d) =>
+      updateDoc(d.ref, { folder_id: null, updated_at: serverTimestamp() })
+    ));
+  }));
+
+  // 폴더 문서 삭제
+  await Promise.all(targetIds.map((id) => deleteDoc(doc(db, 'folders', id))));
 }
 
 // Phase 10: 폴더 순서 일괄 업데이트

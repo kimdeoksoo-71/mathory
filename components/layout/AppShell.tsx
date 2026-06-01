@@ -17,6 +17,7 @@ import {
   getProblemSearchText,
 } from '../../lib/firestore';
 import { listSharedWithMe } from '../../lib/membership';
+import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
 import Sidebar from '../layout/Sidebar';
@@ -241,9 +242,36 @@ export default function AppShell() {
     const name = prompt('새 폴더 이름:');
     if (!name?.trim()) return;
     try {
-      await createFolder({ name: name.trim(), user_id: user.uid, order: folders.length });
+      const rootCount = getChildren(folders, null).length;
+      await createFolder({ name: name.trim(), user_id: user.uid, order: rootCount, parent_id: null });
       await loadData();
     } catch (error) { console.error('폴더 생성 에러:', error); }
+  };
+
+  // Phase 40: 하위 폴더 생성
+  const handleNewSubfolder = async (parent: Folder) => {
+    if (!user) return;
+    const name = prompt(`"${parent.name}" 안에 만들 하위 폴더 이름:`);
+    if (!name?.trim()) return;
+    try {
+      const siblingCount = getChildren(folders, parent.id).length;
+      await createFolder({ name: name.trim(), user_id: user.uid, order: siblingCount, parent_id: parent.id });
+      await loadData();
+    } catch (error) { console.error('하위 폴더 생성 에러:', error); }
+  };
+
+  // Phase 40: 폴더 이동(재부모화). 순환(자기 자손으로 이동) 방지.
+  const handleMoveFolder = async (folder: Folder, newParentId: string | null) => {
+    if ((folder.parent_id || null) === (newParentId || null)) return;
+    if (newParentId && getDescendantIds(folders, folder.id).has(newParentId)) {
+      alert('폴더를 자기 자신의 하위 폴더로는 이동할 수 없습니다.');
+      return;
+    }
+    try {
+      const siblingCount = getChildren(folders, newParentId).length;
+      await updateFolder(folder.id, { parent_id: newParentId, order: siblingCount });
+      await loadData();
+    } catch (error) { console.error('폴더 이동 에러:', error); }
   };
 
   // Phase 10: 폴더 이름 변경 / 삭제
@@ -263,15 +291,20 @@ export default function AppShell() {
         break;
       }
       case 'delete': {
-        const count = folderCounts[folder.id] ?? 0;
-        const msg = count > 0
-          ? `"${folder.name}" 폴더를 삭제하시겠습니까?\n(폴더 안의 ${count}개 문항은 미분류로 이동됩니다)`
-          : `"${folder.name}" 폴더를 삭제하시겠습니까?`;
-        if (confirm(msg)) {
+        const subtree = getDescendantIds(folders, folder.id);
+        const subCount = subtree.size - 1; // 자기 제외
+        const problemCount = folders
+          .filter((f) => subtree.has(f.id))
+          .reduce((sum, f) => sum + (folderCounts[f.id] ?? 0), 0);
+        const lines = [`"${folder.name}" 폴더를 삭제하시겠습니까?`];
+        if (subCount > 0) lines.push(`하위 폴더 ${subCount}개도 함께 삭제됩니다.`);
+        if (problemCount > 0) lines.push(`포함된 ${problemCount}개 문항은 미분류로 이동됩니다.`);
+        if (confirm(lines.join('\n'))) {
           try {
             if (!user) return;
             await deleteFolder(folder.id, user.uid);
-            if (view.type === 'folder' && view.folder.id === folder.id) {
+            // 삭제된 폴더(또는 그 하위)를 보고 있었다면 홈으로
+            if (view.type === 'folder' && subtree.has(view.folder.id)) {
               setView({ type: 'home' });
             }
             await loadData();
@@ -297,7 +330,8 @@ export default function AppShell() {
   const handleFolderReorder = async (reorderedFolders: Folder[]) => {
     setFolders(reorderedFolders);
     try {
-      const orders = reorderedFolders.map((f, i) => ({ id: f.id, order: i }));
+      // Phase 40: order는 폴더 자체 값(형제 그룹 내 인덱스)을 영속화 — 배열 위치가 아님
+      const orders = reorderedFolders.map((f) => ({ id: f.id, order: f.order ?? 0 }));
       await updateFolderOrders(orders);
     } catch (error) {
       console.error('폴더 순서 변경 에러:', error);
@@ -467,6 +501,8 @@ export default function AppShell() {
         onNewFolder={handleNewFolder}
         onFolderAction={handleFolderAction}
         onSetFolderIcon={handleSetFolderIcon}
+        onNewSubfolder={handleNewSubfolder}
+        onMoveFolder={handleMoveFolder}
         onFolderReorder={handleFolderReorder}
         onMoveProblemToFolder={handleMoveProblemToFolder}
         onViewProblem={handleViewProblem}
@@ -521,7 +557,8 @@ export default function AppShell() {
             problems={view.folder.id === SHARED_WITH_ME_FOLDER_ID ? sharedProblems : allProblems}
             folders={folders}
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
-            onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()} />
+            onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
+            onSelectFolder={handleSelectFolder} />
         )}
         {view.type === 'problem' && (
           <ProblemView

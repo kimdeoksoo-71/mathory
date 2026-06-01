@@ -162,7 +162,8 @@ export interface Folder {
   name: string;
   user_id: string;
   order: number;
-  icon?: string;        // 폴더 아이콘 이모지(순수 유니코드). 비어있으면 기본 폴더 아이콘 (Phase 39)
+  icon?: string;              // 폴더 아이콘 이모지(순수 유니코드). 비어있으면 기본 폴더 아이콘 (Phase 39)
+  parent_id?: string | null;  // 상위 폴더 id. null/undefined/'' = 최상위 (Phase 40)
   created_at?: Date;
 }
 

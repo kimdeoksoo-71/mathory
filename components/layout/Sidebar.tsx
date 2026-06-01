@@ -11,6 +11,7 @@ import {
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
+import { buildFolderTree, flattenVisible, getDescendantIds } from '../../lib/folder-tree';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
   useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
@@ -84,9 +85,9 @@ function SidebarItem({
   );
 }
 
-type FolderMenuAction = 'rename' | 'delete' | 'icon' | 'clearIcon';
+type FolderMenuAction = 'rename' | 'delete' | 'icon' | 'clearIcon' | 'newSub' | 'move';
 
-// ─── Folder Menu (icon / rename / delete) ───
+// ─── Folder Menu (subfolder / move / icon / rename / delete) ───
 function FolderMenu({
   x, y, hasIcon, onClose, onAction,
 }: {
@@ -134,8 +135,27 @@ function FolderMenu({
     textAlign: 'left',
   };
 
+  const divider = <div style={{ height: 1, background: 'var(--border-light, #eee)', margin: '4px 0' }} />;
+
   return (
     <div ref={menuRef} style={menuStyle}>
+      <button
+        style={itemStyle}
+        onClick={() => { onAction('newSub'); onClose(); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+      >
+        하위 폴더 만들기
+      </button>
+      <button
+        style={itemStyle}
+        onClick={() => { onAction('move'); }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
+      >
+        폴더 이동
+      </button>
+      {divider}
       <button
         style={itemStyle}
         onClick={() => { onAction('icon'); }}
@@ -162,6 +182,7 @@ function FolderMenu({
       >
         이름 변경
       </button>
+      {divider}
       <button
         style={{ ...itemStyle, color: 'var(--accent-danger, #ea4335)' }}
         onClick={() => { onAction('delete'); onClose(); }}
@@ -180,21 +201,36 @@ function SortableFolderItem({
   count,
   active,
   isDropTarget,
+  depth,
+  hasChildren,
+  expanded,
+  onToggleExpand,
+  allFolders,
   onSelect,
   onAction,
   onSetIcon,
+  onNewSubfolder,
+  onMoveFolder,
 }: {
   folder: Folder;
   count: number;
   active: boolean;
   isDropTarget: boolean;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  allFolders: Folder[];
   onSelect: () => void;
   onAction: (action: 'rename' | 'delete', folder: Folder) => void;
   onSetIcon: (folder: Folder, emoji: string | null) => void;
+  onNewSubfolder: (parent: Folder) => void;
+  onMoveFolder: (folder: Folder, newParentId: string | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [iconPickerPos, setIconPickerPos] = useState<{ x: number; y: number } | null>(null);
+  const [movePos, setMovePos] = useState<{ x: number; y: number } | null>(null);
 
   const {
     attributes, listeners, setNodeRef,
@@ -239,9 +275,10 @@ function SortableFolderItem({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 6,
             width: '100%',
             padding: '8px 12px',
+            paddingLeft: 12 + depth * 16,
             border: isDropTarget ? '2px solid var(--accent-primary, #5b6abf)' : 'none',
             borderRadius: 8,
             cursor: 'pointer',
@@ -255,6 +292,24 @@ function SortableFolderItem({
             transition: 'all 0.15s',
           }}
         >
+          {/* 펼침/접힘 토글 (자식 있을 때만, 없으면 자리만 확보) */}
+          <span
+            onClick={(e) => { e.stopPropagation(); if (hasChildren) onToggleExpand(); }}
+            style={{
+              flexShrink: 0, width: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: hasChildren ? 'pointer' : 'default',
+              color: 'var(--text-muted)',
+              visibility: hasChildren ? 'visible' : 'hidden',
+            }}
+          >
+            <span style={{
+              display: 'flex',
+              transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
+              transition: 'transform var(--transition-fast)',
+            }}>
+              <IconChevron size={12} />
+            </span>
+          </span>
           <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', opacity: active ? 1 : 0.75 }}>
             {folder.icon
               ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
@@ -304,10 +359,15 @@ function SortableFolderItem({
             if (action === 'icon') {
               setIconPickerPos(menuPos);
               setMenuPos(null);
+            } else if (action === 'move') {
+              setMovePos(menuPos);
+              setMenuPos(null);
             } else if (action === 'clearIcon') {
               onSetIcon(folder, null);
+            } else if (action === 'newSub') {
+              onNewSubfolder(folder);
             } else {
-              onAction(action, folder);
+              onAction(action as 'rename' | 'delete', folder);
             }
           }}
         />
@@ -321,7 +381,96 @@ function SortableFolderItem({
           onSelect={(emoji) => { onSetIcon(folder, emoji); setIconPickerPos(null); }}
         />
       )}
+
+      {movePos && (
+        <FolderMovePicker
+          x={movePos.x}
+          y={movePos.y}
+          folder={folder}
+          allFolders={allFolders}
+          onClose={() => setMovePos(null)}
+          onMove={(targetId) => { onMoveFolder(folder, targetId); setMovePos(null); }}
+        />
+      )}
     </>
+  );
+}
+
+// ─── Folder Move Picker (이동 대상 선택: 루트 + 자손 제외 폴더) ───
+function FolderMovePicker({
+  x, y, folder, allFolders, onClose, onMove,
+}: {
+  x: number;
+  y: number;
+  folder: Folder;
+  allFolders: Folder[];
+  onClose: () => void;
+  onMove: (targetId: string | null) => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [onClose]);
+
+  // 자기 자신 + 자손은 이동 대상에서 제외(순환 방지)
+  const blocked = getDescendantIds(allFolders, folder.id);
+  const tree = flattenVisible(buildFolderTree(allFolders), new Set());
+  const targets = tree.filter((n) => !blocked.has(n.folder.id));
+  const currentParent = folder.parent_id || null;
+
+  const WIDTH = 220;
+  const left = typeof window !== 'undefined' ? Math.min(x, window.innerWidth - WIDTH - 8) : x;
+
+  const itemStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+    padding: '7px 10px', border: 'none', background: 'none', cursor: 'pointer',
+    fontSize: 13, fontFamily: 'var(--font-ui)', color: 'var(--text-primary)', textAlign: 'left',
+  };
+  const hover = (e: React.MouseEvent, on: boolean) => {
+    (e.currentTarget as HTMLElement).style.background = on ? 'var(--bg-hover, #f5f5f5)' : 'none';
+  };
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        position: 'fixed', left: Math.max(8, left), top: y, zIndex: 10000,
+        background: 'var(--bg-card, #fff)', border: '1px solid var(--border-primary, #ddd)',
+        borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '4px 0',
+        width: WIDTH, maxHeight: 320, overflowY: 'auto',
+      }}
+    >
+      <div style={{ padding: '4px 10px 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+        "{folder.name}" 이동 위치
+      </div>
+      <button
+        style={{ ...itemStyle, fontWeight: currentParent === null ? 700 : 500 }}
+        disabled={currentParent === null}
+        onClick={() => onMove(null)}
+        onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}
+      >
+        <IconFolder size={15} /> 최상위
+      </button>
+      {targets.map((n) => (
+        <button
+          key={n.folder.id}
+          style={{ ...itemStyle, paddingLeft: 10 + (n.depth + 1) * 14, fontWeight: currentParent === n.folder.id ? 700 : 500 }}
+          disabled={currentParent === n.folder.id}
+          onClick={() => onMove(n.folder.id)}
+          onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}
+        >
+          {n.folder.icon
+            ? <TwemojiImg emoji={n.folder.icon} label={n.folder.name} size={15} />
+            : <IconFolder size={15} />}
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.folder.name}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -487,6 +636,8 @@ export interface SidebarProps {
   onNewFolder: () => void;
   onFolderAction: (action: 'rename' | 'delete', folder: Folder) => void;
   onSetFolderIcon: (folder: Folder, emoji: string | null) => void;
+  onNewSubfolder: (parent: Folder) => void;
+  onMoveFolder: (folder: Folder, newParentId: string | null) => void;
   onFolderReorder: (reorderedFolders: Folder[]) => void;
   onMoveProblemToFolder: (problem: Problem, folder: Folder) => void;
   onViewProblem: (problem: Problem) => void;
@@ -516,6 +667,8 @@ export default function Sidebar({
   onNewFolder,
   onFolderAction,
   onSetFolderIcon,
+  onNewSubfolder,
+  onMoveFolder,
   onFolderReorder,
   onMoveProblemToFolder,
   onViewProblem,
@@ -534,6 +687,24 @@ export default function Sidebar({
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [myHeaderHovered, setMyHeaderHovered] = useState(false);
   const [recentOpen, setRecentOpen] = useState(true);
+
+  // Phase 40: 폴더 트리 펼침/접힘 (collapsed 집합, localStorage 영속)
+  const COLLAPSE_KEY = 'mathory:folder:collapsed';
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(COLLAPSE_KEY);
+      if (raw) setCollapsedFolders(new Set(JSON.parse(raw)));
+    } catch {}
+  }, []);
+  const toggleFolderExpand = (id: string) => {
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
 
   // DnD 상태
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
@@ -580,13 +751,27 @@ export default function Sidebar({
     const overType = over.data.current?.type;
 
     if (activeType === 'folder' && overType === 'folder' && active.id !== over.id) {
-      // 폴더 순서 변경
-      const oldIdx = folders.findIndex((f) => f.id === active.id);
-      const newIdx = folders.findIndex((f) => f.id === over.id);
-      if (oldIdx !== -1 && newIdx !== -1) {
-        const reordered = arrayMove(folders, oldIdx, newIdx);
-        onFolderReorder(reordered);
-      }
+      // 폴더 순서 변경 — 같은 부모(형제) 안에서만 (드래그 중첩/재부모화는 1단계 제외)
+      const activeFolder = folders.find((f) => f.id === active.id);
+      const overFolder = folders.find((f) => f.id === over.id);
+      if (!activeFolder || !overFolder) return;
+      const ap = activeFolder.parent_id || null;
+      const op = overFolder.parent_id || null;
+      if (ap !== op) return; // 다른 그룹으로 드래그 → 무시 (이동은 ⋯ 메뉴 사용)
+
+      const siblings = folders
+        .filter((f) => (f.parent_id || null) === ap)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const oldIdx = siblings.findIndex((f) => f.id === active.id);
+      const newIdx = siblings.findIndex((f) => f.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const reorderedSiblings = arrayMove(siblings, oldIdx, newIdx);
+      // 형제 그룹 안에서만 order 재부여, 나머지 폴더는 그대로
+      const orderById = new Map(reorderedSiblings.map((f, i) => [f.id, i]));
+      const next = folders.map((f) =>
+        orderById.has(f.id) ? { ...f, order: orderById.get(f.id)! } : f
+      );
+      onFolderReorder(next);
     } else if (activeType === 'problem' && overType === 'folder') {
       // 문항을 폴더로 이동
       const problem = active.data.current?.problem as Problem;
@@ -725,22 +910,32 @@ export default function Sidebar({
             )}
           </div>
 
-          {!collapsed && foldersOpen && (
-            <SortableContext items={folders.map((f) => f.id)} strategy={verticalListSortingStrategy}>
-              {folders.map((f) => (
-                <SortableFolderItem
-                  key={f.id}
-                  folder={f}
-                  count={folderCounts[f.id] ?? 0}
-                  active={activeFolderId === f.id}
-                  isDropTarget={dragOverFolderId === f.id}
-                  onSelect={() => onSelectFolder(f)}
-                  onAction={onFolderAction}
-                  onSetIcon={onSetFolderIcon}
-                />
-              ))}
-            </SortableContext>
-          )}
+          {!collapsed && foldersOpen && (() => {
+            const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
+            return (
+              <SortableContext items={visible.map((n) => n.folder.id)} strategy={verticalListSortingStrategy}>
+                {visible.map((n) => (
+                  <SortableFolderItem
+                    key={n.folder.id}
+                    folder={n.folder}
+                    count={folderCounts[n.folder.id] ?? 0}
+                    active={activeFolderId === n.folder.id}
+                    isDropTarget={dragOverFolderId === n.folder.id}
+                    depth={n.depth}
+                    hasChildren={n.children.length > 0}
+                    expanded={!collapsedFolders.has(n.folder.id)}
+                    onToggleExpand={() => toggleFolderExpand(n.folder.id)}
+                    allFolders={folders}
+                    onSelect={() => onSelectFolder(n.folder)}
+                    onAction={onFolderAction}
+                    onSetIcon={onSetFolderIcon}
+                    onNewSubfolder={onNewSubfolder}
+                    onMoveFolder={onMoveFolder}
+                  />
+                ))}
+              </SortableContext>
+            );
+          })()}
 
           {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위) */}
           {!collapsed && foldersOpen && (

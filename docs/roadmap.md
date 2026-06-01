@@ -1062,3 +1062,31 @@ problems/{id}
 - `Sidebar.tsx` — 폴더 `⋯` 메뉴에 "아이콘 변경"/"기본 아이콘으로"(아이콘 있을 때만), 선택 시 `FolderIconPicker` 팝오버. 아이콘 있으면 `IconFolder` 대신 Twemoji SVG 렌더
 - `AppShell.tsx` `handleSetFolderIcon` → `updateFolder({icon})`. 아이콘 제거는 `''` 저장
 - 진입점 UX: ⋯ 메뉴 + 팝오버 (직접 클릭 아님)
+
+## Phase 40: 하위 폴더 (1단계) ✅
+
+폴더 중첩 구조. 결정: **1단계만**(트리 렌더+생성+⋯메뉴 이동+탐색), 드래그 중첩은 보류 / 삭제 시 **하위 함께 삭제** / 개수는 **직접 포함만**.
+
+| 항목 | 구현 |
+|------|------|
+| 데이터 | `Folder.parent_id?`(null/''=루트). 기존 폴더 마이그레이션 불필요 |
+| 트리 | `lib/folder-tree.ts` — buildFolderTree/flattenVisible/getDescendantIds/getChildren/getFolderPath |
+| 생성 | ⋯메뉴 "하위 폴더 만들기" → `createFolder({parent_id})` |
+| 이동 | ⋯메뉴 "폴더 이동" → `FolderMovePicker`(자손 제외+루트) → `updateFolder({parent_id})`, 순환 차단 |
+| 삭제 | `deleteFolder` 하위 트리까지 cascade, 문항은 미분류로 |
+| 탐색 | FolderView에 하위 폴더 카드 + 브레드크럼(상위 경로 클릭 이동) |
+| 펼침 | 폴더별 펼침/접힘(localStorage 영속) |
+| 드래그 | 폴더 재정렬은 **같은 부모(형제) 안에서만** 허용. 재부모화는 ⋯메뉴로 |
+
+### 보류 (별도 단계)
+
+- **드래그로 폴더 중첩/재부모화** — dnd-kit 트리 DnD(투영 깊이·드롭 인디케이터·충돌 계산)는 평면 DnD 전면 재작성 필요, 위험·시간 커서 분리
+- 하위 포함 개수 합산, 중첩 깊이 제한
+
+### 핵심 변경
+
+- `types/problem.ts` `Folder.parent_id` / `lib/firestore.ts` createFolder·updateFolder parent_id, deleteFolder cascade
+- `lib/folder-tree.ts` (신규) — 트리 유틸 (순수 함수, 단위 검증 완료)
+- `Sidebar.tsx` — 트리 렌더(들여쓰기+chevron), `FolderMovePicker`, 형제 한정 재정렬, order를 폴더 자체 값으로 영속화
+- `AppShell.tsx` — handleNewSubfolder/handleMoveFolder(순환 가드)/삭제 메시지에 하위 개수
+- `FolderView.tsx` — 하위 폴더 카드 + 브레드크럼
