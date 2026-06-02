@@ -1,0 +1,5744 @@
+{
+  "_meta": {
+    "generatedFrom": "node_modules/katex/src/symbols.js",
+    "katexVersion": "0.16.28",
+    "license": "MIT (KaTeX, Copyright Khan Academy and contributors)",
+    "note": "Single symbols extracted from KaTeX defineSymbol() calls; structured overlay is standard LaTeX. unicode-math(LPPL) not used.",
+    "generatedBy": "scripts/extract-katex-symbols.cjs"
+  },
+  "counts": {
+    "singleSymbols": 608,
+    "structured": 28,
+    "skippedNonLiteral": 38,
+    "renderFailSingle": 31,
+    "renderFailStructured": 0
+  },
+  "symbols": [
+    {
+      "latex": "ℎ",
+      "unicode": "h",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℤ",
+      "unicode": "Z",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℝ",
+      "unicode": "R",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℚ",
+      "unicode": "Q",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℙ",
+      "unicode": "P",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℕ",
+      "unicode": "N",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℍ",
+      "unicode": "H",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℂ",
+      "unicode": "C",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\maltese",
+      "unicode": "✠",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mathsterling",
+      "unicode": "£",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\pounds",
+      "unicode": "£",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\degree",
+      "unicode": "°",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\degree from gensymb package",
+      "katexSupported": true
+    },
+    {
+      "latex": "ȷ",
+      "unicode": "ȷ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "ı",
+      "unicode": "ı",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@jmath",
+      "unicode": "",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@imath",
+      "unicode": "",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mathring",
+      "unicode": "˚",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dot",
+      "unicode": "˙",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vec",
+      "unicode": "⃗",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hat",
+      "unicode": "^",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\check",
+      "unicode": "ˇ",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\breve",
+      "unicode": "˘",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bar",
+      "unicode": "ˉ",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\tilde",
+      "unicode": "~",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ddot",
+      "unicode": "¨",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\grave",
+      "unicode": "ˋ",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\acute",
+      "unicode": "ˊ",
+      "mathClass": "accent-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varvdots",
+      "unicode": "⋮",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ddots",
+      "unicode": "⋱",
+      "mathClass": "inner",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@cdots",
+      "unicode": "⋯",
+      "mathClass": "inner",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ldots",
+      "unicode": "…",
+      "mathClass": "inner",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mathellipsis",
+      "unicode": "…",
+      "mathClass": "inner",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\smallint",
+      "unicode": "∫",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigsqcup",
+      "unicode": "⨆",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oiiint",
+      "unicode": "∰",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oiint",
+      "unicode": "∯",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oint",
+      "unicode": "∮",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigodot",
+      "unicode": "⨀",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigoplus",
+      "unicode": "⨁",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigotimes",
+      "unicode": "⨂",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sum",
+      "unicode": "∑",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\prod",
+      "unicode": "∏",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\iiint",
+      "unicode": "∭",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\iint",
+      "unicode": "∬",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\intop",
+      "unicode": "∫",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\int",
+      "unicode": "∫",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigcup",
+      "unicode": "⋃",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigcap",
+      "unicode": "⋂",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\biguplus",
+      "unicode": "⨄",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigwedge",
+      "unicode": "⋀",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigvee",
+      "unicode": "⋁",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\coprod",
+      "unicode": "∐",
+      "mathClass": "op-token",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Updownarrow",
+      "unicode": "⇕",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\updownarrow",
+      "unicode": "↕",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Downarrow",
+      "unicode": "⇓",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\downarrow",
+      "unicode": "↓",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Uparrow",
+      "unicode": "⇑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\uparrow",
+      "unicode": "↑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Vert",
+      "unicode": "∥",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\|",
+      "unicode": "∥",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vert",
+      "unicode": "∣",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "|",
+      "unicode": "∣",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\backslash",
+      "unicode": "\\",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rceil",
+      "unicode": "⌉",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lceil",
+      "unicode": "⌈",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rfloor",
+      "unicode": "⌋",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lfloor",
+      "unicode": "⌊",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rparen",
+      "unicode": ")",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lparen",
+      "unicode": "(",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rbrack",
+      "unicode": "]",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lbrack",
+      "unicode": "[",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rbrace",
+      "unicode": "}",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lbrace",
+      "unicode": "{",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\}",
+      "unicode": "}",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\{",
+      "unicode": "{",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\triangleright",
+      "unicode": "▹",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\triangleleft",
+      "unicode": "◃",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\star",
+      "unicode": "⋆",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\diamond",
+      "unicode": "⋄",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dagger",
+      "unicode": "†",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigtriangledown",
+      "unicode": "▽",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigtriangleup",
+      "unicode": "△",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\boxdot",
+      "unicode": "⊡",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circledcirc",
+      "unicode": "⊚",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oslash",
+      "unicode": "⊘",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\partial",
+      "unicode": "∂",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\otimes",
+      "unicode": "⊗",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oplus",
+      "unicode": "⊕",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\odot",
+      "unicode": "⊙",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\veebar",
+      "unicode": "⊻",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\barwedge",
+      "unicode": "⊼",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": ";",
+      "unicode": ";",
+      "mathClass": "punct",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": ",",
+      "unicode": ",",
+      "mathClass": "punct",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\allowbreak",
+      "unicode": null,
+      "mathClass": "spacing",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nobreak",
+      "unicode": null,
+      "mathClass": "spacing",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nobreakspace",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\space",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ ",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nleq",
+      "unicode": "≰",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ngeq",
+      "unicode": "≱",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\to",
+      "unicode": "→",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightarrow",
+      "unicode": "→",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lt",
+      "unicode": "<",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leq",
+      "unicode": "≤",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\le",
+      "unicode": "≤",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftarrow",
+      "unicode": "←",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\models",
+      "unicode": "⊨",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nsupseteq",
+      "unicode": "⊉",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nsubseteq",
+      "unicode": "⊈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\supseteq",
+      "unicode": "⊇",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\subseteq",
+      "unicode": "⊆",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\supset",
+      "unicode": "⊃",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\subset",
+      "unicode": "⊂",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@not",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\in",
+      "unicode": "∈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gt",
+      "unicode": ">",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gets",
+      "unicode": "←",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\geq",
+      "unicode": "≥",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ge",
+      "unicode": "≥",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\cong",
+      "unicode": "≅",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\approx",
+      "unicode": "≈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": ":",
+      "unicode": ":",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "=",
+      "unicode": "=",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rVert",
+      "unicode": "∥",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rvert",
+      "unicode": "∣",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rangle",
+      "unicode": "⟩",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "!",
+      "unicode": "!",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "?",
+      "unicode": "?",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lVert",
+      "unicode": "∥",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lvert",
+      "unicode": "∣",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\langle",
+      "unicode": "⟨",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\surd",
+      "unicode": "√",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vee",
+      "unicode": "∨",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\wedge",
+      "unicode": "∧",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lor",
+      "unicode": "∨",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\land",
+      "unicode": "∧",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\setminus",
+      "unicode": "∖",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\cup",
+      "unicode": "∪",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\cap",
+      "unicode": "∩",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\times",
+      "unicode": "×",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\pm",
+      "unicode": "±",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\div",
+      "unicode": "÷",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circ",
+      "unicode": "∘",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\cdot",
+      "unicode": "⋅",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "-",
+      "unicode": "−",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "+",
+      "unicode": "+",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "*",
+      "unicode": "∗",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varphi",
+      "unicode": "φ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varsigma",
+      "unicode": "ς",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varrho",
+      "unicode": "ϱ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varpi",
+      "unicode": "ϖ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vartheta",
+      "unicode": "ϑ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varepsilon",
+      "unicode": "ε",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\omega",
+      "unicode": "ω",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\psi",
+      "unicode": "ψ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\chi",
+      "unicode": "χ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\phi",
+      "unicode": "ϕ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\upsilon",
+      "unicode": "υ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\tau",
+      "unicode": "τ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sigma",
+      "unicode": "σ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rho",
+      "unicode": "ρ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\pi",
+      "unicode": "π",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\omicron",
+      "unicode": "ο",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\xi",
+      "unicode": "ξ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nu",
+      "unicode": "ν",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mu",
+      "unicode": "μ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lambda",
+      "unicode": "λ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\kappa",
+      "unicode": "κ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\iota",
+      "unicode": "ι",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\theta",
+      "unicode": "θ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eta",
+      "unicode": "η",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\zeta",
+      "unicode": "ζ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\epsilon",
+      "unicode": "ϵ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\delta",
+      "unicode": "δ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gamma",
+      "unicode": "γ",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\beta",
+      "unicode": "β",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\alpha",
+      "unicode": "α",
+      "mathClass": "mathord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varnothing",
+      "unicode": "∅",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\emptyset",
+      "unicode": "∅",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bot",
+      "unicode": "⊥",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\top",
+      "unicode": "⊤",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lnot",
+      "unicode": "¬",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\neg",
+      "unicode": "¬",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Χ",
+      "unicode": "X",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Τ",
+      "unicode": "T",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ρ",
+      "unicode": "P",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ο",
+      "unicode": "O",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ν",
+      "unicode": "N",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Μ",
+      "unicode": "M",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Κ",
+      "unicode": "K",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ι",
+      "unicode": "I",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Η",
+      "unicode": "H",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ζ",
+      "unicode": "Z",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Ε",
+      "unicode": "E",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Β",
+      "unicode": "B",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "Α",
+      "unicode": "A",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Omega",
+      "unicode": "Ω",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Psi",
+      "unicode": "Ψ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Phi",
+      "unicode": "Φ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Upsilon",
+      "unicode": "Υ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Sigma",
+      "unicode": "Σ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Pi",
+      "unicode": "Π",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Xi",
+      "unicode": "Ξ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Lambda",
+      "unicode": "Λ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Theta",
+      "unicode": "Θ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Delta",
+      "unicode": "Δ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Gamma",
+      "unicode": "Γ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\triangle",
+      "unicode": "△",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\prime",
+      "unicode": "′",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\infty",
+      "unicode": "∞",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\angle",
+      "unicode": "∠",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\_",
+      "unicode": "_",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\%",
+      "unicode": "%",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\$",
+      "unicode": "$",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "`",
+      "unicode": "‘",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\restriction",
+      "unicode": "↾",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Rrightarrow",
+      "unicode": "⇛",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leadsto",
+      "unicode": "⇝",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightsquigarrow",
+      "unicode": "⇝",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\downharpoonright",
+      "unicode": "⇂",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\upharpoonright",
+      "unicode": "↾",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\downdownarrows",
+      "unicode": "⇊",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Rsh",
+      "unicode": "↱",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circlearrowright",
+      "unicode": "↻",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curvearrowright",
+      "unicode": "↷",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\looparrowright",
+      "unicode": "↬",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightarrowtail",
+      "unicode": "↣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\twoheadrightarrow",
+      "unicode": "↠",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightleftarrows",
+      "unicode": "⇄",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightrightarrows",
+      "unicode": "⇉",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftrightsquigarrow",
+      "unicode": "↭",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\multimap",
+      "unicode": "⊸",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\imageof",
+      "unicode": "⊷",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\origof",
+      "unicode": "⊶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\downharpoonleft",
+      "unicode": "⇃",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\upharpoonleft",
+      "unicode": "↿",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\upuparrows",
+      "unicode": "⇈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Lsh",
+      "unicode": "↰",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circlearrowleft",
+      "unicode": "↺",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21ba to \\acwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curvearrowleft",
+      "unicode": "↶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftrightharpoons",
+      "unicode": "⇋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\looparrowleft",
+      "unicode": "↫",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftarrowtail",
+      "unicode": "↢",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\twoheadleftarrow",
+      "unicode": "↞",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Lleftarrow",
+      "unicode": "⇚",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftrightarrows",
+      "unicode": "⇆",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftleftarrows",
+      "unicode": "⇇",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dashleftarrow",
+      "unicode": "⇠",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u21e0 to \\leftdasharrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dashrightarrow",
+      "unicode": "⇢",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We'll map it to AMS function \\dashrightarrow. It produces the same atom.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\boxtimes",
+      "unicode": "⊠",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\doublecup",
+      "unicode": "⋓",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\doublecap",
+      "unicode": "⋒",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\intercal",
+      "unicode": "⊺",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\centerdot",
+      "unicode": "⋅",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circledast",
+      "unicode": "⊛",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circleddash",
+      "unicode": "⊝",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curlyvee",
+      "unicode": "⋎",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curlywedge",
+      "unicode": "⋏",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightthreetimes",
+      "unicode": "⋌",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftthreetimes",
+      "unicode": "⋋",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rtimes",
+      "unicode": "⋊",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ltimes",
+      "unicode": "⋉",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\divideontimes",
+      "unicode": "⋇",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\boxplus",
+      "unicode": "⊞",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\boxminus",
+      "unicode": "⊟",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\doublebarwedge",
+      "unicode": "⩞",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Cup",
+      "unicode": "⋓",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Cap",
+      "unicode": "⋒",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\smallsetminus",
+      "unicode": "∖",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dotplus",
+      "unicode": "∔",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Doteq",
+      "unicode": "≑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Join",
+      "unicode": "⋈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eqsim",
+      "unicode": "≂",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rhd",
+      "unicode": "⊳",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lhd",
+      "unicode": "⊲",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gggtr",
+      "unicode": "⋙",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\llless",
+      "unicode": "⋘",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\because",
+      "unicode": "∵",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacktriangleright",
+      "unicode": "▶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\backepsilon",
+      "unicode": "∍",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\therefore",
+      "unicode": "∴",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "We kept the amssymb atom type, which is rel.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacktriangleleft",
+      "unicode": "◀",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varpropto",
+      "unicode": "∝",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\pitchfork",
+      "unicode": "⋔",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\between",
+      "unicode": "≬",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\shortparallel",
+      "unicode": "∥",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\shortmid",
+      "unicode": "∣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Vdash",
+      "unicode": "⊩",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\trianglerighteq",
+      "unicode": "⊵",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vartriangleright",
+      "unicode": "⊳",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succapprox",
+      "unicode": "⪸",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succsim",
+      "unicode": "≿",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curlyeqsucc",
+      "unicode": "⋟",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succcurlyeq",
+      "unicode": "≽",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqsupset",
+      "unicode": "⊐",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Supset",
+      "unicode": "⋑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\supseteqq",
+      "unicode": "⫆",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\thickapprox",
+      "unicode": "≈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\thicksim",
+      "unicode": "∼",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\triangleq",
+      "unicode": "≜",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circeq",
+      "unicode": "≗",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eqcirc",
+      "unicode": "≖",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtreqqless",
+      "unicode": "⪌",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtreqless",
+      "unicode": "⋛",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtrless",
+      "unicode": "≷",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ggg",
+      "unicode": "⋙",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtrdot",
+      "unicode": "⋗",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtrapprox",
+      "unicode": "⪆",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gtrsim",
+      "unicode": "≳",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eqslantgtr",
+      "unicode": "⪖",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\geqslant",
+      "unicode": "⩾",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\geqq",
+      "unicode": "≧",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Bumpeq",
+      "unicode": "≎",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bumpeq",
+      "unicode": "≏",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\smallfrown",
+      "unicode": "⌢",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\smallsmile",
+      "unicode": "⌣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Vvdash",
+      "unicode": "⊪",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vDash",
+      "unicode": "⊨",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\trianglelefteq",
+      "unicode": "⊴",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vartriangleleft",
+      "unicode": "⊲",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\precapprox",
+      "unicode": "⪷",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\precsim",
+      "unicode": "≾",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\curlyeqprec",
+      "unicode": "⋞",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\preccurlyeq",
+      "unicode": "≼",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqsubset",
+      "unicode": "⊏",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Subset",
+      "unicode": "⋐",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\subseteqq",
+      "unicode": "⫅",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\backsimeq",
+      "unicode": "⋍",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\backsim",
+      "unicode": "∽",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\fallingdotseq",
+      "unicode": "≒",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\risingdotseq",
+      "unicode": "≓",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\doteqdot",
+      "unicode": "≑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lesseqqgtr",
+      "unicode": "⪋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lesseqgtr",
+      "unicode": "⋚",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lessgtr",
+      "unicode": "≶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lll",
+      "unicode": "⋘",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lessdot",
+      "unicode": "⋖",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\approxeq",
+      "unicode": "≊",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lessapprox",
+      "unicode": "⪅",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lesssim",
+      "unicode": "≲",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eqslantless",
+      "unicode": "⪕",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leqslant",
+      "unicode": "⩽",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leqq",
+      "unicode": "≦",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@lrcorner",
+      "unicode": "┘",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@llcorner",
+      "unicode": "└",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@urcorner",
+      "unicode": "┐",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@ulcorner",
+      "unicode": "┌",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varkappa",
+      "unicode": "ϰ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Greek",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\digamma",
+      "unicode": "ϝ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Greek",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gimel",
+      "unicode": "ℷ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Hebrew",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\daleth",
+      "unicode": "ℸ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Hebrew",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\beth",
+      "unicode": "ℶ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Hebrew",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\checkmark",
+      "unicode": "✓",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+A5 to \\mathyen. We map to AMS function \\yen",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\yen",
+      "unicode": "¥",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+A5 to \\mathyen. We map to AMS function \\yen",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Diamond",
+      "unicode": "◊",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Box",
+      "unicode": "□",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\square",
+      "unicode": "□",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\diagdown",
+      "unicode": "╲",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\diagup",
+      "unicode": "╱",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\eth",
+      "unicode": "ð",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\complement",
+      "unicode": "∁",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sphericalangle",
+      "unicode": "∢",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigstar",
+      "unicode": "★",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacklozenge",
+      "unicode": "⧫",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacksquare",
+      "unicode": "■",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacktriangledown",
+      "unicode": "▼",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\blacktriangle",
+      "unicode": "▲",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\backprime",
+      "unicode": "‵",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Game",
+      "unicode": "⅁",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Finv",
+      "unicode": "Ⅎ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mho",
+      "unicode": "℧",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nexists",
+      "unicode": "∄",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\measuredangle",
+      "unicode": "∡",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circledR",
+      "unicode": "®",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\circledS",
+      "unicode": "Ⓢ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lozenge",
+      "unicode": "◊",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\triangledown",
+      "unicode": "▽",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hslash",
+      "unicode": "ℏ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vartriangle",
+      "unicode": "△",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nLeftrightarrow",
+      "unicode": "⇎",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nleftrightarrow",
+      "unicode": "↮",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nRightarrow",
+      "unicode": "⇏",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nLeftarrow",
+      "unicode": "⇍",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nrightarrow",
+      "unicode": "↛",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nleftarrow",
+      "unicode": "↚",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Arrows",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\unrhd",
+      "unicode": "⊵",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\unlhd",
+      "unicode": "⊴",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nsubseteqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succneqq",
+      "unicode": "⪶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\precneqq",
+      "unicode": "⪵",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nVdash",
+      "unicode": "⊮",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@varsupsetneqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\supsetneqq",
+      "unicode": "⫌",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@varsupsetneq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\supsetneq",
+      "unicode": "⊋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nsupseteqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ntrianglerighteq",
+      "unicode": "⋭",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ntriangleright",
+      "unicode": "⋫",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nVDash",
+      "unicode": "⊯",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nparallel",
+      "unicode": "∦",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nshortparallel",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ncong",
+      "unicode": "≆",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u2246 to \\simneqq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succnapprox",
+      "unicode": "⪺",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e1 to \\nsucccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succnsim",
+      "unicode": "⋩",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e1 to \\nsucccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nsucceq",
+      "unicode": "⋡",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e1 to \\nsucccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nsucc",
+      "unicode": "⊁",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gnapprox",
+      "unicode": "⪊",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gnsim",
+      "unicode": "⋧",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@gvertneqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gneqq",
+      "unicode": "≩",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gneq",
+      "unicode": "⪈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@ngeqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@ngeqslant",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ngtr",
+      "unicode": "≯",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@varsubsetneqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\subsetneqq",
+      "unicode": "⫋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@varsubsetneq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\subsetneq",
+      "unicode": "⊊",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ntrianglelefteq",
+      "unicode": "⋬",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ntriangleleft",
+      "unicode": "⋪",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nvDash",
+      "unicode": "⊭",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nvdash",
+      "unicode": "⊬",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nmid",
+      "unicode": "∤",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nshortmid",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nsim",
+      "unicode": "≁",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\precnapprox",
+      "unicode": "⪹",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\precnsim",
+      "unicode": "⋨",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\npreceq",
+      "unicode": "⋠",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "unicode-math maps \\u22e0 to \\npreccurlyeq. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nprec",
+      "unicode": "⊀",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lnapprox",
+      "unicode": "⪉",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lnsim",
+      "unicode": "⋦",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@lvertneqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lneqq",
+      "unicode": "≨",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lneq",
+      "unicode": "⪇",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nleqq",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\@nleqslant",
+      "unicode": "",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "Symbol names preceded by \"@\" each have a corresponding macro.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nless",
+      "unicode": "≮",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "ams",
+      "katexSection": "AMS Negated Binary Relations",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightleftharpoons",
+      "unicode": "⇌",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nwarrow",
+      "unicode": "↖",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightharpoondown",
+      "unicode": "⇁",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftharpoondown",
+      "unicode": "↽",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\swarrow",
+      "unicode": "↙",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rightharpoonup",
+      "unicode": "⇀",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftharpoonup",
+      "unicode": "↼",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\searrow",
+      "unicode": "↘",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hookrightarrow",
+      "unicode": "↪",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hookleftarrow",
+      "unicode": "↩",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nearrow",
+      "unicode": "↗",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\longmapsto",
+      "unicode": "⟼",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mapsto",
+      "unicode": "↦",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Longleftrightarrow",
+      "unicode": "⟺",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Leftrightarrow",
+      "unicode": "⇔",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\longleftrightarrow",
+      "unicode": "⟷",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\leftrightarrow",
+      "unicode": "↔",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Longrightarrow",
+      "unicode": "⟹",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Rightarrow",
+      "unicode": "⇒",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\longrightarrow",
+      "unicode": "⟶",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Longleftarrow",
+      "unicode": "⟸",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Leftarrow",
+      "unicode": "⇐",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\longleftarrow",
+      "unicode": "⟵",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Arrow Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\And",
+      "unicode": "&",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\amalg",
+      "unicode": "⨿",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\wr",
+      "unicode": "≀",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ddagger",
+      "unicode": "‡",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bullet",
+      "unicode": "∙",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bigcirc",
+      "unicode": "◯",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqcup",
+      "unicode": "⊔",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ast",
+      "unicode": "∗",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqcap",
+      "unicode": "⊓",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\uplus",
+      "unicode": "⊎",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ominus",
+      "unicode": "⊖",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mp",
+      "unicode": "∓",
+      "mathClass": "bin",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Binary Operators",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lgroup",
+      "unicode": "⟮",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Large Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rgroup",
+      "unicode": "⟯",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Large Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lmoustache",
+      "unicode": "⎰",
+      "mathClass": "open",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Large Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rmoustache",
+      "unicode": "⎱",
+      "mathClass": "close",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Large Delimiters",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ddag",
+      "unicode": "‡",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dag",
+      "unicode": "†",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\P",
+      "unicode": "¶",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\S",
+      "unicode": "§",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\spadesuit",
+      "unicode": "♠",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Im",
+      "unicode": "ℑ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\heartsuit",
+      "unicode": "♡",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\Re",
+      "unicode": "ℜ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\diamondsuit",
+      "unicode": "♢",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sharp",
+      "unicode": "♯",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\wp",
+      "unicode": "℘",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\clubsuit",
+      "unicode": "♣",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\natural",
+      "unicode": "♮",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ell",
+      "unicode": "ℓ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\flat",
+      "unicode": "♭",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nabla",
+      "unicode": "∇",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\exists",
+      "unicode": "∃",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hbar",
+      "unicode": "ℏ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\forall",
+      "unicode": "∀",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\aleph",
+      "unicode": "ℵ",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\&",
+      "unicode": "&",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\#",
+      "unicode": "#",
+      "mathClass": "textord",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\cdotp",
+      "unicode": "⋅",
+      "mathClass": "punct",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Punctuation",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ldotp",
+      "unicode": ".",
+      "mathClass": "punct",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Punctuation",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\owns",
+      "unicode": "∋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dashv",
+      "unicode": "⊣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vdash",
+      "unicode": "⊢",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\propto",
+      "unicode": "∝",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ni",
+      "unicode": "∋",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\frown",
+      "unicode": "⌢",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\doteq",
+      "unicode": "≐",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqsupseteq",
+      "unicode": "⊒",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqsubseteq",
+      "unicode": "⊑",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\smile",
+      "unicode": "⌣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\bowtie",
+      "unicode": "⋈",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\parallel",
+      "unicode": "∥",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\asymp",
+      "unicode": "≍",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\gg",
+      "unicode": "≫",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\ll",
+      "unicode": "≪",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\mid",
+      "unicode": "∣",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\simeq",
+      "unicode": "≃",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succeq",
+      "unicode": "⪰",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\preceq",
+      "unicode": "⪯",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\perp",
+      "unicode": "⊥",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sim",
+      "unicode": "∼",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\succ",
+      "unicode": "≻",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\prec",
+      "unicode": "≺",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\equiv",
+      "unicode": "≡",
+      "mathClass": "rel",
+      "mode": "math",
+      "font": "main",
+      "katexSection": "Relation Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\#",
+      "unicode": "#",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\&",
+      "unicode": "&",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\S",
+      "unicode": "§",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\P",
+      "unicode": "¶",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Misc Symbols",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dag",
+      "unicode": "†",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textdagger",
+      "unicode": "†",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\ddag",
+      "unicode": "‡",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textdaggerdbl",
+      "unicode": "‡",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Math and Text",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\circledR",
+      "unicode": "®",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "AMS Misc",
+      "katexSupported": true
+    },
+    {
+      "latex": "ð",
+      "unicode": "ð",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps U+F0 to \\matheth. We map to AMS function \\eth",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\yen",
+      "unicode": "¥",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+A5 to \\mathyen. We map to AMS function \\yen",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\checkmark",
+      "unicode": "✓",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "unicode-math maps U+A5 to \\mathyen. We map to AMS function \\yen",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\$",
+      "unicode": "$",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textdollar",
+      "unicode": "$",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\%",
+      "unicode": "%",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\_",
+      "unicode": "_",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textunderscore",
+      "unicode": "_",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "unicode-math maps \\u21bb to \\cwopencirclearrow. We'll use the AMS synonym.",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\ ",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": " ",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\space",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\nobreakspace",
+      "unicode": " ",
+      "mathClass": "spacing",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\{",
+      "unicode": "{",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textbraceleft",
+      "unicode": "{",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\}",
+      "unicode": "}",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textbraceright",
+      "unicode": "}",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\lbrack",
+      "unicode": "[",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\rbrack",
+      "unicode": "]",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textless",
+      "unicode": "<",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textgreater",
+      "unicode": ">",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textbar",
+      "unicode": "|",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textbardbl",
+      "unicode": "∥",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textasciitilde",
+      "unicode": "~",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textbackslash",
+      "unicode": "\\",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textasciicircum",
+      "unicode": "^",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\textellipsis",
+      "unicode": "…",
+      "mathClass": "inner",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\ldots",
+      "unicode": "…",
+      "mathClass": "inner",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Ref: LaTeX Source 2e: \\DeclareRobustCommand{\\nobreakspace}{%",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\varvdots",
+      "unicode": "⋮",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\vdots is a macro that uses one of these two symbols (with made-up names):",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\i",
+      "unicode": "ı",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\j",
+      "unicode": "ȷ",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\ss",
+      "unicode": "ß",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\ae",
+      "unicode": "æ",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\oe",
+      "unicode": "œ",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\o",
+      "unicode": "ø",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\AE",
+      "unicode": "Æ",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\OE",
+      "unicode": "Œ",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\O",
+      "unicode": "Ø",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\'",
+      "unicode": "ˊ",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\`",
+      "unicode": "ˋ",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\^",
+      "unicode": "ˆ",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\~",
+      "unicode": "˜",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\=",
+      "unicode": "ˉ",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\u",
+      "unicode": "˘",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\.",
+      "unicode": "˙",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\c",
+      "unicode": "¸",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\r",
+      "unicode": "˚",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\v",
+      "unicode": "ˇ",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\\"",
+      "unicode": "¨",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\H",
+      "unicode": "˝",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textcircled",
+      "unicode": "◯",
+      "mathClass": "accent-token",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\imath and \\jmath should be invariant to \\mathrm, \\mathbf, etc., so use PUA",
+      "katexSupported": true
+    },
+    {
+      "latex": "--",
+      "unicode": "–",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textendash",
+      "unicode": "–",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "---",
+      "unicode": "—",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textemdash",
+      "unicode": "—",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "`",
+      "unicode": "‘",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textquoteleft",
+      "unicode": "‘",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "'",
+      "unicode": "’",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textquoteright",
+      "unicode": "’",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "``",
+      "unicode": "“",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textquotedblleft",
+      "unicode": "“",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "''",
+      "unicode": "”",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textquotedblright",
+      "unicode": "”",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "These ligatures are detected and created in Parser.js's `formLigatures`.",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\degree",
+      "unicode": "°",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\degree from gensymb package",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textdegree",
+      "unicode": "°",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "\\textdegree from inputenc package",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\pounds",
+      "unicode": "£",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\textsterling",
+      "unicode": "£",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": false
+    },
+    {
+      "latex": "\\maltese",
+      "unicode": "✠",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "mode, but among our fonts, only Main-Regular defines this character \"163\".",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℂ",
+      "unicode": "C",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℍ",
+      "unicode": "H",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℕ",
+      "unicode": "N",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℙ",
+      "unicode": "P",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℚ",
+      "unicode": "Q",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℝ",
+      "unicode": "R",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℤ",
+      "unicode": "Z",
+      "mathClass": "textord",
+      "mode": "text",
+      "font": "ams",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    },
+    {
+      "latex": "ℎ",
+      "unicode": "h",
+      "mathClass": "mathord",
+      "mode": "text",
+      "font": "main",
+      "katexSection": "Blackboard bold and script letters in Unicode range",
+      "katexSupported": true
+    }
+  ],
+  "structured": [
+    {
+      "latex": "\\frac{}{}",
+      "displayLatex": "\\frac{a}{b}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "fraction",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\dfrac{}{}",
+      "displayLatex": "\\dfrac{a}{b}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "display fraction",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\tfrac{}{}",
+      "displayLatex": "\\tfrac{a}{b}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "text fraction",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqrt{}",
+      "displayLatex": "\\sqrt{x}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "square root",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sqrt[]{}",
+      "displayLatex": "\\sqrt[n]{x}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "nth root",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "^{}",
+      "displayLatex": "x^{n}",
+      "cursorOffset": 2,
+      "mathClass": "structured",
+      "en": "superscript",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "_{}",
+      "displayLatex": "x_{n}",
+      "cursorOffset": 2,
+      "mathClass": "structured",
+      "en": "subscript",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\overline{}",
+      "displayLatex": "\\overline{AB}",
+      "cursorOffset": 10,
+      "mathClass": "structured",
+      "en": "overline",
+      "field": "geometry",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\vec{}",
+      "displayLatex": "\\vec{v}",
+      "cursorOffset": 5,
+      "mathClass": "structured",
+      "en": "vector",
+      "field": "vector",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\overrightarrow{}",
+      "displayLatex": "\\overrightarrow{AB}",
+      "cursorOffset": 15,
+      "mathClass": "structured",
+      "en": "ray/vector",
+      "field": "vector",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\hat{}",
+      "displayLatex": "\\hat{x}",
+      "cursorOffset": 5,
+      "mathClass": "structured",
+      "en": "hat",
+      "field": "statistics",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\int_{}^{}",
+      "displayLatex": "\\int_{a}^{b}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "definite integral",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\iint_{}^{}",
+      "displayLatex": "\\iint_{D}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "double integral",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\oint_{}^{}",
+      "displayLatex": "\\oint_{C}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "contour integral",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\sum_{}^{}",
+      "displayLatex": "\\sum_{k=1}^{n}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "summation",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\prod_{}^{}",
+      "displayLatex": "\\prod_{k=1}^{n}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "product",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\lim_{}",
+      "displayLatex": "\\lim_{x \\to 0}",
+      "cursorOffset": 6,
+      "mathClass": "structured",
+      "en": "limit",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\frac{d}{dx}",
+      "displayLatex": "\\frac{d}{dx}",
+      "cursorOffset": 12,
+      "mathClass": "structured",
+      "en": "derivative",
+      "field": "calculus",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\binom{}{}",
+      "displayLatex": "\\binom{n}{r}",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "binomial",
+      "field": "discrete",
+      "katexSupported": true
+    },
+    {
+      "latex": "{}_{}\\mathrm{P}_{}",
+      "displayLatex": "{}_{n}\\mathrm{P}_{r}",
+      "cursorOffset": 1,
+      "mathClass": "structured",
+      "en": "permutation",
+      "field": "discrete",
+      "katexSupported": true
+    },
+    {
+      "latex": "{}_{}\\mathrm{C}_{}",
+      "displayLatex": "{}_{n}\\mathrm{C}_{r}",
+      "cursorOffset": 1,
+      "mathClass": "structured",
+      "en": "combination",
+      "field": "discrete",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\begin{pmatrix} \\end{pmatrix}",
+      "displayLatex": "\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}",
+      "cursorOffset": 15,
+      "mathClass": "structured",
+      "en": "matrix (paren)",
+      "field": "linear-algebra",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\begin{bmatrix} \\end{bmatrix}",
+      "displayLatex": "\\begin{bmatrix}a&b\\\\c&d\\end{bmatrix}",
+      "cursorOffset": 15,
+      "mathClass": "structured",
+      "en": "matrix (bracket)",
+      "field": "linear-algebra",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\begin{cases} \\end{cases}",
+      "displayLatex": "\\begin{cases}a&x>0\\\\b&x\\le 0\\end{cases}",
+      "cursorOffset": 14,
+      "mathClass": "structured",
+      "en": "cases",
+      "field": "analysis",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\left( \\right)",
+      "displayLatex": "\\left( x \\right)",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "auto paren",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\left[ \\right]",
+      "displayLatex": "\\left[ x \\right]",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "auto bracket",
+      "field": "arithmetic",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\left\\{ \\right\\}",
+      "displayLatex": "\\left\\{ x \\right\\}",
+      "cursorOffset": 8,
+      "mathClass": "structured",
+      "en": "auto brace",
+      "field": "set",
+      "katexSupported": true
+    },
+    {
+      "latex": "\\left| \\right|",
+      "displayLatex": "\\left| x \\right|",
+      "cursorOffset": 7,
+      "mathClass": "structured",
+      "en": "absolute value",
+      "field": "arithmetic",
+      "katexSupported": true
+    }
+  ]
+}

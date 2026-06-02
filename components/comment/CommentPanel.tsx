@@ -626,17 +626,6 @@ export default function CommentPanel({
           borderTop: '1px solid var(--border-light, #eee)',
           background: 'var(--bg-primary, #FAF9F7)',
         }}>
-          {isAISession && (
-            <AIChipBar
-              models={aiModels}
-              selectedIds={selectedModelIds}
-              onToggle={(modelId) =>
-                setSelectedModelIds((prev) =>
-                  prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
-                )
-              }
-            />
-          )}
           <CommentEditor
             placeholder={
               activeSessionId === LEGACY_SESSION_ID
@@ -648,6 +637,17 @@ export default function CommentPanel({
                   : '메시지...'
             }
             onSubmit={handleSendMessage}
+            headerLeft={isAISession ? (
+              <AIChipBar
+                models={aiModels}
+                selectedIds={selectedModelIds}
+                onToggle={(modelId) =>
+                  setSelectedModelIds((prev) =>
+                    prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
+                  )
+                }
+              />
+            ) : undefined}
           />
         </div>
       ) : (
@@ -875,14 +875,14 @@ function AIChipBar({
 }) {
   if (models.length === 0) {
     return (
-      <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 8 }}>
+      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
         AI 모델을 불러올 수 없습니다.
       </div>
     );
   }
   return (
     <div style={{
-      display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8,
+      display: 'flex', flexWrap: 'wrap', gap: 6,
     }}>
       {models.map((m) => {
         const on = selectedIds.includes(m.modelId);

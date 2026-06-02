@@ -10,7 +10,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MathSnippet } from '../../types/snippet';
-import MathToolbar from './MathToolbar';
+import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader } from '../ui/Icons';
 import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from './EmojiPickerPanel';
@@ -994,10 +994,9 @@ export default function UnifiedToolbar({
             >
               LaTeX
             </div>
-            {/* MathToolbar: 임시 분류 풀다운 (Step 3에서 교체).
-                내부 flex-wrap을 nowrap으로 강제. */}
+            {/* Phase 40: 수식 기호 팔레트 (단일 패널 + 4탭 + KaTeX 하이브리드 렌더) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
-              <MathToolbar onInsert={onInsert} />
+              <MathSymbolPalette onInsert={onInsert} />
             </div>
           </>
         ) : (
