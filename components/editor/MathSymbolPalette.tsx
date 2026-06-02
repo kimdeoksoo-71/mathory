@@ -115,12 +115,12 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
           display: 'flex', alignItems: 'center', gap: 4,
           height: 28, padding: '0 10px',
           fontSize: 13, fontFamily: "'JetBrains Mono', 'Menlo', monospace",
-          background: open ? '#eef2ff' : '#fff',
+          background: open ? '#e0e7ff' : '#f0f3fb',
           border: '1px solid #ccc', borderRadius: 4,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
-        <span dangerouslySetInnerHTML={{ __html: renderKatexCached('f(x)') }} />
+        <span dangerouslySetInnerHTML={{ __html: renderKatexCached('\\sum') }} />
         <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
       </button>
 

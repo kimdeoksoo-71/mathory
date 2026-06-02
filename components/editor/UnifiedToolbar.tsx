@@ -977,24 +977,7 @@ export default function UnifiedToolbar({
       <div ref={leftRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
         {cursorInMath ? (
           <>
-            <div
-              style={{
-                display: 'flex', alignItems: 'center',
-                height: 28, padding: '0 12px',
-                borderRadius: 0,
-                background: 'rgba(229, 57, 53, 0.08)',
-                border: '1px solid rgba(229, 57, 53, 0.25)',
-                color: '#c62828',
-                fontSize: 12,
-                fontWeight: 600,
-                fontFamily: 'var(--font-ui)',
-                whiteSpace: 'nowrap',
-              }}
-              title="커서가 수식 안에 있습니다"
-            >
-              LaTeX
-            </div>
-            {/* Phase 40: 수식 기호 팔레트 (단일 패널 + 4탭 + KaTeX 하이브리드 렌더) */}
+            {/* Phase 40: 수식 기호 팔레트 (단일 패널 + 탭 + KaTeX 하이브리드 렌더) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'nowrap' }}>
               <MathSymbolPalette onInsert={onInsert} />
             </div>
