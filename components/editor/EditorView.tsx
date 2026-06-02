@@ -661,14 +661,13 @@ function SortableEditorBlock({
     transition,
     opacity: isDragging ? 0.5 : 1,
     marginBottom: 6,
-    border: 'none',
+    // 단일 실제 테두리 (거터 배경이 덮지 않음 → 좌측 이중선 해소, 모서리 유지)
+    // 0.5px = 레티나에서 1물리픽셀 헤어라인 (1px은 2물리픽셀이라 두껍게 보임)
+    border: '0.5px solid var(--border-primary)',
     borderRadius: 12,
     background: 'var(--bg-card)',
     overflow: 'hidden',
-    // inset shadow를 테두리로 사용 — transform 위에서도 균일·선명
-    boxShadow: isActive
-      ? 'inset 0 0 0 1px var(--border-primary), 0 6px 20px rgba(0,0,0,0.14)'
-      : 'inset 0 0 0 1px var(--border-primary)',
+    boxShadow: isActive ? '0 6px 20px rgba(0,0,0,0.25)' : 'none',
   };
 
   const isTextBased = TEXT_BASED_TYPES.has(block.type);
@@ -683,9 +682,8 @@ function SortableEditorBlock({
           padding: '4px 8px', background: 'var(--bg-secondary)',
           cursor: 'grab', fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
-          borderTop: '1px solid var(--border-primary)',
-          borderLeft: '1px solid var(--border-primary)',
-          borderRight: '1px solid var(--border-primary)',
+          // 헤더↔에디터 구분 하단선만 (블록 외곽선이 좌·우·위를 감쌈). 0.5px 헤어라인
+          borderBottom: '0.5px solid var(--border-primary)',
         }}
         {...listeners}
       >
