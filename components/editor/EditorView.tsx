@@ -1949,8 +1949,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
         .math-highlight-active {
-          background-color: rgba(229, 57, 53, 0.08) !important;
-          box-shadow: 0 0 0 2px rgba(229, 57, 53, 0.4);
+          background-color: rgba(255, 224, 51, 0.30) !important;
+          box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.30);
           border-radius: 3px;
         }
       `}</style>
