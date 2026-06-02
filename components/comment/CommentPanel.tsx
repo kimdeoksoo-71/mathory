@@ -401,17 +401,9 @@ export default function CommentPanel({
       .map((id) => aiModels.find((m) => m.modelId === id))
       .filter((m): m is AIModelConfig => !!m);
 
-    // 선택된 AI가 있으면 호명 접두사를 사용자 메시지 앞에 붙임 — "민, 쳇에게 물을게."
-    // (저장본·AI 전달본 동일 — 누구에게 말하는지 메시지 자체에서 분명히 보이도록.
-    //  단순 콤마 나열보다 의도를 명시해 AI가 메시지 일부로 오해하지 않게 함)
-    const mentionPrefix = invokedModels.length > 0
-      ? `${invokedModels.map((m) => m.nickname).join(', ')}에게 물을게. `
-      : '';
-    const finalContent = mentionPrefix + content;
-
     await addComment({
       problemId, tabId: activeTabId, authorUid: currentUid,
-      content: finalContent, parentCommentId: null,
+      content, parentCommentId: null,
       authorType: 'human',
       discussionSessionId: activeSessionId,
       invokedModelIds: invokedIds.length > 0 ? invokedIds : undefined,
@@ -431,7 +423,7 @@ export default function CommentPanel({
       currentTabLabel: ctx.currentTabLabel,
       discussionHistory: history,
       participantNicknames,
-      currentMessage: finalContent,
+      currentMessage: content,
     };
 
     // 4. pending 상태 — 동일 (sessionId, modelId) 중복 제거 후 신규 추가
