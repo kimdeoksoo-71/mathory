@@ -630,7 +630,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               padding: '16px',
               wordBreak: 'break-all',
               whiteSpace: 'pre-wrap',
-              lineHeight: '2.5',
+              lineHeight: '1.8',
             },
             '.cm-gutters': {
               backgroundColor: '#f8f9fa',
