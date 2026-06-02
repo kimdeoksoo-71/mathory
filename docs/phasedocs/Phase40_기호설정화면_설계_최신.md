@@ -692,3 +692,43 @@ function renderCell(sym: MathSymbol): string {
 ### 19-4. 다음 (40-F2)
 - 2단계 세부 편집: `UserGroupEditor`(그룹 추가/이름변경/삭제/dnd 정렬) + `SymbolCatalog`(552 카탈로그 검색·등급뱃지·클릭 추가) + `SymbolCell`.
 - 최근 사용 기호(`recentSymbolIds`) 자동 관리.
+
+
+---
+
+## 20. 2단계 세부 편집 — 40-F2 완료 (2026-06-02)
+
+계획서 §4(2단계 편집)를 구현. 모달이 1단계(프리셋)↔2단계(편집) 전환.
+
+### 20-1. 추가된 것
+
+| 파일 | 역할 |
+|------|------|
+| `components/editor/settings/SymbolCell.tsx` | 공유 셀 — KaTeX 렌더 + 등급 뱃지(색+점) + ✓(이미 추가) + hover × 삭제. 팔레트도 이 셀 사용 |
+| `components/editor/settings/SymbolCatalog.tsx` | 우측 — 552 카탈로그(분야 섹션), 검색, 등급 뱃지, ✓, 클릭 추가 |
+| `components/editor/settings/UserGroupEditor.tsx` | 좌측 — 그룹 선택/추가(≤12)/이름변경/삭제(+Undo 5초)/▲▼ 정렬/기호 × 제거 |
+| `SymbolSettingsModal` | 2단계 추가: draft 편집 → [완료] 저장. "직접 편집 →" 활성화 |
+| `lib/toolbar-defaults.ts` | FIELD_ORDER·FIELD_LABELS export |
+
+### 20-2. 동작 (§4-4 클릭 기반)
+- 좌측 그룹 선택 → 우측 카탈로그 기호 클릭 → 선택 그룹에 추가(중복 무시, ✓ 표시).
+- 편집 시 `preset=null`(커스텀)로 전환. [완료] → `save(draft)` → Firestore + 팔레트 즉시 반영.
+- 시작점: 기존 config 있으면 복제, 없으면 `university-basic` 프리셋.
+
+### 20-3. 계획 대비 차이 / 후속
+- **그룹 재정렬**: dnd-kit 대신 ▲▼ 버튼(1차). dnd는 폴리시 항목.
+- **카탈로그 성능**: 현재 524개 일괄 렌더(KaTeX 캐시). IntersectionObserver lazy(§4-2)는 후속 최적화.
+- **남음**: 최근 사용 기호(§7), i18n ja/zh(§6), a11y 그리드 내비(§8), 다른 프리셋 선택 시 초기화 확인(§4-5).
+
+### 20-4. 편집 피드백 반영 (2026-06-02)
+1. **누락 연산자 보강**: `\log \ln \lg \exp \lim \sin \cos \tan …` 등 함수명은 symbols.js가 아닌 op.js에 있어 빠져 있었음. `scripts/build-supplement.cjs` → `lib/data/curated-supplement.json`(32개, 렌더 검증)로 추가. 새 분야 **`function`(함수)** 신설 → 미적분 탭/카탈로그 함수 섹션. ALL_SYMBOLS 552→**584**. id는 553+ 부여(기존 불변, §1).
+2. **그리스 알파벳순**: `build-symbols.cjs`에서 그리스 분야를 α β γ … ω, Γ Δ … Ω 순으로 정렬(자기 위치 내 재배열, id 불변).
+3. **그룹 내 기호 dnd 정렬**: `UserGroupEditor`에 dnd-kit(`SortableContext`/`useSortable`) 적용 — 그룹별 기호를 드래그로 재정렬.
+
+### 20-5. 카탈로그 20개 카테고리 재구성 (2026-06-02)
+첨부 문서(*Comprehensive LaTeX Symbol List* 요약, 20 카테고리) 기준으로 설정 모달 카탈로그를 재분류.
+- `scripts/catalog-classify.cjs`: 명령어 명시 매핑 + mathClass/field/패턴 규칙 → 각 기호에 `catalogCategory`(1~20) 부여. `build-symbols.cjs`가 적용·`CATALOG_CATEGORIES` export.
+- `SymbolCatalog`: field 섹션 → **20개 카테고리 섹션**으로 그룹화(빈 카테고리는 숨김).
+- 글꼴 명령(`\mathbb{} \mathcal{}` 등 9개)·수 체계(ℕℤℚℝℂℙℍ) 보강 → 카탈로그 수학 글꼴/수 체계 채움. ALL_SYMBOLS 593.
+- 분포(1~20): 56·14·47·24·55·42·50·7·37·66·45·11·5·24·5·25·27·20·9·24.
+- 참고: 팔레트 빠른 탭은 그대로 field 기반 7탭. 20 카테고리는 카탈로그(세부 편집) 전용.

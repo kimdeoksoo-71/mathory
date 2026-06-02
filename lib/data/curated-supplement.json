@@ -1,0 +1,677 @@
+{
+  "_meta": {
+    "note": "KaTeX functions/op.js 연산자 보강(수작업). build-symbols.cjs에서 id 부여."
+  },
+  "count": 49,
+  "items": [
+    {
+      "latex": "\\log",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "로그",
+        "en": "logarithm"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\ln",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "자연로그",
+        "en": "natural logarithm"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\lg",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "상용로그",
+        "en": "common logarithm"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\exp",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "지수함수",
+        "en": "exponential"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\lim",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "극한",
+        "en": "limit"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\limsup",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "analysis",
+      "tier": 3,
+      "name": {
+        "ko": "상극한",
+        "en": "limit superior"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\liminf",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "analysis",
+      "tier": 3,
+      "name": {
+        "ko": "하극한",
+        "en": "limit inferior"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\sup",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "analysis",
+      "tier": 2,
+      "name": {
+        "ko": "상한",
+        "en": "supremum"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\inf",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "analysis",
+      "tier": 2,
+      "name": {
+        "ko": "하한",
+        "en": "infimum"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\max",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "최댓값",
+        "en": "maximum"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\min",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "최솟값",
+        "en": "minimum"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\sin",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "사인",
+        "en": "sine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\cos",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "코사인",
+        "en": "cosine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\tan",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 1,
+      "name": {
+        "ko": "탄젠트",
+        "en": "tangent"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\cot",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "코탄젠트",
+        "en": "cotangent"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\sec",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "시컨트",
+        "en": "secant"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\csc",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "코시컨트",
+        "en": "cosecant"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\arcsin",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "아크사인",
+        "en": "arcsine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\arccos",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "아크코사인",
+        "en": "arccosine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\arctan",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "아크탄젠트",
+        "en": "arctangent"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\sinh",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "쌍곡사인",
+        "en": "hyperbolic sine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\cosh",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "쌍곡코사인",
+        "en": "hyperbolic cosine"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\tanh",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "쌍곡탄젠트",
+        "en": "hyperbolic tangent"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\coth",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 3,
+      "name": {
+        "ko": "쌍곡코탄젠트",
+        "en": "hyperbolic cotangent"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\det",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "linear-algebra",
+      "tier": 2,
+      "name": {
+        "ko": "행렬식",
+        "en": "determinant"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\dim",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "linear-algebra",
+      "tier": 2,
+      "name": {
+        "ko": "차원",
+        "en": "dimension"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\ker",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "linear-algebra",
+      "tier": 3,
+      "name": {
+        "ko": "핵",
+        "en": "kernel"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\deg",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "algebra",
+      "tier": 2,
+      "name": {
+        "ko": "차수",
+        "en": "degree"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\gcd",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "discrete",
+      "tier": 1,
+      "name": {
+        "ko": "최대공약수",
+        "en": "greatest common divisor"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\arg",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "function",
+      "tier": 2,
+      "name": {
+        "ko": "편각",
+        "en": "argument"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\hom",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "algebra",
+      "tier": 4,
+      "name": {
+        "ko": "준동형",
+        "en": "hom"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\Pr",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "probability",
+      "tier": 2,
+      "name": {
+        "ko": "확률",
+        "en": "probability"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\cdots",
+      "symbol": "",
+      "mathClass": "op-token",
+      "field": "arithmetic",
+      "tier": 1,
+      "name": {
+        "ko": "가운데 생략점",
+        "en": "centered ellipsis"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathbb{}",
+      "symbol": "",
+      "displayLatex": "\\mathbb{R}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "칠판체",
+        "en": "blackboard bold"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathcal{}",
+      "symbol": "",
+      "displayLatex": "\\mathcal{F}",
+      "cursorOffset": 9,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "필기체",
+        "en": "calligraphic"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathfrak{}",
+      "symbol": "",
+      "displayLatex": "\\mathfrak{g}",
+      "cursorOffset": 9,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "프락투어",
+        "en": "fraktur"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathbf{}",
+      "symbol": "",
+      "displayLatex": "\\mathbf{v}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "굵게",
+        "en": "bold"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathit{}",
+      "symbol": "",
+      "displayLatex": "\\mathit{x}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "이탤릭",
+        "en": "italic"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathrm{}",
+      "symbol": "",
+      "displayLatex": "\\mathrm{d}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "로만체(직립)",
+        "en": "roman"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathsf{}",
+      "symbol": "",
+      "displayLatex": "\\mathsf{A}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "산세리프",
+        "en": "sans-serif"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathtt{}",
+      "symbol": "",
+      "displayLatex": "\\mathtt{x}",
+      "cursorOffset": 8,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "타자체",
+        "en": "typewriter"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\boldsymbol{}",
+      "symbol": "",
+      "displayLatex": "\\boldsymbol{\\alpha}",
+      "cursorOffset": 12,
+      "mathClass": "mathord",
+      "field": "algebra",
+      "tier": 3,
+      "name": {
+        "ko": "굵은 기호",
+        "en": "bold symbol"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathrm{P}()",
+      "symbol": "",
+      "displayLatex": "\\mathrm{P}(A)",
+      "cursorOffset": 11,
+      "mathClass": "mathord",
+      "field": "probability",
+      "tier": 1,
+      "name": {
+        "ko": "확률",
+        "en": "probability"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathrm{V}()",
+      "symbol": "",
+      "displayLatex": "\\mathrm{V}(X)",
+      "cursorOffset": 11,
+      "mathClass": "mathord",
+      "field": "statistics",
+      "tier": 1,
+      "name": {
+        "ko": "분산",
+        "en": "variance"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\sigma()",
+      "symbol": "",
+      "displayLatex": "\\sigma(X)",
+      "cursorOffset": 7,
+      "mathClass": "mathord",
+      "field": "statistics",
+      "tier": 1,
+      "name": {
+        "ko": "표준편차",
+        "en": "standard deviation"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "{}_{}\\Pi_{}",
+      "symbol": "",
+      "displayLatex": "{}_{n}\\Pi_{r}",
+      "cursorOffset": 4,
+      "mathClass": "mathord",
+      "field": "discrete",
+      "tier": 2,
+      "name": {
+        "ko": "중복순열",
+        "en": "permutation with repetition"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "{}_{}\\mathrm{H}_{}",
+      "symbol": "",
+      "displayLatex": "{}_{n}\\mathrm{H}_{r}",
+      "cursorOffset": 4,
+      "mathClass": "mathord",
+      "field": "discrete",
+      "tier": 2,
+      "name": {
+        "ko": "중복조합",
+        "en": "combination with repetition"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathrm{N}()",
+      "symbol": "",
+      "displayLatex": "\\mathrm{N}(m,\\ \\sigma^2)",
+      "cursorOffset": 11,
+      "mathClass": "mathord",
+      "field": "probability",
+      "tier": 2,
+      "name": {
+        "ko": "정규분포",
+        "en": "normal distribution"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    },
+    {
+      "latex": "\\mathrm{B}()",
+      "symbol": "",
+      "displayLatex": "\\mathrm{B}(n,\\ p)",
+      "cursorOffset": 11,
+      "mathClass": "mathord",
+      "field": "probability",
+      "tier": 2,
+      "name": {
+        "ko": "이항분포",
+        "en": "binomial distribution"
+      },
+      "katexSupported": true,
+      "needsReview": false
+    }
+  ]
+}

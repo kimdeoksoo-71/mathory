@@ -9,10 +9,11 @@
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { renderKatexCached, symbolPreviewHtml } from '../../lib/katex-render';
+import { renderKatexCached } from '../../lib/katex-render';
 import { CURATED_SYMBOLS, ALL_SYMBOLS, DEFAULT_CATEGORIES } from '../../lib/math-symbols';
 import useToolbarConfig from '../../hooks/useToolbarConfig';
 import SymbolSettingsModal from './settings/SymbolSettingsModal';
+import SymbolCell from './settings/SymbolCell';
 import type { MathSymbol } from '../../types/toolbar-config';
 
 interface Props {
@@ -21,6 +22,8 @@ interface Props {
   wrapInDollar?: boolean;
   /** true → 팝업이 트리거 위로 열림(하단 입력창용). 기본 false(아래로). */
   openUp?: boolean;
+  /** true → 팝업을 트리거 오른쪽 끝 기준 왼쪽으로 펼침(우측 정렬 트리거용). 기본 false(왼쪽 기준). */
+  alignRight?: boolean;
 }
 
 // ── 삽입 텍스트/커서 계산 ──
@@ -38,39 +41,14 @@ function buildInsert(sym: MathSymbol, wrap: boolean): { text: string; offset: nu
   return { text, offset };
 }
 
-function SymbolCell({ sym, onPick }: { sym: MathSymbol; onPick: (s: MathSymbol) => void }) {
-  const html = symbolPreviewHtml(sym);
-  return (
-    <button
-      type="button"
-      title={`${sym.name.ko} (${sym.latex})`}
-      aria-label={`${sym.name.ko}, ${sym.name.en}`}
-      onClick={() => onPick(sym)}
-      style={{
-        width: 40, height: 40,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 2, border: '1px solid #eee', borderRadius: 6,
-        background: '#fff', cursor: 'pointer', overflow: 'hidden',
-        fontSize: 15, lineHeight: 1,
-      }}
-      onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f4ff'; e.currentTarget.style.borderColor = '#c7d2fe'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#eee'; }}
-    >
-      {html
-        ? <span dangerouslySetInnerHTML={{ __html: html }} />
-        : <span>{sym.symbol || '?'}</span>}
-    </button>
-  );
-}
-
-export default function MathSymbolPalette({ onInsert, wrapInDollar = false, openUp = false }: Props) {
+export default function MathSymbolPalette({ onInsert, wrapInDollar = false, openUp = false, alignRight = false }: Props) {
   const [open, setOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('');
   const [query, setQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const { config, isLoggedIn, applyPreset } = useToolbarConfig();
+  const { config, isLoggedIn, applyPreset, save } = useToolbarConfig();
   const byId = useMemo(() => new Map(ALL_SYMBOLS.map((s) => [s.id, s])), []);
 
   // 탭 도출: 사용자 설정 그룹 우선, 없으면 기본 7탭
@@ -151,7 +129,8 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
           style={{
             position: 'absolute',
             ...(openUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
-            left: 0, width: 340,
+            ...(alignRight ? { right: 0 } : { left: 0 }),
+            width: 340,
             background: '#fff', border: '1px solid #ddd', borderRadius: 10,
             boxShadow: '0 6px 24px rgba(0,0,0,0.14)', zIndex: 1000,
             padding: 10, animation: 'fadeIn 0.1s ease',
@@ -215,7 +194,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
             }}
           >
             {visibleSymbols.map((sym) => (
-              <SymbolCell key={sym.id} sym={sym} onPick={handlePick} />
+              <SymbolCell key={sym.id} sym={sym} onClick={handlePick} />
             ))}
           </div>
 
@@ -233,6 +212,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
         isLoggedIn={isLoggedIn}
         config={config}
         onApplyPreset={applyPreset}
+        onSave={save}
       />
     </div>
   );

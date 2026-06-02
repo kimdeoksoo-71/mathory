@@ -7,6 +7,19 @@
 import type { PresetId, ToolbarConfig, ToolbarGroup, Tier, MathField } from '../types/toolbar-config';
 import { ALL_SYMBOLS } from './math-symbols';
 
+/**
+ * 프리셋 그룹(6개) — 카탈로그 20+1 카테고리를 빠른 팔레트용으로 묶음.
+ * cats = 포함할 catalogCategory id 목록(이 순서로 기호 배열).
+ */
+const PRESET_GROUPS: { name: string; cats: number[] }[] = [
+  { name: '기본', cats: [2, 14, 12, 11, 13] },        // 기본연산·분수근호첨자·악센트·괄호·생략점
+  { name: '연산·미적분', cats: [3, 4, 15, 16] },       // 이항연산·큰연산·미적분·함수
+  { name: '관계·논리', cats: [5, 6, 9, 10] },          // 관계·부등호·논리·화살표
+  { name: '집합·수', cats: [7, 8] },                   // 집합·수체계
+  { name: '기하·확통', cats: [17, 21] },               // 기하·확률통계
+  { name: '그리스·기타', cats: [1, 18, 19, 20] },      // 그리스·문자형·글꼴·기타
+];
+
 export interface PresetMeta {
   id: PresetId;
   label: string;        // ko
@@ -26,6 +39,7 @@ const FIELD_GROUPS: { field: MathField; name: string }[] = [
   { field: 'arithmetic', name: '기본 연산' },
   { field: 'algebra', name: '관계·연산' },
   { field: 'calculus', name: '미적분' },
+  { field: 'function', name: '함수' },
   { field: 'analysis', name: '해석' },
   { field: 'set', name: '집합' },
   { field: 'logic', name: '논리' },
@@ -39,20 +53,30 @@ const FIELD_GROUPS: { field: MathField; name: string }[] = [
   { field: 'bracket', name: '괄호' },
 ];
 
+/** 카탈로그 섹션 순서(분야) */
+export const FIELD_ORDER: MathField[] = FIELD_GROUPS.map((g) => g.field);
+/** 분야 → 한국어 라벨 */
+export const FIELD_LABELS: Record<string, string> = Object.fromEntries(
+  FIELD_GROUPS.map((g) => [g.field, g.name]),
+);
+
 export function presetMaxTier(presetId: PresetId): Tier {
   return PRESETS.find((p) => p.id === presetId)?.maxTier ?? 4;
 }
 
-/** 프리셋 ID로 기본 ToolbarConfig 생성 (field별 그룹, tier 필터). */
+/** 프리셋 ID로 기본 ToolbarConfig 생성 (6개 묶음 그룹, tier 필터). */
 export function buildPresetConfig(presetId: PresetId): ToolbarConfig {
   const maxTier = presetMaxTier(presetId);
   const pool = ALL_SYMBOLS.filter((s) => s.tier <= maxTier && s.katexSupported);
 
   const groups: ToolbarGroup[] = [];
-  FIELD_GROUPS.forEach(({ field, name }) => {
-    const ids = pool.filter((s) => s.field === field).map((s) => s.id);
+  PRESET_GROUPS.forEach((pg, i) => {
+    const ids: number[] = [];
+    pg.cats.forEach((catId) => {
+      pool.filter((s) => s.catalogCategory === catId).forEach((s) => ids.push(s.id));
+    });
     if (ids.length === 0) return;
-    groups.push({ id: `g_${field}`, name, order: groups.length, symbolIds: ids });
+    groups.push({ id: `g_pg${i}`, name: pg.name, order: groups.length, symbolIds: ids });
   });
 
   return {

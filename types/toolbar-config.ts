@@ -21,6 +21,7 @@ export type MathField =
   | 'discrete'        // 이산 (순열·조합)
   | 'vector'          // 벡터
   | 'linear-algebra'  // 선형대수
+  | 'function'        // 함수 (log·삼각함수 등 연산자)
   | 'greek'           // 그리스 문자
   | 'bracket';        // 괄호·구분자
 
@@ -53,6 +54,8 @@ export interface MathSymbol {
   cursorOffset?: number;      // 삽입 후 커서 위치
   mathClass: MathClass;
   field: MathField;
+  /** 카탈로그 20개 카테고리 id (1~20). 첨부 문서 기준 분류. */
+  catalogCategory?: number;
   tier: Tier;
   name: SymbolName;
   katexSupported: boolean;

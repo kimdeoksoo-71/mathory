@@ -66,6 +66,7 @@ export default function CommentEditor({
           <MathSymbolPalette
             wrapInDollar
             openUp
+            alignRight
             onInsert={(text, offset) => editorRef.current?.insertAtCursor(text, offset)}
           />
           <button
