@@ -16,6 +16,11 @@ import {
   setSearchHighlightsEffect,
   clearSearchHighlightsEffect,
 } from '../../lib/search-highlight';
+import {
+  mathHighlightField,
+  mathHighlightTheme,
+  setMathHighlightEffect,
+} from '../../lib/math-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
 
@@ -42,6 +47,10 @@ export interface MarkdownEditorHandle {
   setSearchHighlights: (matches: SearchMatch[], activeIndex: number) => void;
   /** 검색 매치 하이라이트 해제 */
   clearSearchHighlights: () => void;
+  /** 수식 클릭 하이라이트 (행 회색 + 수식 노랑) */
+  highlightMath: (from: number, to: number) => void;
+  /** 수식 클릭 하이라이트 해제 */
+  clearMathHighlight: () => void;
   /** 특정 위치로 스크롤 (검색 결과 이동용) */
   scrollToPos: (pos: number) => void;
 }
@@ -341,6 +350,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           effects: clearSearchHighlightsEffect.of(null),
         });
       },
+      highlightMath(from: number, to: number) {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({ effects: setMathHighlightEffect.of({ from, to }) });
+      },
+      clearMathHighlight() {
+        const view = viewRef.current;
+        if (!view) return;
+        view.dispatch({ effects: setMathHighlightEffect.of(null) });
+      },
       scrollToPos(pos: number) {
         const view = viewRef.current;
         if (!view) return;
@@ -580,6 +599,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           // ── 검색 하이라이트 (커스텀 FindReplacePanel용) ──
           searchHighlightField,
           searchHighlightTheme,
+          // ── 수식 클릭 하이라이트 (미리보기→편집창) ──
+          mathHighlightField,
+          mathHighlightTheme,
           EditorView.lineWrapping,
           latexHighlightPlugin,
           latexHighlightTheme,

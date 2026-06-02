@@ -1569,9 +1569,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
     setActiveBlockId(blockId);
 
-    // 다른 모든 블록의 선택 해제
+    // 다른 모든 블록의 선택/하이라이트 해제
     for (const [id, ref] of Object.entries(editorRefs.current)) {
-      if (id !== blockId && ref) ref.clearSelection();
+      if (id !== blockId && ref) { ref.clearSelection(); ref.clearMathHighlight(); }
     }
 
     setTimeout(() => {
@@ -1582,7 +1582,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       if (mathId < 0 || mathId >= ranges.length) return;
 
       const range = ranges[mathId];
-      ref.setSelection(range.from, range.to);
+      // 파란 텍스트 선택 대신: 커서만 두고 행 회색 + 수식 노랑 하이라이트
+      ref.setSelection(range.from, range.from);
+      ref.highlightMath(range.from, range.to);
       ref.focus();
 
       // 편집 패널에서 선택된 수식을 세로 중앙으로 스크롤
