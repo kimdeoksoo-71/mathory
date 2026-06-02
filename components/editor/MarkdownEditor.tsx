@@ -210,18 +210,14 @@ function latexCompletionSource(context: CompletionContext) {
           changes: { from, to, insert: template },
         });
 
+        // 커서: cursorOffset(큐레이션) 우선, 없으면 첫 {} 또는 끝
         const firstBrace = template.indexOf('{}');
-        if (firstBrace !== -1) {
-          view.dispatch({
-            selection: { anchor: from + firstBrace + 1 },
-          });
-          if (item.braceCount >= 2) {
-            (view as any).__tabStopsActive = true;
-          }
-        } else {
-          view.dispatch({
-            selection: { anchor: from + template.length },
-          });
+        const offset = item.cursorOffset ?? (firstBrace !== -1 ? firstBrace + 1 : template.length);
+        view.dispatch({
+          selection: { anchor: from + offset },
+        });
+        if (item.braceCount >= 2) {
+          (view as any).__tabStopsActive = true;
         }
       },
     }));
