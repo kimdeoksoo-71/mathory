@@ -56,6 +56,10 @@ export interface MathSymbol {
   tier: Tier;
   name: SymbolName;
   katexSupported: boolean;
+  /** 한국어명이 불확실/비표준 → 추후 KMS 수학용어집 대조 대상 */
+  needsReview?: boolean;
+  /** 표기 변형·주의 메모(예: 한국 교과서 표기 차이) */
+  note?: string;
   variants?: SymbolVariant[];
 }
 

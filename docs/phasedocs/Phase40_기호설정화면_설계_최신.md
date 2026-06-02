@@ -646,9 +646,49 @@ function renderCell(sym: MathSymbol): string {
 - **다국어/표기**: ko·en 완비. 한국 교과서 표기는 `variants`로 명시(예: `≒ \fallingdotseq`, `⊂` 부분집합 용법, `\neq`/`\notin`은 KaTeX 매크로라 unicode 오버라이드).
 - **ko 이름 주의**: 현재는 통용 표준 용어. **대한수학회 수학용어집 대조는 후속**(§18-3 갭).
 
-### 18-7. 남은 큐레이션 (후속)
+### 18-7. 전체 큐레이션 v2 — 완료 (2026-06-02)
 
-- 전체 ~552개로 확장(분야·이름·등급) — 워크플로 분할 가능.
+74개 → **552개 전체**로 확장. 멀티에이전트 워크플로(15배치 병렬)로 `field/ko/en/tier/needsReview` 부여 → 시드와 병합.
+
+- **워크플로**: `scripts/gen-curation-workflow.cjs`(데이터 내장 스크립트 생성) → `phase40-symbol-curation`(15에이전트) → `scripts/merge-curation.cjs`(시드 조인)
+- **산출**: `lib/data/curated-full.json`(552), `lib/math-symbols.ts` 재생성(`scripts/build-symbols.cjs`)
+  - `ALL_SYMBOLS`(552, 레지스트리) / `CURATED_SYMBOLS`(201, 팔레트 표시 = tier≤2 & !needsReview)
+- **결과**: 미매칭 0. **needsReview 288개(52%)** — 대부분 tier 3·4 obscure. tier 분포 1:97/2:115/3:123/4:217.
+- **팔레트 7탭**(설계 §12-3 확장): 기본26 / 미적분27 / 관계20 / 집합·논리45 / 그리스32 / 기하·기타28 / 괄호23. 탭 행은 wrap.
+
+### 18-8. 남은 후속 (신뢰성 강화)
+
+- **needsReview 288개 KMS 대조**: 대한수학회 수학용어집으로 한국어명 검증 → worklist는 `curated-full.json`에서 `needsReview:true` 필터.
 - **교육과정 등급(tier) 근거 강화**: 현재 휴리스틱 → 2022 개정 교육과정 수학과 문서 대조.
 - ja/zh 이름.
 - KMS 수학용어집 라이선스·기계가독성 확인(후속 연구).
+- 팔레트 노출 정책(현재 tier≤2 & !needsReview) 튜닝 / 설정 화면 카탈로그(§4)에서 전체 552 노출.
+
+---
+
+## 19. 개인화(커스터마이징) 기반 — 40-F1 완료 (2026-06-02)
+
+결정: 이번 반복 = **기반 + 프리셋 선택까지**. 프리셋 그룹은 552 데이터에서 자동 생성. 로그아웃 시 기본 7탭 유지.
+
+### 19-1. 추가된 것
+
+| 파일 | 역할 |
+|------|------|
+| `lib/toolbar-defaults.ts` | 4개 프리셋(중·고/대학기초/대학전공/전체) → 기본 ToolbarConfig 자동 생성(tier·field). 미리보기 id |
+| `lib/toolbar-config.ts` | Firestore CRUD `users/{uid}/toolbar_config/default` |
+| `hooks/useToolbarConfig.ts` | 로드/저장(모듈 캐시), `applyPreset`, 로그아웃 폴백 |
+| `lib/katex-render.ts` | KaTeX 렌더 캐시 공유 헬퍼(팔레트·모달 공용) |
+| `components/editor/settings/SymbolSettingsModal.tsx` | 1단계 프리셋 선택 모달(미리보기·적용·로그인 안내). 2단계는 후속 |
+| `MathSymbolPalette` | config.groups를 탭으로 읽음(없으면 기본 7탭) + ⚙ 진입 + 검색 풀 확장(config 시 전체 552) |
+
+### 19-2. 동작
+- 로그인 + 프리셋 적용 시: Firestore 저장 → 팔레트 탭이 그 그룹으로 전환.
+- 미적용/로그아웃: 기본 7탭(CURATED_SYMBOLS).
+- 프리셋 기호 수: 중·고 97 / 대학기초 212 / 대학전공 335 / 전체 552(katexSupported 기준 가변).
+
+### 19-3. ⚠️ 배포 필요
+- **`firestore.rules`에 `toolbar_config` 규칙 추가** → 규칙은 하위 컬렉션 비상속이라 필수. **`firebase deploy --only firestore:rules` 배포 전에는 저장이 권한거부로 실패**.
+
+### 19-4. 다음 (40-F2)
+- 2단계 세부 편집: `UserGroupEditor`(그룹 추가/이름변경/삭제/dnd 정렬) + `SymbolCatalog`(552 카탈로그 검색·등급뱃지·클릭 추가) + `SymbolCell`.
+- 최근 사용 기호(`recentSymbolIds`) 자동 관리.

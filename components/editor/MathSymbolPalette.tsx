@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * MathSymbolPalette — Phase 40 수식 기호 팔레트 (§12~14)
+ * MathSymbolPalette — Phase 40 수식 기호 팔레트 (§12~14, §3)
  *
- * 단일 트리거 버튼 → 팝업 패널(검색 + 4탭 + 기호 그리드).
- * 아이콘은 KaTeX 하이브리드 렌더(구조형은 displayLatex, 단일은 latex)로 렌더 + 캐시.
- * 클릭 시 onInsert(template, cursorOffset)로 삽입(패널 유지 → 연속 삽입).
- * 데이터: lib/math-symbols.ts (KaTeX MIT 시드 + 큐레이션). 기존 MathToolbar 대체.
+ * 단일 트리거(f(x)) → 팝업 패널(검색 + 탭 + 기호 그리드 + ⚙ 설정).
+ * 탭: 로그인 사용자가 설정(config.groups)했으면 그 그룹, 아니면 기본 7탭(CURATED_SYMBOLS).
+ * 아이콘은 KaTeX 하이브리드 렌더(공유 캐시). 클릭 시 onInsert(template, cursorOffset).
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
-import { CURATED_SYMBOLS, DEFAULT_CATEGORIES } from '../../lib/math-symbols';
+import { renderKatexCached, symbolPreviewHtml } from '../../lib/katex-render';
+import { CURATED_SYMBOLS, ALL_SYMBOLS, DEFAULT_CATEGORIES } from '../../lib/math-symbols';
+import useToolbarConfig from '../../hooks/useToolbarConfig';
+import SymbolSettingsModal from './settings/SymbolSettingsModal';
 import type { MathSymbol } from '../../types/toolbar-config';
 
 interface Props {
@@ -23,40 +23,23 @@ interface Props {
   openUp?: boolean;
 }
 
-// ── KaTeX 렌더 캐시 (세션 단위, 동일 LaTeX는 1회만 렌더) ──
-const katexCache = new Map<string, string>();
-function renderKatex(latex: string): string {
-  const hit = katexCache.get(latex);
-  if (hit !== undefined) return hit;
-  let html: string;
-  try {
-    html = katex.renderToString(latex, { throwOnError: false, displayMode: false });
-  } catch {
-    html = '';
-  }
-  katexCache.set(latex, html);
-  return html;
-}
-
 // ── 삽입 텍스트/커서 계산 ──
 function buildInsert(sym: MathSymbol, wrap: boolean): { text: string; offset: number } {
   const isStructured = !!sym.displayLatex;
   if (wrap) {
-    // 대화 패널 등 일반 텍스트: $…$로 감싸 삽입
     const text = '$' + sym.latex + '$';
     const offset = (isStructured && sym.cursorOffset != null)
-      ? 1 + sym.cursorOffset   // 안쪽 placeholder로 이동 (앞 '$' 1칸 보정)
-      : text.length;           // 단일 기호: 닫는 '$' 뒤로
+      ? 1 + sym.cursorOffset
+      : text.length;
     return { text, offset };
   }
-  // 에디터(이미 수식 안): 구조형은 placeholder 포함 그대로, 단일 기호는 뒤 공백 한 칸.
   const text = isStructured ? sym.latex : sym.latex + ' ';
   const offset = sym.cursorOffset ?? text.length;
   return { text, offset };
 }
 
 function SymbolCell({ sym, onPick }: { sym: MathSymbol; onPick: (s: MathSymbol) => void }) {
-  const html = renderKatex(sym.displayLatex ?? sym.latex);
+  const html = symbolPreviewHtml(sym);
   return (
     <button
       type="button"
@@ -64,19 +47,11 @@ function SymbolCell({ sym, onPick }: { sym: MathSymbol; onPick: (s: MathSymbol) 
       aria-label={`${sym.name.ko}, ${sym.name.en}`}
       onClick={() => onPick(sym)}
       style={{
-        width: 40,
-        height: 40,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 2,
-        border: '1px solid #eee',
-        borderRadius: 6,
-        background: '#fff',
-        cursor: 'pointer',
-        overflow: 'hidden',
-        fontSize: 15,
-        lineHeight: 1,
+        width: 40, height: 40,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 2, border: '1px solid #eee', borderRadius: 6,
+        background: '#fff', cursor: 'pointer', overflow: 'hidden',
+        fontSize: 15, lineHeight: 1,
       }}
       onMouseEnter={(e) => { e.currentTarget.style.background = '#f0f4ff'; e.currentTarget.style.borderColor = '#c7d2fe'; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#eee'; }}
@@ -90,44 +65,66 @@ function SymbolCell({ sym, onPick }: { sym: MathSymbol; onPick: (s: MathSymbol) 
 
 export default function MathSymbolPalette({ onInsert, wrapInDollar = false, openUp = false }: Props) {
   const [open, setOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState(DEFAULT_CATEGORIES[0].id);
+  const [activeTab, setActiveTab] = useState('');
   const [query, setQuery] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // 외부 클릭 / Esc 닫기
+  const { config, isLoggedIn, applyPreset } = useToolbarConfig();
+  const byId = useMemo(() => new Map(ALL_SYMBOLS.map((s) => [s.id, s])), []);
+
+  // 탭 도출: 사용자 설정 그룹 우선, 없으면 기본 7탭
+  const tabs = useMemo<{ id: string; label: string; symbols: MathSymbol[] }[]>(() => {
+    if (config && config.groups.length) {
+      return config.groups
+        .slice().sort((a, b) => a.order - b.order)
+        .map((g) => ({
+          id: g.id,
+          label: g.name,
+          symbols: g.symbolIds.map((id) => byId.get(id)).filter(Boolean) as MathSymbol[],
+        }));
+    }
+    return DEFAULT_CATEGORIES.map((c) => ({
+      id: c.id,
+      label: c.label,
+      symbols: CURATED_SYMBOLS.filter((s) => c.fields.includes(s.field)),
+    }));
+  }, [config, byId]);
+
+  // 외부 클릭 / Esc 닫기 (설정 모달 열려있으면 유지)
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
+      if (settingsOpen) return;
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !settingsOpen) setOpen(false); };
     document.addEventListener('mousedown', onDown);
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('mousedown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open]);
+  }, [open, settingsOpen]);
 
   const q = query.trim().toLowerCase();
+  const activeId = tabs.some((t) => t.id === activeTab) ? activeTab : tabs[0]?.id;
+  const searchPool = config ? ALL_SYMBOLS : CURATED_SYMBOLS;
   const visibleSymbols = useMemo(() => {
     if (q) {
-      return CURATED_SYMBOLS.filter(
+      return searchPool.filter(
         (s) =>
           s.name.ko.toLowerCase().includes(q) ||
           s.name.en.toLowerCase().includes(q) ||
           s.latex.toLowerCase().includes(q),
       );
     }
-    const cat = DEFAULT_CATEGORIES.find((c) => c.id === activeTab);
-    if (!cat) return [];
-    return CURATED_SYMBOLS.filter((s) => cat.fields.includes(s.field));
-  }, [q, activeTab]);
+    return tabs.find((t) => t.id === activeId)?.symbols ?? [];
+  }, [q, activeId, tabs, searchPool]);
 
   const handlePick = (sym: MathSymbol) => {
     const { text, offset } = buildInsert(sym, wrapInDollar);
     onInsert(text, offset);
-    // 패널 유지 (연속 삽입). 닫으려면 Esc / 외부 클릭.
   };
 
   return (
@@ -137,21 +134,15 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
         onClick={() => setOpen((v) => !v)}
         title="수식 기호 팔레트"
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          height: 28,
-          padding: '0 10px',
-          fontSize: 13,
-          fontFamily: "'JetBrains Mono', 'Menlo', monospace",
+          display: 'flex', alignItems: 'center', gap: 4,
+          height: 28, padding: '0 10px',
+          fontSize: 13, fontFamily: "'JetBrains Mono', 'Menlo', monospace",
           background: open ? '#eef2ff' : '#fff',
-          border: '1px solid #ccc',
-          borderRadius: 4,
-          cursor: 'pointer',
-          whiteSpace: 'nowrap',
+          border: '1px solid #ccc', borderRadius: 4,
+          cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
-        <span dangerouslySetInnerHTML={{ __html: renderKatex('f(x)') }} />
+        <span dangerouslySetInnerHTML={{ __html: renderKatexCached('f(x)') }} />
         <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
       </button>
 
@@ -160,59 +151,55 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
           style={{
             position: 'absolute',
             ...(openUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
-            left: 0,
-            width: 340,
-            background: '#fff',
-            border: '1px solid #ddd',
-            borderRadius: 10,
-            boxShadow: '0 6px 24px rgba(0,0,0,0.14)',
-            zIndex: 1000,
-            padding: 10,
-            animation: 'fadeIn 0.1s ease',
+            left: 0, width: 340,
+            background: '#fff', border: '1px solid #ddd', borderRadius: 10,
+            boxShadow: '0 6px 24px rgba(0,0,0,0.14)', zIndex: 1000,
+            padding: 10, animation: 'fadeIn 0.1s ease',
           }}
         >
-          {/* 검색 */}
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="검색 (이름 / LaTeX)"
-            style={{
-              width: '100%',
-              boxSizing: 'border-box',
-              height: 30,
-              padding: '0 10px',
-              marginBottom: 8,
-              border: '1px solid #ddd',
-              borderRadius: 6,
-              fontSize: 13,
-              outline: 'none',
-            }}
-          />
+          {/* 검색 + 설정 */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="검색 (이름 / LaTeX)"
+              style={{
+                flex: 1, boxSizing: 'border-box', height: 30, padding: '0 10px',
+                border: '1px solid #ddd', borderRadius: 6, fontSize: 13, outline: 'none',
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              title="기호 설정"
+              style={{
+                width: 30, height: 30, flexShrink: 0,
+                border: '1px solid #ddd', borderRadius: 6, background: '#fff',
+                cursor: 'pointer', fontSize: 15, lineHeight: 1,
+              }}
+            >⚙</button>
+          </div>
 
-          {/* 탭 (검색 중이 아닐 때만) */}
+          {/* 탭 (검색 중이 아닐 때) */}
           {!q && (
-            <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
-              {DEFAULT_CATEGORIES.map((cat) => {
-                const active = cat.id === activeTab;
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
+              {tabs.map((t) => {
+                const active = t.id === activeId;
                 return (
                   <button
-                    key={cat.id}
+                    key={t.id}
                     type="button"
-                    onClick={() => setActiveTab(cat.id)}
+                    onClick={() => setActiveTab(t.id)}
                     style={{
-                      flex: 1,
-                      height: 28,
-                      fontSize: 12,
-                      fontWeight: active ? 700 : 400,
+                      flex: '0 0 auto', height: 28, padding: '0 10px',
+                      fontSize: 12, fontWeight: active ? 700 : 400,
                       color: active ? '#3730a3' : '#555',
                       background: active ? '#eef2ff' : '#f7f7f7',
                       border: active ? '1px solid #c7d2fe' : '1px solid transparent',
-                      borderRadius: 6,
-                      cursor: 'pointer',
-                      whiteSpace: 'nowrap',
+                      borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
                     }}
                   >
-                    {cat.label}
+                    {t.label}
                   </button>
                 );
               })}
@@ -222,12 +209,9 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
           {/* 기호 그리드 */}
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, 40px)',
-              gap: 6,
-              justifyContent: 'space-between',
-              maxHeight: 240,
-              overflowY: 'auto',
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 40px)',
+              gap: 6, justifyContent: 'space-between',
+              maxHeight: 240, overflowY: 'auto',
             }}
           >
             {visibleSymbols.map((sym) => (
@@ -237,11 +221,19 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
 
           {visibleSymbols.length === 0 && (
             <div style={{ padding: '16px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>
-              검색 결과 없음
+              {q ? '검색 결과 없음' : '이 그룹에 기호가 없습니다'}
             </div>
           )}
         </div>
       )}
+
+      <SymbolSettingsModal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        isLoggedIn={isLoggedIn}
+        config={config}
+        onApplyPreset={applyPreset}
+      />
     </div>
   );
 }
