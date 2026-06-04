@@ -619,6 +619,7 @@ export default function CommentPanel({
           background: 'var(--bg-primary, #FAF9F7)',
         }}>
           <CommentEditor
+            problemId={problemId}
             placeholder={
               activeSessionId === LEGACY_SESSION_ID
                 ? '댓글 작성... (Ctrl+Enter 전송)'
