@@ -267,7 +267,7 @@ export default function FindReplacePanel({
     if (!open) {
       clearAllHighlights();
       setMatches([]); setCurrentIdx(-1); setQuery(''); setReplaceText('');
-      setShowReplace(false); setCaseSensitive(false); setWholeWord(false); setUseRegex(false);
+      setShowReplace(true); setCaseSensitive(false); setWholeWord(false); setUseRegex(false);
       queryRef.current = ''; csRef.current = false; wwRef.current = false; reRef.current = false;
       matchesRef.current = []; currentIdxRef.current = -1;
     }
