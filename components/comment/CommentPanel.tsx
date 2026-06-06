@@ -620,15 +620,7 @@ export default function CommentPanel({
         }}>
           <CommentEditor
             problemId={problemId}
-            placeholder={
-              activeSessionId === LEGACY_SESSION_ID
-                ? '댓글 작성... (Ctrl+Enter 전송)'
-                : isAISession
-                  ? selectedModelIds.length === 0
-                    ? '메시지... (AI를 선택하지 않으면 메모로 저장됩니다)'
-                    : `메시지... (선택한 AI ${selectedModelIds.length}명에게 전송)`
-                  : '메시지...'
-            }
+            placeholder=""
             onSubmit={handleSendMessage}
             headerLeft={isAISession ? (
               <AIChipBar

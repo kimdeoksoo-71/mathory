@@ -231,44 +231,6 @@ export default function CommentEditor({
               />
             </>
           )}
-          <button
-            type="button"
-            onClick={() => setShowPreview((v) => !v)}
-            style={{
-              border: 'none', background: 'transparent', cursor: 'pointer',
-              fontSize: 11, color: 'var(--text-muted)', padding: '2px 6px',
-            }}
-          >
-            {showPreview ? '편집' : '미리보기'}
-          </button>
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={submitting}
-              style={{
-                border: 'none', background: 'transparent', cursor: 'pointer',
-                fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px',
-              }}
-            >
-              취소
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting || !value.trim()}
-            style={{
-              padding: '5px 14px',
-              border: 'none', borderRadius: 5,
-              background: (submitting || !value.trim()) ? 'var(--text-faint, #ccc)' : 'var(--accent-primary, #B8845C)',
-              color: '#fff',
-              cursor: (submitting || !value.trim()) ? 'not-allowed' : 'pointer',
-              fontSize: 12, fontWeight: 600,
-            }}
-          >
-            {submitting ? '저장 중…' : submitLabel}
-          </button>
         </div>
       </div>
 
@@ -299,6 +261,51 @@ export default function CommentEditor({
           )}
         </div>
       )}
+
+      {/* ── 하단 바: (우) 미리보기·취소·작성 ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+        gap: 6, marginTop: 6,
+      }}>
+        <button
+          type="button"
+          onClick={() => setShowPreview((v) => !v)}
+          style={{
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            fontSize: 11, color: 'var(--text-muted)', padding: '2px 6px',
+          }}
+        >
+          {showPreview ? '편집' : '미리보기'}
+        </button>
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={submitting}
+            style={{
+              border: 'none', background: 'transparent', cursor: 'pointer',
+              fontSize: 12, color: 'var(--text-muted)', padding: '4px 10px',
+            }}
+          >
+            취소
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={submitting || !value.trim()}
+          style={{
+            padding: '5px 14px',
+            border: 'none', borderRadius: 5,
+            background: (submitting || !value.trim()) ? 'var(--text-faint, #ccc)' : 'var(--accent-primary, #B8845C)',
+            color: '#fff',
+            cursor: (submitting || !value.trim()) ? 'not-allowed' : 'pointer',
+            fontSize: 12, fontWeight: 600,
+          }}
+        >
+          {submitting ? '저장 중…' : submitLabel}
+        </button>
+      </div>
     </div>
   );
 }
