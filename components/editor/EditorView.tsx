@@ -1986,9 +1986,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
       `}</style>
 
-      {/* ═══ Row 1: 메타 정보 ═══ */}
+      {/* ═══ Row 1: 메타 정보 ═══
+          높이 57px — 사이드바 헤더(padding 14×2 + 버튼 28 + border 1) + 토론 패널 헤더와 동일 */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px',
+        display: 'flex', alignItems: 'center', gap: 8,
+        padding: '0 16px',
+        minHeight: 57, boxSizing: 'border-box',
+        // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
+        paddingRight: discussionOpen ? 16 + 560 : 16,
+        transition: 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
@@ -2107,9 +2113,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       </div>
 
-      {/* ═══ Row 2: Toolbar (좌) + Tabs (우) ═══ */}
+      {/* ═══ Row 2: Toolbar (좌) + Tabs (우) ═══
+          높이 41px — 토론 패널 세션바와 동일 (둘째 가로선 정렬) */}
       <div style={{
-        display: 'flex', alignItems: 'center', padding: '0 16px',
+        display: 'flex', alignItems: 'center',
+        padding: '0 16px',
+        minHeight: 41, boxSizing: 'border-box',
+        paddingRight: discussionOpen ? 16 + 560 : 16,
+        transition: 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
         gap: 4,
       }}>

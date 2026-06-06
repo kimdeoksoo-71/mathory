@@ -283,11 +283,13 @@ export default function FolderView({
         <div style={{
           position: 'sticky', top: 0, zIndex: 5,
           background: 'var(--bg-primary, #FAF9F7)',
-          borderBottom: '1px solid var(--border-light)',
           marginBottom: 20,
         }}>
+        {/* 행 1: 제목 행 — 사이드바·EditorView·토론패널 헤더와 동일 57px */}
         <div style={{
-          padding: '24px 0 12px 0',
+          minHeight: 57, boxSizing: 'border-box',
+          padding: '0',
+          borderBottom: '1px solid var(--border-light)',
           fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
           fontFamily: 'var(--font-ui)',
           display: 'flex', alignItems: 'center', gap: 8,
@@ -338,11 +340,15 @@ export default function FolderView({
           )}
         </div>
 
-        {/* Phase 40: 하위 폴더 (sticky 영역 안 — 문항 드롭 타깃) */}
+        {/* 행 2: 하위 폴더 — 가로 한 줄, 넘치면 좌우 스크롤. 41px 높이로 EditorView Row 2 / 토론 패널 세션바와 정렬 */}
         {childFolders.length > 0 && (
           <div style={{
-            display: 'flex', flexWrap: 'wrap', gap: 8, paddingBottom: 12,
-            maxHeight: 120, overflowY: 'auto',
+            display: 'flex', flexWrap: 'nowrap', gap: 8,
+            padding: '0',
+            minHeight: 41, boxSizing: 'border-box',
+            alignItems: 'center',
+            borderBottom: '1px solid var(--border-light)',
+            overflowX: 'auto', overflowY: 'hidden',
           }}>
             {childFolders.map((cf) => {
               const cfCount = problems.filter((p) => p.folder_id === cf.id).length;
@@ -353,20 +359,20 @@ export default function FolderView({
                       ref={setNodeRef}
                       onClick={() => onSelectFolder?.(cf)}
                       style={{
-                        display: 'flex', alignItems: 'center', gap: 8,
-                        padding: '8px 14px', borderRadius: 8,
+                        display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
+                        padding: '4px 10px', borderRadius: 6,
                         border: isOver ? '1px solid var(--accent-primary, #5b6abf)' : '1px solid var(--border-light)',
                         background: isOver ? 'rgba(91, 106, 191, 0.12)' : 'var(--bg-card, #fff)',
                         boxShadow: isOver ? '0 0 0 2px rgba(91,106,191,0.25)' : 'none',
-                        cursor: 'pointer', fontSize: 13.5, color: 'var(--text-primary)',
-                        fontFamily: 'var(--font-ui)', maxWidth: 240,
+                        cursor: 'pointer', fontSize: 12.5, color: 'var(--text-primary)',
+                        fontFamily: 'var(--font-ui)', maxWidth: 220,
                         transition: 'background 0.12s, border-color 0.12s',
                       }}
                       onMouseEnter={(e) => { if (!isOver) e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
                       onMouseLeave={(e) => { if (!isOver) e.currentTarget.style.background = 'var(--bg-card, #fff)'; }}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
-                        {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={16} /> : <IconFolder size={16} />}
+                        {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={14} /> : <IconFolder size={14} />}
                       </span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cf.name}</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({cfCount})</span>

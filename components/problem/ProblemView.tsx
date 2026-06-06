@@ -474,13 +474,13 @@ export default function ProblemView({
 
             return (
               <>
-                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정. 사이드바·댓글 상단바와 같은 52px */}
+                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정. 사이드바·토론패널·EditorView와 동일 57px */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: LABEL_GAP,
                   marginBottom: 24,
                   position: 'sticky', top: 0, zIndex: 5,
                   background: 'var(--bg-primary, #FAF9F7)',
-                  minHeight: 52, boxSizing: 'border-box',
+                  minHeight: 57, boxSizing: 'border-box',
                   borderBottom: '1px solid var(--border-light)',
                 }}>
                   {/* 헤더 라벨 박스 — 폭 7em 고정(레이아웃 불변). 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}

@@ -89,6 +89,7 @@ export default function CommentPanel({
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const sessionSubmittingRef = useRef(false); // 한글 IME / blur 이중 호출 방지
+  const messagesScrollRef = useRef<HTMLDivElement>(null); // 메시지 리스트 자동 스크롤
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hideResolved, setHideResolved] = useState(false);
@@ -182,6 +183,33 @@ export default function CommentPanel({
     () => pendingAI.filter((p) => p.sessionId === activeSessionId),
     [pendingAI, activeSessionId],
   );
+
+  // ─── 마지막 메시지로 자동 스크롤 ───
+  // 메시지 수가 늘어나거나 세션이 바뀌거나 AI 응답이 진행되면 하단으로 이동
+  const messageCountSignal = useMemo(() => {
+    // 답글까지 포함한 총 길이 + 마지막 메시지의 updatedAt을 시그널로
+    const total = visibleThreads.reduce((n, t) => n + 1 + t.replies.length, 0);
+    const lastUpdated = visibleThreads.length > 0
+      ? Math.max(
+          ...visibleThreads.map((t) => {
+            const replyMax = t.replies.length > 0
+              ? Math.max(...t.replies.map((r) => r.updatedAt?.getTime?.() || 0))
+              : 0;
+            return Math.max(t.parent.updatedAt?.getTime?.() || 0, replyMax);
+          }),
+        )
+      : 0;
+    return `${total}:${lastUpdated}:${visiblePendingAI.length}`;
+  }, [visibleThreads, visiblePendingAI]);
+
+  useEffect(() => {
+    const el = messagesScrollRef.current;
+    if (!el) return;
+    // 레이아웃이 안정된 후 스크롤
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+  }, [messageCountSignal, activeSessionId, loading]);
 
   // ─── displayInfo 헬퍼 ───
   const getDisplayInfo = useCallback(
@@ -510,11 +538,11 @@ export default function CommentPanel({
         .pending-ai { animation: pulse-pending 1.4s ease-in-out infinite; }
       `}</style>
 
-      {/* ═══ 헤더 ═══ */}
+      {/* ═══ 헤더 ═══ 높이 57px (사이드바 헤더와 정렬) */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '0 16px',
-        minHeight: 52, boxSizing: 'border-box',
+        minHeight: 57, boxSizing: 'border-box',
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
@@ -579,7 +607,7 @@ export default function CommentPanel({
       />
 
       {/* ═══ 메시지 리스트 ═══ */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div ref={messagesScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             불러오는 중…
@@ -695,7 +723,8 @@ function SessionTabBar({
   return (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 6,
-      padding: '8px 12px',
+      padding: '0 12px',
+      minHeight: 41, boxSizing: 'border-box',
       borderBottom: '1px solid var(--border-light, #eee)',
       background: 'var(--bg-primary, #FAF9F7)',
       overflowX: 'auto',
