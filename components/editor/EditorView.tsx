@@ -1273,6 +1273,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           raw_text = '';
         } else if (type === 'ggb' && b.type !== 'ggb') {
           raw_text = '';
+        } else if (type === 'heading' && b.type !== 'heading' && TEXT_BASED_TYPES.has(b.type)) {
+          // 텍스트 계열 → 제목: 첫 줄 맨 앞에 '## ' 자동 부착 (이미 #/## 헤더이면 유지)
+          const trimmedStart = raw_text.trimStart();
+          if (trimmedStart === '') {
+            raw_text = '## ';
+          } else if (!/^#{1,6}\s/.test(trimmedStart)) {
+            raw_text = '## ' + raw_text;
+          }
+          // 텍스트→텍스트 전환은 MarkdownEditor가 재마운트되지 않으므로
+          // 이미 마운트된 CodeMirror 뷰를 직접 갱신
+          if (raw_text !== b.raw_text) {
+            const finalText = raw_text;
+            queueMicrotask(() => {
+              editorRefs.current[blockId]?.setContent(finalText);
+            });
+          }
         } else if (type !== b.type && BLOCK_PRESETS[type] !== undefined && !TEXT_BASED_TYPES.has(b.type)) {
           // 이미지→텍스트 계열 전환 시 프리셋 적용
           raw_text = BLOCK_PRESETS[type];
