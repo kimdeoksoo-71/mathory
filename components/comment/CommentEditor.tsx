@@ -205,21 +205,21 @@ export default function CommentEditor({
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                {/* 그림 삽입 아이콘 — 액자 + 산봉우리 + 해 */}
+                {/* 그림 삽입 아이콘 — 액자 + 산봉우리 + 해 (회색 모노톤) */}
                 <svg
                   width="18" height="18" viewBox="0 0 64 64"
                   fill="none"
-                  stroke="currentColor"
+                  stroke="#888"
                   strokeWidth={3.5}
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   aria-hidden="true"
                 >
                   <rect x="8" y="12" width="48" height="40" rx="3" />
-                  <circle cx="22" cy="24" r="3.5" fill="currentColor" stroke="none" />
+                  <circle cx="22" cy="24" r="3.5" fill="#888" stroke="none" />
                   <path d="M8 44 L24 30 L36 40 L46 32 L56 42 L56 52 L8 52 Z"
-                    fill="currentColor" fillOpacity="0.15" />
-                  <path d="M8 44 L24 30 L36 40 L46 32 L56 42" />
+                    fill="#ccc" />
+                  <path d="M8 44 L24 30 L36 40 L46 32 L56 42" stroke="#888" />
                 </svg>
               </button>
               <input
