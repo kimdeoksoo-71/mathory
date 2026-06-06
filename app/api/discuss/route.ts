@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getModelConfig } from '../../../lib/ai-models';
 import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
+import type { AIModelConfig } from '../../../types/problem';
 
 export const runtime = 'nodejs';
 // Vercel: Hobby 최대 60s, Pro 최대 300s. DeepSeek(reasoning)이 자주 60s 초과
@@ -98,10 +99,46 @@ const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참�
     (c) 도출한 결론이 문제의 모든 조건을 만족하는가? (정의역·치역·부호 조건 등)
     검산에서 오류 발견 시 결론을 수정해서 출력. **검산 과정 자체는 출력에 쓰지 마세요** ("확인해보면", "다시 계산하면" 같은 메타 서술 금지). 자신 없으면 한 줄로 "검토 필요"만 명시. 추측·직관만으로 단정짓지 마세요.`;
 
+/**
+ * 식(DeepSeek) 전용 — 출력 구조 강제용 JSON 스키마 지침.
+ * thinking을 보존하면서 표시는 짧게 압축하기 위해 응답 형식 자체를 JSON으로 고정.
+ */
+const STRUCTURED_OUTPUT_INSTRUCTION = `
+
+⚠️ 출력 형식 강제 (식 전용 — 이 규칙이 위 모든 규칙보다 우선):
+
+이 응답은 **반드시 아래 JSON 형식만으로** 반환하세요. JSON 외의 텍스트(설명, 사고 과정, 코드 펜스 \`\`\` 등) 절대 포함 금지.
+
+스키마:
+{
+  "conclusion": "결론 한 문장. 50단어 이하. 풀이가 옳음/오류 위치/별해 등.",
+  "reasons": ["이유 문장 1", "이유 문장 2", "..."]
+}
+
+규칙:
+- "conclusion": 정확히 1문장. 50단어 이하.
+- "reasons": 최대 4개 항목. 각 항목 1문장, 50단어 이하.
+- 결론과 이유에 LaTeX 수식 그대로 포함 가능 ($...$).
+- 사고 과정·중간 단계·"확인해보면" 같은 메타 서술 모두 금지.
+
+좋은 예시:
+{
+  "conclusion": "풀이는 옳음.",
+  "reasons": ["완전제곱식 변형이 등가.", "최솟값 $-1$ 직접 도출.", "부호 조건 만족."]
+}
+
+나쁜 예시 (절대 금지):
+- JSON 밖에 설명 추가
+- "conclusion"이 2문장 이상
+- reasons가 5개 이상
+- 한 항목이 50단어 초과
+- 코드 펜스로 감싸기 (\`\`\`json ... \`\`\`)`;
+
 function buildSystemPrompt(args: {
   appendPrompt: string;
   participantNicknames: string[];
   myNickname: string;
+  structuredOutput?: boolean;
 }): string {
   const participants = args.participantNicknames.length
     ? args.participantNicknames.join(', ')
@@ -115,7 +152,45 @@ function buildSystemPrompt(args: {
   if (args.appendPrompt.trim()) {
     lines.push('', `[추가 지침] ${args.appendPrompt.trim()}`);
   }
+  if (args.structuredOutput) {
+    lines.push(STRUCTURED_OUTPUT_INSTRUCTION);
+  }
   return lines.join('\n');
+}
+
+/** 식 호출 시 user message 끝에 강제 부착 (B3) — 시스템 프롬프트보다 강한 압박 */
+const USER_MESSAGE_STRUCTURED_SUFFIX =
+  '\n\n[필수 출력 규칙] 사고 과정 적지 말고 JSON 스키마 그대로만 답하기. ' +
+  '"conclusion": 1문장 50단어 이하, "reasons": 0~4문장 각 50단어 이하. JSON 외 텍스트 금지.';
+
+/** 식 응답(JSON)을 마크다운으로 변환 — 파싱 실패 시 원본 폴백 */
+function formatStructuredResponse(raw: string): string {
+  const trimmed = raw.trim();
+  // 코드 펜스 제거 (\`\`\`json ... \`\`\` 패턴)
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/);
+  const jsonStr = fenceMatch ? fenceMatch[1] : trimmed;
+  try {
+    const parsed = JSON.parse(jsonStr);
+    const conclusion = typeof parsed.conclusion === 'string' ? parsed.conclusion.trim() : '';
+    const reasonsRaw = Array.isArray(parsed.reasons) ? parsed.reasons : [];
+    const reasons = reasonsRaw
+      .map((r: unknown) => (typeof r === 'string' ? r.trim() : ''))
+      .filter(Boolean)
+      .slice(0, 4);
+    const parts: string[] = [];
+    if (conclusion) parts.push(`**[결론]** ${conclusion}`);
+    if (reasons.length) parts.push(reasons.map((r: string) => `- ${r}`).join('\n'));
+    if (!parts.length) return raw; // 빈 응답이면 원본 유지
+    return parts.join('\n\n');
+  } catch {
+    // JSON 파싱 실패 — 원본을 그대로 보여주되 안내 한 줄 추가
+    return `_(JSON 형식 위반 — 원본 표시)_\n\n${raw}`;
+  }
+}
+
+/** 식(DeepSeek) 여부 판정 — provider 기반 */
+function isStructuredOutputModel(config: AIModelConfig): boolean {
+  return config.provider === 'deepseek';
 }
 
 function buildUserPrompt(body: DiscussRequest): string {
@@ -217,18 +292,27 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
     return NextResponse.json({ error: msg, modelId: body.modelId }, { status: 500 });
   }
 
+  const structured = isStructuredOutputModel(config);
+
   const systemPrompt = buildSystemPrompt({
     appendPrompt: config.appendPrompt,
     participantNicknames: body.participantNicknames,
     myNickname: body.myNickname,
+    structuredOutput: structured,
   });
-  const userPrompt = buildUserPrompt(body);
+  // 식: user message 끝에 출력 규칙 강제 부착 (B3) — 시스템 프롬프트보다 강하게 작동
+  const promptBody: DiscussRequest = structured
+    ? { ...body, currentMessage: body.currentMessage + USER_MESSAGE_STRUCTURED_SUFFIX }
+    : body;
+  const userPrompt = buildUserPrompt(promptBody);
 
   try {
     const result = await withTimeout(
-      provider.complete(systemPrompt, userPrompt, config.maxTokens),
+      provider.complete(systemPrompt, userPrompt, config.maxTokens, { jsonMode: structured }),
       TIMEOUT_MS,
     );
+    // 식: JSON 응답을 마크다운으로 변환 (실패 시 원본 폴백)
+    const finalContent = structured ? formatStructuredResponse(result.content) : result.content;
     const costUsd = calcCost(
       result.inputTokens,
       result.outputTokens,
@@ -237,7 +321,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
     );
     return NextResponse.json({
       modelId: config.modelId,
-      content: result.content,
+      content: finalContent,
       inputTokens: result.inputTokens,
       outputTokens: result.outputTokens,
       costUsd,

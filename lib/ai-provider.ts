@@ -8,8 +8,18 @@ export interface AIProviderResult {
   outputTokens: number;
 }
 
+export interface CompleteOptions {
+  /** OpenAI 호환 provider에서 response_format을 json_object로 강제 (식 전용) */
+  jsonMode?: boolean;
+}
+
 export interface AIProvider {
-  complete(systemPrompt: string, userPrompt: string, maxTokens?: number): Promise<AIProviderResult>;
+  complete(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens?: number,
+    opts?: CompleteOptions,
+  ): Promise<AIProviderResult>;
 }
 
 // ═══ 기존 단일 모델 호환 (Phase 23 AI 풀이 자동완성에서 사용) ═══
@@ -23,7 +33,12 @@ class GeminiProvider implements AIProvider {
     this.modelName = modelName;
   }
 
-  async complete(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<AIProviderResult> {
+  async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens = 1024,
+    _opts?: CompleteOptions, // Gemini는 JSON mode 미사용 (필요해지면 responseMimeType 활용)
+  ): Promise<AIProviderResult> {
     const model = this.genAI.getGenerativeModel({
       model: this.modelName,
       systemInstruction: systemPrompt,
@@ -57,7 +72,12 @@ class OpenAICompatProvider implements AIProvider {
     this.useCompletionTokens = useCompletionTokens;
   }
 
-  async complete(systemPrompt: string, userPrompt: string, maxTokens = 1024): Promise<AIProviderResult> {
+  async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens = 1024,
+    opts?: CompleteOptions,
+  ): Promise<AIProviderResult> {
     const params: Record<string, unknown> = {
       model: this.modelName,
       messages: [
@@ -69,6 +89,9 @@ class OpenAICompatProvider implements AIProvider {
       params.max_completion_tokens = maxTokens;
     } else {
       params.max_tokens = maxTokens;
+    }
+    if (opts?.jsonMode) {
+      params.response_format = { type: 'json_object' };
     }
     const res = await this.client.chat.completions.create(params as unknown as Parameters<typeof this.client.chat.completions.create>[0]);
     // DeepSeek 등 일부 모델은 reasoning에 토큰을 소비하고 content가 빌 수 있음 — reasoning_content 폴백
