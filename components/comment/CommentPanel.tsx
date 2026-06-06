@@ -97,7 +97,8 @@ export default function CommentPanel({
   const refreshComments = useCallback(async () => {
     const all = await listAllComments(problemId);
     setComments(all);
-    onCommentsChange?.(all);
+    // 부모(EditorView/ProblemView)로의 emit은 별도 effect에서
+    // "고아 메시지 제외" 필터를 거쳐 처리한다 (세션 삭제 후 카운트 동기화).
     // 인간 작성자 프로필 백필
     const unknownUids = Array.from(
       new Set(all.filter((c) => c.authorType !== 'ai').map((c) => c.authorUid)),
@@ -108,7 +109,7 @@ export default function CommentPanel({
       unknownUids.forEach((u, i) => { if (fetched[i]) map[u] = fetched[i]!; });
       setProfiles(map);
     }
-  }, [problemId, profiles, onCommentsChange]);
+  }, [problemId, profiles]);
 
   const refreshSessions = useCallback(async () => {
     const list = await listSessions(problemId);
@@ -127,6 +128,18 @@ export default function CommentPanel({
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemId, currentUid]);
+
+  // 부모(EditorView/ProblemView)에 노출되는 메시지 목록은
+  // "사용자에게 보이는 것"만 — 삭제된 세션의 고아 메시지는 제외 (카운트 동기화)
+  useEffect(() => {
+    if (!onCommentsChange) return;
+    const sessionIdSet = new Set(sessions.map((s) => s.id));
+    const visible = comments.filter((c) => {
+      if (!c.discussionSessionId) return true; // legacy 댓글 — 항상 표시
+      return sessionIdSet.has(c.discussionSessionId);
+    });
+    onCommentsChange(visible);
+  }, [comments, sessions, onCommentsChange]);
 
   // 초기 1회만 자동 선택: 세션이 있으면 첫 normal 세션, 없으면 legacy 유지
   const initialSelectionDoneRef = useRef(false);

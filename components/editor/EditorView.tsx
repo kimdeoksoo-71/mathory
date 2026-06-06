@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, TabComment, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
+import { listAllComments, countByTab } from '../../lib/comments';
+import { canComment as canCommentOnProblem } from '../../lib/membership';
+import CommentPanel from '../comment/CommentPanel';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -808,6 +811,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 글꼴 크기
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
 
+  // 토론 패널 (편집 중에도 AI 토론·댓글 참조 가능)
+  // 활성 탭과 동기 — 사용자가 편집 탭을 바꾸면 토론 탭도 따라감
+  const [discussionOpen, setDiscussionOpen] = useState(false);
+  const [allComments, setAllComments] = useState<TabComment[]>([]);
+  const commentCounts = useMemo(
+    () => countByTab(allComments, { unresolvedOnly: true }),
+    [allComments],
+  );
+
   // 활성 블록
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   // Phase 25 Step 1: 활성 블록 커서가 $...$ / $$...$$ 내부인지 (구분자 안쪽만)
@@ -904,6 +916,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         // 첫 블록 활성화
         const firstTabBlocks = blocksMap[loadedTabs[0].id] || [];
         if (firstTabBlocks.length > 0) setActiveBlockId(firstTabBlocks[0].id);
+
+        // 댓글·토론 로드 (실패 시 빈 배열 — 토론 패널은 별개로 동작)
+        listAllComments(problemId).then(setAllComments).catch(() => setAllComments([]));
       }
       setLoading(false);
     };
@@ -2225,10 +2240,38 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         >
           <IconPlus size={14} />
         </button>
+
+        {/* 토론 패널 토글 — ProblemView와 동일한 💬 스타일 */}
+        {user && problem && (
+          <button
+            onClick={() => setDiscussionOpen((v) => !v)}
+            title="토론 열기"
+            style={{
+              display: 'flex', alignItems: 'center', gap: 2,
+              border: 'none', background: 'none', cursor: 'pointer',
+              padding: '2px 4px', borderRadius: 4,
+              fontSize: 11,
+              color: discussionOpen ? 'var(--accent-primary)' : 'var(--text-faint)',
+              fontFamily: 'var(--font-ui)',
+              transition: 'color 0.15s',
+              marginLeft: 'auto',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+            onMouseLeave={(e) => {
+              if (!discussionOpen) (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+            }}
+          >
+            💬{commentCounts[activeTab] ? ` ${commentCounts[activeTab]}` : ''}
+          </button>
+        )}
       </div>
 
       {/* ═══ Row 3: Split View (편집창 최소폭 미달 시 가로 스크롤) ═══ */}
-      <div style={{ flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0 }}>
+      <div style={{
+        flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
+        paddingRight: discussionOpen ? 560 : 0, // 토론 패널(35em ≈ 560px) 공간 확보
+        transition: 'padding-right 0.2s',
+      }}>
 
         {/* ─── Left: Editor ─── */}
         <div style={{
@@ -2383,6 +2426,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       </div>
 
+      {/* 토론 패널 — 우측 슬라이드 (ProblemView와 동일 패턴) */}
+      {discussionOpen && user && problem && (
+        <CommentPanel
+          problemId={problem.id}
+          ownerUid={problem.authorUid || ''}
+          tabs={tabs}
+          activeTabId={activeTab}
+          currentUid={user.uid}
+          canComment={canCommentOnProblem(problem, user.uid)}
+          bodyFontSize={contentFontSize}
+          onClose={() => setDiscussionOpen(false)}
+          onCommentsChange={setAllComments}
+        />
+      )}
     </div>
   );
 }
