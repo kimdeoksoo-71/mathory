@@ -38,7 +38,7 @@ export default function FindReplacePanel({
   const [replaceText, setReplaceText] = useState('');
   const [matches, setMatches] = useState<Match[]>([]);
   const [currentIdx, setCurrentIdx] = useState(-1);
-  const [showReplace, setShowReplace] = useState(false);
+  const [showReplace, setShowReplace] = useState(true);
   const [caseSensitive, setCaseSensitive] = useState(false);
   const [wholeWord, setWholeWord] = useState(false);
   const [useRegex, setUseRegex] = useState(false);

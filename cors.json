@@ -2,6 +2,10 @@
   {
     "origin": [
       "http://localhost:3000",
+      "https://mathory.app",
+      "https://www.mathory.app",
+      "https://mathory.net",
+      "https://www.mathory.net",
       "https://mathory.vercel.app",
       "https://*.vercel.app"
     ],
