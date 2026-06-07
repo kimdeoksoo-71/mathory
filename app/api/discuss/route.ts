@@ -11,9 +11,10 @@ import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
 import type { AIModelConfig } from '../../../types/problem';
 
 export const runtime = 'nodejs';
-// Vercel: Hobby 최대 60s, Pro 최대 300s. DeepSeek(reasoning)이 자주 60s 초과
-// → 3분(180s)으로 확장. 운영은 Vercel Pro 플랜 필요.
-export const maxDuration = 200;
+// Vercel: Hobby 최대 60s, Pro 최대 300s.
+// reasoning 모델(식·민)이 고난도 문제에 길게 사고할 수 있도록 Pro 한도 최대치(300)로 설정.
+// 운영은 Vercel Pro 플랜 필수 (Hobby에선 60초에서 강제 종료됨).
+export const maxDuration = 300;
 
 interface DiscussionMessage {
   role: 'human' | 'ai';
@@ -40,7 +41,7 @@ interface DiscussSuccess {
   costUsd: number;
 }
 
-const TIMEOUT_MS = 180_000;
+const TIMEOUT_MS = 280_000;
 
 const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참여하는 전문가입니다.
 
@@ -79,8 +80,8 @@ const BASE_SYSTEM_PROMPT = `당신은 한국 고등학교 수학 토론에 참�
 4. 대안적 풀이 방법이 있다면 제시하세요.
 5. **답변 형식 — 결론 우선 (Top-down) 엄수**:
    - 첫 줄: **결론 한 문장** (예: "풀이는 옳다", "3번째 줄에 오류", "별해 있음")
-   - 다음 줄들: 그 결론의 **결정적 근거만 1~3줄**
-   - 전체 한국어 **400자 이내**
+   - 다음 줄들: 그 결론의 **결정적 근거 1~5줄**
+   - 전체 한국어 **800자 이내** (고난도 문제로 검증 단계가 길게 필요하면 1200자까지 허용)
    - **금지**:
      · 사고 과정 서술 ("먼저 ~를 살펴보면", "이를 정리하면", "다음과 같이 계산하면", "따라서 ~한 결과를 얻고", "이로부터 ~를 알 수 있으므로")
      · 단계 나열 (1./2./3./… 번호로 풀이 재작성)
@@ -235,7 +236,7 @@ function calcCost(
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   let timer: NodeJS.Timeout | undefined;
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (3분)')), ms);
+    timer = setTimeout(() => reject(new Error('AI 응답 시간 초과 (약 4.5분)')), ms);
   });
   try {
     return await Promise.race([promise, timeout]);
