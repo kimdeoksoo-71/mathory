@@ -8,7 +8,7 @@ import {
 } from '../../types/problem';
 import { db } from '../../lib/firebase';
 import {
-  listAllComments, addComment, editCommentContent, deleteComment,
+  listAllComments, watchAllComments, addComment, editCommentContent, deleteComment,
   toggleResolved, buildThreads,
 } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
@@ -129,6 +129,32 @@ export default function CommentPanel({
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemId, currentUid]);
+
+  // ─── 실시간 구독 ───
+  // 백그라운드에서 도착하는 AI 응답·다른 클라이언트 메시지를 자동 반영.
+  // 사용자가 패널을 닫아도 fetch 자체는 브라우저에서 계속 진행되며 응답이
+  // addComment로 저장되는데, 그 신호를 이 리스너가 즉시 받아 UI에 반영한다.
+  const profilesRef = useRef(profiles);
+  useEffect(() => { profilesRef.current = profiles; }, [profiles]);
+  useEffect(() => {
+    const unsub = watchAllComments(problemId, (all) => {
+      setComments(all);
+      // 인간 작성자 프로필 백필 (캐시되지 않은 uid만)
+      const unknownUids = Array.from(
+        new Set(all.filter((c) => c.authorType !== 'ai').map((c) => c.authorUid)),
+      ).filter((u) => !profilesRef.current[u]);
+      if (unknownUids.length > 0) {
+        Promise.all(unknownUids.map((u) => getUserProfile(u).catch(() => null))).then((fetched) => {
+          setProfiles((prev) => {
+            const next = { ...prev };
+            unknownUids.forEach((u, i) => { if (fetched[i]) next[u] = fetched[i]!; });
+            return next;
+          });
+        });
+      }
+    });
+    return () => unsub();
+  }, [problemId]);
 
   // 부모(EditorView/ProblemView)에 노출되는 메시지 목록은
   // "사용자에게 보이는 것"만 — 삭제된 세션의 고아 메시지는 제외 (카운트 동기화)

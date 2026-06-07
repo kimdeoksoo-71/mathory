@@ -1,6 +1,7 @@
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, serverTimestamp, Timestamp,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { TabComment, AIUsage } from '../types/problem';
@@ -90,6 +91,24 @@ export async function addComment(input: AddCommentInput): Promise<string> {
 export async function listAllComments(problemId: string): Promise<TabComment[]> {
   const snap = await getDocs(query(commentsCol(problemId), orderBy('createdAt', 'asc')));
   return snap.docs.map(mapDoc);
+}
+
+/**
+ * 한 문항의 모든 댓글에 대한 실시간 구독.
+ * 백그라운드에서 도착하는 AI 응답·다른 클라이언트의 새 메시지가
+ * 자동으로 callback에 흘러들어옴.
+ * @returns 구독 해제 함수
+ */
+export function watchAllComments(
+  problemId: string,
+  callback: (comments: TabComment[]) => void,
+): () => void {
+  const q = query(commentsCol(problemId), orderBy('createdAt', 'asc'));
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(mapDoc)),
+    (err) => console.error('[comments] 실시간 구독 오류:', err),
+  );
 }
 
 /** 특정 탭의 모든 댓글 */
