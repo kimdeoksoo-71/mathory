@@ -7,6 +7,7 @@ import { EditorState } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
+import { createMathShortcuts, createLatexAutocompletion } from '../../lib/math-editor-extensions';
 
 export interface LatexInputEditorHandle {
   insertAtCursor(text: string, cursorOffset?: number): void;
@@ -46,6 +47,9 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
 
     useEffect(() => {
       if (!containerRef.current) return;
+      // 수식 단축키 (Ctrl+N chord, Shift+Esc, Opt+Tab) — 인스턴스별 chord 상태
+      const { shortcuts: mathShortcuts, chordListener } = createMathShortcuts();
+      const latexAutocompletion = createLatexAutocompletion();
       const view = new EditorView({
         parent: containerRef.current,
         state: EditorState.create({
@@ -53,6 +57,9 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
           extensions: [
             history(),
             markdown(),
+            mathShortcuts,
+            chordListener,
+            latexAutocompletion,
             latexHighlightPlugin,
             latexHighlightTheme,
             EditorView.lineWrapping,
