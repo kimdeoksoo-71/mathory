@@ -156,6 +156,14 @@ ul li::before {
 ul ul li::before {
   content: "◦";
 }
+/* loose list (항목 사이 빈 줄)에서 ReactMarkdown이 <li> 내용을 <p>로 감싸,
+   첫 <p>가 block이라 불릿과 줄이 분리되던 문제 해결.
+   첫 <p>만 inline 처리하여 불릿과 같은 행에 흐르게 하고,
+   2번째 이후 <p>는 그대로 block으로 두어 단락 구분 유지. */
+ul li > p:first-child {
+  display: inline;
+  margin: 0;
+}
 
 /* Ordered list: 기본 숫자 (locale 변환은 전처리기에서 처리) */
 ol {
