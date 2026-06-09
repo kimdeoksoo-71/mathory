@@ -24,7 +24,42 @@ export interface LatexCompletionItem {
   cursorOffset?: number;
 }
 
-export const LATEX_COMPLETIONS: LatexCompletionItem[] = buildCompletions();
+/**
+ * 수식 환경 자동완성 (수동 등록)
+ * — ALL_SYMBOLS에는 환경이 들어있지 않으므로 별도 정의
+ * — 템플릿은 멀티라인. cursorOffset은 `\begin{...}\n  ` 다음 위치
+ */
+function envItem(name: string, detail: string): LatexCompletionItem {
+  const begin = `\\begin{${name}}`;
+  const template = `${begin}\n  \n\\end{${name}}`;
+  return {
+    label: begin,
+    detail,
+    template,
+    braceCount: 0,
+    category: 'environment',
+    boost: 100, // 환경은 자주 쓰이므로 상위 노출
+    cursorOffset: begin.length + 3, // `\begin{...}\n  ` 이후
+  };
+}
+
+const MANUAL_ENVIRONMENTS: LatexCompletionItem[] = [
+  envItem('aligned', '정렬 수식 (& 위치 기준)'),
+  envItem('cases', '조건 분기 (case 분류)'),
+  envItem('matrix', '행렬 (괄호 없음)'),
+  envItem('pmatrix', '행렬 (소괄호)'),
+  envItem('bmatrix', '행렬 (대괄호)'),
+  envItem('vmatrix', '행렬 (행렬식 |…|)'),
+  envItem('Vmatrix', '행렬 (이중 막대 ‖…‖)'),
+  envItem('gathered', '여러 줄 수식 중앙 정렬'),
+  envItem('split', '단일 수식 줄바꿈 정렬'),
+  envItem('array', '배열 (\\begin{array}{cl} …)'),
+];
+
+export const LATEX_COMPLETIONS: LatexCompletionItem[] = [
+  ...MANUAL_ENVIRONMENTS,
+  ...buildCompletions(),
+];
 
 /**
  * 큐레이션 기호 데이터(lib/math-symbols.ts, ALL_SYMBOLS)에서 자동완성 항목 생성.
