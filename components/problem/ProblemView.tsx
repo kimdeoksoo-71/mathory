@@ -17,7 +17,7 @@ import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import SharePanel from '../editor/SharePanel';
 import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
-import { listAllComments, countByTab } from '../../lib/comments';
+import { watchAllComments, countByTab } from '../../lib/comments';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import { UserProfile, TabComment } from '../../types/problem';
 import {
@@ -165,13 +165,23 @@ export default function ProblemView({
       if (data.authorUid) {
         getUserProfile(data.authorUid).then(setAuthorProfile).catch(() => setAuthorProfile(null));
       }
-      // 댓글 카운트용 로드 (실패는 무시 — 권한 없으면 빈 배열)
-      listAllComments(problemId).then(setAllComments).catch(() => setAllComments([]));
     }
     setLoading(false);
   }, [problemId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 댓글 실시간 구독 — 삭제·추가가 즉시 반영되도록 (권한 오류는 조용히 빈 배열)
+  useEffect(() => {
+    if (!problemId) return;
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = watchAllComments(problemId, setAllComments);
+    } catch {
+      setAllComments([]);
+    }
+    return () => { if (unsub) unsub(); };
+  }, [problemId]);
 
   /* ─── 글꼴 크기 로드 ─── */
   useEffect(() => {

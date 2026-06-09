@@ -8,6 +8,7 @@ import {
 } from '@dnd-kit/core';
 import { Problem, Block, Folder } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
+import { listAllComments } from '../../lib/comments';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import SvgViewer from '../viewer/SvgViewer';
@@ -108,6 +109,8 @@ export default function FolderView({
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
+  // 문항별 미해결 댓글 수
+  const [commentCountsMap, setCommentCountsMap] = useState<Record<string, number>>({});
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   // ⋮ 카드 메뉴
@@ -179,6 +182,30 @@ export default function FolderView({
       setBlocksLoading(false);
     };
     loadBlocks();
+  }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 문항별 미해결 댓글 수 로드 (병렬, 실패는 0으로)
+  useEffect(() => {
+    if (folderProblems.length === 0) { setCommentCountsMap({}); return; }
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        folderProblems.map(async (p) => {
+          try {
+            const comments = await listAllComments(p.id);
+            const n = comments.filter((c) => !c.resolved).length;
+            return [p.id, n] as const;
+          } catch {
+            return [p.id, 0] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      const map: Record<string, number> = {};
+      for (const [id, n] of entries) map[id] = n;
+      setCommentCountsMap(map);
+    })();
+    return () => { cancelled = true; };
   }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** 카드 ⋮ 메뉴 열기 — 버튼 위치 기준 */
@@ -443,6 +470,19 @@ export default function FolderView({
                     }}>
                       {problem.title}
                     </h2>
+                    {(commentCountsMap[problem.id] ?? 0) > 0 && (
+                      <span
+                        title="미해결 댓글"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          fontSize: 11, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-ui)', lineHeight: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        💬<span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
+                      </span>
+                    )}
                     <BlockchainBadge problem={problem} size={13} />
                     <button
                       onPointerDown={(e) => e.stopPropagation()}

@@ -6,7 +6,7 @@ import {
   getProblemWithBlocks, updateProblem,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
-import { listAllComments, countByTab } from '../../lib/comments';
+import { watchAllComments, countByTab } from '../../lib/comments';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
@@ -917,12 +917,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const firstTabBlocks = blocksMap[loadedTabs[0].id] || [];
         if (firstTabBlocks.length > 0) setActiveBlockId(firstTabBlocks[0].id);
 
-        // 댓글·토론 로드 (실패 시 빈 배열 — 토론 패널은 별개로 동작)
-        listAllComments(problemId).then(setAllComments).catch(() => setAllComments([]));
       }
       setLoading(false);
     };
     load();
+  }, [problemId]);
+
+  // 댓글 실시간 구독 — 삭제·추가가 즉시 반영되도록
+  useEffect(() => {
+    if (!problemId) return;
+    let unsub: (() => void) | null = null;
+    try {
+      unsub = watchAllComments(problemId, setAllComments);
+    } catch {
+      setAllComments([]);
+    }
+    return () => { if (unsub) unsub(); };
   }, [problemId]);
 
   /* ─── 현재 탭의 블록 ─── */
