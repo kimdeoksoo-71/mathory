@@ -4,17 +4,17 @@
  * 입력: { blocks: [{ id, masked }] }   ← 수식이 ⟦M0⟧, ⟦M1⟧... 로 마스킹된 상태
  * 출력: { results: { [blockId]: { status, issues, error? } } }
  *
- * Gemini Flash + responseSchema(JSON 모드)로 안정적인 구조화 출력 강제.
- * (이전: Claude Haiku 4.5 + tool_use → Gemini로 전환)
+ * Claude Haiku + tool_use(강제)로 안정적인 구조화 출력 강제.
+ * (Gemini Flash → Claude로 재전환. SDK v0.32.1은 output_config 미지원 → tool_use 사용)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import Anthropic from '@anthropic-ai/sdk';
 
 interface ReqBlock { id: string; masked: string; }
 interface ProofreadRequest { blocks: ReqBlock[]; }
 
-const MODEL = process.env.GEMINI_PROOFREAD_MODEL || 'gemini-2.5-flash';
+const MODEL = process.env.CLAUDE_PROOFREAD_MODEL || 'claude-haiku-4-5';
 
 const SYSTEM_PROMPT = `당신은 한국어 수학 문제집의 보수적인 교정자입니다. **확실한 오류만** 보고하고, 의심스러우면 침묵하세요.
 
@@ -50,25 +50,26 @@ const SYSTEM_PROMPT = `당신은 한국어 수학 문제집의 보수적인 교�
 
 지정된 JSON 스키마(results 배열, 각 항목 block_id + issues)를 정확히 따라 반환하세요.`;
 
+// tool_use 입력 스키마 (표준 JSON Schema). Claude가 이 도구를 호출하도록 강제.
 const RESPONSE_SCHEMA = {
-  type: SchemaType.OBJECT,
+  type: 'object' as const,
   properties: {
     results: {
-      type: SchemaType.ARRAY,
+      type: 'array' as const,
       description: '입력 블록 순서대로 교정 결과 배열',
       items: {
-        type: SchemaType.OBJECT,
+        type: 'object' as const,
         properties: {
-          block_id: { type: SchemaType.STRING },
+          block_id: { type: 'string' as const },
           issues: {
-            type: SchemaType.ARRAY,
+            type: 'array' as const,
             items: {
-              type: SchemaType.OBJECT,
+              type: 'object' as const,
               properties: {
-                kind: { type: SchemaType.STRING, enum: ['spelling', 'spacing', 'other'] },
-                original: { type: SchemaType.STRING },
-                suggestion: { type: SchemaType.STRING },
-                reason: { type: SchemaType.STRING },
+                kind: { type: 'string' as const, enum: ['spelling', 'spacing', 'other'] },
+                original: { type: 'string' as const },
+                suggestion: { type: 'string' as const },
+                reason: { type: 'string' as const },
               },
               required: ['kind', 'original', 'suggestion', 'reason'],
             },
@@ -90,10 +91,10 @@ interface IssueRaw {
 
 export async function POST(req: NextRequest) {
   try {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'GEMINI_API_KEY 환경변수가 설정되지 않았습니다' },
+        { error: 'ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다' },
         { status: 500 }
       );
     }
@@ -107,33 +108,37 @@ export async function POST(req: NextRequest) {
       .map((b) => `[BLOCK ${b.id}]\n${b.masked}`)
       .join('\n\n---\n\n');
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
+    const client = new Anthropic({ apiKey });
+    const apiResult = await client.messages.create({
       model: MODEL,
-      systemInstruction: SYSTEM_PROMPT,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        // SDK 타입이 보수적이라 any 캐스트
-        responseSchema: RESPONSE_SCHEMA as unknown as Parameters<typeof genAI.getGenerativeModel>[0]['generationConfig'] extends infer T ? T : never,
-        maxOutputTokens: 4096,
-        // 보수적 판단을 위해 temperature 낮춤 (기본 1.0 → 0.2)
-        temperature: 0.2,
-      } as Parameters<typeof genAI.getGenerativeModel>[0]['generationConfig'],
+      max_tokens: 4096,
+      // 보수적 판단을 위해 temperature 낮춤 (Haiku 4.5는 temperature 지원)
+      temperature: 0,
+      system: SYSTEM_PROMPT,
+      tools: [
+        {
+          name: 'report_proofreading',
+          description: '교정 결과를 구조화된 형식으로 보고한다. 오류가 없으면 issues를 빈 배열로 둔다.',
+          input_schema: RESPONSE_SCHEMA,
+        },
+      ],
+      // 반드시 도구를 호출하도록 강제 → 구조화 출력 보장
+      tool_choice: { type: 'tool', name: 'report_proofreading' },
+      messages: [{ role: 'user', content: userPrompt }],
     });
 
-    const apiResult = await model.generateContent(userPrompt);
-    const text = apiResult.response.text();
-
-    let parsed: { results?: Array<{ block_id: string; issues: IssueRaw[] }> };
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      console.error('[proofread] JSON parse 실패. raw:', text.slice(0, 200));
+    // tool_use 블록에서 구조화 입력 추출 (이미 객체)
+    const toolUse = apiResult.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use'
+    );
+    if (!toolUse) {
+      console.error('[proofread] tool_use 블록 없음. stop_reason:', apiResult.stop_reason);
       return NextResponse.json(
-        { error: 'AI 응답이 유효한 JSON이 아닙니다' },
+        { error: 'AI가 구조화된 결과를 반환하지 않았습니다' },
         { status: 502 }
       );
     }
+    const parsed = toolUse.input as { results?: Array<{ block_id: string; issues: IssueRaw[] }> };
 
     // 응답 정규화: 입력 블록 ID 모두 채우기
     const results: Record<string, { status: 'ok' | 'failed'; issues: IssueRaw[] }> = {};

@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
+import Anthropic from '@anthropic-ai/sdk';
 import type { AIModelConfig } from '../types/problem';
 
 export interface AIProviderResult {
@@ -109,6 +110,45 @@ class OpenAICompatProvider implements AIProvider {
   }
 }
 
+class ClaudeProvider implements AIProvider {
+  private client: Anthropic;
+  private modelName: string;
+
+  constructor(apiKey: string, modelName: string) {
+    this.client = new Anthropic({ apiKey });
+    this.modelName = modelName;
+  }
+
+  async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens = 1024,
+    _opts?: CompleteOptions, // Anthropic은 JSON mode 미지원 (필요 시 system 지시/prefill로 대체)
+  ): Promise<AIProviderResult> {
+    // Anthropic: system은 top-level 파라미터, messages는 user/assistant만, max_tokens 필수
+    const res = await this.client.messages.create({
+      model: this.modelName,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+    // content는 블록 배열 — text 블록만 이어붙임
+    let content = res.content
+      .filter((b): b is Anthropic.TextBlock => b.type === 'text')
+      .map((b) => b.text)
+      .join('');
+    // 토큰 한도로 잘렸으면 사용자에게 표시
+    if (res.stop_reason === 'max_tokens') {
+      content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
+    }
+    return {
+      content,
+      inputTokens: res.usage.input_tokens,
+      outputTokens: res.usage.output_tokens,
+    };
+  }
+}
+
 // ═══ Phase 37: 모델 설정 기반 provider 디스패치 ═══
 
 const PROVIDER_BASE_URLS: Record<'openai' | 'deepseek' | 'xai', string> = {
@@ -122,6 +162,7 @@ const PROVIDER_ENV_KEYS: Record<AIModelConfig['provider'], string> = {
   openai: 'OPENAI_API_KEY',
   deepseek: 'DEEPSEEK_API_KEY',
   xai: 'XAI_API_KEY',
+  anthropic: 'ANTHROPIC_API_KEY',
 };
 
 /** AIModelConfig 기반 provider 인스턴스 생성 */
@@ -136,6 +177,10 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
     return new GeminiProvider(apiKey, config.apiModelName);
   }
 
+  if (config.provider === 'anthropic') {
+    return new ClaudeProvider(apiKey, config.apiModelName);
+  }
+
   const baseURL = PROVIDER_BASE_URLS[config.provider];
   // GPT-5 계열은 max_completion_tokens 필수. DeepSeek/xAI는 max_tokens 사용
   const useCompletionTokens = config.provider === 'openai';
@@ -143,12 +188,6 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
 }
 
 // ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
-
-class ClaudeProvider implements AIProvider {
-  async complete(): Promise<AIProviderResult> {
-    throw new Error('ClaudeProvider not implemented');
-  }
-}
 
 /** 레거시 호환: AI 풀이 자동완성 등에서 사용. 단일 provider 환경변수 기반 */
 export function getAIProvider(): AIProvider {
@@ -162,7 +201,10 @@ export function getAIProvider(): AIProvider {
   }
 
   if (provider === 'claude') {
-    return new ClaudeProvider();
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) throw new Error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다');
+    const model = process.env.AI_MODEL || 'claude-opus-4-8';
+    return new ClaudeProvider(apiKey, model);
   }
 
   throw new Error(`Unknown AI provider: ${provider}`);

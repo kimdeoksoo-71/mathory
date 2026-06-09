@@ -70,7 +70,7 @@ export interface AIModelConfig {
   modelId: string;                     // 'gemini-3.1-pro'
   displayName: string;                  // 'Gemini 3.1 Pro'
   nickname: string;                     // '민' (한 음절, 인간 사용 금지 예약어)
-  provider: 'google' | 'openai' | 'deepseek' | 'xai';
+  provider: 'google' | 'openai' | 'deepseek' | 'xai' | 'anthropic';
   apiModelName: string;                 // 실제 API 호출 모델명
   enabled: boolean;
   maxTokens: number;
