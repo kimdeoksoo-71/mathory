@@ -218,6 +218,13 @@ p:has(.marker-circled) {
   display: inline-block;
 }
 
+/* 인라인 \displaystyle 분수가 있는 단락은 행간을 자동으로 늘려 위/아래 행과 겹치지 않도록.
+   분수가 없는 일반 텍스트 단락은 그대로. */
+.preview-content p:has(.mfrac),
+.preview-content li:has(.mfrac) {
+  line-height: 2.2;
+}
+
 /* 선택지 가로 배열: 셀 내부 여백 최소화 */
 .choices-grid .preview-content p {
   margin: 0;
