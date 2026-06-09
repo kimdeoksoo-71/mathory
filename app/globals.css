@@ -218,11 +218,13 @@ p:has(.marker-circled) {
   display: inline-block;
 }
 
-/* 인라인 \displaystyle 분수가 있는 단락은 행간을 자동으로 늘려 위/아래 행과 겹치지 않도록.
-   분수가 없는 일반 텍스트 단락은 그대로. */
-.preview-content p:has(.mfrac),
-.preview-content li:has(.mfrac) {
-  line-height: 2.2;
+/* 인라인 \displaystyle로 커진 수식(분수·sqrt·displaystyle ∑/∫/∏)이 위/아래 행과
+   겹치지 않도록 해당 수식 요소에만 padding을 줘서 그 줄만 라인 박스 확대.
+   line-height와 달리 단락 전체가 아닌 수식이 위치한 줄에만 적용되어
+   같은 단락 내 일반 텍스트 줄은 그대로 좁게 유지됨. */
+.preview-content .katex:has(.mfrac, .sqrt, .op-symbol.large-op) {
+  padding-top: 0.4em;
+  padding-bottom: 0.4em;
 }
 
 /* 선택지 가로 배열: 셀 내부 여백 최소화 */
