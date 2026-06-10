@@ -159,6 +159,68 @@ class OpenAICompatProvider implements AIProvider {
   }
 }
 
+/**
+ * Phase 41: OpenAI 전용 provider — Responses API + code_interpreter(SymPy 검산).
+ * DeepSeek/xAI는 Responses API를 지원하지 않으므로 OpenAICompatProvider를 계속 사용.
+ */
+class OpenAIResponsesProvider implements AIProvider {
+  private client: OpenAI;
+  private modelName: string;
+
+  constructor(apiKey: string, modelName: string) {
+    this.client = new OpenAI({ apiKey });
+    this.modelName = modelName;
+  }
+
+  async complete(
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens = 1024,
+    _opts?: CompleteOptions, // OpenAI 토론 모델(쳇)은 JSON mode 미사용
+  ): Promise<AIProviderResult> {
+    const res = await this.client.responses.create({
+      model: this.modelName,
+      instructions: systemPrompt,
+      input: userPrompt,
+      max_output_tokens: maxTokens,
+      tools: [{ type: 'code_interpreter', container: { type: 'auto' } }],
+    });
+
+    // output 순회 직렬화 — message text는 본문, code_interpreter_call은 검산 부록으로
+    let body = '';
+    const codeBlocks: Array<{ code: string; output: string }> = [];
+    for (const item of res.output ?? []) {
+      if (item.type === 'message') {
+        for (const c of item.content) {
+          if (c.type === 'output_text') body += c.text;
+        }
+      } else if (item.type === 'code_interpreter_call') {
+        const logs = (item.outputs ?? [])
+          .filter((o): o is { type: 'logs'; logs: string } => o.type === 'logs')
+          .map((o) => o.logs)
+          .join('\n');
+        codeBlocks.push({ code: item.code ?? '', output: logs });
+      }
+    }
+    // output_text 폴백 (message 파트 누락 등 예외)
+    if (!body && codeBlocks.length === 0) {
+      body = res.output_text ?? '';
+    }
+
+    let content = appendCodeExecDetails(body, codeBlocks);
+    // 토큰 한도로 잘렸으면 사용자에게 표시
+    if (res.incomplete_details?.reason === 'max_output_tokens') {
+      content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
+    }
+    return {
+      content,
+      inputTokens: res.usage?.input_tokens ?? 0,
+      outputTokens: res.usage?.output_tokens ?? 0,
+      hasCodeExecution: codeBlocks.length > 0,
+    };
+  }
+}
+
 class ClaudeProvider implements AIProvider {
   private client: Anthropic;
   private modelName: string;
@@ -231,10 +293,14 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
     return new ClaudeProvider(apiKey, config.apiModelName);
   }
 
+  if (config.provider === 'openai') {
+    // 토론용 GPT(쳇)는 Responses API + code_interpreter(SymPy 검산) 사용 (Phase 41)
+    return new OpenAIResponsesProvider(apiKey, config.apiModelName);
+  }
+
+  // DeepSeek/xAI는 Responses API 미지원 — chat.completions 기반 OpenAICompat 사용. max_tokens.
   const baseURL = PROVIDER_BASE_URLS[config.provider];
-  // GPT-5 계열은 max_completion_tokens 필수. DeepSeek/xAI는 max_tokens 사용
-  const useCompletionTokens = config.provider === 'openai';
-  return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName, useCompletionTokens);
+  return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName, false);
 }
 
 // ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
