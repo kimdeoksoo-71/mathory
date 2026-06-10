@@ -145,7 +145,8 @@ const CODE_EXEC_INSTRUCTION = `
 - 명시가 없어도 본인 판단으로 수치·대수 결과의 정확성이 의심되면 자유롭게 실행 가능.
 - 사용자가 검증 대상을 지정했으면 그것만 검증. 임의로 다른 부분까지 확장 검증 금지.
 - 코드는 짧고 한 목적만 — print로 결과를 명확히 출력.
-- 검산 결과는 최종 결론에 자연어로 반영하세요. 코드/출력 자체는 부록(<details>) 위치에 자동 첨부되므로 본문에 코드를 다시 적지 마세요.`;
+- 검산 결과는 최종 결론에 **자연어로만** 반영하세요.
+- ⚠️ **본문(결론)에는 절대로 코드 블록(\`\`\`python …\`\`\`)이나 실행 출력 텍스트를 적지 마세요.** 실행한 코드와 출력은 시스템이 자동으로 별도 부록(<details>)에 첨부합니다. 본문에 코드를 또 적으면 사용자에게 동일 코드가 **두 번** 보여 무효 처리됩니다. 본문엔 코드 없이 "검산 결과 ~로 확인됨" 같은 자연어 결론만 남기세요.`;
 
 function buildSystemPrompt(args: {
   appendPrompt: string;
@@ -180,6 +181,15 @@ function buildSystemPrompt(args: {
 const USER_MESSAGE_STRUCTURED_SUFFIX =
   '\n\n[필수 출력 규칙] 사고 과정 적지 말고 JSON 스키마 그대로만 답하기. ' +
   '"conclusion": 1문장 50단어 이하, "reasons": 0~4문장 각 50단어 이하. JSON 외 텍스트 금지.';
+
+/** Phase 41: 사용자가 명시적으로 검산을 요구했는지 감지 (민·쳇 코드 실행 강제용) */
+const CODE_EXEC_TRIGGER_RE = /검산|sympy|코드로\s*(확인|검증|계산)|파이썬으로|계산해\s*확인/i;
+
+/** 검산 명시 요청 시 user message 끝에 강제 부착 — 코드 실행 없이 답변 금지 */
+const USER_MESSAGE_CODEEXEC_SUFFIX =
+  '\n\n[필수] 이 메시지는 명시적인 검산 요청입니다. 추론만으로 답하지 말고 ' +
+  '반드시 Python(SymPy) 코드를 **실제로 실행**해 결과를 확인한 뒤 결론을 내세요. ' +
+  '코드 실행 없이 답하면 응답이 무효 처리됩니다. (코드/출력은 시스템이 자동 첨부하므로 본문엔 자연어 결론만 적으세요.)';
 
 /** 식 응답(JSON)을 마크다운으로 변환 — 파싱 실패 시 원본 폴백 */
 function formatStructuredResponse(raw: string): string {
@@ -325,10 +335,16 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
     structuredOutput: structured,
     codeExecution,
   });
-  // 식: user message 끝에 출력 규칙 강제 부착 (B3) — 시스템 프롬프트보다 강하게 작동
-  const promptBody: DiscussRequest = structured
-    ? { ...body, currentMessage: body.currentMessage + USER_MESSAGE_STRUCTURED_SUFFIX }
-    : body;
+  // 검산 명시 요청 감지 — 민·쳇은 코드 실행을 강제 (Phase 41)
+  const codeExecForced = codeExecution && CODE_EXEC_TRIGGER_RE.test(body.currentMessage);
+
+  // user message 끝에 출력 규칙 강제 부착 — 시스템 프롬프트보다 강하게 작동
+  // (식: JSON 스키마 강제 / 민·쳇: 검산 명시 시 코드 실행 강제. provider가 달라 동시 적용 없음)
+  let currentMessage = body.currentMessage;
+  if (structured) currentMessage += USER_MESSAGE_STRUCTURED_SUFFIX;
+  if (codeExecForced) currentMessage += USER_MESSAGE_CODEEXEC_SUFFIX;
+  const promptBody: DiscussRequest =
+    currentMessage === body.currentMessage ? body : { ...body, currentMessage };
   const userPrompt = buildUserPrompt(promptBody);
 
   try {

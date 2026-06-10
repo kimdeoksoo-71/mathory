@@ -26,7 +26,7 @@ function appendCodeExecDetails(
         `\n\`\`\`python\n${b.code}\n\`\`\`\n\n실행 결과:\n\`\`\`\n${b.output}\n\`\`\``,
     )
     .join('\n\n---\n\n');
-  return `${body}\n\n<details>\n<summary>🔍 검산 코드 (${codeBlocks.length}개)</summary>\n${details}\n</details>`;
+  return `${body}\n\n<details>\n<summary>{ / } 검산 코드 (${codeBlocks.length}개)</summary>\n${details}\n</details>`;
 }
 
 export interface CompleteOptions {

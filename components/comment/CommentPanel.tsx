@@ -557,6 +557,14 @@ export default function CommentPanel({
         .comment-body.ai-body { color: #4a4a4a; }
         .comment-body .katex,
         .comment-body .katex * { color: var(--text-primary); }
+        /* 검산 코드(<details>) 등 넓은 블록이 토론창 밖으로 새지 않도록 — 테두리 안에서 가로 스크롤 */
+        .comment-body, .comment-body > div { min-width: 0; max-width: 100%; }
+        .comment-body details { max-width: 100%; }
+        .comment-body pre {
+          overflow-x: auto;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
         @keyframes pulse-pending {
           0%, 100% { opacity: 0.55; }
           50% { opacity: 0.95; }
