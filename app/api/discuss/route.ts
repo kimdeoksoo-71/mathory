@@ -135,11 +135,24 @@ const STRUCTURED_OUTPUT_INSTRUCTION = `
 - 한 항목이 50단어 초과
 - 코드 펜스로 감싸기 (\`\`\`json ... \`\`\`)`;
 
+/**
+ * Phase 41: 검산 도구(SymPy/Python code execution)가 활성화된 모델(민·쳇)에만 추가하는 지침.
+ * BASE_SYSTEM_PROMPT 규칙 #11 다음에 #12로 이어붙는다.
+ */
+const CODE_EXEC_INSTRUCTION = `
+12. **검산 도구 (SymPy/Python 코드 실행)**:
+- 사용자가 "검산해줘", "코드로 확인", "파이썬으로" 등을 명시하면 반드시 코드를 실행해 검증하세요.
+- 명시가 없어도 본인 판단으로 수치·대수 결과의 정확성이 의심되면 자유롭게 실행 가능.
+- 사용자가 검증 대상을 지정했으면 그것만 검증. 임의로 다른 부분까지 확장 검증 금지.
+- 코드는 짧고 한 목적만 — print로 결과를 명확히 출력.
+- 검산 결과는 최종 결론에 자연어로 반영하세요. 코드/출력 자체는 부록(<details>) 위치에 자동 첨부되므로 본문에 코드를 다시 적지 마세요.`;
+
 function buildSystemPrompt(args: {
   appendPrompt: string;
   participantNicknames: string[];
   myNickname: string;
   structuredOutput?: boolean;
+  codeExecution?: boolean;
 }): string {
   const participants = args.participantNicknames.length
     ? args.participantNicknames.join(', ')
@@ -150,6 +163,10 @@ function buildSystemPrompt(args: {
     `참여 토론자: ${participants}`,
     `당신의 닉네임: ${args.myNickname}`,
   ];
+  // 검산 도구 지침은 BASE 규칙 #11 바로 뒤(#12)에 이어붙는 것이 자연스러움
+  if (args.codeExecution) {
+    lines.push(CODE_EXEC_INSTRUCTION);
+  }
   if (args.appendPrompt.trim()) {
     lines.push('', `[추가 지침] ${args.appendPrompt.trim()}`);
   }
@@ -192,6 +209,11 @@ function formatStructuredResponse(raw: string): string {
 /** 식(DeepSeek) 여부 판정 — provider 기반 */
 function isStructuredOutputModel(config: AIModelConfig): boolean {
   return config.provider === 'deepseek';
+}
+
+/** 검산 도구(code execution) 활성 모델 판정 — 민(google)·쳇(openai) (Phase 41) */
+function isCodeExecutionModel(config: AIModelConfig): boolean {
+  return config.provider === 'google' || config.provider === 'openai';
 }
 
 function buildUserPrompt(body: DiscussRequest): string {
@@ -294,12 +316,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
   }
 
   const structured = isStructuredOutputModel(config);
+  const codeExecution = isCodeExecutionModel(config);
 
   const systemPrompt = buildSystemPrompt({
     appendPrompt: config.appendPrompt,
     participantNicknames: body.participantNicknames,
     myNickname: body.myNickname,
     structuredOutput: structured,
+    codeExecution,
   });
   // 식: user message 끝에 출력 규칙 강제 부착 (B3) — 시스템 프롬프트보다 강하게 작동
   const promptBody: DiscussRequest = structured
@@ -314,6 +338,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
     );
     // 식: JSON 응답을 마크다운으로 변환 (실패 시 원본 폴백)
     const finalContent = structured ? formatStructuredResponse(result.content) : result.content;
+    // Phase 41 비용: Gemini code execution은 토큰에 산입되므로 그대로 반영.
+    // OpenAI code_interpreter 컨테이너 시간은 별도 청구되지만 여기선 입출력 토큰만 카운트한다.
     const costUsd = calcCost(
       result.inputTokens,
       result.outputTokens,
