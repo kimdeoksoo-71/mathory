@@ -2296,7 +2296,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
         {/* ─── Left: Editor ─── */}
         <div style={{
-          flex: 1, minWidth: 420, borderRight: '1px solid var(--border-light)',
+          flex: 1, minWidth: 420,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
         }}>
           {/* ── 찾기/바꾸기 패널 ── */}

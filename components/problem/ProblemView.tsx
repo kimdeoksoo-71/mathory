@@ -443,21 +443,27 @@ export default function ProblemView({
       background: '#ffffff', fontSize: contentFontSize,
       overflow: 'hidden', position: 'relative',
     }}>
-      {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 (sticky 호환을 위해 비-flex) ═══ */}
-      {/* 댓글 패널 폭(35em) + 24px 여백만큼 우측 패딩 → 본문이 패널에 가려지지 않고 자연스러운 간격 확보 */}
+      {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 ═══ */}
+      {/* 토론 패널 열림: flex 우측 정렬로 콘텐츠 오른쪽 끝을 (패널 왼쪽 - 24px)에 고정.
+          창이 좁을 땐 왼쪽이 잘려나가도 OK (overflow-x:hidden). */}
       <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
-        overflow: 'auto',
+        overflowY: 'auto',
+        overflowX: 'hidden',
         background: 'var(--bg-primary, #FAF9F7)',
-        paddingRight: commentPanelTab ? 'calc(35em + 24px)' : 0,
+        paddingRight: commentPanelTab ? 'calc(35em + 48px)' : 0,
         transition: 'padding-right 0.18s ease',
+        display: 'flex',
+        // unsafe flex-end: 콘텐츠가 컨테이너보다 커도 우측 정렬 유지 (왼쪽으로 overflow)
+        // overflow-x: hidden이 좌측 잘림 허용
+        justifyContent: commentPanelTab ? 'unsafe flex-end' : 'center',
       }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
-          width: 'fit-content',
-          margin: '0 auto',
-          padding: '0 32px',
+          display: 'table',
+          padding: commentPanelTab ? '0 0 0 32px' : '0 32px',
           boxSizing: 'border-box',
+          flexShrink: 0,
         }}>
           {(() => {
             const fid = problem.folder_id || '';
@@ -473,25 +479,26 @@ export default function ProblemView({
             const expanded = folderPathHover && hasAncestors;
 
             const LABEL_GAP = 28; // 라벨↔본문 간격
-            // 공유 스타일 — 헤더/탭 행 공통, 항상 7em 고정 (컨텐츠 행 위치 불변)
+            // 공유 스타일 — 헤더/탭 행 공통. em은 적용 요소의 자체 font-size 기준이라
+            // h1처럼 fontSize override가 있는 곳에서 폭이 달라짐 → px로 고정해 통일.
             const labelColStyle: React.CSSProperties = {
-              width: '7em', flexShrink: 0,
+              width: 7 * contentFontSize, flexShrink: 0,
               textAlign: 'left', fontFamily: 'var(--font-ui)',
             };
             const mainColStyle: React.CSSProperties = {
-              width: '35em', flexShrink: 0,
+              width: 35 * contentFontSize, flexShrink: 0,
             };
 
             return (
               <>
                 {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정. 사이드바·토론패널·EditorView와 동일 57px */}
+                {/* 구분선은 제목 column(35em)에만 적용되도록 h1 아래에 별도 그림 */}
                 <div style={{
                   display: 'flex', alignItems: 'center', gap: LABEL_GAP,
                   marginBottom: 24,
                   position: 'sticky', top: 0, zIndex: 5,
                   background: 'var(--bg-primary, #FAF9F7)',
                   minHeight: 57, boxSizing: 'border-box',
-                  borderBottom: '1px solid var(--border-light)',
                 }}>
                   {/* 헤더 라벨 박스 — 폭 7em 고정(레이아웃 불변). 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
                   <div
@@ -567,6 +574,10 @@ export default function ProblemView({
                       // 펼침 시 제목만 우측으로 슬라이드(레이아웃 불변 → 컨텐츠 행 위치 고정)
                       transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
                       transition: 'color 0.15s, transform 0.25s ease',
+                      // 구분선을 제목 column에만 — sticky 행 전체가 아닌 35em 폭으로 제한
+                      alignSelf: 'stretch',
+                      borderBottom: '1px solid var(--border-light)',
+                      paddingBottom: 12,
                     }}
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
@@ -593,6 +604,18 @@ export default function ProblemView({
                         display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4,
                         paddingTop: isOpen ? 14 : 0,
                       }}>
+                        <span
+                          onClick={() => toggleTab(tab.id)}
+                          style={{
+                            fontSize: 12, fontWeight: 600,
+                            color: isOpen ? 'var(--text-muted)' : 'var(--text-faint)',
+                            letterSpacing: 0.5,
+                            cursor: 'pointer', userSelect: 'none',
+                          }}
+                          title={isOpen ? '탭 접기' : '탭 펼치기'}
+                        >
+                          {tab.label}
+                        </span>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
                           title="Markdown 복사"
@@ -606,18 +629,6 @@ export default function ProblemView({
                         >
                           {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
                         </button>
-                        <span
-                          onClick={() => toggleTab(tab.id)}
-                          style={{
-                            fontSize: 12, fontWeight: 600,
-                            color: isOpen ? 'var(--text-muted)' : 'var(--text-faint)',
-                            letterSpacing: 0.5,
-                            cursor: 'pointer', userSelect: 'none',
-                          }}
-                          title={isOpen ? '탭 접기' : '탭 펼치기'}
-                        >
-                          {tab.label}
-                        </span>
                         {/* 댓글 버튼 — 로그인했고 본인 문항 OR 멤버일 때만 표시 */}
                         {user && (isOwnerView || isMemberView) && (
                           <button
@@ -660,8 +671,8 @@ export default function ProblemView({
                   );
                 })}
 
-                {/* 하단 여백 */}
-                <div style={{ height: '70vh' }} />
+                {/* 하단 여백 — width:0으로 fit-content 부모의 폭 계산에 영향 안 주도록 */}
+                <div style={{ height: '70vh', width: 0 }} />
               </>
             );
           })()}
