@@ -444,12 +444,12 @@ export default function ProblemView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 (sticky 호환을 위해 비-flex) ═══ */}
-      {/* 댓글 패널이 열리면 우측 패딩으로 본문이 패널 폭(380px)만큼 + 여백을 두고 왼쪽으로 시프트 */}
+      {/* 댓글 패널 폭(35em) + 24px 여백만큼 우측 패딩 → 본문이 패널에 가려지지 않고 자연스러운 간격 확보 */}
       <div className="no-scrollbar" style={{
         flex: 1, minWidth: 0,
         overflow: 'auto',
         background: 'var(--bg-primary, #FAF9F7)',
-        paddingRight: commentPanelTab ? 408 : 0,
+        paddingRight: commentPanelTab ? 'calc(35em + 24px)' : 0,
         transition: 'padding-right 0.18s ease',
       }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}

@@ -2003,7 +2003,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         padding: '0 16px',
         minHeight: 57, boxSizing: 'border-box',
         // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
-        paddingRight: discussionOpen ? 16 + 560 : 16,
+        paddingRight: discussionOpen ? 'calc(35em + 16px + 24px)' : 16,
         transition: 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)',
         flexShrink: 0, flexWrap: 'wrap',
@@ -2129,7 +2129,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center',
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
-        paddingRight: discussionOpen ? 16 + 560 : 16,
+        paddingRight: discussionOpen ? 'calc(35em + 16px + 24px)' : 16,
         transition: 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
         gap: 4,
@@ -2290,7 +2290,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       {/* ═══ Row 3: Split View (편집창 최소폭 미달 시 가로 스크롤) ═══ */}
       <div style={{
         flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
-        paddingRight: discussionOpen ? 560 : 0, // 토론 패널(35em ≈ 560px) 공간 확보
+        paddingRight: discussionOpen ? 'calc(35em + 24px)' : 0, // 토론 패널(35em) + 24px 여백
         transition: 'padding-right 0.2s',
       }}>
 
