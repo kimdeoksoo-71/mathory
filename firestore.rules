@@ -188,9 +188,14 @@ service cloud.firestore {
 
         // 삭제:
         //  - 인간 댓글: 작성 본인만
-        //  - AI 댓글: 불가 (resolved 토글로만 정리)
-        allow delete: if resource.data.get('authorType', 'human') == 'human'
-          && resource.data.authorUid == request.auth.uid;
+        //  - AI 댓글: 문제 오너만 (길거나 잘린 AI 답변 정리용, Phase 41)
+        allow delete: if (
+          resource.data.get('authorType', 'human') == 'human'
+          && resource.data.authorUid == request.auth.uid
+        ) || (
+          resource.data.authorType == 'ai'
+          && isOwnerCmt()
+        );
       }
 
       // ===== problems/{id}/discussion_sessions/{sid} (Phase 37) =====

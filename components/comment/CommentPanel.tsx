@@ -1249,7 +1249,10 @@ function CommentItem({
               <button onClick={onDelete} style={{ ...miniLinkStyle, color: 'var(--accent-danger)' }}>삭제</button>
             </>
           )}
-          {/* AI 메시지엔 수정/삭제 버튼 없음 (보안 규칙도 차단) */}
+          {/* AI 메시지: 수정 불가. 삭제는 문제 오너만 (길거나 잘린 답변 정리용, Phase 41) */}
+          {info.isAI && isOwner && (
+            <button onClick={onDelete} style={{ ...miniLinkStyle, color: 'var(--accent-danger)' }}>삭제</button>
+          )}
           {info.isAI && comment.aiUsage && (
             <span
               style={{

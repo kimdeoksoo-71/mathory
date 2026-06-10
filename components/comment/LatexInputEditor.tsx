@@ -24,6 +24,8 @@ interface LatexInputEditorProps {
   onChange?: (v: string) => void;
   /** Ctrl/Cmd + Enter 콜백 — true 반환해 기본동작 막음 */
   onSubmit?: () => void;
+  /** 입력 글자수 상한 (초과하는 변경은 차단). 미지정 시 무제한 */
+  maxLength?: number;
 }
 
 const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProps>(
@@ -35,6 +37,7 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
     autoFocus = false,
     onChange,
     onSubmit,
+    maxLength,
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
@@ -63,6 +66,14 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             latexHighlightPlugin,
             latexHighlightTheme,
             EditorView.lineWrapping,
+            // 글자수 상한 — 결과 문서가 maxLength를 넘기는 변경(타이핑·붙여넣기)은 통째로 차단
+            ...(maxLength
+              ? [
+                  EditorState.changeFilter.of((tr) =>
+                    !tr.docChanged || tr.newDoc.length <= maxLength,
+                  ),
+                ]
+              : []),
             cmPlaceholder(placeholder),
             keymap.of([
               {

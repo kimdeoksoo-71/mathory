@@ -25,6 +25,8 @@ interface CommentEditorProps {
   headerLeft?: ReactNode;
   /** 그림 업로드 시 Storage 경로용. 미지정 시 그림 버튼 숨김. */
   problemId?: string;
+  /** 입력 글자수 상한 (기본 1000). 토론 답변이 지나치게 길어지는 것을 방지 */
+  maxLength?: number;
 }
 
 export default function CommentEditor({
@@ -36,6 +38,7 @@ export default function CommentEditor({
   autoFocus = false,
   headerLeft,
   problemId,
+  maxLength = 1000,
 }: CommentEditorProps) {
   const [value, setValue] = useState(initialValue);
   const [showPreview, setShowPreview] = useState(false);
@@ -244,6 +247,7 @@ export default function CommentEditor({
           minHeight={120}
           placeholder={placeholder}
           autoFocus={autoFocus}
+          maxLength={maxLength}
           onChange={setValue}
           onSubmit={handleSubmit}
         />
@@ -267,6 +271,12 @@ export default function CommentEditor({
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
         gap: 6, marginTop: 6,
       }}>
+        <span style={{
+          fontSize: 11, marginRight: 'auto',
+          color: value.length >= maxLength ? 'var(--accent-danger, #c0392b)' : 'var(--text-faint)',
+        }}>
+          {value.length}/{maxLength}
+        </span>
         <button
           type="button"
           onClick={() => setShowPreview((v) => !v)}
