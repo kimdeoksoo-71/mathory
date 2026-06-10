@@ -1,7 +1,7 @@
 # Phase 41: AI 토론자 SymPy 검산 도구
 
 > **목표**: 토론창에서 민·쳇에게 SymPy 코드 실행으로 수치·기호 검산 요청 가능
-> **상태**: 계획서 v1 — 구현 대기
+> **상태**: Step A~E 구현 완료 (2026-06-10). Step F는 dev 서버 라이브 검증 대기 (실 API 호출 필요)
 > **선행 의존**: Phase 37 (AI 토론 기능)
 > **제외 범위**: 식(DeepSeek), 락(Grok), 섬(Gemini Flash)은 이번 phase에서 도구 미적용
 >   - 식·락: provider 자체 내장 미지원 (별도 phase에서 Pyodide 등으로 구현 가능)

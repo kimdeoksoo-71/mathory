@@ -1114,3 +1114,21 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
   - 마지막 세그먼트: 자식 폴더 드롭다운 (2-2), 없으면 "하위 폴더 없음"
   - 선택 시 `setEditFolderId` → editFolderId는 dirty 추적 포함이라 기존 저장 흐름으로 이동 반영
 - `components/editor/FolderPathBar.tsx` (신규) — getFolderPath/getChildren 재사용, 칩별 드롭다운 + 외부클릭 닫기
+
+---
+
+## Phase 41: AI 토론자 SymPy 검산 도구 ✅ (Step A~E)
+
+토론창에서 민(Gemini)·쳇(GPT)에게 코드 실행으로 수치·기호 검산 요청. 상세: `docs/phasedocs/Phase41 SymPy 검산도구.md`
+
+| Step | 구현 |
+|------|------|
+| A | `GeminiProvider` code execution(`tools:[{codeExecution:{}}]`) + parts 순회 직렬화. `appendCodeExecDetails`로 `<details>` 부록 생성 |
+| B | `OpenAIResponsesProvider` 신규 — Responses API + `code_interpreter`. output 순회 직렬화 |
+| C | `getProviderForModel`: openai→Responses, deepseek/xai→OpenAICompat 유지 |
+| D | discuss 시스템 프롬프트 #12(검산 도구 지침) — google·openai 모델에만 부착 |
+| E | 비용: Gemini 토큰 산입, OpenAI 컨테이너 시간은 별도(미추적) |
+
+- 검산 결과는 본문 결론 + 접힌 `<details>🔍 검산 코드` 부록. EditorPreview의 rehype-raw가 렌더
+- 제외: 식(DeepSeek)·락(Grok)·섬(Gemini Flash)은 도구 미적용
+- **남은 것**: Step F 라이브 검증(dev 서버 실 API 호출)
