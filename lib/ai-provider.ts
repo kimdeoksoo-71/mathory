@@ -7,6 +7,26 @@ export interface AIProviderResult {
   content: string;
   inputTokens: number;
   outputTokens: number;
+  /** 통계용: 응답에 코드 실행(SymPy 검산)이 포함되었는지 */
+  hasCodeExecution?: boolean;
+}
+
+/**
+ * Gemini/GPT 응답의 코드 실행 파트를 접힌 `<details>` 마크다운 부록으로 직렬화.
+ * 본문(body) 뒤에 검산 코드+실행결과를 붙여 반환. 코드 블록이 없으면 body 그대로.
+ */
+function appendCodeExecDetails(
+  body: string,
+  codeBlocks: Array<{ code: string; output: string }>,
+): string {
+  if (codeBlocks.length === 0) return body;
+  const details = codeBlocks
+    .map(
+      (b) =>
+        `\n\`\`\`python\n${b.code}\n\`\`\`\n\n실행 결과:\n\`\`\`\n${b.output}\n\`\`\``,
+    )
+    .join('\n\n---\n\n');
+  return `${body}\n\n<details>\n<summary>🔍 검산 코드 (${codeBlocks.length}개)</summary>\n${details}\n</details>`;
 }
 
 export interface CompleteOptions {
@@ -28,10 +48,13 @@ export interface AIProvider {
 class GeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI;
   private modelName: string;
+  /** SymPy 검산용 code execution tool 활성화 (Phase 41) */
+  private enableCodeExecution: boolean;
 
-  constructor(apiKey: string, modelName: string) {
+  constructor(apiKey: string, modelName: string, enableCodeExecution = false) {
     this.genAI = new GoogleGenerativeAI(apiKey);
     this.modelName = modelName;
+    this.enableCodeExecution = enableCodeExecution;
   }
 
   async complete(
@@ -44,10 +67,35 @@ class GeminiProvider implements AIProvider {
       model: this.modelName,
       systemInstruction: systemPrompt,
       generationConfig: { maxOutputTokens: maxTokens },
+      ...(this.enableCodeExecution ? { tools: [{ codeExecution: {} }] } : {}),
     });
     const result = await model.generateContent(userPrompt);
     const usage = result.response.usageMetadata;
-    let content = result.response.text();
+
+    // parts 순회 직렬화 — text는 본문, executableCode+codeExecutionResult는 검산 부록으로
+    const parts = result.response.candidates?.[0]?.content?.parts ?? [];
+    let body = '';
+    const codeBlocks: Array<{ code: string; output: string }> = [];
+    let pendingCode: string | null = null;
+    for (const part of parts) {
+      if (typeof part.text === 'string') {
+        body += part.text;
+      } else if (part.executableCode) {
+        pendingCode = part.executableCode.code ?? '';
+      } else if (part.codeExecutionResult) {
+        codeBlocks.push({
+          code: pendingCode ?? '',
+          output: part.codeExecutionResult.output ?? '',
+        });
+        pendingCode = null;
+      }
+    }
+    // parts가 비어있는 예외적 경우 .text() 폴백
+    if (!body && codeBlocks.length === 0) {
+      body = result.response.text();
+    }
+
+    let content = appendCodeExecDetails(body, codeBlocks);
     // 토큰 한도로 잘렸으면 사용자에게 표시
     const finishReason = result.response.candidates?.[0]?.finishReason;
     if (finishReason === 'MAX_TOKENS') {
@@ -57,6 +105,7 @@ class GeminiProvider implements AIProvider {
       content,
       inputTokens: usage?.promptTokenCount ?? 0,
       outputTokens: usage?.candidatesTokenCount ?? 0,
+      hasCodeExecution: codeBlocks.length > 0,
     };
   }
 }
@@ -174,7 +223,8 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
   }
 
   if (config.provider === 'google') {
-    return new GeminiProvider(apiKey, config.apiModelName);
+    // 토론용 Gemini(민)는 SymPy 검산 code execution 활성 (Phase 41)
+    return new GeminiProvider(apiKey, config.apiModelName, true);
   }
 
   if (config.provider === 'anthropic') {
