@@ -358,7 +358,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
       } : {
         position: 'relative',
         width: '100%',
-        maxWidth: 320,
         height: PREVIEW_HEIGHT,
         margin: '8px 0',
         background: '#fafafa',
@@ -431,7 +430,7 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
         </div>
       )}
 
-      {/* 💾 블록 저장 버튼 + 형식 드롭다운 (편집 화면에서만 = onSaveAsBlock 있을 때만) */}
+      {/* 블록 저장 버튼 + 형식 드롭다운 (편집 화면에서만 = onSaveAsBlock 있을 때만) */}
       {onSaveAsBlock && active && !loading && !error && (
         <div
           style={{ position: 'absolute', top: 8, right: 46, zIndex: 9999 }}
@@ -450,7 +449,7 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
               color: 'var(--text-secondary, #444)',
             }}
           >
-            {saving ? '저장 중…' : '💾 저장'}
+            {saving ? '저장 중…' : '블록으로 저장'}
           </button>
           {saveMenuOpen && !saving && (
             <div style={{
