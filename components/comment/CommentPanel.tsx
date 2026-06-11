@@ -19,6 +19,7 @@ import {
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor from './CommentEditor';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
+import { IconDownload } from '../ui/Icons';
 
 const LEGACY_SESSION_ID = '__legacy__';
 const HISTORY_LIMIT = 5;
@@ -1391,9 +1392,9 @@ function CommentItem({
               onClick={handleDownloadGgb}
               disabled={graphBusy !== null}
               title="GGB 파일 다운로드"
-              style={{ ...miniLinkStyle, fontSize: 12 }}
+              style={{ ...miniLinkStyle, display: 'inline-flex', alignItems: 'center' }}
             >
-              {graphBusy === 'download' ? '…' : '⬇'}
+              {graphBusy === 'download' ? '…' : <IconDownload size={12} />}
             </button>
           )}
           {graphStatus && (
