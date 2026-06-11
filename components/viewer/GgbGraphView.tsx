@@ -320,9 +320,16 @@ export default function GgbGraphView({ spec, autoActivate = false, onRegisterExp
         } catch (e) { clearTimeout(timer); reject(e); }
       });
       if (!svg || !svg.includes('<svg')) throw new Error('SVG 내보내기 실패');
-      file = new File([new Blob([svg], { type: 'image/svg+xml' })], `ai-graph-${ts}.svg`, { type: 'image/svg+xml' });
+      // GGB SVG는 배경이 투명 → 어두운 배경(전체화면 lightbox 등) 위에서 반전돼 보임.
+      // 흰 배경 rect를 svg 루트 바로 안쪽에 삽입해 배경을 흰색으로 고정.
+      const svgWithBg = svg.replace(
+        /(<svg\b[^>]*>)/i,
+        '$1<rect x="0" y="0" width="100%" height="100%" fill="#ffffff"/>',
+      );
+      file = new File([new Blob([svgWithBg], { type: 'image/svg+xml' })], `ai-graph-${ts}.svg`, { type: 'image/svg+xml' });
     } else {
-      const b64 = api.getPNGBase64(2, true, 72);
+      // transparent=false — PNG도 흰 배경으로 통일 (어두운 배경 위 표시 대비)
+      const b64 = api.getPNGBase64(2, false, 72);
       if (typeof b64 !== 'string' || !b64) throw new Error('PNG 내보내기 실패');
       file = base64ToFile(b64, `ai-graph-${ts}.png`, 'image/png');
     }
