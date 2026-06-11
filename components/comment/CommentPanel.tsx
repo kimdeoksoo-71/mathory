@@ -18,9 +18,20 @@ import {
 } from '../../lib/discussion-sessions';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor from './CommentEditor';
+import type { GraphBlockSave } from '../viewer/GgbGraphView';
 
 const LEGACY_SESSION_ID = '__legacy__';
 const HISTORY_LIMIT = 5;
+
+/** Phase 42: 다음 라운드 AI 입력으로 보내는 히스토리에서 대용량 첨부 제거.
+ *  그래프 펜스·검산 <details> 부록이 그대로 역류하면 토큰 낭비 + 펜스 모방을 유발.
+ *  ⚠️ Firestore 저장본(표시용 content)은 건드리지 않음 — 히스토리 조립 시에만 적용. */
+function stripForHistory(content: string): string {
+  return content
+    .replace(/```mathory-graph[\s\S]*?```/g, '[그래프 첨부됨]')
+    .replace(/<details>[\s\S]*?<\/details>/g, '[검산 코드 첨부됨]')
+    .trim();
+}
 
 interface CommentPanelProps {
   problemId: string;
@@ -34,6 +45,8 @@ interface CommentPanelProps {
   onCommentsChange?: (comments: TabComment[]) => void;
   initialTabId?: string;
   onTabChange?: (tabId: string) => void;
+  /** Phase 42: AI 그래프 → 에디터 블록 저장 (편집 화면에서만 전달). 반환값은 토스트용 탭 이름 */
+  onInsertGraphBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }
 
 interface DisplayInfo {
@@ -67,7 +80,7 @@ interface DiscussRequestContext {
 export default function CommentPanel({
   problemId, ownerUid, tabs, activeTabId, currentUid, canComment,
   bodyFontSize = 15,
-  onClose, onCommentsChange,
+  onClose, onCommentsChange, onInsertGraphBlock,
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
   const isOwner = currentUid === ownerUid;
@@ -93,6 +106,10 @@ export default function CommentPanel({
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [hideResolved, setHideResolved] = useState(false);
+  // Phase 42: 이 세션(브라우저 세션) 중 "방금 도착한" 최신 AI 응답 id —
+  // 해당 댓글의 첫 그래프만 자동 활성화. 패널 재오픈/페이지 재진입 시엔 비어 있어
+  // 모든 그래프가 placeholder로 시작 (GGB CDN 자동 로딩 방지).
+  const [freshAiCommentId, setFreshAiCommentId] = useState<string | null>(null);
 
   // ─── 로드 ───
   const refreshComments = useCallback(async () => {
@@ -384,7 +401,7 @@ export default function CommentPanel({
       return {
         role: info.isAI ? ('ai' as const) : ('human' as const),
         nickname: info.name,
-        content: c.content,
+        content: stripForHistory(c.content),
       };
     });
   }, [visibleComments, getDisplayInfo]);
@@ -411,7 +428,7 @@ export default function CommentPanel({
         if (!res.ok || data.error) {
           throw new Error(data.error || `HTTP ${res.status}`);
         }
-        await addComment({
+        const newCommentId = await addComment({
           problemId, tabId: activeTabId,
           authorUid: `ai:${model.modelId}`,
           content: data.content || '(빈 응답)',
@@ -425,6 +442,8 @@ export default function CommentPanel({
             costUsd: data.costUsd || 0,
           },
         });
+        // Phase 42: 방금 도착한 응답의 그래프만 자동 활성화 (가장 최근 도착 1개)
+        setFreshAiCommentId(newCommentId);
         await refreshComments();
         setPendingAI((prev) =>
           prev.filter((p) => !(p.modelId === model.modelId && p.sessionId === sessionId)),
@@ -666,6 +685,8 @@ export default function CommentPanel({
                 canComment={canComment}
                 replyingToId={replyingTo}
                 editingId={editingId}
+                graphAutoActivate={thread.parent.id === freshAiCommentId}
+                onSaveGraphAsBlock={onInsertGraphBlock}
                 onSetReplying={setReplyingTo}
                 onSetEditing={setEditingId}
                 onReplySubmit={(content) => handleReplySubmit(thread.parent.id, content)}
@@ -1039,6 +1060,7 @@ function CommentThreadView({
   replyingToId, editingId,
   onSetReplying, onSetEditing,
   onReplySubmit, onEditSubmit, onDelete, onResolve,
+  graphAutoActivate, onSaveGraphAsBlock,
 }: {
   thread: { parent: TabComment; replies: TabComment[] };
   getDisplayInfo: (c: TabComment) => DisplayInfo;
@@ -1053,6 +1075,8 @@ function CommentThreadView({
   onEditSubmit: (commentId: string, content: string) => Promise<void>;
   onDelete: (commentId: string) => void;
   onResolve: (c: TabComment) => void;
+  graphAutoActivate?: boolean;
+  onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }) {
   const { parent, replies } = thread;
   const parentIsAI = parent.authorType === 'ai';
@@ -1082,6 +1106,8 @@ function CommentThreadView({
         onEditSubmit={(c) => onEditSubmit(parent.id, c)}
         onDelete={() => onDelete(parent.id)}
         onResolve={() => onResolve(parent)}
+        graphAutoActivate={graphAutoActivate}
+        onSaveGraphAsBlock={onSaveGraphAsBlock}
       />
 
       {replies.length > 0 && (
@@ -1130,6 +1156,7 @@ function CommentItem({
   isEditing, isReplying,
   onSetEditing, onSetReplying,
   onEditSubmit, onDelete, onResolve,
+  graphAutoActivate, onSaveGraphAsBlock,
 }: {
   comment: TabComment;
   info: DisplayInfo;
@@ -1144,6 +1171,8 @@ function CommentItem({
   onEditSubmit: (content: string) => Promise<void>;
   onDelete: () => void;
   onResolve: () => void;
+  graphAutoActivate?: boolean;
+  onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }) {
   const isMine = !info.isAI && comment.authorUid === currentUid;
 
@@ -1206,7 +1235,12 @@ function CommentItem({
           />
         ) : (
           <div className={`comment-body ${info.isAI ? 'ai-body' : ''}`}>
-            <EditorPreview content={comment.content} borderless autoHeight locale="ko" />
+            <EditorPreview
+              content={comment.content}
+              borderless autoHeight locale="ko"
+              graphAutoActivate={graphAutoActivate}
+              onSaveGraphAsBlock={onSaveGraphAsBlock}
+            />
           </div>
         )}
       </div>

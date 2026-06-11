@@ -8,6 +8,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
+import GgbGraphView, { GraphBlockSave } from '../viewer/GgbGraphView';
 import 'katex/dist/katex.min.css';
 
 interface EditorPreviewProps {
@@ -21,6 +22,10 @@ interface EditorPreviewProps {
   activeMathId?: number;
   /** 미리보기 수식 클릭 시 콜백 (수식 인덱스 전달) */
   onClickMath?: (mathId: number) => void;
+  /** Phase 42: true면 본문의 첫 mathory-graph 펜스를 자동 활성화 (방금 도착한 AI 응답 전용) */
+  graphAutoActivate?: boolean;
+  /** Phase 42: 그래프 → 에디터 블록 저장 콜백 (편집 화면에서만 전달 — 없으면 저장 버튼 숨김) */
+  onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }
 
 /* ═══ setext heading 방지 ═══
@@ -52,6 +57,27 @@ function preventSetextHeadings(text: string): string {
   }
 
   return result.join('\n');
+}
+
+/* ═══ 코드펜스 보호 (Phase 42) ═══
+ * preprocessLocale/preprocessMath/preventSetextHeadings는 코드펜스를 인지하지 못하고
+ * raw 문자열 전체에 regex를 적용한다. mathory-graph JSON과 검산 python 부록이
+ * 변형되지 않도록, 파이프라인 맨 앞에서 ``` 펜스 영역을 placeholder로 치환하고
+ * 맨 뒤에서 복원한다 (수식 보호 ⟦MATH_n⟧과 동일 기법).
+ * 닫는 펜스는 CommonMark 규칙대로 info string 없는 ``` 줄만 인정. */
+function protectFences(text: string): { text: string; fences: string[] } {
+  if (!text.includes('```')) return { text, fences: [] };
+  const fences: string[] = [];
+  const out = text.replace(/^```[^\n]*\n[\s\S]*?\n```[ \t]*$/gm, (m) => {
+    fences.push(m);
+    return `⟦FENCE_${fences.length - 1}⟧`;
+  });
+  return { text: out, fences };
+}
+
+function restoreFences(text: string, fences: string[]): string {
+  if (fences.length === 0) return text;
+  return text.replace(/⟦FENCE_(\d+)⟧/g, (_, idx) => fences[parseInt(idx)] ?? '');
 }
 
 /* ═══ 원문자 상수 (locale/math 공용) ═══ */
@@ -248,11 +274,21 @@ function ImageResizeOverlay({
 export default function EditorPreview({
   content, borderless = false, autoHeight = false,
   onImageResize, locale, activeMathId, onClickMath,
+  graphAutoActivate = false, onSaveGraphAsBlock,
 }: EditorPreviewProps) {
-  const processed = useMemo(
-    () => preprocessMath(preprocessLocale(preventSetextHeadings(content))),
-    [content],
-  );
+  const processed = useMemo(() => {
+    // 코드펜스를 placeholder로 보호 → 전처리 → 복원 (Phase 42)
+    const { text: shielded, fences } = protectFences(content);
+    const out = preprocessMath(preprocessLocale(preventSetextHeadings(shielded)));
+    return restoreFences(out, fences);
+  }, [content]);
+
+  // 첫 번째 mathory-graph 펜스의 내용 — autoActivate 대상 식별용 (Phase 42)
+  // 렌더러 내 카운터 대신 내용 비교를 쓰는 이유: StrictMode 이중 렌더에도 결정적
+  const firstGraphSpec = useMemo(() => {
+    const m = processed.match(/^```mathory-graph[ \t]*\n([\s\S]*?)\n```[ \t]*$/m);
+    return m ? m[1].trim() : null;
+  }, [processed]);
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const [hoveredImg, setHoveredImg] = useState<HTMLImageElement | null>(null);
@@ -272,6 +308,27 @@ export default function EditorPreview({
         }],
       ]}
       components={{
+        // Phase 42: mathory-graph 펜스 → GgbGraphView (pre 레벨에서 가로채야
+        // <pre> 안에 div가 렌더되는 invalid HTML과 pre 스타일 누수를 피함)
+        pre: ({ children, ...props }) => {
+          const child = Array.isArray(children) ? children[0] : children;
+          if (
+            child && typeof child === 'object' && 'props' in child &&
+            typeof (child as { props?: { className?: unknown } }).props?.className === 'string' &&
+            ((child as { props: { className: string } }).props.className).includes('language-mathory-graph')
+          ) {
+            const raw = (child as { props: { children?: unknown } }).props.children;
+            const spec = (Array.isArray(raw) ? raw.join('') : String(raw ?? '')).trim();
+            return (
+              <GgbGraphView
+                spec={spec}
+                autoActivate={graphAutoActivate && firstGraphSpec !== null && spec === firstGraphSpec}
+                onSaveAsBlock={onSaveGraphAsBlock}
+              />
+            );
+          }
+          return <pre {...props}>{children}</pre>;
+        },
         h1: ({ children, ...props }) => (
           <h1 style={{ fontSize: '1.5em', fontWeight: 700, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h1>
         ),
@@ -312,7 +369,7 @@ export default function EditorPreview({
     >
       {processed}
     </ReactMarkdown>
-  ), [processed]);
+  ), [processed, firstGraphSpec, graphAutoActivate, onSaveGraphAsBlock]);
 
   /* ─── 렌더 후: 모든 .katex 요소에 data-math-id 부여 (출현 순서) ─── */
   useEffect(() => {

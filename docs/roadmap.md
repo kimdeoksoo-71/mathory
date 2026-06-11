@@ -1132,3 +1132,27 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 - 검산 결과는 본문 결론 + 접힌 `<details>🔍 검산 코드` 부록. EditorPreview의 rehype-raw가 렌더
 - 제외: 식(DeepSeek)·락(Grok)·섬(Gemini Flash)은 도구 미적용
 - **남은 것**: Step F 라이브 검증(dev 서버 실 API 호출)
+
+---
+
+## Phase 42: AI 토론자 그래프 도구 ✅ (Step A~I)
+
+토론창에서 민(Gemini)·쳇(GPT)에게 함수·좌표 그래프를 그리게 하고, 대화창의 GeoGebra applet으로 인터랙티브 표시. AI가 그린 그래프를 💾 클릭으로 에디터 블록(GGB/SVG/PNG)으로 저장. 상세: `docs/phasedocs/Phase42 AI 그래프 도구.md`
+
+**핵심 설계 (C 방식: 클라이언트 렌더)**: AI는 ```mathory-graph 펜스(GGB 명령 JSON 명세)만 emit → 코드 실행 없음, 토큰 비용 거의 0 → 브라우저의 GgbGraphView가 GeoGebra applet에 `evalCommand`로 주입해 벡터 렌더.
+
+| Step | 구현 |
+|------|------|
+| A | route.ts: `isGraphModel`(민·쳇) + `GRAPH_TRIGGER_RE`(그리기 동사 결합형) + `USER_MESSAGE_GRAPH_SUFFIX` + 시스템 프롬프트 #13 + #12 carve-out |
+| B | route.ts: `sanitizeGraphFences` — 줄 단위 파서(미종결 펜스 제거·JSON 1차 검증·명령 30개 상한). graphEnabled 모델만 적용 |
+| C | `GgbGraphView.tsx` 신규 — 빈 applet + evalCommand 주입, 개별 명령 실패 수집(부분 렌더+경고 배지), placeholder/전체화면/외부클릭 비활성화 (GgbViewer 패턴) |
+| D | EditorPreview: `protectFences`(전처리에서 코드펜스 보호) + `pre` 렌더러 가로채기 + `graphAutoActivate`(첫 펜스 내용 비교 방식) |
+| E | CommentPanel: `stripForHistory`(그래프 펜스·검산 details 역류 차단) + `freshAiCommentId`(방금 도착한 응답만 자동 활성화) + prop 체인 |
+| F | (운영) 민·쳇 maxTokens 8192 — 완료 |
+| H | GgbGraphView 💾 저장 버튼 + GGB/SVG/PNG 드롭다운 — `getBase64`/`exportSVG`(가드)/`getPNGBase64(2,true,72)` → File 생성 |
+| I | EditorView `handleInsertGraphBlock` — 업로드 후 현재 탭 블록 맨 끝 append (GGB는 저장 시점 시야를 초기뷰로 이관) |
+
+- 자동 활성화 정책: **방금 도착한 응답의 첫 그래프만** (패널 재오픈·페이지 재진입 시엔 placeholder — GGB CDN 자동 로딩 방지)
+- 💾 버튼은 편집 화면(EditorView 경유)에서만 노출 — ProblemView·공유 페이지는 콜백 미전달로 숨김
+- 좌표 캡처 로직을 `lib/ggb-utils.ts`로 추출, GgbViewer 초기뷰 저장과 공유
+- **남은 것**: 검증 시나리오 16개 실사용 확인 (dev 서버 실 API 호출)

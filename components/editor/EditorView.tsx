@@ -21,6 +21,7 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
+import type { GraphBlockSave } from '../viewer/GgbGraphView';
 import SvgViewer from '../viewer/SvgViewer';
 import GgbViewer from '../viewer/GgbViewer';
 import ImageTypeSelectModal, { ImageMediaKind } from './ImageTypeSelectModal';
@@ -1446,6 +1447,43 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [problemId, setCurrentBlocks]);
 
+  /* ─── AI 그래프 → 블록 저장 (Phase 42) ─── */
+  // 토론창 GgbGraphView의 💾 저장 → 업로드 후 현재 활성 탭 블록 목록 맨 끝에 append.
+  // 반환값(탭 이름)은 GgbGraphView 토스트에 표기. 영구 저장은 기존 문제 저장 버튼 흐름.
+  const handleInsertGraphBlock = useCallback(async (
+    { format, file, view }: GraphBlockSave,
+  ): Promise<string> => {
+    const pid = problemId || `temp-${Date.now()}`;
+    const newBlock: LocalBlock = {
+      id: `new-${Date.now()}`,
+      order: 0,
+      type: 'text',
+      raw_text: '',
+      title: '',
+      collapsed: false,
+      isNew: true,
+    };
+    if (format === 'ggb') {
+      const url = await uploadGgb(file, pid);
+      newBlock.type = 'ggb';
+      newBlock.raw_text = url;
+      // 저장 시점에 사용자가 보던 시야를 초기뷰로 이관
+      newBlock.ggb_initial_coords = view ?? null;
+      newBlock.ggb_height = GGB_BLOCK_HEIGHT;
+    } else if (format === 'svg') {
+      const url = await uploadSvg(file, pid);
+      newBlock.type = 'svg';
+      newBlock.raw_text = url;
+      newBlock.svg_initial_view = null;
+    } else {
+      const url = await uploadImage(file, pid);
+      newBlock.type = 'image';
+      newBlock.raw_text = `<img src="${url}" alt="AI 그래프" width="400" />`;
+    }
+    setCurrentBlocks((prev) => [...prev, newBlock]);
+    return tabs.find((t) => t.id === activeTab)?.label || activeTab;
+  }, [problemId, setCurrentBlocks, tabs, activeTab]);
+
   /* ─── SVG 초기뷰 저장 ─── */
   const handleSaveSvgInitialView = useCallback(
     (blockId: string, view: { scale: number; positionX: number; positionY: number }) => {
@@ -2459,6 +2497,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           bodyFontSize={contentFontSize}
           onClose={() => setDiscussionOpen(false)}
           onCommentsChange={setAllComments}
+          onInsertGraphBlock={handleInsertGraphBlock}
         />
       )}
     </div>

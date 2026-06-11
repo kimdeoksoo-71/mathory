@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { GgbInitialCoords } from '../../types/problem';
 import { loadGGB } from '../../lib/ggb-loader';
+import { captureGgbView } from '../../lib/ggb-utils';
 
 interface GgbViewerProps {
   url: string;
@@ -300,68 +301,13 @@ export default function GgbViewer({
       return;
     }
     try {
-      const candidates = ['getXmin', 'getXmax', 'getYmin', 'getYmax',
-        'getCoordSystem', 'getViewProperties', 'getValueString',
-        'setCoordSystem', 'evalCommand'];
-      const availableMethods = candidates.filter((m) => typeof (api as any)[m] === 'function');
-      // eslint-disable-next-line no-console
-      console.log('[GgbViewer] 사용 가능한 API:', availableMethods);
-
-      let xMin = NaN, xMax = NaN, yMin = NaN, yMax = NaN;
-
-      // 1) 개별 getter
-      if (typeof api.getXmin === 'function') {
-        try { xMin = api.getXmin(1); xMax = api.getXmax(1); yMin = api.getYmin(1); yMax = api.getYmax(1); }
-        catch { xMin = api.getXmin(); xMax = api.getXmax(); yMin = api.getYmin(); yMax = api.getYmax(); }
-      }
-
-      // 2) getViewProperties(viewId) — 모던 GGB 클래식
-      // 반환 예: {"invXscale":0.05,"invYscale":0.05,"xMin":-10,"yMin":-10,"width":600,"height":400}
-      if (![xMin, xMax, yMin, yMax].every((n) => isFinite(n)) && typeof api.getViewProperties === 'function') {
-        try {
-          const raw = api.getViewProperties(1);
-          // eslint-disable-next-line no-console
-          console.log('[GgbViewer] getViewProperties(1) raw:', raw);
-          const props = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          if (props) {
-            // invXscale = 픽셀당 x단위 (1px == invXscale 단위)
-            const invX: number | null =
-              typeof props.invXscale === 'number' ? props.invXscale
-              : (typeof props.xscale === 'number' ? 1 / props.xscale
-                : (typeof props.scale === 'number' ? 1 / props.scale : null));
-            const invY: number | null =
-              typeof props.invYscale === 'number' ? props.invYscale
-              : (typeof props.yscale === 'number' ? 1 / props.yscale : null);
-
-            if (typeof props.xMin === 'number') xMin = props.xMin;
-            if (typeof props.yMin === 'number') yMin = props.yMin;
-            if (typeof props.xMax === 'number') xMax = props.xMax;
-            if (typeof props.yMax === 'number') yMax = props.yMax;
-
-            if (!isFinite(xMax) && typeof props.xMin === 'number'
-                && typeof props.width === 'number' && invX != null) {
-              xMax = props.xMin + props.width * invX;
-            }
-            if (!isFinite(yMax) && typeof props.yMin === 'number'
-                && typeof props.height === 'number' && invY != null) {
-              yMax = props.yMin + props.height * invY;
-            }
-            // eslint-disable-next-line no-console
-            console.log('[GgbViewer] 파싱 결과:', { xMin, xMax, yMin, yMax, invX, invY });
-          }
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.warn('[GgbViewer] getViewProperties 파싱 실패:', e);
-        }
-      }
-
-      // eslint-disable-next-line no-console
-      console.log('[GgbViewer] 최종 캡처:', { xMin, xMax, yMin, yMax });
-      if (![xMin, xMax, yMin, yMax].every((n) => typeof n === 'number' && isFinite(n))) {
-        showToast(false, `좌표 캡처 실패 (${availableMethods.join(',') || 'API 없음'})`);
+      const coords = captureGgbView(api);
+      if (!coords) {
+        showToast(false, '좌표 캡처 실패');
         return;
       }
-      onSaveInitialView({ xMin, xMax, yMin, yMax });
+      const { xMin, xMax, yMin, yMax } = coords;
+      onSaveInitialView(coords);
       showToast(true, `초기뷰 저장됨 (${xMin.toFixed(1)},${xMax.toFixed(1)},${yMin.toFixed(1)},${yMax.toFixed(1)})`);
     } catch (err: any) {
       // eslint-disable-next-line no-console

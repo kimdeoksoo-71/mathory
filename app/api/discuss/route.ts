@@ -148,7 +148,34 @@ const CODE_EXEC_INSTRUCTION = `
 - ⚠️ **반드시 기호(exact) 계산만 사용**: 소수점 숫자(예: 0.5, 3.14, 1.414…) 사용 금지. \`sympy.Rational\`·\`sympy.sqrt\`·\`pi\`·\`S()\` 등으로 분수·무리수를 정확값 그대로 다루세요. \`float()\`, \`.evalf()\`, \`N()\`, \`math\` 모듈, 소수 리터럴은 사용 금지입니다.
 - ⚠️ **근사값(수치 근사)으로 결론 내는 것 절대 금지**: "≈ 0.333이므로 1/3" 같은 근사 비교로 검증하지 말고, 기호 계산 결과가 정확히 같은지(\`==\`, \`simplify(a-b)==0\`, \`Eq\`)로만 판정하세요.
 - 검산 결과는 최종 결론에 **자연어로만** 반영하세요.
-- ⚠️ **본문(결론)에는 절대로 코드 블록(\`\`\`python …\`\`\`)이나 실행 출력 텍스트를 적지 마세요.** 실행한 코드와 출력은 시스템이 자동으로 별도 부록(<details>)에 첨부합니다. 본문에 코드를 또 적으면 사용자에게 동일 코드가 **두 번** 보여 무효 처리됩니다. 본문엔 코드 없이 "검산 결과 ~로 확인됨" 같은 자연어 결론만 남기세요.`;
+- ⚠️ **본문(결론)에는 절대로 코드 블록(\`\`\`python …\`\`\`)이나 실행 출력 텍스트를 적지 마세요.** 실행한 코드와 출력은 시스템이 자동으로 별도 부록(<details>)에 첨부합니다. 본문에 코드를 또 적으면 사용자에게 동일 코드가 **두 번** 보여 무효 처리됩니다. 본문엔 코드 없이 "검산 결과 ~로 확인됨" 같은 자연어 결론만 남기세요.
+  단, \`\`\`mathory-graph 펜스는 이 금지의 예외입니다. 그것은 실행 코드가 아니라 그래프 명세이며, 그래프 도구 규칙(#13)에 따라 본문 뒤에 출력해야 합니다.`;
+
+/**
+ * Phase 42: 그래프 도구 지침 — 그래프 활성 모델(민·쳇)에만 #13으로 추가.
+ * AI는 코드 실행 없이 ```mathory-graph 펜스(JSON 명세)만 emit하고,
+ * 클라이언트(GgbGraphView)가 GeoGebra applet으로 렌더한다.
+ */
+const GRAPH_INSTRUCTION = `
+13. **그래프 도구 (좌표 시각화)**:
+- 사용자가 그래프를 그려달라고 명시하면 반드시 그래프 명세를 출력하세요.
+- 명시가 없어도 함수·도형의 형태를 시각적으로 보이는 게 설명에 크게 도움되면 자유롭게 추가 가능.
+  단, 토론 히스토리에 동일한 그래프가 이미 첨부되어 있으면 다시 그리지 마세요.
+- 출력 형식: 본문(자연어 설명) 뒤, 응답의 **맨 끝**에 아래 코드펜스 정확히 한 개:
+  \`\`\`mathory-graph
+  { "commands": ["..."], "view": { "xMin": -5, "xMax": 5, "yMin": -6, "yMax": 6 } }
+  \`\`\`
+- ⚠️ 이 펜스는 "본문에 코드 블록 금지" 규칙(#12)의 예외입니다. 실행 코드가 아닌 명세입니다.
+- ⚠️ 그래프를 그리기 위해 Python/matplotlib 코드를 실행하지 마세요. 그래프는 오직 mathory-graph 펜스로만 출력합니다. (코드 실행 도구는 검산 전용)
+- commands는 GeoGebra Classic 문법, 최대 30개. 유효한 예:
+  · 함수: "f(x)=x^2-4" / "g(x)=sin(x)" / "h(x)=2^x"
+  · 점: "A=(2,0)" / 선분: "s=Segment(A,B)" / 원: "c=Circle(A,3)"
+  · 교점: "P=Intersect(f,g)" (교점이 여러 개면 "P=Intersect(f,g,1)" 식으로 인덱스 지정)
+  · 직선: "l=Line(A,B)" / 접선: "t=Tangent(A,f)"
+- view는 **필수**이며 꼭짓점·절편·교점 등 핵심 특징이 모두 보이도록 설정하세요.
+- 본문에 그래프 명세(JSON/명령)를 자연어로 또 풀어 적지 마세요. 펜스 하나면 충분합니다.
+- 펜스 내용은 답변 글자수 제한(800자/1200자)에 **포함되지 않습니다.**
+- 그래프가 불필요한 질문엔 펜스를 넣지 마세요.`;
 
 function buildSystemPrompt(args: {
   appendPrompt: string;
@@ -156,6 +183,7 @@ function buildSystemPrompt(args: {
   myNickname: string;
   structuredOutput?: boolean;
   codeExecution?: boolean;
+  graphTool?: boolean;
 }): string {
   const participants = args.participantNicknames.length
     ? args.participantNicknames.join(', ')
@@ -169,6 +197,10 @@ function buildSystemPrompt(args: {
   // 검산 도구 지침은 BASE 규칙 #11 바로 뒤(#12)에 이어붙는 것이 자연스러움
   if (args.codeExecution) {
     lines.push(CODE_EXEC_INSTRUCTION);
+  }
+  // 그래프 도구 지침은 #12 다음 #13으로 (Phase 42 — 현재 민·쳇은 둘 다 활성)
+  if (args.graphTool) {
+    lines.push(GRAPH_INSTRUCTION);
   }
   if (args.appendPrompt.trim()) {
     lines.push('', `[추가 지침] ${args.appendPrompt.trim()}`);
@@ -192,6 +224,89 @@ const USER_MESSAGE_CODEEXEC_SUFFIX =
   '\n\n[필수] 이 메시지는 명시적인 검산 요청입니다. 추론만으로 답하지 말고 ' +
   '반드시 Python(SymPy) 코드를 **실제로 실행**해 결과를 확인한 뒤 결론을 내세요. ' +
   '코드 실행 없이 답하면 응답이 무효 처리됩니다. (코드/출력은 시스템이 자동 첨부하므로 본문엔 자연어 결론만 적으세요.)';
+
+/** Phase 42: 그래프 "그리기" 요청 감지 — 그래프에 *관한* 질문("이 그래프 문제 검토해줘")과 구분하기 위해
+ *  그래프 명사 + 그리기 동사 결합형으로 좁힌다 */
+const GRAPH_TRIGGER_RE =
+  /(그래프|좌표\s*평면|개형)\s*(을|를|으로|로)?\s*(좀\s*)?(그려|그리|보여|시각화)|도시해|plot\b/i;
+
+/** 그래프 명시 요청 시 user message 끝에 강제 부착 — 펜스 출력 강제 */
+const USER_MESSAGE_GRAPH_SUFFIX =
+  '\n\n[필수] 이 메시지는 그래프 요청을 포함합니다. 본문(자연어 설명) 뒤, 응답의 맨 끝에 ' +
+  '반드시 ```mathory-graph 코드펜스 1개로 그래프 명세를 출력하세요. ' +
+  '(이 펜스는 "본문에 코드 블록 금지" 규칙의 예외입니다. matplotlib 등 코드 실행으로 ' +
+  '그래프를 그리지 말고 오직 mathory-graph 펜스로만 출력하세요.)';
+
+/* ═══ Phase 42: mathory-graph 펜스 sanitize ═══
+ * provider 응답을 클라이언트로 반환하기 전에:
+ *  1) 미종결 펜스(maxTokens 잘림) 제거 + 안내 부착 — 방치하면 이후 텍스트 전체가 코드로 렌더됨
+ *  2) JSON 1차 검증 — 깨진 명세가 Firestore에 영구 저장되는 것 방지
+ *  3) 명령 상한(30개) 적용 후 재직렬화
+ * 줄 단위 파서 사용: 닫는 펜스는 CommonMark 규칙대로 info string 없는 ``` 줄만 인정
+ * (단순 regex 짝맞춤은 검산 <details> 안의 ```python 펜스와 오인될 수 있음) */
+
+const GRAPH_MAX_COMMANDS = 30;
+
+/** 펜스 내용 검증 — 유효하면 정규화된 JSON(명령 30개 상한), 아니면 null */
+function validateGraphSpec(inner: string): string | null {
+  try {
+    const parsed = JSON.parse(inner);
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.commands)) return null;
+    const commands = (parsed.commands as unknown[])
+      .filter((c): c is string => typeof c === 'string' && c.trim().length > 0)
+      .slice(0, GRAPH_MAX_COMMANDS);
+    if (commands.length === 0) return null;
+    const v = parsed.view;
+    const view =
+      v && ['xMin', 'xMax', 'yMin', 'yMax'].every(
+        (k) => typeof v[k] === 'number' && isFinite(v[k]),
+      )
+        ? { xMin: v.xMin, xMax: v.xMax, yMin: v.yMin, yMax: v.yMax }
+        : undefined;
+    return JSON.stringify(view ? { commands, view } : { commands });
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeGraphFences(content: string): string {
+  if (!content.includes('```mathory-graph')) return content;
+  const lines = content.split('\n');
+  const out: string[] = [];
+  let truncated = false;
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (/^```mathory-graph\s*$/.test(line.trim())) {
+      // 닫는 펜스 탐색 — info string 없는 ``` 줄만 (CommonMark)
+      let close = -1;
+      for (let j = i + 1; j < lines.length; j++) {
+        if (/^```\s*$/.test(lines[j].trim())) { close = j; break; }
+      }
+      if (close === -1) {
+        // 미종결 — 펜스 시작부터 끝까지 버림 (maxTokens 잘림)
+        truncated = true;
+        break;
+      }
+      const inner = lines.slice(i + 1, close).join('\n').trim();
+      const validated = validateGraphSpec(inner);
+      if (validated) {
+        out.push('```mathory-graph', validated, '```');
+      } else {
+        out.push('_(그래프 명세가 손상되어 표시할 수 없습니다)_');
+      }
+      i = close + 1;
+      continue;
+    }
+    out.push(line);
+    i++;
+  }
+  let result = out.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+  if (truncated) {
+    result += '\n\n_(그래프 명세가 토큰 한도로 잘려 제거되었습니다)_';
+  }
+  return result;
+}
 
 /** 식 응답(JSON)을 마크다운으로 변환 — 파싱 실패 시 원본 폴백 */
 function formatStructuredResponse(raw: string): string {
@@ -225,6 +340,13 @@ function isStructuredOutputModel(config: AIModelConfig): boolean {
 
 /** 검산 도구(code execution) 활성 모델 판정 — 민(google)·쳇(openai) (Phase 41) */
 function isCodeExecutionModel(config: AIModelConfig): boolean {
+  return config.provider === 'google' || config.provider === 'openai';
+}
+
+/** 그래프 도구 활성 모델 판정 — 민(google)·쳇(openai) (Phase 42).
+ *  현재는 isCodeExecutionModel과 동일하나, 식의 structured output(JSON 강제)과
+ *  충돌하는 모델 제외 기준이 달라 향후 분리 가능성을 위해 별도 함수로 둔다. */
+function isGraphModel(config: AIModelConfig): boolean {
   return config.provider === 'google' || config.provider === 'openai';
 }
 
@@ -329,6 +451,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
 
   const structured = isStructuredOutputModel(config);
   const codeExecution = isCodeExecutionModel(config);
+  const graphEnabled = isGraphModel(config);
 
   const systemPrompt = buildSystemPrompt({
     appendPrompt: config.appendPrompt,
@@ -336,15 +459,20 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
     myNickname: body.myNickname,
     structuredOutput: structured,
     codeExecution,
+    graphTool: graphEnabled,
   });
   // 검산 명시 요청 감지 — 민·쳇은 코드 실행을 강제 (Phase 41)
   const codeExecForced = codeExecution && CODE_EXEC_TRIGGER_RE.test(body.currentMessage);
+  // 그래프 그리기 요청 감지 — 민·쳇은 펜스 출력을 강제 (Phase 42)
+  const graphForced = graphEnabled && GRAPH_TRIGGER_RE.test(body.currentMessage);
 
   // user message 끝에 출력 규칙 강제 부착 — 시스템 프롬프트보다 강하게 작동
-  // (식: JSON 스키마 강제 / 민·쳇: 검산 명시 시 코드 실행 강제. provider가 달라 동시 적용 없음)
+  // (식: JSON 스키마 강제 / 민·쳇: 검산·그래프 명시 시 강제. 검산+그래프 동시 부착 가능 —
+  //  두 suffix 모두 "본문은 자연어 / 펜스·코드는 별도" 구조라 충돌 없음)
   let currentMessage = body.currentMessage;
   if (structured) currentMessage += USER_MESSAGE_STRUCTURED_SUFFIX;
   if (codeExecForced) currentMessage += USER_MESSAGE_CODEEXEC_SUFFIX;
+  if (graphForced) currentMessage += USER_MESSAGE_GRAPH_SUFFIX;
   const promptBody: DiscussRequest =
     currentMessage === body.currentMessage ? body : { ...body, currentMessage };
   const userPrompt = buildUserPrompt(promptBody);
@@ -355,7 +483,9 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
       TIMEOUT_MS,
     );
     // 식: JSON 응답을 마크다운으로 변환 (실패 시 원본 폴백)
-    const finalContent = structured ? formatStructuredResponse(result.content) : result.content;
+    let finalContent = structured ? formatStructuredResponse(result.content) : result.content;
+    // 그래프 활성 모델만 펜스 sanitize — 식(JSON 펜스 처리)과의 간섭 방지 (Phase 42)
+    if (graphEnabled) finalContent = sanitizeGraphFences(finalContent);
     // Phase 41 비용: Gemini code execution은 토큰에 산입되므로 그대로 반영.
     // OpenAI code_interpreter 컨테이너 시간은 별도 청구되지만 여기선 입출력 토큰만 카운트한다.
     const costUsd = calcCost(
