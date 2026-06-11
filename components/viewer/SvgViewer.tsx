@@ -374,8 +374,9 @@ function FullscreenOverlay({
         style={{
           position: 'fixed', top: 16, right: 16, zIndex: 10000,
           width: 40, height: 40,
-          background: 'rgba(255,255,255,0.15)', color: '#fff',
-          border: '1px solid rgba(255,255,255,0.3)',
+          // 흰 배경 SVG 위에서도 보이도록 회색 (흰 X는 묻힘)
+          background: 'rgba(255,255,255,0.9)', color: '#666',
+          border: '1px solid #bbb',
           borderRadius: 6, cursor: 'pointer',
           fontSize: 18,
         }}
