@@ -8,7 +8,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
-import GgbGraphView, { GraphBlockSave } from '../viewer/GgbGraphView';
+import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
 import 'katex/dist/katex.min.css';
 
 interface EditorPreviewProps {
@@ -24,8 +24,8 @@ interface EditorPreviewProps {
   onClickMath?: (mathId: number) => void;
   /** Phase 42: true면 본문의 첫 mathory-graph 펜스를 자동 활성화 (방금 도착한 AI 응답 전용) */
   graphAutoActivate?: boolean;
-  /** Phase 42: 그래프 → 에디터 블록 저장 콜백 (편집 화면에서만 전달 — 없으면 저장 버튼 숨김) */
-  onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
+  /** Phase 42: 첫 그래프의 내보내기 핸들 등록 — 댓글 액션 행(블록 저장·다운로드)이 사용 */
+  onRegisterGraphExport?: (handle: GraphExportHandle | null) => void;
 }
 
 /* ═══ setext heading 방지 ═══
@@ -274,7 +274,7 @@ function ImageResizeOverlay({
 export default function EditorPreview({
   content, borderless = false, autoHeight = false,
   onImageResize, locale, activeMathId, onClickMath,
-  graphAutoActivate = false, onSaveGraphAsBlock,
+  graphAutoActivate = false, onRegisterGraphExport,
 }: EditorPreviewProps) {
   const processed = useMemo(() => {
     // 코드펜스를 placeholder로 보호 → 전처리 → 복원 (Phase 42)
@@ -319,11 +319,12 @@ export default function EditorPreview({
           ) {
             const raw = (child as { props: { children?: unknown } }).props.children;
             const spec = (Array.isArray(raw) ? raw.join('') : String(raw ?? '')).trim();
+            const isFirst = firstGraphSpec !== null && spec === firstGraphSpec;
             return (
               <GgbGraphView
                 spec={spec}
-                autoActivate={graphAutoActivate && firstGraphSpec !== null && spec === firstGraphSpec}
-                onSaveAsBlock={onSaveGraphAsBlock}
+                autoActivate={graphAutoActivate && isFirst}
+                onRegisterExport={isFirst ? onRegisterGraphExport : undefined}
               />
             );
           }
@@ -369,7 +370,7 @@ export default function EditorPreview({
     >
       {processed}
     </ReactMarkdown>
-  ), [processed, firstGraphSpec, graphAutoActivate, onSaveGraphAsBlock]);
+  ), [processed, firstGraphSpec, graphAutoActivate, onRegisterGraphExport]);
 
   /* ─── 렌더 후: 모든 .katex 요소에 data-math-id 부여 (출현 순서) ─── */
   useEffect(() => {

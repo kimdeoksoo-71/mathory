@@ -6,8 +6,9 @@
  * evalCommand로 주입해 렌더한다. GgbViewer(파일 기반)와 달리 빈 applet에
  * 명령을 주입하는 방식. 활성화/전체화면/외부클릭 비활성화 패턴은 GgbViewer와 동일.
  *
- * onSaveAsBlock이 주어지면(편집 화면 경유) 💾 버튼으로 현재 그래프를
- * GGB/SVG/PNG 형식의 에디터 블록으로 내보낼 수 있다 (Step H).
+ * 내보내기(블록 저장·GGB 다운로드)는 그래프 위 오버레이가 아니라 댓글 액션 행에서
+ * 트리거된다: onRegisterExport로 GraphExportHandle을 상위(CommentItem)에 등록하고,
+ * exportFile 호출 시 applet이 비활성이면 자동 활성화 후 로드를 기다렸다가 추출한다.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -29,13 +30,19 @@ interface GraphSpec {
   view: GgbInitialCoords;
 }
 
+/** 댓글 액션 행(블록 저장·다운로드)이 사용하는 내보내기 핸들 */
+export interface GraphExportHandle {
+  /** 형식별 파일 추출 — applet이 비활성이면 자동 활성화 후 로드를 기다림 */
+  exportFile: (format: GraphBlockFormat) => Promise<GraphBlockSave>;
+}
+
 interface GgbGraphViewProps {
   /** ```mathory-graph 펜스 내용 (JSON 문자열) */
   spec: string;
   /** true면 마운트 시 즉시 applet 로드 (최신 도착 응답의 첫 그래프 전용) */
   autoActivate?: boolean;
-  /** 그래프 → 에디터 블록 저장. 반환값은 토스트에 표기할 탭 이름 (편집 화면에서만 전달) */
-  onSaveAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
+  /** 내보내기 핸들 등록 (메시지의 첫 그래프만, unmount 시 null) */
+  onRegisterExport?: (handle: GraphExportHandle | null) => void;
 }
 
 const MAX_COMMANDS = 30;
@@ -77,7 +84,7 @@ function base64ToFile(b64: string, name: string, type: string): File {
   return new File([bytes], name, { type });
 }
 
-export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock }: GgbGraphViewProps) {
+export default function GgbGraphView({ spec, autoActivate = false, onRegisterExport }: GgbGraphViewProps) {
   const parsedSpec = useMemo(() => parseGraphSpec(spec), [spec]);
 
   const [active, setActive] = useState(false);
@@ -85,9 +92,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState<{ ok: boolean; msg: string } | null>(null);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const containerIdRef = useRef<string>(nextContainerId());
@@ -107,7 +111,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
       if (!hostRef.current) return;
       if (!hostRef.current.contains(e.target as Node)) {
         setActive(false);
-        setSaveMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', onDocDown);
@@ -149,6 +152,8 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
           width: Math.max(200, Math.floor(rect.width)),
           height: Math.max(150, Math.floor(rect.height)) + EXTRA_BOTTOM,
           perspective: 'G',
+          // GGB 자체 회색 테두리 제거 (호스트 컨테이너도 테두리 없음)
+          borderColor: '#FFFFFF',
           showToolBar: false,
           showAlgebraInput: false,
           showMenuBar: false,
@@ -266,14 +271,8 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
     return () => document.removeEventListener('keydown', onKey);
   }, [active, isFullscreen]);
 
-  const showToast = (ok: boolean, msg: string) => {
-    setToast({ ok, msg });
-    setTimeout(() => setToast(null), 3000);
-  };
-
   const toggleFullscreen = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSaveMenuOpen(false);
     setIsFullscreen((v) => !v);
   };
 
@@ -283,47 +282,59 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
     setActive(true);
   };
 
-  /* ─── 그래프 → 에디터 블록 저장 (Step H) ─── */
-  const handleSave = async (format: GraphBlockFormat) => {
-    const api = apiRef.current;
-    if (!api || !onSaveAsBlock || saving) return;
-    setSaveMenuOpen(false);
-    setSaving(true);
-    try {
-      // 사용자가 줌·팬한 현재 시야 그대로 저장 (보고 있는 그대로가 직관적)
-      const view = captureGgbView(api) ?? parsedSpec?.view ?? null;
-      const ts = Date.now();
-      let file: File;
-      if (format === 'ggb') {
-        const b64 = api.getBase64();
-        if (typeof b64 !== 'string' || !b64) throw new Error('GGB 내보내기 실패');
-        file = base64ToFile(b64, `ai-graph-${ts}.ggb`, 'application/vnd.geogebra.file');
-      } else if (format === 'svg') {
-        const svg = await new Promise<string>((resolve, reject) => {
-          const timer = setTimeout(() => reject(new Error('SVG 내보내기 시간 초과')), 10_000);
-          try {
-            api.exportSVG((s: string) => { clearTimeout(timer); resolve(s); });
-          } catch (e) { clearTimeout(timer); reject(e); }
-        });
-        if (!svg || !svg.includes('<svg')) throw new Error('SVG 내보내기 실패');
-        file = new File([new Blob([svg], { type: 'image/svg+xml' })], `ai-graph-${ts}.svg`, { type: 'image/svg+xml' });
-      } else {
-        const b64 = api.getPNGBase64(2, true, 72);
-        if (typeof b64 !== 'string' || !b64) throw new Error('PNG 내보내기 실패');
-        file = base64ToFile(b64, `ai-graph-${ts}.png`, 'image/png');
-      }
-      const tabLabel = await onSaveAsBlock({ format, file, view: format === 'ggb' ? view : null });
-      showToast(true, tabLabel
-        ? `"${tabLabel}" 탭에 블록 추가됨 (문제 저장 시 확정)`
-        : '블록 추가됨 (문제 저장 시 확정)');
-    } catch (err: any) {
-      // eslint-disable-next-line no-console
-      console.error('[GgbGraphView] 블록 저장 실패:', err);
-      showToast(false, err?.message || '저장 실패');
-    } finally {
-      setSaving(false);
+  /* ─── 내보내기 (Step H — 댓글 액션 행에서 호출) ─── */
+  // applet이 비활성이면 자동 활성화 후 로드 완료를 폴링으로 기다린다.
+  // appletOnLoad에서 apiRef 할당과 명령 주입이 동기로 끝나므로 apiRef가 보이면 안전.
+  const exportFile = useCallback(async (format: GraphBlockFormat): Promise<GraphBlockSave> => {
+    if (!parsedSpec) throw new Error('그래프 명세 오류 — 내보낼 수 없습니다');
+    let api = apiRef.current;
+    if (!api) {
+      setActive(true);
+      api = await new Promise<any>((resolve, reject) => {
+        const start = Date.now();
+        const timer = setInterval(() => {
+          if (apiRef.current) { clearInterval(timer); resolve(apiRef.current); }
+          else if (Date.now() - start > 20_000) {
+            clearInterval(timer); reject(new Error('그래프 로드 시간 초과'));
+          }
+        }, 150);
+      });
     }
-  };
+    // 사용자가 줌·팬한 현재 시야 그대로 저장 (보고 있는 그대로가 직관적)
+    const view = captureGgbView(api) ?? parsedSpec.view ?? null;
+    const ts = Date.now();
+    let file: File;
+    if (format === 'ggb') {
+      const b64 = api.getBase64();
+      if (typeof b64 !== 'string' || !b64) throw new Error('GGB 내보내기 실패');
+      file = base64ToFile(b64, `ai-graph-${ts}.ggb`, 'application/vnd.geogebra.file');
+    } else if (format === 'svg') {
+      if (typeof api.exportSVG !== 'function') {
+        throw new Error('이 환경에서 SVG 내보내기를 지원하지 않습니다');
+      }
+      const ggbApi = api;
+      const svg = await new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('SVG 내보내기 시간 초과')), 10_000);
+        try {
+          ggbApi.exportSVG((s: string) => { clearTimeout(timer); resolve(s); });
+        } catch (e) { clearTimeout(timer); reject(e); }
+      });
+      if (!svg || !svg.includes('<svg')) throw new Error('SVG 내보내기 실패');
+      file = new File([new Blob([svg], { type: 'image/svg+xml' })], `ai-graph-${ts}.svg`, { type: 'image/svg+xml' });
+    } else {
+      const b64 = api.getPNGBase64(2, true, 72);
+      if (typeof b64 !== 'string' || !b64) throw new Error('PNG 내보내기 실패');
+      file = base64ToFile(b64, `ai-graph-${ts}.png`, 'image/png');
+    }
+    return { format, file, view: format === 'ggb' ? view : null };
+  }, [parsedSpec]);
+
+  // 상위(CommentItem 액션 행)에 내보내기 핸들 등록
+  useEffect(() => {
+    if (!onRegisterExport) return;
+    onRegisterExport({ exportFile });
+    return () => onRegisterExport(null);
+  }, [onRegisterExport, exportFile]);
 
   /* ─── 명세 파싱 실패 → 폴백 박스 (본문 렌더에는 영향 없음) ─── */
   if (!parsedSpec) {
@@ -345,8 +356,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
     );
   }
 
-  const svgSupported = typeof apiRef.current?.exportSVG === 'function';
-
   return (
     <div
       ref={hostRef}
@@ -361,10 +370,10 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
         height: PREVIEW_HEIGHT,
         margin: '8px 0',
         background: '#fafafa',
-        border: '1px solid var(--border-light, #e0e0e0)',
+        // 테두리 없음 — 활성화(팬·줌 가능) 시에만 살짝 그림자로 구분
         borderRadius: 6,
         overflow: 'hidden',
-        boxShadow: active ? '0 4px 14px rgba(0,0,0,0.08)' : 'none',
+        boxShadow: active ? '0 4px 16px rgba(0,0,0,0.16)' : 'none',
         cursor: active ? 'default' : 'pointer',
         transition: 'box-shadow 0.15s',
       }}
@@ -430,64 +439,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
         </div>
       )}
 
-      {/* 블록 저장 버튼 + 형식 드롭다운 (편집 화면에서만 = onSaveAsBlock 있을 때만) */}
-      {onSaveAsBlock && active && !loading && !error && (
-        <div
-          style={{ position: 'absolute', top: 8, right: 46, zIndex: 9999 }}
-          onMouseDown={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          <button
-            onClick={(e) => { e.stopPropagation(); setSaveMenuOpen((v) => !v); }}
-            disabled={saving}
-            title="그래프를 에디터 블록으로 저장"
-            style={{
-              padding: '4px 10px', fontSize: 11,
-              background: 'rgba(255,255,255,0.92)',
-              border: '1px solid var(--border-light, #ccc)',
-              borderRadius: 4, cursor: saving ? 'wait' : 'pointer',
-              color: 'var(--text-secondary, #444)',
-            }}
-          >
-            {saving ? '저장 중…' : '블록으로 저장'}
-          </button>
-          {saveMenuOpen && !saving && (
-            <div style={{
-              position: 'absolute', top: '110%', right: 0,
-              minWidth: 170,
-              background: 'var(--bg-card, #fff)',
-              border: '1px solid var(--border-light, #ccc)',
-              borderRadius: 6,
-              boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
-              overflow: 'hidden',
-            }}>
-              {([
-                { format: 'ggb' as const, label: 'GGB 블록 (인터랙티브)', enabled: true },
-                { format: 'svg' as const, label: 'SVG 블록 (벡터)', enabled: svgSupported },
-                { format: 'png' as const, label: 'PNG 블록 (이미지)', enabled: true },
-              ]).map((item) => (
-                <button
-                  key={item.format}
-                  onClick={(e) => { e.stopPropagation(); if (item.enabled) handleSave(item.format); }}
-                  disabled={!item.enabled}
-                  title={item.enabled ? undefined : '이 환경에서 SVG 내보내기를 지원하지 않습니다'}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'left',
-                    padding: '7px 12px', fontSize: 11,
-                    background: 'transparent', border: 'none',
-                    cursor: item.enabled ? 'pointer' : 'not-allowed',
-                    color: item.enabled ? 'var(--text-secondary, #444)' : 'var(--text-faint, #bbb)',
-                    fontFamily: 'var(--font-ui)',
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
       {/* 전체화면 토글 */}
       {active && !loading && !error && (
         <button
@@ -509,20 +460,6 @@ export default function GgbGraphView({ spec, autoActivate = false, onSaveAsBlock
         >
           {isFullscreen ? '✕' : '⛶'}
         </button>
-      )}
-
-      {toast && (
-        <div style={{
-          position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 9999,
-          padding: '6px 14px', fontSize: 12,
-          background: toast.ok ? 'rgba(40,140,60,0.92)' : 'rgba(180,40,40,0.92)',
-          color: '#fff',
-          borderRadius: 4, pointerEvents: 'none',
-          maxWidth: '90%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-        }}>
-          {toast.msg}
-        </div>
       )}
     </div>
   );

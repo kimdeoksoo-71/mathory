@@ -18,7 +18,7 @@ import {
 } from '../../lib/discussion-sessions';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor from './CommentEditor';
-import type { GraphBlockSave } from '../viewer/GgbGraphView';
+import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 
 const LEGACY_SESSION_ID = '__legacy__';
 const HISTORY_LIMIT = 5;
@@ -1176,6 +1176,72 @@ function CommentItem({
 }) {
   const isMine = !info.isAI && comment.authorUid === currentUid;
 
+  /* ─── Phase 42: 그래프 내보내기 (블록 저장·GGB 다운로드 — 액션 행 버튼) ─── */
+  const hasGraph = info.isAI && comment.content.includes('```mathory-graph');
+  const [graphExport, setGraphExport] = useState<GraphExportHandle | null>(null);
+  const [saveMenuOpen, setSaveMenuOpen] = useState(false);
+  const [graphBusy, setGraphBusy] = useState<'save' | 'download' | null>(null);
+  const [graphStatus, setGraphStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const saveMenuRef = useRef<HTMLSpanElement>(null);
+  const handleRegisterExport = useCallback(
+    (h: GraphExportHandle | null) => setGraphExport(h),
+    [],
+  );
+
+  // 드롭다운 외부 클릭 닫기
+  useEffect(() => {
+    if (!saveMenuOpen) return;
+    const onDocDown = (e: MouseEvent) => {
+      if (saveMenuRef.current && !saveMenuRef.current.contains(e.target as Node)) {
+        setSaveMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocDown);
+    return () => document.removeEventListener('mousedown', onDocDown);
+  }, [saveMenuOpen]);
+
+  const flashStatus = (ok: boolean, msg: string) => {
+    setGraphStatus({ ok, msg });
+    setTimeout(() => setGraphStatus(null), 4000);
+  };
+
+  const handleSaveBlock = async (format: GraphBlockFormat) => {
+    if (!graphExport || !onSaveGraphAsBlock || graphBusy) return;
+    setSaveMenuOpen(false);
+    setGraphBusy('save');
+    try {
+      const save = await graphExport.exportFile(format);
+      const tabLabel = await onSaveGraphAsBlock(save);
+      flashStatus(true, tabLabel
+        ? `"${tabLabel}" 탭에 추가됨 (문제 저장 시 확정)`
+        : '블록 추가됨 (문제 저장 시 확정)');
+    } catch (err) {
+      flashStatus(false, err instanceof Error ? err.message : '저장 실패');
+    } finally {
+      setGraphBusy(null);
+    }
+  };
+
+  const handleDownloadGgb = async () => {
+    if (!graphExport || graphBusy) return;
+    setGraphBusy('download');
+    try {
+      const { file } = await graphExport.exportFile('ggb');
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      flashStatus(false, err instanceof Error ? err.message : '다운로드 실패');
+    } finally {
+      setGraphBusy(null);
+    }
+  };
+
   return (
     <div style={{ marginBottom: isReply ? 8 : 0 }}>
       {/* 헤더 */}
@@ -1239,7 +1305,7 @@ function CommentItem({
               content={comment.content}
               borderless autoHeight locale="ko"
               graphAutoActivate={graphAutoActivate}
-              onSaveGraphAsBlock={onSaveGraphAsBlock}
+              onRegisterGraphExport={hasGraph ? handleRegisterExport : undefined}
             />
           </div>
         )}
@@ -1276,6 +1342,67 @@ function CommentItem({
               />
               해결됨
             </button>
+          )}
+          {/* Phase 42: 그래프 → 블록 저장 + GGB 다운로드 (해결됨과 삭제 사이) */}
+          {hasGraph && graphExport && onSaveGraphAsBlock && (
+            <span ref={saveMenuRef} style={{ position: 'relative' }}>
+              <button
+                onClick={() => setSaveMenuOpen((v) => !v)}
+                disabled={graphBusy !== null}
+                style={miniLinkStyle}
+              >
+                {graphBusy === 'save' ? '저장 중…' : '블록으로 저장'}
+              </button>
+              {saveMenuOpen && (
+                <div style={{
+                  position: 'absolute', bottom: '140%', left: 0, zIndex: 100,
+                  minWidth: 160,
+                  background: 'var(--bg-card, #fff)',
+                  border: '1px solid var(--border-light, #ccc)',
+                  borderRadius: 6,
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.12)',
+                  overflow: 'hidden',
+                }}>
+                  {([
+                    ['ggb', 'GGB 블록 (인터랙티브)'],
+                    ['svg', 'SVG 블록 (벡터)'],
+                    ['png', 'PNG 블록 (이미지)'],
+                  ] as const).map(([format, label]) => (
+                    <button
+                      key={format}
+                      onClick={() => handleSaveBlock(format)}
+                      style={{
+                        display: 'block', width: '100%', textAlign: 'left',
+                        padding: '7px 12px', fontSize: 11,
+                        background: 'transparent', border: 'none', cursor: 'pointer',
+                        color: 'var(--text-secondary, #444)',
+                        fontFamily: 'var(--font-ui)',
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </span>
+          )}
+          {hasGraph && graphExport && (
+            <button
+              onClick={handleDownloadGgb}
+              disabled={graphBusy !== null}
+              title="GGB 파일 다운로드"
+              style={{ ...miniLinkStyle, fontSize: 12 }}
+            >
+              {graphBusy === 'download' ? '…' : '⬇'}
+            </button>
+          )}
+          {graphStatus && (
+            <span style={{
+              fontSize: 10,
+              color: graphStatus.ok ? '#2a8a3c' : 'var(--accent-danger, #c33)',
+            }}>
+              {graphStatus.msg}
+            </span>
           )}
           {isMine && (
             <>
