@@ -451,7 +451,7 @@ export default function ProblemView({
         overflowY: 'auto',
         overflowX: 'hidden',
         background: 'var(--bg-primary, #FAF9F7)',
-        paddingRight: commentPanelTab ? 'calc(35em + 48px)' : 0,
+        paddingRight: commentPanelTab ? 'calc(35em + 16px)' : 0,
         transition: 'padding-right 0.18s ease',
         display: 'flex',
         // unsafe flex-end: 콘텐츠가 컨테이너보다 커도 우측 정렬 유지 (왼쪽으로 overflow)
