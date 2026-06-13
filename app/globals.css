@@ -270,11 +270,14 @@ p:has(.marker-circled) {
   display: inline-block;
 }
 
-/* 인라인 \displaystyle로 커진 수식(분수·sqrt·displaystyle ∑/∫/∏)이 위/아래 행과
-   겹치지 않도록 해당 수식 요소에만 padding을 줘서 그 줄만 라인 박스 확대.
-   line-height와 달리 단락 전체가 아닌 수식이 위치한 줄에만 적용되어
-   같은 단락 내 일반 텍스트 줄은 그대로 좁게 유지됨. */
-.preview-content .katex:has(.mfrac, .sqrt, .op-symbol.large-op) {
+/* 세로 폭 큰 수식(분수·sqrt·displaystyle ∑/∫/∏)이 위/아래 행과 겹치지 않도록
+   "그 행"(.base)에만 padding을 줘서 그 행의 라인 박스만 확대.
+   - .katex 전체가 아닌 행 단위(.base)에 적용 → 다중행 독립수식($$ … \\ … $$)
+     내부에서도 큰 수식이 든 행만 벌어짐(KaTeX는 행을 .base, 행 사이를 .mspace.newline로 분리).
+   - .base는 기본 inline이라 세로 padding이 라인 박스를 못 늘림 → inline-block 필수.
+   - 단일 인라인 수식도 .base가 하나뿐이라 동일하게 그 줄만 확대됨. */
+.preview-content .katex .base:has(.mfrac, .sqrt, .op-symbol.large-op) {
+  display: inline-block;
   padding-top: 0.4em;
   padding-bottom: 0.4em;
 }
