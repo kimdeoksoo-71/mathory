@@ -693,7 +693,7 @@ export default function CommentPanel({
       />
 
       {/* ═══ 메시지 리스트 ═══ */}
-      <div ref={messagesScrollRef} style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div ref={messagesScrollRef} className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             불러오는 중…
