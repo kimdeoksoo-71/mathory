@@ -602,7 +602,7 @@ function HomeView() {
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <h1 style={{
-          fontSize: 36, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8,
+          fontSize: 36, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8,
           fontFamily: 'var(--font-logo)', letterSpacing: -1,
         }}>Mathory</h1>
         <p style={{ fontSize: 15, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontStyle: 'italic' }}>

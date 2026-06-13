@@ -111,7 +111,7 @@ export default function SymbolSettingsModal({ open, onClose, isLoggedIn, config,
             <button type="button" onClick={() => setStep('preset')} title="프리셋으로"
               style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 15, color: '#888' }}>←</button>
           )}
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 600 }}>
             {isEditor ? '기호 그룹 편집' : '수식 기호 설정'}
           </h2>
           <div style={{ flex: 1 }} />
@@ -134,14 +134,14 @@ export default function SymbolSettingsModal({ open, onClose, isLoggedIn, config,
           /* ── 2단계: 세부 편집 ── */
           <div style={{ flex: 1, display: 'flex', gap: 12, minHeight: 0, marginTop: 8 }}>
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#666', marginBottom: 6 }}>내 그룹</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>내 그룹</div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <UserGroupEditor config={draft} selectedGroupId={selectedGroupId} onSelectGroup={setSelectedGroupId} onChange={setDraft} />
               </div>
             </div>
             <div style={{ width: 1, background: '#eee', flexShrink: 0 }} />
             <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: '#666', marginBottom: 6 }}>기호 카탈로그</div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 6 }}>기호 카탈로그</div>
               <div style={{ flex: 1, minHeight: 0 }}>
                 <SymbolCatalog inGroupIds={inGroupIds} onPick={addToGroup} canPick={!!selectedGroupId} />
               </div>
@@ -163,7 +163,7 @@ export default function SymbolSettingsModal({ open, onClose, isLoggedIn, config,
                     padding: '12px 14px', background: current ? 'rgba(184,132,92,0.06)' : '#fff',
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontWeight: 700, fontSize: 15 }}>{p.label}</span>
+                      <span style={{ fontWeight: 600, fontSize: 15 }}>{p.label}</span>
                       {current && <span style={{ fontSize: 11, fontWeight: 600, color: '#fff', background: '#B8845C', borderRadius: 10, padding: '1px 8px' }}>현재</span>}
                       <span style={{ fontSize: 12, color: '#aaa' }}>{count}개 기호</span>
                       <div style={{ flex: 1 }} />

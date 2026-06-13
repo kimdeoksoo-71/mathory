@@ -91,7 +91,7 @@ export default function SettingsPage() {
         ← 홈으로
       </button>
 
-      <h1 style={{ fontSize: 22, fontWeight: 700, margin: '0 0 4px' }}>개인 설정</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 600, margin: '0 0 4px' }}>개인 설정</h1>
       <p style={{ fontSize: 13, color: 'var(--text-secondary)', margin: '0 0 28px' }}>
         {user?.email}
       </p>
@@ -103,7 +103,7 @@ export default function SettingsPage() {
           padding: 20,
         }}
       >
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 8px' }}>닉네임</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 8px' }}>닉네임</h2>
         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: '0 0 14px', lineHeight: 1.5 }}>
           토론에서 다른 참여자(AI 포함)가 당신을 부르는 이름입니다. 최대 20자.
           <br />
@@ -170,14 +170,14 @@ export default function SettingsPage() {
           padding: 20,
         }}
       >
-        <h2 style={{ fontSize: 15, fontWeight: 700, margin: '0 0 8px' }}>정보 / 라이선스</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 8px' }}>정보 / 라이선스</h2>
         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
           이모지 이미지는{' '}
           <a
             href="https://github.com/jdecked/twemoji"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: 'var(--accent-primary, #4285f4)' }}
+            style={{ color: 'var(--accent-primary)' }}
           >
             Twemoji
           </a>
@@ -186,7 +186,7 @@ export default function SettingsPage() {
             href="https://creativecommons.org/licenses/by/4.0/"
             target="_blank"
             rel="noopener noreferrer"
-            style={{ color: 'var(--accent-primary, #4285f4)' }}
+            style={{ color: 'var(--accent-primary)' }}
           >
             CC BY 4.0
           </a>

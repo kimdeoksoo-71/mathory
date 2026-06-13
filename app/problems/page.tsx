@@ -66,14 +66,14 @@ export default function ProblemsPage() {
     <div style={{ maxWidth: '900px', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>문제 목록</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 600 }}>문제 목록</h1>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {user && (
             <button
               onClick={() => router.push('/problems/new')}
               style={{
                 padding: '8px 20px',
-                backgroundColor: '#4285f4',
+                backgroundColor: 'var(--accent-primary)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: '6px',
@@ -210,13 +210,13 @@ export default function ProblemsPage() {
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ fontSize: '16px', fontWeight: 'bold' }}>{p.title}</h2>
+                <h2 style={{ fontSize: '16px', fontWeight: 600 }}>{p.title}</h2>
                 <span style={{
                   padding: '2px 10px',
                   backgroundColor: '#e8f0fe',
                   borderRadius: '12px',
                   fontSize: '12px',
-                  color: '#4285f4',
+                  color: 'var(--accent-primary)',
                 }}>
                   난이도 {p.difficulty}
                 </span>

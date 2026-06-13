@@ -184,7 +184,7 @@ function FolderMenu({
       </button>
       {divider}
       <button
-        style={{ ...itemStyle, color: 'var(--accent-danger, #ea4335)' }}
+        style={{ ...itemStyle, color: 'var(--accent-danger)' }}
         onClick={() => { onAction('delete'); onClose(); }}
         onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
         onMouseLeave={(e) => { e.currentTarget.style.background = 'none'; }}
@@ -813,7 +813,7 @@ export default function Sidebar({
       >
         {!collapsed && (
           <span style={{
-            fontSize: 19, fontWeight: 700, color: 'var(--text-primary)',
+            fontSize: 19, fontWeight: 600, color: 'var(--text-primary)',
             letterSpacing: -0.5, fontFamily: 'var(--font-logo)',
           }}>
             Mathory
@@ -867,7 +867,7 @@ export default function Sidebar({
                     flex: 1,
                     display: 'flex', alignItems: 'center',
                     border: 'none', background: 'none', cursor: 'pointer',
-                    fontSize: 12.5, fontWeight: 700, color: 'var(--text-muted)',
+                    fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)',
                     letterSpacing: 0.3,
                     fontFamily: 'var(--font-ui)', padding: '4px 0',
                     textAlign: 'left',

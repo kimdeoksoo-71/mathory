@@ -2066,7 +2066,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
         {status && (
           <span style={{ fontSize: 12, marginRight: 4,
-            color: status.includes('에러') || status.includes('오류') ? 'var(--accent-danger)' : '#34a853',
+            color: status.includes('에러') || status.includes('오류') ? 'var(--accent-danger)' : 'var(--accent-success)',
           }}>{status}</span>
         )}
 

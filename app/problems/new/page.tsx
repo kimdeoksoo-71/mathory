@@ -94,7 +94,7 @@ export default function NewProblemPage() {
   if (!user) {
     return (
       <div style={{ maxWidth: '600px', margin: '0 auto', padding: '24px', textAlign: 'center' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>새 문제 작성</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '16px' }}>새 문제 작성</h1>
         <p style={{ color: '#888', marginBottom: '16px' }}>로그인이 필요합니다.</p>
         <LoginButton user={user} />
       </div>
@@ -104,7 +104,7 @@ export default function NewProblemPage() {
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>새 문제 작성</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 600 }}>새 문제 작성</h1>
         <LoginButton user={user} />
       </div>
 
@@ -204,18 +204,18 @@ export default function NewProblemPage() {
           disabled={saving}
           style={{
             padding: '10px 32px',
-            backgroundColor: saving ? '#ccc' : '#4285f4',
+            backgroundColor: saving ? '#ccc' : 'var(--accent-primary)',
             color: '#fff',
             border: 'none',
             borderRadius: '6px',
             cursor: saving ? 'not-allowed' : 'pointer',
             fontSize: '15px',
-            fontWeight: 'bold',
+            fontWeight: 600,
           }}
         >
           {saving ? '저장 중...' : '저장'}
         </button>
-        {status && <span style={{ color: status.includes('에러') ? '#ea4335' : '#34a853', fontSize: '14px' }}>{status}</span>}
+        {status && <span style={{ color: status.includes('에러') ? 'var(--accent-danger)' : 'var(--accent-success)', fontSize: '14px' }}>{status}</span>}
       </div>
     </div>
   );

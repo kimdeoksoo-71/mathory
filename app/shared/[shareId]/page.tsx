@@ -63,7 +63,7 @@ export default function SharedPage() {
         display: 'flex', alignItems: 'center', gap: 12,
       }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 18, fontWeight: 700, color: '#222',
+          <div style={{ fontSize: 18, fontWeight: 600, color: '#222',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {share.snapshot.title || '제목 없음'}
           </div>

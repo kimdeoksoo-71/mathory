@@ -599,7 +599,7 @@ export default function CommentPanel({
         minHeight: 57, boxSizing: 'border-box',
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
           토론 — {tabs.find((t) => t.id === activeTabId)?.label || activeTabId}
         </div>
         <button

@@ -76,7 +76,7 @@ export default function FolderPathBar({
             padding: '7px 12px', border: 'none', background: 'none',
             cursor: f.id === currentFolderId ? 'default' : 'pointer',
             fontSize: 13, fontFamily: 'var(--font-ui)',
-            color: f.id === currentFolderId ? 'var(--accent-primary, #4285f4)' : 'var(--text-primary)',
+            color: f.id === currentFolderId ? 'var(--accent-primary)' : 'var(--text-primary)',
             fontWeight: f.id === currentFolderId ? 700 : 500, textAlign: 'left',
           }}
           onMouseEnter={(e) => { if (f.id !== currentFolderId) e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}
@@ -101,7 +101,7 @@ export default function FolderPathBar({
           title="My (최상위 카테고리) — 바로 아래 폴더로 이동"
           style={{
             ...chipStyle,
-            fontWeight: 700, color: 'var(--text-secondary)',
+            fontWeight: 600, color: 'var(--text-secondary)',
             background: path.length === 0 ? 'var(--bg-active, #e8eaf6)' : 'var(--bg-hover)',
           }}
         >
@@ -125,7 +125,7 @@ export default function FolderPathBar({
                 padding: '7px 12px', border: 'none', background: 'none',
                 cursor: currentFolderId === '' ? 'default' : 'pointer',
                 fontSize: 13, fontFamily: 'var(--font-ui)',
-                color: currentFolderId === '' ? 'var(--accent-primary, #4285f4)' : 'var(--text-primary)',
+                color: currentFolderId === '' ? 'var(--accent-primary)' : 'var(--text-primary)',
                 fontWeight: currentFolderId === '' ? 700 : 500, textAlign: 'left',
               }}
               onMouseEnter={(e) => { if (currentFolderId !== '') e.currentTarget.style.background = 'var(--bg-hover, #f5f5f5)'; }}

@@ -1,7 +1,18 @@
 /* ═══════════════════════════════════════════════
    Mathory Design System — Phase 6 Clay Theme
    Claude-inspired warm, earthy color palette
+   Phase 43: Pretendard 기반 글꼴 리뉴얼 (테라코타 액센트)
    ═══════════════════════════════════════════════ */
+
+/* D2Coding — 에디터 수식 영역 고정폭 (jsDelivr woff2) */
+@font-face {
+  font-family: 'D2Coding';
+  src: url('https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding@1.3.2/D2Coding.woff2') format('woff2'),
+       url('https://cdn.jsdelivr.net/gh/joungkyun/font-d2coding@1.3.2/D2Coding.woff') format('woff');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   /* Background */
@@ -25,20 +36,28 @@
   --text-faint: #B8AFA4;
   --text-placeholder: #C8C1B6;
 
-  /* Accent */
-  --accent-primary: #B8845C;
-  --accent-hover: #A67548;
+  /* Accent — Phase 43: 클레이 → 테라코타 */
+  --accent-primary: #c96442;
+  --accent-hover: #b1502f;
+  --accent-soft: #f5e6df;          /* 액센트 연한 배경 (선택 탭, 활성 항목) */
   --accent-danger: #C0392B;
   --accent-danger-bg: #FEF2F2;
+  --accent-success: #5f6b3c;       /* 성공/완료 (올리브) */
 
   /* Badge colors */
   --badge-bg: #E8E4DF;
 
-  /* Fonts */
-  --font-logo: 'Noto Serif KR', 'Georgia', serif;
-  --font-ui: 'Pretendard', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-content: 'Noto Serif KR', 'Georgia', 'Times New Roman', serif;
-  --font-mono: 'Courier New', 'Consolas', monospace;
+  /* Fonts — Phase 43: Pretendard 기반 통일 */
+  --font-ui: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  --font-logo: var(--font-ui);     /* 로고도 산스 통일 (명조 제거) */
+  --font-content: var(--font-ui);  /* 화면 본문도 Pretendard (명조 → 산스) */
+  --font-mono: 'D2Coding', 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
+  --font-print: 'Noto Serif KR', 'Noto Serif CJK KR', 'Georgia', serif;  /* 인쇄·PDF 전용 */
+
+  /* Weights — 3단계만 (700 금지) */
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
 
   /* Sizing */
   --sidebar-expanded: 260px;
@@ -117,9 +136,16 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* 본문 톤다운: 텍스트는 회색조, 수식은 100% 검정 (가독성 향상) */
-.problem-content-toned { color: #6a6a6a; }
-.problem-content-toned .katex { color: #000; }
+/* 본문 톤다운 (Phase 43): 본문은 톤다운 웜그레이, 수식은 진하게 → 수식이 앞으로
+   "수식은 진하게, 본문은 흐리게" — 굵기 대신 명도 대비로 위계 형성 */
+.problem-content-toned {
+  font-family: var(--font-ui);
+  font-weight: var(--weight-regular);
+  line-height: 1.8;
+  letter-spacing: -0.01em;
+  color: var(--text-secondary);
+}
+.problem-content-toned .katex { color: var(--text-primary); }
 
 /* Display math: 왼쪽 정렬 + 들여쓰기 */
 .katex-display,
@@ -131,7 +157,7 @@ textarea:focus-visible {
   padding-left: 3em;
 }
 
-/* KaTeX \text{} 폰트를 본문(명조체)과 동일하게 */
+/* KaTeX \text{} 폰트를 본문(Pretendard)과 동일하게 */
 .katex .text {
   font-family: var(--font-content) !important;
   font-size: 15px !important;
@@ -151,7 +177,7 @@ ul li::before {
   display: inline-block;
   width: 2em;
   margin-left: -2em;
-  font-weight: bold;
+  font-weight: var(--weight-semibold);
 }
 ul ul li::before {
   content: "◦";

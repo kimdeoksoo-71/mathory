@@ -69,7 +69,7 @@ export default function SymbolCell({ sym, onClick, onRemove, checked, showTier, 
         <span style={{
           position: 'absolute', top: -4, right: -4, width: 15, height: 15,
           borderRadius: '50%', background: '#22c55e', color: '#fff',
-          fontSize: 10, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'none',
         }}>✓</span>
       )}

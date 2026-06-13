@@ -317,7 +317,7 @@ export default function FolderView({
           minHeight: 57, boxSizing: 'border-box',
           padding: '0',
           borderBottom: '1px solid var(--border-light)',
-          fontSize: 18, fontWeight: 700, color: 'var(--text-primary)',
+          fontSize: 18, fontWeight: 600, color: 'var(--text-primary)',
           fontFamily: 'var(--font-ui)',
           display: 'flex', alignItems: 'center', gap: 8,
         }}>
@@ -463,7 +463,7 @@ export default function FolderView({
                   }}>
                     <h2 style={{
                       flex: 1, minWidth: 0,
-                      fontSize: 16, fontWeight: 700, margin: 0,
+                      fontSize: 16, fontWeight: 600, margin: 0,
                       fontFamily: 'var(--font-ui)',
                       color: 'var(--text-primary)',
                       overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

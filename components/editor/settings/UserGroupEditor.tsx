@@ -211,7 +211,7 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
           padding: '8px 12px', background: '#1f2937', color: '#fff', borderRadius: 8, fontSize: 12,
         }}>
           <span style={{ flex: 1 }}>'{deleted.group.name}' 그룹 삭제됨</span>
-          <button type="button" onClick={undoDelete} style={{ border: 'none', background: 'none', color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+          <button type="button" onClick={undoDelete} style={{ border: 'none', background: 'none', color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
             실행취소
           </button>
         </div>

@@ -127,8 +127,8 @@ export default function SortableBlock({
               color: '#999',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#ea4335';
-              e.currentTarget.style.borderColor = '#ea4335';
+              e.currentTarget.style.color = 'var(--accent-danger)';
+              e.currentTarget.style.borderColor = 'var(--accent-danger)';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.color = '#999';

@@ -114,7 +114,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
           height: 28, padding: '0 10px',
-          fontSize: 13, fontFamily: "'JetBrains Mono', 'Menlo', monospace",
+          fontSize: 13, fontFamily: 'var(--font-mono)',
           background: open ? '#e0e7ff' : '#f0f3fb',
           border: '1px solid #ccc', borderRadius: 4,
           cursor: 'pointer', whiteSpace: 'nowrap',

@@ -159,7 +159,7 @@ export function EmojiPickerPanel({
                   justifyContent: 'center',
                   border: 'none',
                   borderBottom: activeGroup === g.key
-                    ? '2px solid var(--accent-primary, #4285f4)'
+                    ? '2px solid var(--accent-primary)'
                     : '2px solid transparent',
                   background: 'transparent',
                   cursor: 'pointer',

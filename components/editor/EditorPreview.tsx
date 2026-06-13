@@ -331,10 +331,10 @@ export default function EditorPreview({
           return <pre {...props}>{children}</pre>;
         },
         h1: ({ children, ...props }) => (
-          <h1 style={{ fontSize: '1.5em', fontWeight: 700, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h1>
+          <h1 style={{ fontSize: '1.5em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h1>
         ),
         h2: ({ children, ...props }) => (
-          <h2 style={{ fontSize: '1.3em', fontWeight: 700, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4,
+          <h2 style={{ fontSize: '1.3em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4,
             paddingBottom: '0.3em', borderBottom: '1px solid #999' }} {...props}>{children}</h2>
         ),
         h3: ({ children, ...props }) => (
@@ -439,8 +439,8 @@ export default function EditorPreview({
       backgroundColor: borderless ? 'transparent' : '#ffffff',
       border: borderless ? 'none' : '1px solid #ddd',
       borderRadius: borderless ? '0' : '8px',
-      overflow: borderless ? 'visible' : 'auto', fontSize: '15px', lineHeight: '2.5',
-      fontFamily: "var(--font-content, 'Noto Serif KR', Georgia, serif)",
+      overflow: borderless ? 'visible' : 'auto', fontSize: '15px', lineHeight: '1.8',
+      fontFamily: 'var(--font-ui)',
     }}>
       {/* 독립행 수식: 위는 기존 KaTeX 기본값(1em), 아래는 1.8배 */}
       <style>{`

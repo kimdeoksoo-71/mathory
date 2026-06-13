@@ -163,7 +163,7 @@ export default function EditProblemPage() {
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
       {/* 헤더 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>문제 편집</h1>
+        <h1 style={{ fontSize: '24px', fontWeight: 600 }}>문제 편집</h1>
         <LoginButton user={user} />
       </div>
 
@@ -238,10 +238,10 @@ export default function EditProblemPage() {
         <button onClick={handleSave} disabled={saving}
           style={{
             padding: '10px 32px',
-            backgroundColor: saving ? '#ccc' : '#4285f4',
+            backgroundColor: saving ? '#ccc' : 'var(--accent-primary)',
             color: '#fff', border: 'none', borderRadius: '6px',
             cursor: saving ? 'not-allowed' : 'pointer',
-            fontSize: '15px', fontWeight: 'bold',
+            fontSize: '15px', fontWeight: 600,
           }}>
           {saving ? '저장 중...' : '저장'}
         </button>
@@ -255,7 +255,7 @@ export default function EditProblemPage() {
           locale="ko"
         />
 
-        {status && <span style={{ color: status.includes('에러') ? '#ea4335' : '#34a853', fontSize: '14px' }}>{status}</span>}
+        {status && <span style={{ color: status.includes('에러') ? 'var(--accent-danger)' : 'var(--accent-success)', fontSize: '14px' }}>{status}</span>}
       </div>
     </div>
   );

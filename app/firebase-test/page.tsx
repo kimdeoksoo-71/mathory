@@ -93,7 +93,7 @@ export default function FirebaseTestPage() {
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 'bold' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 600 }}>
           Firebase 연동 테스트
         </h1>
         <LoginButton user={user} />
@@ -147,7 +147,7 @@ export default function FirebaseTestPage() {
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2 style={{ fontSize: '18px', fontWeight: 'bold' }}>{p.title}</h2>
+                <h2 style={{ fontSize: '18px', fontWeight: 600 }}>{p.title}</h2>
                 <button
                   onClick={() => handleDelete(p.id)}
                   style={{
@@ -167,7 +167,7 @@ export default function FirebaseTestPage() {
                 {p.year} {p.exam_type} | {p.category} | 난이도 {p.difficulty} | 정답: {p.answer}
               </p>
 
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, marginTop: '12px' }}>
                 문제 블록 ({p.question_blocks.length}개)
               </h3>
               {p.question_blocks.map((b) => (
@@ -186,7 +186,7 @@ export default function FirebaseTestPage() {
                 </pre>
               ))}
 
-              <h3 style={{ fontSize: '14px', fontWeight: 'bold', marginTop: '12px' }}>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, marginTop: '12px' }}>
                 풀이 블록 ({p.solution_blocks.length}개)
               </h3>
               {p.solution_blocks.map((b) => (

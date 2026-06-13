@@ -31,7 +31,7 @@ export default function EditorTestPage() {
 
   return (
     <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px' }}>
-      <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }}>
+      <h1 style={{ fontSize: '24px', fontWeight: 600, marginBottom: '16px' }}>
         Mathory Editor — Split View
       </h1>
 

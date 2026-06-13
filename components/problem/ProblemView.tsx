@@ -566,7 +566,7 @@ export default function ProblemView({
                     onClick={() => { if (isOwnerView) onEdit?.(problem); }}
                     style={{
                       ...mainColStyle,
-                      fontSize: 22, fontWeight: 700, color: 'var(--text-primary)',
+                      fontSize: 22, fontWeight: 600, color: 'var(--text-primary)',
                       margin: 0, lineHeight: 1.2,
                       fontFamily: 'var(--font-ui)',
                       cursor: isOwnerView ? 'pointer' : 'default',
@@ -623,7 +623,7 @@ export default function ProblemView({
                             display: 'flex', alignItems: 'center', justifyContent: 'center',
                             width: 22, height: 22, border: 'none', background: 'none',
                             cursor: 'pointer', borderRadius: 4, padding: 0,
-                            color: copiedTab === tab.id ? '#34a853' : 'var(--text-faint)',
+                            color: copiedTab === tab.id ? 'var(--accent-success)' : 'var(--text-faint)',
                             transition: 'color 0.2s',
                           }}
                         >

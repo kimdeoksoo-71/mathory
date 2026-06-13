@@ -65,10 +65,10 @@ export default function PdfDownloadButton({
 
   return (
     <button onClick={handlePrint} disabled={isPrinting} style={{
-      padding: '8px 20px', backgroundColor: isPrinting ? '#ccc' : '#34a853',
+      padding: '8px 20px', backgroundColor: isPrinting ? '#ccc' : 'var(--accent-success)',
       color: '#fff', border: 'none', borderRadius: '6px',
       cursor: isPrinting ? 'not-allowed' : 'pointer',
-      fontSize: '14px', fontWeight: 'bold',
+      fontSize: '14px', fontWeight: 600,
       display: 'flex', alignItems: 'center', gap: '6px',
     }}>
       {isPrinting ? <>⏳ 준비 중...</> : <>📄 {label}</>}

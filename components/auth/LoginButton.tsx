@@ -52,7 +52,7 @@ export default function LoginButton({ user }: LoginButtonProps) {
       onClick={handleLogin}
       style={{
         padding: '8px 20px',
-        backgroundColor: '#4285f4',
+        backgroundColor: 'var(--accent-primary)',
         color: '#fff',
         border: 'none',
         borderRadius: '6px',

@@ -661,7 +661,7 @@ function TableInsertDialog({
           fontFamily: 'var(--font-ui)',
         }}
       >
-        <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
+        <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16, color: 'var(--text-primary)' }}>
           표 삽입
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

@@ -79,7 +79,7 @@ export default function SymbolCatalog({ inGroupIds, onPick, canPick }: Props) {
         ) : (
           sections.map((sec) => (
             <div key={sec.key} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#999', margin: '0 0 6px', letterSpacing: 0.3 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: '#999', margin: '0 0 6px', letterSpacing: 0.3 }}>
                 {sec.label} <span style={{ color: '#ccc', fontWeight: 400 }}>({sec.syms.length})</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 40px)', gap: 6 }}>

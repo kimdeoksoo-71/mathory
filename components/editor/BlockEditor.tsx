@@ -251,7 +251,7 @@ export default function BlockEditor({ blocks, onChange, problemId }: BlockEditor
         style={{
           height: '8px',
           cursor: 'ns-resize',
-          backgroundColor: isResizing ? '#4285f4' : '#e8e8e8',
+          backgroundColor: isResizing ? 'var(--accent-primary)' : '#e8e8e8',
           borderRadius: '0 0 4px 4px',
           display: 'flex',
           alignItems: 'center',

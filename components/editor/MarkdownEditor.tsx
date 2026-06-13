@@ -620,7 +620,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             },
             '.cm-scroller': {
               overflow: 'auto',
-              fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+              // 기본 = Pretendard (일반 텍스트). 수식 영역은 cm-math-region이 D2Coding으로 오버라이드
+              fontFamily: 'var(--font-ui)',
             },
             '.cm-content': {
               padding: '16px',
@@ -668,7 +669,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               backgroundColor: '#fff',
               overflow: 'hidden',
-              fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+              fontFamily: 'var(--font-mono)',
               fontSize: '13px',
             },
             '.cm-tooltip-autocomplete ul': {

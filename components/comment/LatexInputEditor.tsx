@@ -88,7 +88,8 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
               '&.cm-editor': { background: 'transparent' },
               '&.cm-focused': { outline: 'none' },
               '.cm-content': {
-                fontFamily: "'JetBrains Mono', 'Courier New', monospace",
+                // 기본 = Pretendard. 수식 영역은 cm-math-region이 D2Coding으로 오버라이드
+                fontFamily: 'var(--font-ui)',
                 minHeight: `${minHeight}px`,
                 padding: '4px 4px',
                 caretColor: 'var(--text-primary)',

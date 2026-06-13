@@ -215,7 +215,7 @@ export default function MathSnippetMenu({
                       borderRadius: 3,
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.color = '#4285f4';
+                      (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
                     }}
                     onMouseLeave={(e) => {
                       (e.currentTarget as HTMLElement).style.color = '#aaa';
@@ -267,7 +267,7 @@ export default function MathSnippetMenu({
                 background: 'none',
                 cursor: 'pointer',
                 fontSize: 13,
-                color: '#4285f4',
+                color: 'var(--accent-primary)',
                 fontFamily: "'Pretendard', 'Noto Sans KR', sans-serif",
                 display: 'flex',
                 alignItems: 'center',
@@ -310,7 +310,7 @@ export default function MathSnippetMenu({
                 boxSizing: 'border-box',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#4285f4';
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = '#ddd';
@@ -367,14 +367,14 @@ export default function MathSnippetMenu({
                 border: '1px solid #ddd',
                 borderRadius: 6,
                 fontSize: 13,
-                fontFamily: "'JetBrains Mono', 'Menlo', 'Monaco', 'Apple SD Gothic Neo', 'Malgun Gothic', '맑은 고딕', monospace",
+                fontFamily: 'var(--font-mono)',
                 outline: 'none',
                 resize: 'vertical',
                 boxSizing: 'border-box',
                 lineHeight: '1.6',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#4285f4';
+                e.currentTarget.style.borderColor = 'var(--accent-primary)';
               }}
               onBlur={(e) => {
                 e.currentTarget.style.borderColor = '#ddd';
@@ -406,7 +406,7 @@ export default function MathSnippetMenu({
                 border: 'none',
                 borderRadius: 6,
                 background:
-                  formName.trim() && formContent.trim() ? '#4285f4' : '#ccc',
+                  formName.trim() && formContent.trim() ? 'var(--accent-primary)' : '#ccc',
                 color: '#fff',
                 cursor: formName.trim() && formContent.trim() ? 'pointer' : 'default',
                 fontSize: 13,
