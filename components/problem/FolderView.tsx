@@ -275,7 +275,7 @@ export default function FolderView({
       }
       if (isBordered) {
         return (
-          <div key={block.id || `b-${i}`} style={{ border: '1.5px solid var(--text-muted, #888)', borderRadius: 0, padding: '12px 16px', margin: '1.2em 0' }}>
+          <div key={block.id || `b-${i}`} style={{ border: '0.7px solid var(--text-primary)', borderRadius: 0, padding: '12px 16px', margin: '1.2em 0' }}>
             <EditorPreview content={block.raw_text} borderless locale="ko" />
           </div>
         );

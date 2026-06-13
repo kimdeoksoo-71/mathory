@@ -342,7 +342,7 @@ export default function ProblemView({
       if (isBordered) {
         return (
           <div key={block.id} style={{
-            border: '1.5px solid var(--text-muted, #888)',
+            border: '0.7px solid var(--text-primary)',
             borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
           }}>
             <EditorPreview content={block.raw_text} borderless locale="ko" />

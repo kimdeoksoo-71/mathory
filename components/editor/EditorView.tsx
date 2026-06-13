@@ -2504,7 +2504,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     </div>
                   ) : isBordered ? (
                     <div style={{
-                      border: '1.5px solid var(--text-muted, #888)',
+                      border: '0.7px solid var(--text-primary)',
                       borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
                     }}>
                       <EditorPreview
