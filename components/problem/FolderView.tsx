@@ -299,24 +299,14 @@ export default function FolderView({
       onDragEnd={handleDndEnd}
       onDragCancel={() => setDraggingProblem(null)}
     >
-    <div style={{
-      flex: 1, minHeight: 0, width: '100%',
-      background: 'var(--bg-primary, #FAF9F7)',
-      fontSize: contentFontSize,
-      overflow: 'auto', position: 'relative',
-    }}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
-        {/* 폴더명 헤더 + 하위 폴더 (sticky 고정 영역 — 스크롤해도 제자리, 드롭 타깃 유지) */}
-        <div style={{
-          position: 'sticky', top: 0, zIndex: 5,
-          background: 'var(--bg-primary, #FAF9F7)',
-          marginBottom: 20,
-        }}>
-        {/* 행 1: 제목 행 — 사이드바·EditorView·토론패널 헤더와 동일 57px */}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%', background: 'var(--bg-functional)' }}>
+      {/* ─── 제목바: 전체폭 아이보리 chrome (U자 밖) — 하위폴더 유무와 무관하게 높이 일정(가로 경계선 Y 통일) ─── */}
+      <div style={{ flexShrink: 0, background: 'var(--bg-functional)', minHeight: 98, boxSizing: 'border-box' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
+        {/* 행 1: 제목 행 — 57px */}
         <div style={{
           minHeight: 57, boxSizing: 'border-box',
           padding: '0',
-          borderBottom: '1px solid var(--border-light)',
           fontSize: 18, fontWeight: 600, color: 'var(--text-primary)',
           fontFamily: 'var(--font-ui)',
           display: 'flex', alignItems: 'center', gap: 8,
@@ -366,8 +356,7 @@ export default function FolderView({
             </button>
           )}
         </div>
-
-        {/* 행 2: 하위 폴더 — 가로 한 줄, 넘치면 좌우 스크롤. 41px 높이로 EditorView Row 2 / 토론 패널 세션바와 정렬 */}
+        {/* 행 2: 하위 폴더 — 제목행과 함께 U자 밖 아이보리 영역에 위치 (가로 스크롤, 드롭 타깃) */}
         {childFolders.length > 0 && (
           <div style={{
             display: 'flex', flexWrap: 'nowrap', gap: 8,
@@ -411,6 +400,20 @@ export default function FolderView({
           </div>
         )}
         </div>
+      </div>
+
+      {/* ─── U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 폴더 리스트 아래에서 시작 ─── */}
+      <div style={{
+        flex: 1, minHeight: 0, width: '100%',
+        background: 'var(--bg-content)',
+        fontSize: contentFontSize,
+        overflow: 'auto', position: 'relative',
+        borderTop: '0.5px solid var(--border-content)',
+        borderLeft: '0.5px solid var(--border-content)',
+        borderRight: '0.5px solid var(--border-content)',
+        borderTopLeftRadius: 14, borderTopRightRadius: 14,
+      }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
 
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
@@ -428,6 +431,7 @@ export default function FolderView({
             gridTemplateColumns: 'repeat(auto-fill, 35em)',
             justifyContent: 'center',
             gap: 20,
+            paddingTop: 28, // 경계선↔카드 상단 여백 (스크롤 영역 안이라 스크롤 시 사라짐)
             paddingBottom: '20vh',
           }}>
             {folderProblems.map((problem) => {
@@ -441,7 +445,7 @@ export default function FolderView({
                   {...listeners}
                   onClick={() => onView(problem)}
                   style={{
-                    background: '#ffffff',
+                    background: 'var(--bg-functional)',
                     border: '1px solid var(--border-light)',
                     borderRadius: 12,
                     padding: '18px 22px',
@@ -534,6 +538,7 @@ export default function FolderView({
           onAction={handleCardMenuAction}
         />
       )}
+    </div>
     </div>
 
     <DragOverlay dropAnimation={null}>

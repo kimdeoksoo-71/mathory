@@ -792,8 +792,7 @@ export default function Sidebar({
       style={{
         width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-expanded)',
         flexShrink: 0,
-        background: 'var(--bg-sidebar)',
-        borderRight: '1px solid var(--border-primary)',
+        background: 'var(--bg-functional)',
         display: 'flex',
         flexDirection: 'column',
         transition: 'width var(--transition-normal)',
@@ -807,7 +806,6 @@ export default function Sidebar({
           alignItems: 'center',
           justifyContent: collapsed ? 'center' : 'space-between',
           padding: collapsed ? '14px 0' : '14px 16px',
-          borderBottom: '1px solid var(--border-primary)',
           minHeight: 52,
         }}
       >
@@ -833,7 +831,7 @@ export default function Sidebar({
       </div>
 
       {/* ═══ Section 1: New + Search ═══ */}
-      <div style={{ padding: collapsed ? '8px 8px' : '8px 12px', borderBottom: '1px solid var(--border-primary)' }}>
+      <div style={{ padding: collapsed ? '8px 8px' : '8px 12px' }}>
         <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={collapsed} onClick={onNewProblem} />
         <SidebarItem icon={<IconSearch />} label="검색" collapsed={collapsed} onClick={onSearch} />
       </div>
@@ -849,7 +847,7 @@ export default function Sidebar({
       >
         {/* ═══ Section 2: Folders ═══ */}
         <div
-          style={{ padding: collapsed ? '8px 8px' : '8px 12px', borderBottom: '1px solid var(--border-primary)', overflow: 'auto' }}
+          style={{ padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}
           onMouseEnter={() => setMyHeaderHovered(true)}
           onMouseLeave={() => setMyHeaderHovered(false)}
         >

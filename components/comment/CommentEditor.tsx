@@ -27,6 +27,8 @@ interface CommentEditorProps {
   problemId?: string;
   /** 입력 글자수 상한 (기본 1000). 토론 답변이 지나치게 길어지는 것을 방지 */
   maxLength?: number;
+  /** 입력창 세로 높이(px). 메인 작성 영역은 패널에서 드래그 리사이즈로 제어, 답글은 기본 120 */
+  inputHeight?: number;
 }
 
 export default function CommentEditor({
@@ -39,6 +41,7 @@ export default function CommentEditor({
   headerLeft,
   problemId,
   maxLength = 1000,
+  inputHeight = 120,
 }: CommentEditorProps) {
   const [value, setValue] = useState(initialValue);
   const [showPreview, setShowPreview] = useState(false);
@@ -127,9 +130,6 @@ export default function CommentEditor({
 
   return (
     <div style={{
-      border: '1px solid var(--border-light, #ddd)',
-      borderRadius: 8, padding: 8,
-      background: 'var(--bg-card, #fff)',
       fontFamily: 'var(--font-ui)',
     }}>
       {/* ── 상단 바: (좌) headerLeft(AI 모델 칩 등)  ·  (우) 수식·미리보기/편집·작성 ── */}
@@ -244,7 +244,7 @@ export default function CommentEditor({
           ref={editorRef}
           initialValue={initialValue}
           fontSize={13}
-          minHeight={120}
+          minHeight={inputHeight}
           placeholder={placeholder}
           autoFocus={autoFocus}
           maxLength={maxLength}
@@ -254,9 +254,7 @@ export default function CommentEditor({
       </div>
       {showPreview && (
         <div style={{
-          minHeight: 120, padding: 6, fontSize: 13,
-          border: '1px dashed var(--border-light, #ddd)', borderRadius: 4,
-          background: 'var(--bg-input, #fafafa)',
+          minHeight: inputHeight, padding: 6, fontSize: 13,
         }}>
           {value.trim() ? (
             <EditorPreview content={value} borderless autoHeight locale="ko" />

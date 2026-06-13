@@ -667,11 +667,11 @@ function SortableEditorBlock({
     marginBottom: 6,
     // 단일 실제 테두리 (거터 배경이 덮지 않음 → 좌측 이중선 해소, 모서리 유지)
     // 0.5px = 레티나에서 1물리픽셀 헤어라인 (1px은 2물리픽셀이라 두껍게 보임)
-    border: '0.5px solid var(--border-primary)',
+    border: '0.5px solid var(--border-block)',
     borderRadius: 12,
-    background: 'var(--bg-card)',
+    background: isActive ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
-    boxShadow: isActive ? '0 6px 20px rgba(0,0,0,0.25)' : 'none',
+    boxShadow: isActive ? 'var(--block-shadow-active)' : 'none',
   };
 
   const isTextBased = TEXT_BASED_TYPES.has(block.type);
@@ -683,7 +683,7 @@ function SortableEditorBlock({
       <div
         style={{
           display: 'flex', alignItems: 'center', gap: 4,
-          padding: '4px 8px', background: 'var(--bg-secondary)',
+          padding: '4px 8px', background: 'var(--block-bg-active)',
           cursor: 'grab', fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
           // 헤더↔에디터 구분 하단선만 (블록 외곽선이 좌·우·위를 감쌈). 0.5px 헤어라인
@@ -797,6 +797,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
+  // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 560px ≈ 35em@16px.
+  const [panelWidth, setPanelWidth] = useState(560);
+  const [resizeHover, setResizeHover] = useState(false);   // hover 시 핸들 라인 강조
+  const [resizeDragging, setResizeDragging] = useState(false);
   // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
   const skipDirtyRef = useRef(true);
   const [status, setStatus] = useState('');
@@ -2017,10 +2022,42 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     e.target.style.background = 'transparent';
   };
 
+  // ─── Phase 44 Step D: 토론 패널 드래그 리사이즈 핸들러 (상태는 컴포넌트 상단에 선언됨) ───
+  const PANEL_MIN = 360;
+
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // dnd-kit 블록 드래그와 충돌 방지
+    const el = e.currentTarget as HTMLElement;
+    const pid = e.pointerId;
+    try { el.setPointerCapture(pid); } catch {} // 드래그 중 이벤트를 핸들에 고정 (오버레이 무관)
+    setResizeDragging(true);
+    const onMove = (ev: PointerEvent) => {
+      // 핸들 = U자 컨텐츠 우측 경계선(콘텐츠 우측 끝 = panelWidth + 12px 갭). 경계선을 커서에 맞춤.
+      const next = window.innerWidth - ev.clientX - 12;
+      setPanelWidth(Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.9, next)));
+    };
+    const onUp = () => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      try { el.releasePointerCapture(pid); } catch {}
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setResizeDragging(false);
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+  const handleResizeEnter = () => setResizeHover(true);
+  const handleResizeLeave = () => setResizeHover(false);
+  const resizeActive = resizeHover || resizeDragging;
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-      display: 'flex', flexDirection: 'column', background: 'var(--bg-primary)',
+      display: 'flex', flexDirection: 'column', background: 'var(--bg-functional)',
     }}>
       {/* CSS 오버라이드 */}
       <style>{`
@@ -2028,8 +2065,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
         .math-highlight-active {
-          background-color: rgba(255, 224, 51, 0.30) !important;
-          box-shadow: 0 0 0 1px rgba(234, 179, 8, 0.30);
+          /* 활성 행/거터와 동일한 웜 브라운 계열. 미리보기 배경(#F4EFE7)이 더 밝아
+             같은 강도가 더 도드라지므로 편집창보다 한 톤 약하게. */
+          background-color: rgba(184, 155, 120, 0.18) !important;
+          box-shadow: 0 0 0 1px rgba(184, 155, 120, 0.42);
           border-radius: 3px;
         }
       `}</style>
@@ -2041,9 +2080,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         padding: '0 16px',
         minHeight: 57, boxSizing: 'border-box',
         // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
-        paddingRight: discussionOpen ? 'calc(35em + 16px + 24px)' : 16,
+        paddingRight: discussionOpen ? `calc(${panelWidth}px + 40px)` : 16,
         transition: 'padding-right 0.2s',
-        borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)',
+        borderBottom: '1px solid var(--border-light)', background: 'var(--bg-functional)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
         <button onClick={handleBackWithSave} style={{
@@ -2167,9 +2206,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center',
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
-        paddingRight: discussionOpen ? 'calc(35em + 16px + 24px)' : 16,
+        paddingRight: discussionOpen ? `calc(${panelWidth}px + 40px)` : 16,
         transition: 'padding-right 0.2s',
-        borderBottom: '1px solid var(--border-light)', background: 'var(--bg-card)', flexShrink: 0,
+        background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
       }}>
         <UnifiedToolbar
@@ -2325,12 +2364,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         )}
       </div>
 
-      {/* ═══ Row 3: Split View (편집창 최소폭 미달 시 가로 스크롤) ═══ */}
+      {/* ═══ Row 3: Split View — 외부 래퍼(아이보리 백드롭, 토론 패널 자리 확보) ═══ */}
       <div style={{
-        flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
-        paddingRight: discussionOpen ? 'calc(35em + 24px)' : 0, // 토론 패널(35em) + 24px 여백
+        flex: 1, display: 'flex', minHeight: 0,
+        paddingRight: discussionOpen ? `calc(${panelWidth}px + 12px)` : 0, // 토론 패널 + 12px 여백
         transition: 'padding-right 0.2s',
       }}>
+
+        {/* ─── U자 컨텐츠 프레임: 클레이 + 3면 경계(상·좌·우) + 상단 14px 라운드, 하단 열림 ─── */}
+        <div className="content-frame" style={{
+          flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
+          background: 'var(--bg-content)',
+          borderTop: '0.5px solid var(--border-content)',
+          borderLeft: '0.5px solid var(--border-content)',
+          borderRight: '0.5px solid var(--border-content)',
+          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+        }}>
 
         {/* ─── Left: Editor ─── */}
         <div style={{
@@ -2401,9 +2450,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-primary, #FAF9F7)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-content)', minHeight: 0 }}>
             <div style={activeTab === 'question' ? {
-              background: '#ffffff', padding: '20px 24px', borderRadius: 8,
+              background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
@@ -2483,6 +2532,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             </div>
           </div>
         </div>
+        </div>
       </div>
 
       {/* 토론 패널 — 우측 슬라이드 (ProblemView와 동일 패턴) */}
@@ -2498,7 +2548,31 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onClose={() => setDiscussionOpen(false)}
           onCommentsChange={setAllComments}
           onInsertGraphBlock={handleInsertGraphBlock}
+          width={panelWidth}
         />
+      )}
+
+      {/* ─── Step D: 토론 패널 좌측변 드래그 리사이즈 핸들 (200ms dwell 후 활성) ─── */}
+      {discussionOpen && (
+        <div
+          onPointerEnter={handleResizeEnter}
+          onPointerLeave={handleResizeLeave}
+          onPointerDown={handleResizeStart}
+          style={{
+            position: 'absolute', top: 0, bottom: 0,
+            right: `calc(${panelWidth}px + 7px)`, // U자 컨텐츠 우측 경계선(panelWidth+12) 위에 strip 걸침
+            width: 10, zIndex: 100,
+            cursor: 'col-resize',
+            display: 'flex', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            width: resizeActive ? 1.5 : 0,
+            height: '100%',
+            background: 'var(--border-content-active)',
+            transition: 'width 0.1s',
+          }} />
+        </div>
       )}
     </div>
   );

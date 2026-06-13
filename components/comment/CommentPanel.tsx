@@ -48,6 +48,8 @@ interface CommentPanelProps {
   onTabChange?: (tabId: string) => void;
   /** Phase 42: AI 그래프 → 에디터 블록 저장 (편집 화면에서만 전달). 반환값은 토스트용 탭 이름 */
   onInsertGraphBlock?: (save: GraphBlockSave) => Promise<string | void>;
+  /** Phase 44: 드래그 리사이즈된 패널 폭 (px 숫자). 미전달 시 기본 35em */
+  width?: number | string;
 }
 
 interface DisplayInfo {
@@ -82,6 +84,7 @@ export default function CommentPanel({
   problemId, ownerUid, tabs, activeTabId, currentUid, canComment,
   bodyFontSize = 15,
   onClose, onCommentsChange, onInsertGraphBlock,
+  width = '35em',
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
   const isOwner = currentUid === ownerUid;
@@ -95,6 +98,10 @@ export default function CommentPanel({
   const [myProfile, setMyProfile] = useState<UserProfile | null>(null);
 
   // ─── UI 상태 ───
+  // Phase 44: 메인 작성 입력창 세로 높이 드래그 리사이즈 (상단 경계선 = 핸들)
+  const [inputHeight, setInputHeight] = useState(120);
+  const [inputResizeHover, setInputResizeHover] = useState(false);
+  const [inputResizeDragging, setInputResizeDragging] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string>(LEGACY_SESSION_ID);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]); // AI 칩 토글
   const [pendingAI, setPendingAI] = useState<PendingAI[]>([]); // 응답 대기 중
@@ -556,13 +563,38 @@ export default function CommentPanel({
     setPendingAI((prev) => prev.filter((p) => !(p.modelId === modelId && p.sessionId === sessionId)));
   };
 
+  // 메인 작성 입력창 상단 경계선 드래그 → 세로 높이 조정 (위로 끌면 커짐). 패널 가로 리사이즈와 동일 방식.
+  const handleInputResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    const el = e.currentTarget as HTMLElement;
+    const pid = e.pointerId;
+    const startY = e.clientY;
+    const startH = inputHeight;
+    try { el.setPointerCapture(pid); } catch {}
+    setInputResizeDragging(true);
+    const onMove = (ev: PointerEvent) => {
+      const next = startH + (startY - ev.clientY);
+      setInputHeight(Math.max(80, Math.min(window.innerHeight * 0.6, next)));
+    };
+    const onUp = () => {
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      try { el.releasePointerCapture(pid); } catch {}
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setInputResizeDragging(false);
+    };
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   return (
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: '35em', maxWidth: '90vw',
-      background: 'var(--bg-card, #fff)',
-      borderLeft: '1px solid var(--border-light, #ddd)',
-      boxShadow: '-4px 0 16px rgba(0,0,0,0.06)',
+      width: width, maxWidth: '90vw',
+      background: 'var(--bg-functional)',
       display: 'flex', flexDirection: 'column',
       zIndex: 50,
       fontFamily: 'var(--font-ui)',
@@ -712,12 +744,31 @@ export default function CommentPanel({
       {canComment ? (
         <div style={{
           padding: '10px 16px 12px',
-          borderTop: '1px solid var(--border-light, #eee)',
           background: 'var(--bg-primary, #FAF9F7)',
+          position: 'relative',
         }}>
+          {/* 입력창 상단 경계선 = 세로 리사이즈 핸들 (전체폭, 패널 헤더 경계선과 길이·위치 정렬) */}
+          <div
+            onPointerDown={handleInputResizeStart}
+            onPointerEnter={() => setInputResizeHover(true)}
+            onPointerLeave={() => setInputResizeHover(false)}
+            style={{
+              position: 'absolute', top: -5, left: 0, right: 0, height: 11,
+              cursor: 'row-resize', zIndex: 5,
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            <div style={{
+              width: '100%',
+              height: (inputResizeHover || inputResizeDragging) ? 2 : 1,
+              background: (inputResizeHover || inputResizeDragging) ? 'var(--border-content-active)' : 'var(--border-light, #eee)',
+              transition: 'height 0.1s, background 0.1s',
+            }} />
+          </div>
           <CommentEditor
             problemId={problemId}
             placeholder=""
+            inputHeight={inputHeight}
             onSubmit={handleSendMessage}
             headerLeft={isAISession ? (
               <AIChipBar

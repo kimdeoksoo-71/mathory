@@ -617,6 +617,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '&': {
               height: '100%',
               fontSize: '15px',
+              // 블록 클레이가 비치도록 CodeMirror 기본 흰 배경 차단
+              backgroundColor: 'transparent',
             },
             '.cm-scroller': {
               overflow: 'auto',
@@ -630,8 +632,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               lineHeight: '1.8',
             },
             '.cm-gutters': {
-              backgroundColor: '#f8f9fa',
-              borderRight: '1px solid #e0e0e0',
+              backgroundColor: 'transparent',
+              borderRight: '1px solid var(--border-subtle)',
               // 블록이 실제 border를 쓰므로 거터가 좌측 테두리를 덮지 않음
               // → 거터 자체의 좌측선/모서리 보정 불필요 (이중선 제거)
             },
@@ -660,6 +662,16 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             // 비활성 에디터의 행번호 거터 배경색 제거
             '&:not(.cm-focused) .cm-activeLineGutter': {
               backgroundColor: 'transparent !important',
+            },
+            // ═══ 활성 행/행번호 강조 — 웜 클레이 톤 (기본 차가운 강조색 대체) ═══
+            // 활성 블록(#EDE6DA)과 같은 색 가족에서 톤만 살짝 깊게 깔아 부드럽게 강조.
+            // 반투명 웜 브라운(--border-content-active 계열)이 클레이 위에 합성됨.
+            '&.cm-focused .cm-activeLine': {
+              backgroundColor: 'rgba(184, 155, 120, 0.13)',
+            },
+            '&.cm-focused .cm-activeLineGutter': {
+              backgroundColor: 'rgba(184, 155, 120, 0.20)',
+              color: 'var(--text-secondary)',
             },
 
             // ═══ 자동완성 드롭다운 스타일 ═══

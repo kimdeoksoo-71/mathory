@@ -142,6 +142,10 @@ export default function ProblemView({
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   // 댓글 — 패널 열림 여부, 활성 탭, 카운트
   const [commentPanelTab, setCommentPanelTab] = useState<string | null>(null);
+  // Phase 44: 댓글 패널 드래그 리사이즈 (우측). 기본 560px ≈ 35em@16px
+  const [panelWidth, setPanelWidth] = useState(560);
+  const [resizeHover, setResizeHover] = useState(false);
+  const [resizeDragging, setResizeDragging] = useState(false);
   const [allComments, setAllComments] = useState<TabComment[]>([]);
   const commentCounts = useMemo(
     () => countByTab(allComments, { unresolvedOnly: true }),
@@ -436,158 +440,184 @@ export default function ProblemView({
     { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
   ];
 
+  // ─── Phase 44: 댓글 패널 드래그 리사이즈 핸들러 (우측 패널만) ───
+  const PANEL_MIN = 360;
+  const handleResizeStart = (e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setResizeDragging(true);
+    const onMove = (ev: PointerEvent) => {
+      // 핸들 = U자 컨텐츠 우측 경계선(콘텐츠 우측 끝 = panelWidth + 24px 갭). 경계선을 커서에 맞춤.
+      const next = window.innerWidth - ev.clientX - 24;
+      setPanelWidth(Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.9, next)));
+    };
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      setResizeDragging(false);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+  const resizeActive = resizeHover || resizeDragging;
+
+  // ─── 제목바용 계산값 (IIFE에서 컴포넌트 스코프로 호이스팅) ───
+  const fid = problem.folder_id || '';
+  const isTrash = fid === TRASH_FOLDER_ID;
+  const folderLabel = isTrash ? '휴지통' : (folders.find((f) => f.id === fid)?.name || '미분류');
+  const targetId = isTrash ? TRASH_FOLDER_ID : (fid || '__unassigned__');
+  const folderPath = (!isTrash && fid) ? getFolderPath(folders, fid) : [];
+  const hasAncestors = folderPath.length > 1;
+  const expanded = folderPathHover && hasAncestors;
+  const LABEL_GAP = 28; // 라벨↔본문 간격
+  const labelColStyle: React.CSSProperties = {
+    width: 7 * contentFontSize, flexShrink: 0,
+    textAlign: 'left', fontFamily: 'var(--font-ui)',
+  };
+  const mainColStyle: React.CSSProperties = {
+    width: 35 * contentFontSize, flexShrink: 0,
+  };
+
   return (
     <div style={{
-      display: 'flex', flexDirection: 'row',
+      display: 'flex', flexDirection: 'column',
       flex: 1, minHeight: 0, width: '100%',
-      background: '#ffffff', fontSize: contentFontSize,
+      background: 'var(--bg-functional)', fontSize: contentFontSize,
       overflow: 'hidden', position: 'relative',
     }}>
-      {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 ═══ */}
-      {/* 토론 패널 열림: flex 우측 정렬로 콘텐츠 오른쪽 끝을 (패널 왼쪽 - 24px)에 고정.
-          창이 좁을 땐 왼쪽이 잘려나가도 OK (overflow-x:hidden). */}
-      <div className="no-scrollbar" style={{
-        flex: 1, minWidth: 0,
-        overflowY: 'auto',
-        overflowX: 'hidden',
-        background: 'var(--bg-primary, #FAF9F7)',
-        paddingRight: commentPanelTab ? 'calc(35em + 48px)' : 0,
+      {/* ═══ 제목바: U자 밖 아이보리 chrome — [폴더경로 | 제목]. 아래 빈 공간은 추후 메타데이터 ═══ */}
+      <div style={{
+        flexShrink: 0, background: 'var(--bg-functional)',
+        minHeight: 98, // EditorView(제목 57 + 탭 41)와 가로 경계선 Y 일치
+        paddingRight: commentPanelTab ? `calc(${panelWidth}px + 24px)` : 0,
         transition: 'padding-right 0.18s ease',
-        display: 'flex',
-        // unsafe flex-end: 콘텐츠가 컨테이너보다 커도 우측 정렬 유지 (왼쪽으로 overflow)
-        // overflow-x: hidden이 좌측 잘림 허용
-        justifyContent: commentPanelTab ? 'unsafe flex-end' : 'center',
+        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
       }}>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: LABEL_GAP,
+          padding: '22px 32px 0', boxSizing: 'border-box', // 제목을 위에서 내림(#7), 아래 빈 공간은 추후 메타데이터
+        }}>
+          {/* 헤더 라벨 박스 — 폭 7em 고정. 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
+          <div
+            ref={labelBoxRef}
+            onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
+            onMouseLeave={() => setFolderPathHover(false)}
+            style={{
+              ...labelColStyle,
+              position: 'relative', height: '1.5em',
+              display: 'flex', alignItems: 'center',
+            }}
+          >
+            {/* 접힘: ‹ leaf 폴더명 */}
+            <div
+              onClick={() => onNavigateFolder?.(targetId)}
+              style={{
+                position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                display: 'inline-flex', alignItems: 'center', gap: 2,
+                fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer',
+                opacity: expanded ? 0 : 1, pointerEvents: expanded ? 'none' : 'auto',
+                transition: 'opacity 0.15s, color 0.15s',
+                maxWidth: '7em', overflow: 'hidden', textOverflow: 'ellipsis',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+              title={hasAncestors ? '폴더로 이동 (hover 시 전체 경로)' : '폴더로 이동'}
+            >
+              <IconChevronLeft size={14} />
+              {folderLabel}
+            </div>
+            {/* 펼침: 전체 경로 (측정용으로 항상 렌더, 평소 opacity 0) */}
+            {hasAncestors && (
+              <div
+                ref={folderPathRef}
+                style={{
+                  position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
+                  display: 'inline-flex', alignItems: 'center', gap: 2,
+                  fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap',
+                  opacity: expanded ? 1 : 0, pointerEvents: expanded ? 'auto' : 'none',
+                  transition: 'opacity 0.2s',
+                  background: 'var(--bg-functional)', paddingRight: 8, zIndex: 2,
+                }}
+              >
+                {folderPath.map((seg, i) => (
+                  <span key={seg.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+                    {i > 0 && <span style={{ color: 'var(--text-faint)' }}>/</span>}
+                    <span
+                      onClick={() => onNavigateFolder?.(seg.id)}
+                      style={{
+                        cursor: 'pointer', transition: 'color 0.15s',
+                        fontWeight: i === folderPath.length - 1 ? 600 : 400,
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                      title={`${seg.name}(으)로 이동`}
+                    >
+                      {seg.name}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <h1
+            onClick={() => { if (isOwnerView) onEdit?.(problem); }}
+            style={{
+              ...mainColStyle,
+              fontSize: 22, fontWeight: 600, color: 'var(--text-primary)',
+              margin: 0, lineHeight: 1.2,
+              fontFamily: 'var(--font-ui)',
+              cursor: isOwnerView ? 'pointer' : 'default',
+              display: 'flex', alignItems: 'center',
+              transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
+              transition: 'color 0.15s, transform 0.25s ease',
+            }}
+            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+            title="클릭하여 편집"
+          >
+            <span>{problem.title}</span>
+            <BlockchainBadge problem={problem} size={16} />
+          </h1>
+        </div>
+      </div>
+
+      {/* ═══ 컨텐츠 행: 본문 + 메타 (패널·핸들은 컨테이너 직속, 전체 높이) ═══ */}
+      <div style={{ display: 'flex', flexDirection: 'row', flex: 1, minHeight: 0 }}>
+      {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 ═══ */}
+      {/* 외부 래퍼: 패널 자리 확보(아이보리 백드롭), 경계선 없음 — 패널과 컨텐츠가 절대 겹치지 않음 */}
+      <div style={{
+        flex: 1, minWidth: 0, display: 'flex', minHeight: 0,
+        paddingRight: commentPanelTab ? `calc(${panelWidth}px + 24px)` : 0,
+        transition: 'padding-right 0.18s ease',
+      }}>
+        {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
+        <div className="no-scrollbar" style={{
+          flex: 1, minWidth: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          background: 'var(--bg-content)',
+          borderTop: '0.5px solid var(--border-content)',
+          borderLeft: '0.5px solid var(--border-content)',
+          borderRight: '0.5px solid var(--border-content)',
+          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+          display: 'flex',
+          // 패널 열림: 우측 정렬 → 컨텐츠 우측 끝이 경계선에 붙어 함께 왼쪽으로 이동(가려지지 않음)
+          justifyContent: commentPanelTab ? 'unsafe flex-end' : 'center',
+        }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
           display: 'table',
-          padding: commentPanelTab ? '0 0 0 32px' : '0 32px',
+          padding: '0 32px', // 좌우 32px 유지 — 우측 경계선과 컨텐츠 사이 여백 보존
           boxSizing: 'border-box',
           flexShrink: 0,
         }}>
           {(() => {
-            const fid = problem.folder_id || '';
-            const isTrash = fid === TRASH_FOLDER_ID;
-            const folderLabel = isTrash
-              ? '휴지통'
-              : (folders.find((f) => f.id === fid)?.name || '미분류');
-            const targetId = isTrash ? TRASH_FOLDER_ID : (fid || '__unassigned__');
-
-            // Phase 40: 상위 폴더 경로 (휴지통/미분류 제외)
-            const folderPath = (!isTrash && fid) ? getFolderPath(folders, fid) : [];
-            const hasAncestors = folderPath.length > 1;
-            const expanded = folderPathHover && hasAncestors;
-
-            const LABEL_GAP = 28; // 라벨↔본문 간격
-            // 공유 스타일 — 헤더/탭 행 공통. em은 적용 요소의 자체 font-size 기준이라
-            // h1처럼 fontSize override가 있는 곳에서 폭이 달라짐 → px로 고정해 통일.
-            const labelColStyle: React.CSSProperties = {
-              width: 7 * contentFontSize, flexShrink: 0,
-              textAlign: 'left', fontFamily: 'var(--font-ui)',
-            };
-            const mainColStyle: React.CSSProperties = {
-              width: 35 * contentFontSize, flexShrink: 0,
-            };
-
             return (
               <>
-                {/* 헤더 행: [폴더명 | 제목] — 스크롤 시 최상단 고정. 사이드바·토론패널·EditorView와 동일 57px */}
-                {/* 구분선은 제목 column(35em)에만 적용되도록 h1 아래에 별도 그림 */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', gap: LABEL_GAP,
-                  marginBottom: 24,
-                  position: 'sticky', top: 0, zIndex: 5,
-                  background: 'var(--bg-primary, #FAF9F7)',
-                  minHeight: 57, boxSizing: 'border-box',
-                }}>
-                  {/* 헤더 라벨 박스 — 폭 7em 고정(레이아웃 불변). 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
-                  <div
-                    ref={labelBoxRef}
-                    onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
-                    onMouseLeave={() => setFolderPathHover(false)}
-                    style={{
-                      ...labelColStyle,
-                      position: 'relative', height: '1.5em',
-                      display: 'flex', alignItems: 'center',
-                    }}
-                  >
-                    {/* 접힘: ‹ leaf 폴더명 */}
-                    <div
-                      onClick={() => onNavigateFolder?.(targetId)}
-                      style={{
-                        position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                        display: 'inline-flex', alignItems: 'center', gap: 2,
-                        fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer',
-                        opacity: expanded ? 0 : 1, pointerEvents: expanded ? 'none' : 'auto',
-                        transition: 'opacity 0.15s, color 0.15s',
-                        maxWidth: '7em', overflow: 'hidden', textOverflow: 'ellipsis',
-                      }}
-                      onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                      onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                      title={hasAncestors ? '폴더로 이동 (hover 시 전체 경로)' : '폴더로 이동'}
-                    >
-                      <IconChevronLeft size={14} />
-                      {folderLabel}
-                    </div>
-                    {/* 펼침: 전체 경로 (측정용으로 항상 렌더, 평소 opacity 0) */}
-                    {hasAncestors && (
-                      <div
-                        ref={folderPathRef}
-                        style={{
-                          position: 'absolute', left: 0, top: '50%', transform: 'translateY(-50%)',
-                          display: 'inline-flex', alignItems: 'center', gap: 2,
-                          fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap',
-                          opacity: expanded ? 1 : 0, pointerEvents: expanded ? 'auto' : 'none',
-                          transition: 'opacity 0.2s',
-                          background: 'var(--bg-primary, #FAF9F7)', paddingRight: 8, zIndex: 2,
-                        }}
-                      >
-                        {folderPath.map((seg, i) => (
-                          <span key={seg.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
-                            {i > 0 && <span style={{ color: 'var(--text-faint)' }}>/</span>}
-                            <span
-                              onClick={() => onNavigateFolder?.(seg.id)}
-                              style={{
-                                cursor: 'pointer', transition: 'color 0.15s',
-                                fontWeight: i === folderPath.length - 1 ? 600 : 400,
-                              }}
-                              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-                              title={`${seg.name}(으)로 이동`}
-                            >
-                              {seg.name}
-                            </span>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <h1
-                    onClick={() => { if (isOwnerView) onEdit?.(problem); }}
-                    style={{
-                      ...mainColStyle,
-                      fontSize: 22, fontWeight: 600, color: 'var(--text-primary)',
-                      margin: 0, lineHeight: 1.2,
-                      fontFamily: 'var(--font-ui)',
-                      cursor: isOwnerView ? 'pointer' : 'default',
-                      display: 'flex', alignItems: 'center',
-                      // 펼침 시 제목만 우측으로 슬라이드(레이아웃 불변 → 컨텐츠 행 위치 고정)
-                      transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
-                      transition: 'color 0.15s, transform 0.25s ease',
-                      // 구분선을 제목 column에만 — sticky 행 전체가 아닌 35em 폭으로 제한
-                      alignSelf: 'stretch',
-                      borderBottom: '1px solid var(--border-light)',
-                      paddingBottom: 12,
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-                    title="클릭하여 편집"
-                  >
-                    <span>{problem.title}</span>
-                    <BlockchainBadge problem={problem} size={16} />
-                  </h1>
-                </div>
-
                 {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글 */}
                 {tabs.map((tab, tabIdx) => {
                   const blocks = problem.tabBlocks[tab.id] || [];
@@ -655,7 +685,7 @@ export default function ProblemView({
                         <div style={{
                           ...mainColStyle,
                           ...(isQuestion ? {
-                            background: '#ffffff',
+                            background: 'var(--bg-content)',
                             padding: '20px 24px',
                             borderRadius: 8,
                             marginLeft: -24,
@@ -676,6 +706,7 @@ export default function ProblemView({
               </>
             );
           })()}
+        </div>
         </div>
       </div>
 
@@ -701,11 +732,10 @@ export default function ProblemView({
       {rightOpen && <div style={{
         flex: 1, minWidth: 150, maxWidth: 220,
         padding: '32px 16px',
-        borderLeft: '1px solid var(--border-light)',
         overflowY: 'auto',
         fontSize: 13,
         fontFamily: 'var(--font-ui)',
-        background: '#ffffff',
+        background: 'var(--bg-functional)',
         position: 'relative',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -898,6 +928,7 @@ export default function ProblemView({
           />
         </div>
       </div>}
+      </div>
 
       <PdfDialog
         open={pdfOpen}
@@ -919,7 +950,28 @@ export default function ProblemView({
           bodyFontSize={contentFontSize}
           onClose={() => setCommentPanelTab(null)}
           onCommentsChange={setAllComments}
+          width={panelWidth}
         />
+      )}
+
+      {/* 댓글 패널 좌측변 드래그 리사이즈 핸들 (우측 패널만) */}
+      {commentPanelTab && (
+        <div
+          onPointerEnter={() => setResizeHover(true)}
+          onPointerLeave={() => setResizeHover(false)}
+          onPointerDown={handleResizeStart}
+          style={{
+            position: 'absolute', top: 0, bottom: 0,
+            right: `calc(${panelWidth}px + 19px)`, // U자 컨텐츠 우측 경계선(panelWidth+24) 위에 strip 걸침
+            width: 10, zIndex: 100, cursor: 'col-resize',
+            display: 'flex', justifyContent: 'center',
+          }}
+        >
+          <div style={{
+            width: resizeActive ? 1.5 : 0, height: '100%',
+            background: 'var(--border-content-active)', transition: 'width 0.1s',
+          }} />
+        </div>
       )}
     </div>
   );

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap, placeholder as cmPlaceholder } from '@codemirror/view';
-import { EditorState } from '@codemirror/state';
+import { EditorState, Compartment } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
@@ -41,6 +41,9 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
   }, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+    // minHeight 반응형: 컴파트먼트로 재구성 (에디터는 마운트 1회만 생성되므로)
+    const heightCompartment = useRef(new Compartment()).current;
+    const heightTheme = (h: number) => EditorView.theme({ '.cm-content': { minHeight: `${h}px` } });
 
     // 최신 콜백 ref
     const onChangeRef = useRef(onChange);
@@ -90,13 +93,13 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
               '.cm-content': {
                 // 기본 = Pretendard. 수식 영역은 cm-math-region이 D2Coding으로 오버라이드
                 fontFamily: 'var(--font-ui)',
-                minHeight: `${minHeight}px`,
                 padding: '4px 4px',
                 caretColor: 'var(--text-primary)',
               },
               '.cm-scroller': { lineHeight: '1.5' },
               '.cm-line': { padding: '0' },
             }),
+            heightCompartment.of(heightTheme(minHeight)),
             EditorView.updateListener.of((u) => {
               if (u.docChanged) onChangeRef.current?.(u.state.doc.toString());
             }),
@@ -111,6 +114,12 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
       return () => { view.destroy(); viewRef.current = null; };
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // minHeight prop 변경 → 에디터 높이 재구성 (드래그 리사이즈 반영)
+    useEffect(() => {
+      viewRef.current?.dispatch({ effects: heightCompartment.reconfigure(heightTheme(minHeight)) });
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [minHeight]);
 
     useImperativeHandle(ref, () => ({
       insertAtCursor(text: string, cursorOffset?: number) {

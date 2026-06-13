@@ -29,6 +29,22 @@
   --border-light: #E8E4DF;
   --border-dashed: rgba(184, 175, 164, 0.3);
 
+  /* ── Phase 44: 색·경계선 구분 체계 (역할 기반) ──
+     기능 영역은 밝게 후퇴(아이보리), 가운데 컨텐츠는 따뜻하게 강조(클레이),
+     둘 사이를 U자 컨텐츠 구분선으로 가른다. 다크모드 확장 대비 역할 토큰 유지. */
+  /* 영역 배경 */
+  --bg-functional: #FEFDFB;   /* 아이보리: 기능 영역(사이드바·토론·제목/탭바) — 밝게 후퇴, 클레이와 대비 */
+  --bg-content:    #F4EFE7;   /* 클레이: 가운데 컨텐츠 영역 (한 단계 진하게) */
+  /* 블록 */
+  --block-bg:        var(--bg-content);  /* 비활성 블록 = 컨텐츠와 동일 클레이 */
+  --block-bg-active: #EDE6DA;            /* 활성: 클레이 한 단계 더 진하게 */
+  --block-shadow-active: 0 4px 16px rgba(0, 0, 0, 0.14); /* 활성 떠오름 그림자 (키 + 그림자 병행) */
+  /* 경계선 위계 (주목도: content > block > subtle) */
+  --border-content:        #D2C8B8;   /* U자 컨텐츠 구분선 (가장 뚜렷) */
+  --border-content-active: #B89B78;   /* 구분선 hover 활성 */
+  --border-block:          var(--border-primary); /* 블록 경계 (중간) */
+  --border-subtle:         var(--border-light);    /* chrome 최소 사용 (가장 약) */
+
   /* Text */
   --text-primary: #2D2A23;
   --text-secondary: #5D5647;
