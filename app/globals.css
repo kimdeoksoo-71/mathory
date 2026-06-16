@@ -105,8 +105,9 @@ html, body {
 }
 
 /* ═══ Scrollbar ═══ */
+/* 세로 스크롤바는 전역으로 숨김(스크롤 동작은 유지). 가로 스크롤바는 유지. */
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 0;
   height: 5px;
 }
 ::-webkit-scrollbar-track {
