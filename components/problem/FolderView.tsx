@@ -434,6 +434,11 @@ export default function FolderView({
             paddingTop: 28, // 경계선↔카드 상단 여백 (스크롤 영역 안이라 스크롤 시 사라짐)
             paddingBottom: '20vh',
           }}>
+            {/* 카드 hover 강조: 배경 한 톤 진하게(#E4DBCB) + 그림자 강화. 페이드도 같은 색으로 동조 */}
+            <style>{`
+              .problem-card:hover { background: #E4DBCB !important; box-shadow: 0 6px 18px rgba(0,0,0,0.16) !important; }
+              .problem-card:hover .problem-card-fade { background: linear-gradient(180deg, rgba(228,219,203,0) 0%, #E4DBCB 100%) !important; }
+            `}</style>
             {folderProblems.map((problem) => {
               const blocks = questionBlocksMap[problem.id] || [];
               return (
@@ -444,6 +449,7 @@ export default function FolderView({
                   {...attributes}
                   {...listeners}
                   onClick={() => onView(problem)}
+                  className="problem-card"
                   style={{
                     background: 'var(--block-bg-active)',
                     border: '1px solid var(--border-light)',
@@ -454,11 +460,9 @@ export default function FolderView({
                     cursor: dndEnabled ? 'grab' : 'pointer',
                     opacity: isDragging ? 0.4 : 1,
                     position: 'relative',
-                    transition: 'box-shadow 0.15s, transform 0.15s',
+                    transition: 'box-shadow 0.15s, transform 0.15s, background 0.15s',
                     display: 'flex', flexDirection: 'column',
                   }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 14px rgba(0,0,0,0.08)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.boxShadow = 'none'; }}
                 >
                   {/* 카드 제목 + ⋮ 메뉴 */}
                   <div style={{
@@ -513,7 +517,7 @@ export default function FolderView({
                     <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
                     {renderBlocks(blocks)}
                     {/* 하단 fade out 그라데이션으로 잘린 부분 자연스럽게 */}
-                    <div style={{
+                    <div className="problem-card-fade" style={{
                       position: 'absolute', bottom: 0, left: 0, right: 0, height: 36,
                       // 카드 배경(--block-bg-active #EDE6DA)으로 페이드 — 시작색도 같은 RGB의 투명값(회색 끼임 방지)
                       background: 'linear-gradient(180deg, rgba(237,230,218,0) 0%, var(--block-bg-active) 100%)',
