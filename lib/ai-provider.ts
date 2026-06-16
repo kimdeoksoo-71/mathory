@@ -193,18 +193,74 @@ class OpenAIResponsesProvider implements AIProvider {
     // output 순회 직렬화 — message text는 본문, code_interpreter_call은 검산 부록으로
     let body = '';
     const codeBlocks: Array<{ code: string; output: string }> = [];
-    for (const item of res.output ?? []) {
+    // 일부 SDK/모델 버전에서는 outputs가 별도 item으로 분리되어 옴 — call_id로 매칭
+    const callIdToCode = new Map<string, string>();
+    const outputsByCallId = new Map<string, string>();
+    for (const it of res.output ?? []) {
+      const item = it as unknown as Record<string, unknown>;
       if (item.type === 'message') {
-        for (const c of item.content) {
-          if (c.type === 'output_text') body += c.text;
+        const content = item.content as Array<{ type: string; text?: string }>;
+        for (const c of content) {
+          if (c.type === 'output_text' && c.text) body += c.text;
         }
       } else if (item.type === 'code_interpreter_call') {
-        const logs = (item.outputs ?? [])
-          .filter((o): o is { type: 'logs'; logs: string } => o.type === 'logs')
-          .map((o) => o.logs)
-          .join('\n');
-        codeBlocks.push({ code: item.code ?? '', output: logs });
+        const code = (item.code as string) ?? '';
+        const callId = (item.id as string) ?? (item.call_id as string) ?? '';
+        if (callId) callIdToCode.set(callId, code);
+        // outputs가 함께 오는 경우도 처리
+        const outputs = item.outputs as Array<Record<string, unknown>> | undefined;
+        if (Array.isArray(outputs)) {
+          const logs = outputs
+            .map((o) => {
+              if (o.type === 'logs' && typeof o.logs === 'string') return o.logs;
+              // 다른 가능성 — text/content 등
+              if (typeof o.text === 'string') return o.text;
+              if (typeof o.content === 'string') return o.content;
+              return '';
+            })
+            .filter(Boolean)
+            .join('\n');
+          if (logs) {
+            // 이미 outputs가 인라인으로 같이 옴 — 바로 codeBlocks에 push
+            codeBlocks.push({ code, output: logs });
+            continue;
+          }
+        }
+        // outputs가 비었거나 별도 아이템으로 올 경우 — 일단 stash
+        if (callId) {
+          codeBlocks.push({ code, output: '' }); // 후처리에서 채움
+        }
+      } else if (
+        item.type === 'code_interpreter_call_outputs'
+        || item.type === 'code_interpreter_call_output'
+        || item.type === 'tool_call_output'
+      ) {
+        // 별도 아이템으로 오는 outputs
+        const callId = (item.call_id as string) ?? (item.tool_call_id as string) ?? '';
+        const outputs = item.outputs as Array<Record<string, unknown>> | undefined;
+        const output = item.output as string | undefined;
+        let logs = '';
+        if (Array.isArray(outputs)) {
+          logs = outputs
+            .map((o) => (typeof o.logs === 'string' ? o.logs : typeof o.text === 'string' ? o.text : ''))
+            .filter(Boolean)
+            .join('\n');
+        } else if (typeof output === 'string') {
+          logs = output;
+        }
+        if (callId) outputsByCallId.set(callId, logs);
       }
+    }
+    // 후처리: outputsByCallId의 결과를 빈 codeBlocks에 채워넣기
+    if (outputsByCallId.size > 0) {
+      // 빈 codeBlocks를 outputsByCallId와 순서대로 매칭 (call_id 없을 수도 있어 단순 순서 매칭)
+      const emptyIdxs = codeBlocks
+        .map((b, i) => (b.output === '' ? i : -1))
+        .filter((i) => i >= 0);
+      const outputValues = Array.from(outputsByCallId.values());
+      emptyIdxs.forEach((idx, k) => {
+        if (k < outputValues.length) codeBlocks[idx].output = outputValues[k];
+      });
     }
     // output_text 폴백 (message 파트 누락 등 예외)
     if (!body && codeBlocks.length === 0) {
@@ -298,11 +354,11 @@ class ClaudeProvider implements AIProvider {
       // 호출되는 도구는 bash_code_execution / text_editor_code_execution / (legacy) code_execution
       // 으로 분기되며, 결과 블록도 *_code_execution_tool_result로 다양함.
       params.tools = [{ type: 'code_execution_20250825', name: 'code_execution' }];
-      // 검산 트리거가 명시되면 code_execution을 반드시 호출하도록 강제 (Claude 한정).
-      // tool_choice의 name은 도구 정의의 name과 일치해야 함 (실제 server_tool_use name이
-      // bash_code_execution로 다르게 와도, 강제 매칭은 정의 name 기준).
+      // 검산 트리거가 명시되면 도구를 반드시 호출하도록 강제 (Claude 한정).
+      // {type: 'tool', name}은 runtime 호출명(bash_code_execution 등)과 불일치 가능성 있어
+      // {type: 'any'}로 "어떤 도구라도 호출 필수"로 강제 — 우리는 도구 1개만 정의했으므로 결과는 동일.
       if (opts?.forceCodeExecution) {
-        params.tool_choice = { type: 'tool', name: 'code_execution' };
+        params.tool_choice = { type: 'any' };
       }
     }
     const rawRes = await this.client.messages.create(
