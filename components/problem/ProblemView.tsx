@@ -297,7 +297,7 @@ export default function ProblemView({
       if (block.type === 'image') {
         const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
         return (
-          <div key={block.id} style={{ textAlign: 'center', margin: '0.8em 0' }}>
+          <div key={block.id} style={{ textAlign: 'center', margin: '1.2em 0' }}>
             {src ? (
               <img src={src} alt="" style={{
                 width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',

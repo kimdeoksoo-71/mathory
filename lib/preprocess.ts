@@ -19,6 +19,58 @@ import { preprocessLocale, Locale, CIRCLED_CONSONANTS } from './locale';
  * setext heading(h1/h2)으로 해석됨. 이를 방지하기 위해
  * 해당 줄 앞에 빈 줄을 삽입.
  */
+/**
+ * `$$ ... $$` 독립수식 앞·뒤 공백을 정확히 빈 줄 1개(= 줄바꿈 2개)로 정규화.
+ * - 수식 앞/뒤에 텍스트가 있으면 사이를 `\n\n`로 통일
+ * - 수식이 블록 시작/끝에 있으면 앞/뒤에 빈 줄을 굳이 추가하지 않음
+ * - 빈 줄이 2개 이상이거나 없는 경우 모두 1개로 보정
+ */
+export function normalizeDisplayMathSpacing(text: string): string {
+  // 토큰화: [text, math, text, math, ...]
+  type Tok = { type: 'text' | 'math'; content: string };
+  const tokens: Tok[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const open = text.indexOf('$$', i);
+    if (open === -1) {
+      tokens.push({ type: 'text', content: text.slice(i) });
+      break;
+    }
+    const close = text.indexOf('$$', open + 2);
+    if (close === -1) {
+      tokens.push({ type: 'text', content: text.slice(i) });
+      break;
+    }
+    if (open > i) {
+      tokens.push({ type: 'text', content: text.slice(i, open) });
+    }
+    tokens.push({ type: 'math', content: text.slice(open, close + 2) });
+    i = close + 2;
+  }
+
+  const out: string[] = [];
+  for (let idx = 0; idx < tokens.length; idx++) {
+    const tok = tokens[idx];
+    if (tok.type === 'math') {
+      out.push(tok.content);
+      continue;
+    }
+    let content = tok.content;
+    const prev = idx > 0 ? tokens[idx - 1] : null;
+    const next = idx < tokens.length - 1 ? tokens[idx + 1] : null;
+    if (prev?.type === 'math') {
+      content = content.replace(/^\s+/, '');
+      if (content.length > 0) content = '\n\n' + content;
+    }
+    if (next?.type === 'math') {
+      content = content.replace(/\s+$/, '');
+      if (content.length > 0) content = content + '\n\n';
+    }
+    out.push(content);
+  }
+  return out.join('');
+}
+
 export function preventSetextHeadings(text: string): string {
   const lines = text.split('\n');
   const result: string[] = [];

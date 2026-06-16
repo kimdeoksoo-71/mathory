@@ -19,6 +19,7 @@ import FolderPathBar from '../editor/FolderPathBar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
+import { normalizeDisplayMathSpacing } from '../../lib/preprocess';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import type { GraphBlockSave } from '../viewer/GgbGraphView';
@@ -1867,8 +1868,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         // 새로 저장 (빈줄 trim 적용)
         for (let i = 0; i < blocks.length; i++) {
           const b = blocks[i];
-          // 위아래 빈 줄 제거
-          const trimmed = b.raw_text
+          // $$ ... $$ 독립수식 앞·뒤 빈 줄을 정확히 1개로 정규화 → 위아래 빈 줄 제거
+          const trimmed = normalizeDisplayMathSpacing(b.raw_text)
             .replace(/^\s*\n/, '')   // 첫 비어있지 않은 행 위의 빈 행 제거
             .replace(/\n\s*$/, '');  // 마지막 비어있지 않은 행 아래의 빈 행 제거
           const saveData: Record<string, any> = {
@@ -2461,7 +2462,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               return (
                 <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
                   {block.type === 'image' ? (
-                    <div style={{ textAlign: 'center' }}>
+                    <div style={{ textAlign: 'center', margin: '1.2em 0' }}>
                       {block.raw_text ? (
                         <img
                           src={block.raw_text.match(/src="([^"]+)"/)?.[1] || ''}
