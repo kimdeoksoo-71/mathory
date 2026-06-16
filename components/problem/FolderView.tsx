@@ -445,7 +445,7 @@ export default function FolderView({
                   {...listeners}
                   onClick={() => onView(problem)}
                   style={{
-                    background: 'var(--bg-functional)',
+                    background: 'var(--block-bg-active)',
                     border: '1px solid var(--border-light)',
                     borderRadius: 12,
                     padding: '18px 22px',
@@ -515,7 +515,8 @@ export default function FolderView({
                     {/* 하단 fade out 그라데이션으로 잘린 부분 자연스럽게 */}
                     <div style={{
                       position: 'absolute', bottom: 0, left: 0, right: 0, height: 36,
-                      background: 'linear-gradient(180deg, rgba(255,255,255,0) 0%, #ffffff 100%)',
+                      // 카드 배경(--block-bg-active #EDE6DA)으로 페이드 — 시작색도 같은 RGB의 투명값(회색 끼임 방지)
+                      background: 'linear-gradient(180deg, rgba(237,230,218,0) 0%, var(--block-bg-active) 100%)',
                       pointerEvents: 'none',
                     }} />
                   </div>
