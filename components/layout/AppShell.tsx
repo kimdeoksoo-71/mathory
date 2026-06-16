@@ -195,6 +195,15 @@ export default function AppShell() {
 
   const handleNewProblem = async () => {
     if (!user) { alert('로그인이 필요합니다.'); return; }
+    // FolderView에서 호출 시: 현재 폴더 아래 생성 (가상 폴더 — 휴지통/미지정/공유받음 — 제외)
+    // ProblemView/EditorView/Home에서 호출 시: 미지정(folder_id 없음)
+    let targetFolderId: string | undefined;
+    if (view.type === 'folder') {
+      const fid = view.folder.id;
+      if (fid && fid !== TRASH_FOLDER_ID && fid !== UNASSIGNED_FOLDER_ID && fid !== SHARED_WITH_ME_FOLDER_ID) {
+        targetFolderId = fid;
+      }
+    }
     try {
       const newProblemId = await createProblem({
         title: '새 문제',
@@ -206,6 +215,7 @@ export default function AppShell() {
         answer: '',
         authorUid: user.uid,
         visibility: 'private',
+        ...(targetFolderId ? { folder_id: targetFolderId } : {}),
       });
       await saveQuestionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
       await saveSolutionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
@@ -602,7 +612,7 @@ function HomeView() {
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <h1 style={{
-          fontSize: 36, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8,
+          fontSize: 36, fontWeight: 500, color: 'var(--text-primary)', marginBottom: 8,
           fontFamily: 'var(--font-logo)', letterSpacing: -1,
         }}>Mathory</h1>
         <p style={{ fontSize: 15, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontStyle: 'italic' }}>
