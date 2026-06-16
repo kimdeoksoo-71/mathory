@@ -436,7 +436,7 @@ export default function FolderView({
           }}>
             {/* 카드 hover 강조: 배경 한 톤 진하게(#E4DBCB) + 그림자 강화. 페이드도 같은 색으로 동조 */}
             <style>{`
-              .problem-card:hover { background: #E4DBCB !important; box-shadow: 0 6px 18px rgba(0,0,0,0.16) !important; }
+              .problem-card:hover { background: #E4DBCB !important; box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important; }
               .problem-card:hover .problem-card-fade { background: linear-gradient(180deg, rgba(228,219,203,0) 0%, #E4DBCB 100%) !important; }
             `}</style>
             {folderProblems.map((problem) => {
