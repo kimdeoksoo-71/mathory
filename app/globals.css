@@ -75,6 +75,10 @@
   --weight-medium: 500;
   --weight-semibold: 600;
 
+  /* 화면 수식 크기 — 본문 대비 배율. 반드시 em 단위(단위 없으면 무효 → 미적용).
+     KaTeX 기본 1.21em → 1.15em으로 살짝 축소 */
+  --katex-scale: 1.15em;
+
   /* Sizing */
   --sidebar-expanded: 260px;
   --sidebar-collapsed: 56px;
@@ -171,6 +175,13 @@ textarea:focus-visible {
 
 .katex-display {
   padding-left: 3em;
+}
+
+/* 화면 본문 수식 크기 — 본문 대비 115%(--katex-scale). KaTeX 기본 1.21em보다 살짝 작게.
+   인쇄(.print-body .katex 1em)와 에디터(cm-math-region)는 영향 없음 */
+.preview-content .katex,
+.problem-content-toned .katex {
+  font-size: var(--katex-scale);
 }
 
 /* KaTeX \text{} 폰트를 본문(Pretendard)과 동일하게 */
