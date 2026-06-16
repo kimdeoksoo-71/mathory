@@ -290,8 +290,18 @@ export default function CommentPanel({
 
   const handleDelete = async (commentId: string) => {
     if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
-    await deleteComment(problemId, commentId);
-    await refreshComments();
+    // Optimistic local update — listener 도착 전이라도 즉시 AI 컨텍스트에서 제외되도록
+    // (삭제 직후 새 메시지 전송 시 race condition 차단)
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    try {
+      await deleteComment(problemId, commentId);
+      // 성공 — listener가 곧 동일 결과로 동기화
+    } catch (err) {
+      // 실패 시 롤백
+      console.error('메시지 삭제 실패:', err);
+      await refreshComments();
+      alert('삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   const handleResolve = async (comment: TabComment) => {
@@ -402,7 +412,19 @@ export default function CommentPanel({
 
   const buildHistory = useCallback(() => {
     // 최근 5개 메시지 (현재 visible 기준), 답글 제외
-    const tops = visibleComments.filter((c) => !c.parentCommentId);
+    // 추가 방어:
+    //  (1) discussionSessionId가 실존 세션(또는 legacy)을 가리키는지 재확인.
+    //      visibleComments에서 이미 활성 세션으로 필터되었지만, 명시적 가드를 둬서
+    //      삭제된 세션의 orphan 메시지가 미래 코드 변경에서 leak되지 않도록.
+    //  (2) handleDelete의 optimistic state update와 함께 race condition을 차단.
+    const sessionIdSet = new Set(sessions.map((s) => s.id));
+    const tops = visibleComments.filter((c) => {
+      if (c.parentCommentId) return false;
+      // legacy(세션 미할당) 메시지는 항상 허용
+      if (!c.discussionSessionId) return true;
+      // 실존 세션만 통과 (삭제된 세션의 orphan 차단)
+      return sessionIdSet.has(c.discussionSessionId);
+    });
     const recent = tops.slice(-HISTORY_LIMIT);
     return recent.map((c) => {
       const info = getDisplayInfo(c);
@@ -412,7 +434,7 @@ export default function CommentPanel({
         content: stripForHistory(c.content),
       };
     });
-  }, [visibleComments, getDisplayInfo]);
+  }, [visibleComments, sessions, getDisplayInfo]);
 
   // ─── 단일 AI 호출 (전송 + 재시도에서 공유) ───
   const invokeOneAI = useCallback(

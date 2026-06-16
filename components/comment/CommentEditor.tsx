@@ -116,13 +116,14 @@ export default function CommentEditor({
     const trimmed = value.trim();
     if (!trimmed || submitting) return;
     setSubmitting(true);
+    // 즉시 입력창 비우기 — AI 응답을 기다리지 않고 사용자에게 "전송됨"을 시각화
+    if (clearOnSubmit) {
+      setValue('');
+      editorRef.current?.setValue('');
+      setShowPreview(false);
+    }
     try {
       await onSubmit(trimmed);
-      if (clearOnSubmit) {
-        setValue('');
-        editorRef.current?.setValue('');
-      }
-      setShowPreview(false);
     } finally {
       setSubmitting(false);
     }
@@ -311,7 +312,7 @@ export default function CommentEditor({
             fontSize: 12, fontWeight: 600,
           }}
         >
-          {submitting ? '저장 중…' : submitLabel}
+          {submitLabel}
         </button>
       </div>
     </div>

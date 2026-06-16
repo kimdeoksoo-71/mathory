@@ -148,7 +148,8 @@ const CODE_EXEC_INSTRUCTION = `
 - ⚠️ **반드시 기호(exact) 계산만 사용**: 소수점 숫자(예: 0.5, 3.14, 1.414…) 사용 금지. \`sympy.Rational\`·\`sympy.sqrt\`·\`pi\`·\`S()\` 등으로 분수·무리수를 정확값 그대로 다루세요. \`float()\`, \`.evalf()\`, \`N()\`, \`math\` 모듈, 소수 리터럴은 사용 금지입니다.
 - ⚠️ **근사값(수치 근사)으로 결론 내는 것 절대 금지**: "≈ 0.333이므로 1/3" 같은 근사 비교로 검증하지 말고, 기호 계산 결과가 정확히 같은지(\`==\`, \`simplify(a-b)==0\`, \`Eq\`)로만 판정하세요.
 - 검산 결과는 최종 결론에 **자연어로만** 반영하세요.
-- ⚠️ **본문(결론)에는 절대로 코드 블록(\`\`\`python …\`\`\`)이나 실행 출력 텍스트를 적지 마세요.** 실행한 코드와 출력은 시스템이 자동으로 별도 부록(<details>)에 첨부합니다. 본문에 코드를 또 적으면 사용자에게 동일 코드가 **두 번** 보여 무효 처리됩니다. 본문엔 코드 없이 "검산 결과 ~로 확인됨" 같은 자연어 결론만 남기세요.
+- ⚠️ **반드시 결과 값을 자연어로 명시**: "검산 결과 -1로 일치", "값이 4임을 확인", "풀이는 옳음(최솟값 -1 검증됨)" 등 **실제 수치/판정을 본문에 적어야 함**. "검산 결과:" 같은 빈 라벨만 적고 값을 생략하면 사용자에게 무용지물 — 무효 처리됩니다.
+- ⚠️ **본문(결론)에는 절대로 코드 블록(\`\`\`python …\`\`\`)이나 실행 출력 텍스트(stdout 등)를 적지 마세요.** 실행한 코드와 stdout 자체는 시스템이 자동으로 별도 부록(<details>)에 첨부합니다. 본문엔 코드 없이 자연어 결론만 — 단 결론에는 위 ⚠️와 같이 **실제 결과 값(숫자·식·판정)을 명확히 포함**해야 합니다.
   단, \`\`\`mathory-graph 펜스는 이 금지의 예외입니다. 그것은 실행 코드가 아니라 그래프 명세이며, 그래프 도구 규칙(#13)에 따라 본문 뒤에 출력해야 합니다.`;
 
 /**
@@ -338,9 +339,9 @@ function isStructuredOutputModel(config: AIModelConfig): boolean {
   return config.provider === 'deepseek';
 }
 
-/** 검산 도구(code execution) 활성 모델 판정 — 민(google)·쳇(openai) (Phase 41) */
+/** 검산 도구(code execution) 활성 모델 판정 — 민(google)·쳇(openai)·클(anthropic) (Phase 41) */
 function isCodeExecutionModel(config: AIModelConfig): boolean {
-  return config.provider === 'google' || config.provider === 'openai';
+  return config.provider === 'google' || config.provider === 'openai' || config.provider === 'anthropic';
 }
 
 /** 그래프 도구 활성 모델 판정 — 민(google)·쳇(openai) (Phase 42).
@@ -479,7 +480,12 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
 
   try {
     const result = await withTimeout(
-      provider.complete(systemPrompt, userPrompt, config.maxTokens, { jsonMode: structured }),
+      provider.complete(systemPrompt, userPrompt, config.maxTokens, {
+        jsonMode: structured,
+        // Anthropic Claude는 시스템 프롬프트만으론 도구를 안 부르는 경향이 있어,
+        // 검산 트리거가 명시되면 tool_choice로 code_execution 강제 호출.
+        forceCodeExecution: codeExecForced && config.provider === 'anthropic',
+      }),
       TIMEOUT_MS,
     );
     // 식: JSON 응답을 마크다운으로 변환 (실패 시 원본 폴백)
