@@ -151,7 +151,7 @@ function highlightMathContent(
       continue;
     }
 
-    if (doc[i] === '{' || doc[i] === '}') {
+    if (doc[i] === '{' || doc[i] === '}' || doc[i] === '(' || doc[i] === ')' || doc[i] === '[' || doc[i] === ']') {
       decorations.push({ from: i, to: i + 1, deco: latexBraceStyle });
       i++;
       continue;
@@ -182,12 +182,21 @@ export const latexHighlightPlugin = ViewPlugin.fromClass(
   }
 );
 
+// 편집창 모든 글자 굵기 400 통일 — 구분은 색으로만.
+// 텍스트=진한 회색 / 수식 본문(영문·연산자·숫자·\·명령어)=차분한 네이비 / 괄호류($ ( ) [ ] { })=벽돌빛 딥레드.
+const SYNTAX_NAVY = '#3a5275';  // 차분한 네이비 (수식 본문)
+const SYNTAX_RED = '#a23f2e';   // 벽돌빛 딥레드 (괄호·구분자)
 export const latexHighlightTheme = EditorView.baseTheme({
-  // 일반 텍스트: Pretendard(스크롤러 기본) + 톤다운 색
-  '.cm-base-text': { color: 'var(--text-secondary, #5D5647)' },
-  // 수식 영역 전체: 고정폭 D2Coding (x-height 보정 0.95em)
-  '.cm-math-region': { fontFamily: 'var(--font-mono)', fontSize: '0.95em' },
-  '.cm-math-delimiter': { color: 'var(--text-muted, #9C9585)' },
-  '.cm-latex-command': { color: '#3b5b7d', fontWeight: '500' },
-  '.cm-latex-brace': { color: 'var(--text-muted, #9C9585)' },
+  // 일반 텍스트(한글 등): Pretendard + 톤다운 회색
+  '.cm-base-text': { color: 'var(--text-secondary, #5D5647)', fontWeight: '400' },
+  // 수식 영역: 고정폭 D2Coding(0.95em) + 네이비 기본색. 괄호류만 아래에서 레드로 덮음.
+  '.cm-math-region': {
+    fontFamily: 'var(--font-mono)', fontSize: '0.95em',
+    color: SYNTAX_NAVY, fontWeight: '400',
+  },
+  // 구분자($ \[ \]) · 괄호류({ } ( ) [ ]): 벽돌빛 딥레드 — 텍스트와 명확히 구별
+  '.cm-math-delimiter': { color: SYNTAX_RED, fontWeight: '400' },
+  '.cm-latex-brace': { color: SYNTAX_RED, fontWeight: '400' },
+  // 명령어(\neq 등): 수식 본문과 동일 네이비
+  '.cm-latex-command': { color: SYNTAX_NAVY, fontWeight: '400' },
 });
