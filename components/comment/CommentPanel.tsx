@@ -9,7 +9,7 @@ import {
 import { db } from '../../lib/firebase';
 import {
   listAllComments, watchAllComments, addComment, editCommentContent, deleteComment,
-  toggleResolved, buildThreads,
+  buildThreads,
 } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
 import { getEnabledModels } from '../../lib/ai-models';
@@ -113,7 +113,6 @@ export default function CommentPanel({
   const messagesScrollRef = useRef<HTMLDivElement>(null); // 메시지 리스트 자동 스크롤
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [hideResolved, setHideResolved] = useState(false);
   // Phase 42: 이 세션(브라우저 세션) 중 "방금 도착한" 최신 AI 응답 id —
   // 해당 댓글의 첫 그래프만 자동 활성화. 패널 재오픈/페이지 재진입 시엔 비어 있어
   // 모든 그래프가 placeholder로 시작 (GGB CDN 자동 로딩 방지).
@@ -216,7 +215,7 @@ export default function CommentPanel({
   }, [comments, activeTabId, activeSessionId]);
 
   const threads = useMemo(() => buildThreads(visibleComments), [visibleComments]);
-  const visibleThreads = hideResolved ? threads.filter((t) => !t.parent.resolved) : threads;
+  const visibleThreads = threads;
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === activeSessionId) || null,
@@ -302,11 +301,6 @@ export default function CommentPanel({
       await refreshComments();
       alert('삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
-  };
-
-  const handleResolve = async (comment: TabComment) => {
-    await toggleResolved(problemId, comment.id, !comment.resolved);
-    await refreshComments();
   };
 
   const handleReplySubmit = async (parentCommentId: string, content: string) => {
@@ -656,16 +650,6 @@ export default function CommentPanel({
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
           토론 — {tabs.find((t) => t.id === activeTabId)?.label || activeTabId}
         </div>
-        <button
-          onClick={() => setHideResolved((v) => !v)}
-          style={{
-            border: 'none', background: 'transparent', cursor: 'pointer',
-            fontSize: 11, color: 'var(--text-muted)',
-            fontFamily: 'var(--font-ui)', padding: '2px 4px',
-          }}
-        >
-          {hideResolved ? '해결된 메시지 보이기' : '해결된 메시지 숨기기'}
-        </button>
         <div style={{ flex: 1 }} />
         {isAISession && sessionCostUsd > 0 && (
           <span
@@ -747,7 +731,6 @@ export default function CommentPanel({
                 onReplySubmit={(content) => handleReplySubmit(thread.parent.id, content)}
                 onEditSubmit={(commentId, content) => handleEdit(commentId, content)}
                 onDelete={handleDelete}
-                onResolve={handleResolve}
               />
             ))}
             {visiblePendingAI.map((p) => (
@@ -1133,7 +1116,7 @@ function CommentThreadView({
   thread, getDisplayInfo, currentUid, isOwner, canComment,
   replyingToId, editingId,
   onSetReplying, onSetEditing,
-  onReplySubmit, onEditSubmit, onDelete, onResolve,
+  onReplySubmit, onEditSubmit, onDelete,
   graphAutoActivate, onSaveGraphAsBlock,
 }: {
   thread: { parent: TabComment; replies: TabComment[] };
@@ -1148,7 +1131,6 @@ function CommentThreadView({
   onReplySubmit: (content: string) => Promise<void>;
   onEditSubmit: (commentId: string, content: string) => Promise<void>;
   onDelete: (commentId: string) => void;
-  onResolve: (c: TabComment) => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }) {
@@ -1159,13 +1141,8 @@ function CommentThreadView({
       marginBottom: 16,
       padding: 10,
       borderRadius: 8,
-      background: parent.resolved
-        ? 'var(--bg-hover, #f5f5f5)'
-        : parentIsAI ? 'rgba(184,132,92,0.04)' : 'transparent',
-      opacity: parent.resolved ? 0.65 : 1,
-      border: parent.resolved
-        ? '1px solid var(--border-light)'
-        : parentIsAI ? '1px solid rgba(184,132,92,0.18)' : '1px solid transparent',
+      background: parentIsAI ? 'rgba(184,132,92,0.04)' : 'transparent',
+      border: parentIsAI ? '1px solid rgba(184,132,92,0.18)' : '1px solid transparent',
     }}>
       <CommentItem
         comment={parent}
@@ -1179,7 +1156,6 @@ function CommentThreadView({
         onSetReplying={(v) => onSetReplying(v ? parent.id : null)}
         onEditSubmit={(c) => onEditSubmit(parent.id, c)}
         onDelete={() => onDelete(parent.id)}
-        onResolve={() => onResolve(parent)}
         graphAutoActivate={graphAutoActivate}
         onSaveGraphAsBlock={onSaveGraphAsBlock}
       />
@@ -1201,7 +1177,6 @@ function CommentThreadView({
               onSetReplying={() => {}}
               onEditSubmit={(c) => onEditSubmit(r.id, c)}
               onDelete={() => onDelete(r.id)}
-              onResolve={() => {}}
             />
           ))}
         </div>
@@ -1229,7 +1204,7 @@ function CommentItem({
   comment, info, currentUid, isOwner, canComment, isReply,
   isEditing, isReplying,
   onSetEditing, onSetReplying,
-  onEditSubmit, onDelete, onResolve,
+  onEditSubmit, onDelete,
   graphAutoActivate, onSaveGraphAsBlock,
 }: {
   comment: TabComment;
@@ -1244,7 +1219,6 @@ function CommentItem({
   onSetReplying: (v: boolean) => void;
   onEditSubmit: (content: string) => Promise<void>;
   onDelete: () => void;
-  onResolve: () => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
 }) {
@@ -1397,27 +1371,7 @@ function CommentItem({
               {isReplying ? '답글 취소' : '답글'}
             </button>
           )}
-          {!isReply && (isOwner || isMine) && (
-            <button
-              onClick={onResolve}
-              style={{ ...miniLinkStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}
-              title={comment.resolved ? '해결 취소' : '해결됨으로 표시'}
-            >
-              <input
-                type="checkbox"
-                checked={comment.resolved}
-                readOnly
-                tabIndex={-1}
-                style={{
-                  margin: 0, width: 11, height: 11,
-                  accentColor: 'var(--text-muted)',
-                  cursor: 'pointer', pointerEvents: 'none',
-                }}
-              />
-              해결됨
-            </button>
-          )}
-          {/* Phase 42: 그래프 → 블록 저장 + GGB 다운로드 (해결됨과 삭제 사이) */}
+          {/* Phase 42: 그래프 → 블록 저장 + GGB 다운로드 */}
           {hasGraph && graphExport && onSaveGraphAsBlock && (
             <span ref={saveMenuRef} style={{ position: 'relative' }}>
               <button
