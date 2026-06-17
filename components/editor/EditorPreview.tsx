@@ -350,7 +350,7 @@ export default function EditorPreview({
           }} {...props}>{children}</table>
         ),
         thead: ({ children, ...props }) => (
-          <thead style={{ background: '#f5f5f5' }} {...props}>{children}</thead>
+          <thead style={{ background: 'var(--bg-active)' }} {...props}>{children}</thead>
         ),
         th: ({ children, style, ...props }) => (
           <th style={{
