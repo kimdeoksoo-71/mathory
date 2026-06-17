@@ -428,7 +428,8 @@ export default function FolderView({
         {!blocksLoading && folderProblems.length > 0 && (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, 35em)',
+            // 카드 폭 고정 px → 컬럼 수가 글꼴 크기와 무관하게 '폭'에만 의존 (35em@15 ≈ 525 기준 520)
+            gridTemplateColumns: 'repeat(auto-fill, 520px)',
             justifyContent: 'center',
             gap: 20,
             paddingTop: 28, // 경계선↔카드 상단 여백 (스크롤 영역 안이라 스크롤 시 사라짐)
