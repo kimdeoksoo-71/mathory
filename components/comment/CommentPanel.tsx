@@ -17,7 +17,7 @@ import {
   listSessions, createNormalSession, renameSession, deleteSession,
 } from '../../lib/discussion-sessions';
 import EditorPreview from '../editor/EditorPreview';
-import CommentEditor from './CommentEditor';
+import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 
@@ -111,6 +111,7 @@ export default function CommentPanel({
   const [renameDraft, setRenameDraft] = useState('');
   const sessionSubmittingRef = useRef(false); // 한글 IME / blur 이중 호출 방지
   const messagesScrollRef = useRef<HTMLDivElement>(null); // 메시지 리스트 자동 스크롤
+  const mainEditorRef = useRef<CommentEditorHandle>(null); // 답글 버튼 클릭 시 메인 입력창 포커스용
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   // Phase 42: 이 세션(브라우저 세션) 중 "방금 도착한" 최신 AI 응답 id —
@@ -303,20 +304,8 @@ export default function CommentPanel({
     }
   };
 
-  const handleReplySubmit = async (parentCommentId: string, content: string) => {
-    await addComment({
-      problemId,
-      tabId: activeTabId,
-      authorUid: currentUid,
-      content,
-      parentCommentId,
-      authorType: 'human',
-      discussionSessionId:
-        activeSessionId === LEGACY_SESSION_ID ? undefined : activeSessionId,
-    });
-    setReplyingTo(null);
-    await refreshComments();
-  };
+  // (구) handleReplySubmit는 인라인 답글 에디터가 제거되어 삭제됨.
+  // 답글은 메인 입력창의 handleSendMessage가 replyingTo를 보고 처리한다.
 
   // ─── 세션 CRUD ───
   const handleCreateSession = async () => {
@@ -493,6 +482,21 @@ export default function CommentPanel({
   // ─── 메시지 전송 (Phase 37-F 핵심) ───
   const handleSendMessage = async (content: string) => {
     const myNickname = myProfile?.nickname || 'KDS';
+
+    // 답글 모드 — parentCommentId 설정 + AI 호출 안 함 (인라인 답글과 동일 의미)
+    if (replyingTo) {
+      const replyParentId = replyingTo;
+      setReplyingTo(null);
+      await addComment({
+        problemId, tabId: activeTabId, authorUid: currentUid,
+        content, parentCommentId: replyParentId,
+        authorType: 'human',
+        discussionSessionId:
+          activeSessionId === LEGACY_SESSION_ID ? undefined : activeSessionId,
+      });
+      await refreshComments();
+      return;
+    }
 
     // 1. 레거시 세션: AI 호출 없이 단순 댓글 추가
     if (activeSessionId === LEGACY_SESSION_ID) {
@@ -726,9 +730,14 @@ export default function CommentPanel({
                 editingId={editingId}
                 graphAutoActivate={thread.parent.id === freshAiCommentId}
                 onSaveGraphAsBlock={onInsertGraphBlock}
-                onSetReplying={setReplyingTo}
+                onSetReplying={(id) => {
+                  setReplyingTo(id);
+                  if (id) {
+                    // 메인 입력창에 포커스 이동 (다음 tick에서 안전하게)
+                    setTimeout(() => mainEditorRef.current?.focus(), 0);
+                  }
+                }}
                 onSetEditing={setEditingId}
-                onReplySubmit={(content) => handleReplySubmit(thread.parent.id, content)}
                 onEditSubmit={(commentId, content) => handleEdit(commentId, content)}
                 onDelete={handleDelete}
               />
@@ -770,7 +779,35 @@ export default function CommentPanel({
               transition: 'height 0.1s, background 0.1s',
             }} />
           </div>
+          {/* 답글 모드 인디케이터 — 메인 입력창 바로 위 */}
+          {replyingTo && (() => {
+            const target = comments.find((c) => c.id === replyingTo);
+            const targetName = target ? getDisplayInfo(target).name : '메시지';
+            return (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '4px 8px', marginBottom: 4,
+                background: 'var(--bg-hover, #f5f5f5)',
+                borderRadius: 4,
+                fontSize: 11, color: 'var(--text-muted)',
+              }}>
+                <span>↳ <b>{targetName}</b>의 메시지에 답글</span>
+                <div style={{ flex: 1 }} />
+                <button
+                  onClick={() => setReplyingTo(null)}
+                  title="답글 취소"
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer',
+                    color: 'var(--text-muted)', fontSize: 14, lineHeight: 1, padding: '0 4px',
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            );
+          })()}
           <CommentEditor
+            ref={mainEditorRef}
             problemId={problemId}
             placeholder=""
             inputHeight={inputHeight}
@@ -1116,7 +1153,7 @@ function CommentThreadView({
   thread, getDisplayInfo, currentUid, isOwner, canComment,
   replyingToId, editingId,
   onSetReplying, onSetEditing,
-  onReplySubmit, onEditSubmit, onDelete,
+  onEditSubmit, onDelete,
   graphAutoActivate, onSaveGraphAsBlock,
 }: {
   thread: { parent: TabComment; replies: TabComment[] };
@@ -1128,7 +1165,6 @@ function CommentThreadView({
   editingId: string | null;
   onSetReplying: (id: string | null) => void;
   onSetEditing: (id: string | null) => void;
-  onReplySubmit: (content: string) => Promise<void>;
   onEditSubmit: (commentId: string, content: string) => Promise<void>;
   onDelete: (commentId: string) => void;
   graphAutoActivate?: boolean;
@@ -1182,17 +1218,6 @@ function CommentThreadView({
         </div>
       )}
 
-      {replyingToId === parent.id && canComment && (
-        <div style={{ marginLeft: 20, marginTop: 8 }}>
-          <CommentEditor
-            placeholder="답글…"
-            submitLabel="답글"
-            autoFocus
-            onSubmit={onReplySubmit}
-            onCancel={() => onSetReplying(null)}
-          />
-        </div>
-      )}
     </div>
   );
 }

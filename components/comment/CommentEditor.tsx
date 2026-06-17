@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, useImperativeHandle, forwardRef, type ReactNode } from 'react';
 import EditorPreview from '../editor/EditorPreview';
 import MathSymbolPalette from '../editor/MathSymbolPalette';
 import LatexInputEditor, { LatexInputEditorHandle } from './LatexInputEditor';
@@ -8,6 +8,10 @@ import {
   OCR_ACCEPT, OCR_LANGUAGES, validateOcrFile, toDataUrl, normalizeAndFix,
 } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
+
+export interface CommentEditorHandle {
+  focus(): void;
+}
 
 interface CommentEditorProps {
   /** 초기 내용 (편집 모드 시) */
@@ -31,7 +35,7 @@ interface CommentEditorProps {
   inputHeight?: number;
 }
 
-export default function CommentEditor({
+const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(function CommentEditor({
   initialValue = '',
   placeholder = '댓글 작성... (수식: $...$ )',
   submitLabel = '작성',
@@ -42,7 +46,7 @@ export default function CommentEditor({
   problemId,
   maxLength = 1000,
   inputHeight = 120,
-}: CommentEditorProps) {
+}, ref) {
   const [value, setValue] = useState(initialValue);
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -51,6 +55,13 @@ export default function CommentEditor({
   const editorRef = useRef<LatexInputEditorHandle>(null);
   const ocrInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+
+  // 부모(CommentPanel)가 답글 버튼 클릭 시 메인 입력창에 포커스를 줄 수 있도록
+  useImperativeHandle(ref, () => ({
+    focus() {
+      editorRef.current?.focus();
+    },
+  }));
 
   const handleImageClick = () => {
     if (imageUploading || !problemId) return;
@@ -317,4 +328,6 @@ export default function CommentEditor({
       </div>
     </div>
   );
-}
+});
+
+export default CommentEditor;

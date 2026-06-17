@@ -142,8 +142,8 @@ export default function ProblemView({
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   // 댓글 — 패널 열림 여부, 활성 탭, 카운트
   const [commentPanelTab, setCommentPanelTab] = useState<string | null>(null);
-  // Phase 44: 댓글 패널 드래그 리사이즈 (우측). 기본 560px ≈ 35em@16px
-  const [panelWidth, setPanelWidth] = useState(560);
+  // Phase 44: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
+  const [panelWidth, setPanelWidth] = useState(420);
   const [resizeHover, setResizeHover] = useState(false);
   const [resizeDragging, setResizeDragging] = useState(false);
   const [allComments, setAllComments] = useState<TabComment[]>([]);

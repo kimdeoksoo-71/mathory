@@ -799,8 +799,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
-  // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 560px ≈ 35em@16px.
-  const [panelWidth, setPanelWidth] = useState(560);
+  // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
+  const [panelWidth, setPanelWidth] = useState(420);
   const [resizeHover, setResizeHover] = useState(false);   // hover 시 핸들 라인 강조
   const [resizeDragging, setResizeDragging] = useState(false);
   // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
