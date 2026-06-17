@@ -390,6 +390,86 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   return { fixed, count: matches.length };
 }
 
+/**
+ * 텍스트 영역의 영문 글자 시퀀스(앞·뒤가 영숫자가 아닌 경우)를 인라인 수식으로 감싼다.
+ * - 모두 소문자: `$abc$` (수학 변수, 이탤릭)
+ * - 대문자 포함(전부 대문자 또는 혼합): `$\mathrm{ABC}$` (로만체)
+ * - 길이 무관 (단일 글자도 다중 글자도 동일 규칙)
+ * - 보호 영역(수식·HTML·URL·코드·tag/ref)은 건드리지 않음
+ */
+export function autoWrapBareLetters(text: string): { fixed: string; count: number } {
+  const protectedRanges: Array<[number, number]> = [];
+
+  // 수식 영역 (구분자 포함)
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '$' && text[i + 1] === '$') {
+      const close = text.indexOf('$$', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+      break;
+    }
+    if (text[i] === '$') {
+      let j = i + 1, found = -1;
+      while (j < text.length) {
+        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
+        if (text[j] === '\n' && text[j + 1] === '\n') break;
+        j++;
+      }
+      if (found !== -1) { protectedRanges.push([i, found + 1]); i = found + 1; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '[') {
+      const close = text.indexOf('\\]', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '(') {
+      const close = text.indexOf('\\)', i + 2);
+      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    i++;
+  }
+
+  const addAll = (re: RegExp) => {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      protectedRanges.push([m.index, m.index + m[0].length]);
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  };
+  addAll(/<[^>\n]+>/g);
+  addAll(/https?:\/\/\S+/g);
+  addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);
+  addAll(/`[^`\n]*`/g);
+  addAll(/\\(?:tag|ref)\{[^}]*\}/g);
+  // ol 라벨 예외:
+  //   - 단일 영문 글자 in parens: (a), (b), ..., (z), (A), ...
+  //   - 로마 숫자 in parens: (i), (ii), (iii), (iv), (v), (vi)... 대소문자 모두
+  addAll(/\([a-zA-Z]\)/g);
+  addAll(/\([ivxlcdmIVXLCDM]{1,5}\)/g);
+
+  const inProtected = (pos: number) =>
+    protectedRanges.some(([s, e]) => pos >= s && pos < e);
+
+  // 영문 글자 시퀀스 (1자 이상): 양옆이 영숫자가 아닐 때만
+  const letterRe = /(?<![A-Za-z0-9])([A-Za-z]+)(?![A-Za-z0-9])/g;
+  const matches: Array<{ start: number; end: number; seq: string }> = [];
+  let nm: RegExpExecArray | null;
+  while ((nm = letterRe.exec(text)) !== null) {
+    const start = nm.index;
+    const end = start + nm[0].length;
+    if (inProtected(start)) continue;
+    matches.push({ start, end, seq: nm[1] });
+  }
+
+  matches.sort((a, b) => b.start - a.start);
+  let fixed = text;
+  for (const m of matches) {
+    // 대문자가 하나라도 포함되면 \mathrm{}, 전부 소문자면 이탤릭
+    const wrap = /[A-Z]/.test(m.seq) ? `$\\mathrm{${m.seq}}$` : `$${m.seq}$`;
+    fixed = fixed.slice(0, m.start) + wrap + fixed.slice(m.end);
+  }
+  return { fixed, count: matches.length };
+}
+
 /* ─── 자동 수정: josa-space + latex-brace + latex-comma 결정적 규칙 일괄 적용 ─── */
 
 /**
@@ -402,10 +482,17 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
 export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
   let count = 0;
 
-  // Step 0: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
+  // Step 0a: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
   // (이후 단계의 수식 내 규칙이 새 영역에도 작용)
   {
     const r = autoWrapBareNumbers(text);
+    text = r.fixed;
+    count += r.count;
+  }
+  // Step 0b: 텍스트 영역의 단일 영문 글자 → $x$ / $\mathrm{X}$
+  // 숫자 감싼 다음에 처리해야 새로 생긴 $..$ 영역도 보호 대상에 들어감.
+  {
+    const r = autoWrapBareLetters(text);
     text = r.fixed;
     count += r.count;
   }
