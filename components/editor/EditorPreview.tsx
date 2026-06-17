@@ -343,8 +343,9 @@ export default function EditorPreview({
         table: ({ children, ...props }) => (
           <table style={{
             borderCollapse: 'collapse',
-            margin: '1em 0',
-            width: '100%',
+            margin: '1em auto',     // 가로 중앙 정렬
+            width: 'auto',           // 콘텐츠 폭으로 축소 (전체 폭 차지 X)
+            maxWidth: '100%',        // 컨테이너 넘어가지 않도록
             lineHeight: 1.4,
           }} {...props}>{children}</table>
         ),
