@@ -3,11 +3,12 @@
 import { useEffect, useRef, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap, placeholder as cmPlaceholder } from '@codemirror/view';
-import { EditorState, Compartment } from '@codemirror/state';
+import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import { createMathShortcuts, createLatexAutocompletion } from '../../lib/math-editor-extensions';
+import { isInsideMath } from '../../lib/latex-completions';
 
 export interface LatexInputEditorHandle {
   insertAtCursor(text: string, cursorOffset?: number): void;
@@ -66,6 +67,19 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             mathShortcuts,
             chordListener,
             latexAutocompletion,
+            // 수식 영역 내에서 ( [ { 입력 시 자동으로 짝 괄호 닫기 + 커서 중앙 배치.
+            // 수식 밖에선 기본 동작(1글자 삽입)을 유지.
+            Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {
+              if (text !== '(' && text !== '[' && text !== '{') return false;
+              const doc = view.state.doc.toString();
+              if (!isInsideMath(doc, from)) return false;
+              const pair = text === '(' ? '()' : text === '[' ? '[]' : '{}';
+              view.dispatch({
+                changes: { from, to, insert: pair },
+                selection: { anchor: from + 1 },
+              });
+              return true;
+            })),
             latexHighlightPlugin,
             latexHighlightTheme,
             EditorView.lineWrapping,
