@@ -10,7 +10,7 @@
  * (EditorPreview는 자체 인라인 전처리를 사용)
  */
 
-import { preprocessLocale, Locale, CIRCLED_CONSONANTS } from './locale';
+import { preprocessLocale, Locale } from './locale';
 
 /**
  * Setext heading 방지
@@ -94,31 +94,19 @@ export function preventSetextHeadings(text: string): string {
 
 /**
  * 수식 문법 전처리
- * - \tag{n} → \tag*{…… ㉠} (수식 내 꼬리표)
- * - \ref{n} → \text{㉠} (수식 내 꼬리표 인용)
+ * - \tag{n} → \tag*{(n)} (수식 내 참조 번호)
+ * - \ref{n} → \text{(n)} (수식 내 참조 번호 인용)
  * - \[...\] → $$...$$
  * - \(...\) → $...$
  * - $$...$$ 블록에서 bare \\ → array{l}로 감싸기
  * - 인라인 수식에 \displaystyle 추가
  */
 export function preprocessMath(text: string): string {
-  // \tag{n} → \tag*{…… ㉠} (수식 내 꼬리표)
-  let result = text.replace(/\\tag\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return `\\tag*{…… ${CIRCLED_CONSONANTS[idx]}}`;
-    }
-    return match;
-  });
+  // \tag{n} → \tag*{(n)} (수식 내 참조 번호)
+  let result = text.replace(/\\tag\{(\d+)\}/g, (_, num) => `\\tag*{(${num})}`);
 
-  // \ref{n} → \text{㉠} (수식 내 꼬리표 인용)
-  result = result.replace(/\\ref\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return `\\text{${CIRCLED_CONSONANTS[idx]}}`;
-    }
-    return match;
-  });
+  // \ref{n} → \text{(n)} (수식 내 참조 번호 인용)
+  result = result.replace(/\\ref\{(\d+)\}/g, (_, num) => `\\text{(${num})}`);
 
   // \[...\] → $$...$$
   result = result.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);

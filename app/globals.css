@@ -254,6 +254,35 @@ p:has(.marker-circled) {
   float: right;
   white-space: nowrap;
   margin-left: 2em;
+  font-family: KaTeX_Main, 'Times New Roman', serif;
+  font-size: 14px;   /* 수식 안 \tag 번호와 동일 절대값으로 통일 */
+}
+
+/* ═══ 독립행 수식 참조 번호(\tag) 마지막 행 정렬 ═══ */
+/* KaTeX 기본은 .tag 안의 full-height strut이 번호를 수식 중앙축에 고정함.
+   strut을 무력화해 .tag 박스를 번호 크기로 줄인 뒤 bottom 앵커.
+   bottom 값으로 번호 baseline을 마지막 행 baseline에 맞춤(행 수 무관). */
+.katex-display > .katex > .katex-html > .tag {
+  top: auto;
+  bottom: 0.85em;
+  line-height: 1;
+}
+.katex-display > .katex > .katex-html > .tag > .strut {
+  display: none;
+}
+/* 참조 번호는 `.katex .text` override(Pretendard)에서 제외 →
+   KaTeX_Main(LaTeX 수식 글자체)로 렌더.
+   크기는 수식 밖 텍스트 행 번호(tag-marker, 본문 15px)와 동일하게 절대값 고정.
+   수식(.katex)이 본문×1.15라 em로 주면 더 커지므로 px로 못박음. */
+.katex-display > .katex > .katex-html > .tag .text {
+  font-family: KaTeX_Main, 'Times New Roman', serif !important;
+}
+/* font-size는 측정 요소(.mord)까지 직접 못박아 .katex 1.15배 스케일 상속을 차단.
+   .text만 지정하면 일부 뷰(problem-content-toned)에서 안 먹어 수식 크기로 커짐. */
+.katex-display > .katex > .katex-html > .tag,
+.katex-display > .katex > .katex-html > .tag .text,
+.katex-display > .katex > .katex-html > .tag .mord {
+  font-size: 14px !important;
 }
 
 /* ═══ 프리뷰 본문: 좌측 정렬 + 한글 어절 단위 줄바꿈 ═══ */

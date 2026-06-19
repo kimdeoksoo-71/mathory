@@ -76,6 +76,23 @@
   white-space: nowrap;
   margin-left: 2em;
   font-size: 0.95em;
+  font-family: KaTeX_Main, 'Times New Roman', serif;
+}
+
+/* 독립행 수식 참조 번호(\tag) 마지막 행 정렬 — strut 무력화 후 bottom 앵커 */
+.katex-display > .katex > .katex-html > .tag {
+  top: auto;
+  bottom: 0.85em;
+  line-height: 1;
+}
+.katex-display > .katex > .katex-html > .tag > .strut {
+  display: none;
+}
+/* 참조 번호: .text 폰트 override 제외 → KaTeX_Main(LaTeX 수식 글자체).
+   크기는 텍스트 행 번호(tag-marker 0.95em)와 통일. */
+.katex-display > .katex > .katex-html > .tag .text {
+  font-family: KaTeX_Main, 'Times New Roman', serif !important;
+  font-size: 0.95em !important;
 }
 .marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
 p:has(> .marker-gana:first-child),

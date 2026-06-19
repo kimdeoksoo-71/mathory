@@ -80,11 +80,6 @@ function restoreFences(text: string, fences: string[]): string {
   return text.replace(/⟦FENCE_(\d+)⟧/g, (_, idx) => fences[parseInt(idx)] ?? '');
 }
 
-/* ═══ 원문자 상수 (locale/math 공용) ═══ */
-const CIRCLED_CONSONANTS = [
-  '㉠','㉡','㉢','㉣','㉤','㉥','㉦','㉧','㉨','㉩','㉪','㉫','㉬','㉭',
-];
-
 /* ═══ locale 변환 (ko): 수식 보호 → 텍스트 치환 → 복원 ═══ */
 function preprocessLocale(text: string): string {
   // 1. 수식 영역을 placeholder로 보호 (display → inline 순서)
@@ -138,23 +133,12 @@ function preprocessLocale(text: string): string {
   // 6. Table N → [표N]
   t = t.replace(/\bTable\s+(\d+)/g, '[표$1]');
 
-  // 7. \ref{n} → ㉠ (꼬리표 인용)
-  t = t.replace(/\\ref\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return CIRCLED_CONSONANTS[idx];
-    }
-    return match;
-  });
+  // 7. \ref{n} → (n) (참조 번호 인용)
+  t = t.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
 
   // 8. 텍스트 행 \tag{n} → inline span (block div 사용 금지 — 후속 수식 렌더링 보호)
-  t = t.replace(/\\tag\{(\d+)\}\s*$/gm, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return `<span class="tag-marker">…… ${CIRCLED_CONSONANTS[idx]}</span>`;
-    }
-    return match;
-  });
+  t = t.replace(/\\tag\{(\d+)\}\s*$/gm, (_, num) =>
+    `<span class="tag-marker">(${num})</span>`);
 
   // 9. 수식 영역 복원
   t = t.replace(/⟦MATH_(\d+)⟧/g, (_, idx) => mathRegions[parseInt(idx)]);
@@ -165,22 +149,10 @@ function preprocessLocale(text: string): string {
 /* ═══ 수식 전처리 ═══ */
 
 function preprocessMath(text: string): string {
-  // \tag{n} → \tag*{⋯⋯ ㉠} (가운뎃점 6개 + 간격 + 원문자)
-  let result = text.replace(/\\tag\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return `\\tag*{…… ${CIRCLED_CONSONANTS[idx]}}`;
-    }
-    return match;
-  });
-  // \ref{n} → \text{㉠} (수식 내 꼬리표 인용)
-  result = result.replace(/\\ref\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    if (idx >= 0 && idx < CIRCLED_CONSONANTS.length) {
-      return `\\text{${CIRCLED_CONSONANTS[idx]}}`;
-    }
-    return match;
-  });
+  // \tag{n} → \tag*{(n)} (수식 내 참조 번호)
+  let result = text.replace(/\\tag\{(\d+)\}/g, (_, num) => `\\tag*{(${num})}`);
+  // \ref{n} → \text{(n)} (수식 내 참조 번호 인용)
+  result = result.replace(/\\ref\{(\d+)\}/g, (_, num) => `\\text{(${num})}`);
   result = result.replace(/\\\[([\s\S]*?)\\\]/g, (_, inner) => `$$${inner}$$`);
   result = result.replace(/\\\(([\s\S]*?)\\\)/g, (_, inner) => `$${inner}$`);
 

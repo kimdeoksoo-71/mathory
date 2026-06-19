@@ -103,22 +103,15 @@ function convertCircledList(text: string): string {
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 }
 
-/** \ref{n} → ㉠ (텍스트 영역) */
+/** \ref{n} → (n) (텍스트 영역, 참조 번호) */
 function convertRefReferences(text: string): string {
-  return text.replace(/\\ref\{(\d+)\}/g, (match, num) => {
-    const idx = parseInt(num) - 1;
-    return idx >= 0 && idx < CIRCLED_CONSONANTS.length
-      ? CIRCLED_CONSONANTS[idx] : match;
-  });
+  return text.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
 }
 
-/** \tag{n} (텍스트 행 끝) → tag-marker span */
+/** \tag{n} (텍스트 행 끝) → tag-marker span, 참조 번호 (n) */
 function convertTextTags(text: string): string {
-  return text.replace(/\\tag\{(\d+)\}\s*$/gm, (match, num) => {
-    const idx = parseInt(num) - 1;
-    return idx >= 0 && idx < CIRCLED_CONSONANTS.length
-      ? `<span class="tag-marker">…… ${CIRCLED_CONSONANTS[idx]}</span>` : match;
-  });
+  return text.replace(/\\tag\{(\d+)\}\s*$/gm, (_, num) =>
+    `<span class="tag-marker">(${num})</span>`);
 }
 
 /** Fig. 1 → [그림1] */
