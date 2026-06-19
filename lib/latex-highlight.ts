@@ -92,11 +92,14 @@ function buildDecorations(view: EditorView): DecorationSet {
       let end = -1;
 
       for (let j = innerStart; j < doc.length; j++) {
+        // 인라인 수식($...$)은 한 줄 안으로 제한 — 줄을 넘으면 닫힘으로 보지 않음.
+        // (줄 넘김 허용 시, 타이핑 중 $ 짝이 잠깐 어긋나면 아래 줄의 $를 닫힘으로 오인해
+        //  활성 행 이하가 통째로 수식으로 칠해져 색·글꼴이 매 타이핑마다 요동침)
+        if (doc[j] === '\n') break;
         if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
           end = j;
           break;
         }
-        if (doc[j] === '\n' && doc[j + 1] === '\n') break;
       }
 
       if (end === -1) { i++; continue; }
@@ -170,8 +173,15 @@ export const latexHighlightPlugin = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      // 한글 IME 조합 중에는 decoration 재빌드 스킵 (자소 분리 방지)
-      if (update.view.composing) return;
+      // 한글 IME 조합 중에는 decoration 재빌드 스킵 (재빌드 시 IME DOM이 흔들려 자소 분리됨).
+      // 단, 그냥 두면 데코레이션이 옛 위치에 멈춰 삽입 길이만큼 어긋나 커서 이하 색·글꼴이 요동침.
+      // → 재빌드 대신 변경에 맞춰 매핑만 하여 위치를 따라가게 함.
+      if (update.view.composing) {
+        if (update.docChanged) {
+          this.decorations = this.decorations.map(update.changes);
+        }
+        return;
+      }
       if (update.docChanged || update.viewportChanged) {
         this.decorations = buildDecorations(update.view);
       }
