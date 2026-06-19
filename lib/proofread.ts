@@ -356,7 +356,8 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   addAll(/https?:\/\/\S+/g);                     // URL
   addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);          // 마크다운 링크/이미지
   addAll(/`[^`\n]*`/g);                          // 인라인 코드
-  addAll(/\\(?:tag|ref)\{[^}]*\}/g);             // \tag, \ref
+  addAll(/\\(?:tag|ref)\{[^}]*\}/g);             // \tag, \ref (안의 숫자 보호)
+  addAll(/\(\d+\)/g);                             // 참조 번호 (1), (2), (3) … 은 수식화 제외
   // 순서 리스트 마커: 라인 선두 "  3. " 등의 숫자
   {
     const re = /^[ \t]*(\d+)\.(?=\s)/gm;
