@@ -34,8 +34,8 @@ export default function ChoicesBlock({ rawText, locale = 'ko' }: ChoicesBlockPro
     }}>
       {choices.map(({ label, content }, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '1em' }}>
-          {/* 원문자 라벨: Pretendard 원문자가 작아 가독성 보강 위해 확대 */}
-          <span style={{ flexShrink: 0, fontSize: '1.3em', lineHeight: 1 }}>{label}</span>
+          {/* 원문자 라벨: 본문과 동일한 정상 크기 */}
+          <span style={{ flexShrink: 0, lineHeight: 1 }}>{label}</span>
           <div style={{ flex: 1 }}>
             <EditorPreview content={content} borderless locale={locale} />
           </div>

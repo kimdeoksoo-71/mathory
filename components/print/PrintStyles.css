@@ -125,6 +125,6 @@ p:has(.marker-circled) { padding-left: 5em; text-indent: -2em; }
   min-width: 0;
 }
 .print-choice-item p { margin: 0; display: inline; }
-.print-choice-label { font-weight: 400; flex-shrink: 0; font-size: 1.3em; line-height: 1; }
+.print-choice-label { font-weight: 400; flex-shrink: 0; line-height: 1; }
 .print-choice-content { display: inline; }
 .print-choice-content p { margin: 0; display: inline; }
