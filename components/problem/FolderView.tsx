@@ -9,6 +9,7 @@ import {
 import { Problem, Block, Folder } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { listAllComments } from '../../lib/comments';
+import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import SvgViewer from '../viewer/SvgViewer';
@@ -243,7 +244,7 @@ export default function FolderView({
         const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
         return (
           <div key={block.id || `img-${i}`} style={{ textAlign: 'center', margin: '0.8em 0' }}>
-            {src ? <img src={src} alt="" style={{ width: block.imageWidth || 400, maxWidth: '90%', height: 'auto' }} /> : null}
+            {src ? <img src={src} alt="" style={{ width: block.imageWidth || 400, maxWidth: '90%', height: 'auto', ...imageTreatmentStyle(block) }} /> : null}
           </div>
         );
       }

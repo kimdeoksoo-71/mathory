@@ -130,6 +130,10 @@ export interface Block {
   step_label?: string;
   title?: string;
   imageWidth?: number;
+  /** 이미지 블록 전용: 배경 treatment. 미설정 = 'blend'(multiply, 기본), 'frame' = 액자 */
+  imageTreatment?: 'frame';
+  /** 이미지 블록 전용: 흑백 여부. 미설정/true = grayscale(기본), false = 컬러 유지 */
+  imageGray?: boolean;
   /** SVG 블록 전용: 편집자가 저장한 초기 뷰 transform (없으면 fit-to-container) */
   svg_initial_view?: SvgInitialView | null;
   /** SVG 블록 전용: 표시 높이(px). 기본 300 */

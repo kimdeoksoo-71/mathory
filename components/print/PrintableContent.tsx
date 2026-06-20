@@ -6,6 +6,7 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
+import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import './PrintStyles.css';
@@ -16,6 +17,8 @@ export interface PrintBlock {
   type: string;
   raw_text: string;
   imageWidth?: number;
+  imageTreatment?: 'frame';
+  imageGray?: boolean;
   svg_initial_view?: { scale: number; positionX: number; positionY: number } | null;
   svg_height?: number;
   ggb_initial_coords?: { xMin: number; xMax: number; yMin: number; yMax: number } | null;
@@ -56,7 +59,7 @@ export default function PrintableContent({
                 {block.type === 'choices' ? (
                   <PrintChoicesBlock content={block.raw_text} locale={locale} />
                 ) : block.type === 'image' ? (
-                  <PrintImageBlock content={block.raw_text} imageWidth={block.imageWidth} />
+                  <PrintImageBlock content={block.raw_text} imageWidth={block.imageWidth} imageTreatment={block.imageTreatment} imageGray={block.imageGray} />
                 ) : block.type === 'svg' ? (
                   <PrintSvgBlock url={block.raw_text} initialView={block.svg_initial_view} height={block.svg_height} />
                 ) : block.type === 'ggb' ? (
@@ -192,8 +195,10 @@ function PrintGgbBlock({ height = 350 }: { height?: number }) {
   );
 }
 
-/** 이미지 인쇄 블록: imageWidth 적용 */
-function PrintImageBlock({ content, imageWidth }: { content: string; imageWidth?: number }) {
+/** 이미지 인쇄 블록: imageWidth + treatment 적용 */
+function PrintImageBlock({ content, imageWidth, imageTreatment, imageGray }: {
+  content: string; imageWidth?: number; imageTreatment?: 'frame'; imageGray?: boolean;
+}) {
   const srcMatch = content.match(/src="([^"]+)"/);
   const src = srcMatch?.[1] || '';
   if (!src) return null;
@@ -203,7 +208,10 @@ function PrintImageBlock({ content, imageWidth }: { content: string; imageWidth?
       <img
         src={src}
         alt=""
-        style={{ width: `${Math.min(w, 600)}px`, maxWidth: '90%', height: 'auto' }}
+        style={{
+          width: `${Math.min(w, 600)}px`, maxWidth: '90%', height: 'auto',
+          ...imageTreatmentStyle({ imageTreatment, imageGray }, { print: true }),
+        }}
       />
     </div>
   );

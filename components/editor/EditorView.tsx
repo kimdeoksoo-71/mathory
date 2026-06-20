@@ -23,6 +23,7 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { normalizeDisplayMathSpacing } from '../../lib/preprocess';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
+import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import type { GraphBlockSave } from '../viewer/GgbGraphView';
 import SvgViewer from '../viewer/SvgViewer';
 import GgbViewer from '../viewer/GgbViewer';
@@ -259,6 +260,8 @@ function MediaBlockContent({
   block,
   onMediaUpload,
   onImageWidthChange,
+  onImageTreatmentChange,
+  onImageGrayChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
   onSaveGgbInitialView,
@@ -268,6 +271,8 @@ function MediaBlockContent({
   block: LocalBlock;
   onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
+  onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
+  onImageGrayChange: (blockId: string, gray: boolean | undefined) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
   onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
@@ -280,6 +285,8 @@ function MediaBlockContent({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const pendingKindRef = useRef<ImageMediaKind | null>(null);
   const imgWidth = block.imageWidth || 400;
+  const isFrame = block.imageTreatment === 'frame';
+  const isColor = block.imageGray === false;
 
   const openTypeModal = () => setShowTypeModal(true);
   const cancelTypeModal = () => setShowTypeModal(false);
@@ -428,7 +435,7 @@ function MediaBlockContent({
     const maxW = 600;
     return (
       <div style={{ padding: 8, textAlign: 'center' }}>
-        <img src={src} alt="" style={{ width: Math.min(imgWidth, maxW), maxWidth: '90%', borderRadius: 8 }} />
+        <img src={src} alt="" style={{ width: Math.min(imgWidth, maxW), maxWidth: '90%', borderRadius: 8, ...imageTreatmentStyle(block) }} />
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           gap: 8, marginTop: 8, fontSize: 11, color: 'var(--text-muted)',
@@ -445,6 +452,34 @@ function MediaBlockContent({
             style={{ width: 140, cursor: 'pointer' }}
           />
           <span>{imgWidth}px</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 6 }}>
+          <button
+            onClick={() => onImageTreatmentChange(block.id, isFrame ? undefined : 'frame')}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="흰 배경 사진/스크린샷을 액자(테두리)로 감쌉니다"
+            style={{
+              padding: '4px 12px', fontSize: 12,
+              background: isFrame ? 'var(--accent-primary)' : 'var(--bg-hover)',
+              color: isFrame ? '#fff' : 'var(--text-primary)',
+              border: '1px solid var(--border-light)', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            액자
+          </button>
+          <button
+            onClick={() => onImageGrayChange(block.id, isColor ? undefined : false)}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="기본은 흑백입니다. 켜면 원래 색을 유지합니다"
+            style={{
+              padding: '4px 12px', fontSize: 12,
+              background: isColor ? 'var(--accent-primary)' : 'var(--bg-hover)',
+              color: isColor ? '#fff' : 'var(--text-primary)',
+              border: '1px solid var(--border-light)', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            컬러 유지
+          </button>
         </div>
         <div style={{ marginTop: 6 }}>
           <button
@@ -629,6 +664,8 @@ function SortableEditorBlock({
   onToggleSelect,
   onMediaUpload,
   onImageWidthChange,
+  onImageTreatmentChange,
+  onImageGrayChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
   onSaveGgbInitialView,
@@ -659,6 +696,8 @@ function SortableEditorBlock({
   onToggleSelect: () => void;
   onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
+  onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
+  onImageGrayChange: (blockId: string, gray: boolean | undefined) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
   onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
@@ -814,6 +853,8 @@ function SortableEditorBlock({
               block={block}
               onMediaUpload={onMediaUpload}
               onImageWidthChange={onImageWidthChange}
+              onImageTreatmentChange={onImageTreatmentChange}
+              onImageGrayChange={onImageGrayChange}
               onSaveSvgInitialView={onSaveSvgInitialView}
               onSvgHeightChange={onSvgHeightChange}
               onSaveGgbInitialView={onSaveGgbInitialView}
@@ -1461,6 +1502,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
   }, [setCurrentBlocks]);
 
+  /** 이미지 액자 토글 — undefined(기본 blend) ↔ 'frame' */
+  const handleImageTreatmentChange = useCallback((blockId: string, treatment: 'frame' | undefined) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, imageTreatment: treatment } : b))
+    );
+  }, [setCurrentBlocks]);
+
+  /** 이미지 컬러 유지 토글 — undefined(기본 흑백) ↔ false(컬러) */
+  const handleImageGrayChange = useCallback((blockId: string, gray: boolean | undefined) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, imageGray: gray } : b))
+    );
+  }, [setCurrentBlocks]);
+
   const handleSplitBlock = useCallback(() => {
     if (!activeBlockId) return;
     const activeBlock = currentBlocks.find((b) => b.id === activeBlockId);
@@ -2020,6 +2075,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           if (b.type === 'image' && b.imageWidth) {
             saveData.imageWidth = b.imageWidth;
           }
+          if (b.type === 'image' && b.imageTreatment) {
+            saveData.imageTreatment = b.imageTreatment;
+          }
+          if (b.type === 'image' && b.imageGray === false) {
+            saveData.imageGray = false;
+          }
           if (b.type === 'svg' && b.svg_initial_view) {
             saveData.svg_initial_view = b.svg_initial_view;
           }
@@ -2557,6 +2618,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onToggleSelect={() => handleToggleSelectBlock(block.id)}
                     onMediaUpload={handleBlockMediaUpload}
                     onImageWidthChange={handleImageWidthChange}
+                    onImageTreatmentChange={handleImageTreatmentChange}
+                    onImageGrayChange={handleImageGrayChange}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
                     onSvgHeightChange={handleSvgHeightChange}
                     onSaveGgbInitialView={handleSaveGgbInitialView}
@@ -2614,6 +2677,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                             width: block.imageWidth || 400,
                             maxWidth: '90%',
                             height: 'auto',
+                            ...imageTreatmentStyle(block),
                           }}
                         />
                       ) : (

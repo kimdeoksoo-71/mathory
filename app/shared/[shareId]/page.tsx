@@ -6,6 +6,7 @@ import EditorPreview from '../../../components/editor/EditorPreview';
 import ChoicesBlock from '../../../components/editor/ChoicesBlock';
 import { getShare, isShareExpired, ShareWithSnapshot } from '../../../lib/shares';
 import { Block } from '../../../types/problem';
+import { imageTreatmentStyle } from '../../../lib/imageTreatment';
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
@@ -163,6 +164,7 @@ function TabContent({ blocks }: { blocks: Block[] }) {
               {src ? (
                 <img src={src} alt="" style={{
                   width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
+                  ...imageTreatmentStyle(block),
                 }} />
               ) : (
                 <span style={{ color: '#888', fontSize: 12 }}>(이미지 없음)</span>

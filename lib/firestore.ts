@@ -429,6 +429,8 @@ export async function duplicateProblem(problemId: string, authorUid?: string): P
         title: block.title,
         step_label: block.step_label,
         imageWidth: block.imageWidth,
+        imageTreatment: block.imageTreatment,
+        imageGray: block.imageGray,
         svg_initial_view: block.svg_initial_view,
         svg_height: block.svg_height,
         ggb_initial_coords: block.ggb_initial_coords,

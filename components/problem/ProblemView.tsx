@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
+import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -275,6 +276,7 @@ export default function ProblemView({
           label: t.label,
           blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
             id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
+            imageTreatment: b.imageTreatment, imageGray: b.imageGray,
             svg_initial_view: b.svg_initial_view, svg_height: b.svg_height,
             ggb_initial_coords: b.ggb_initial_coords, ggb_height: b.ggb_height,
           })),
@@ -301,6 +303,7 @@ export default function ProblemView({
             {src ? (
               <img src={src} alt="" style={{
                 width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
+                ...imageTreatmentStyle(block),
               }} />
             ) : (
               <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
