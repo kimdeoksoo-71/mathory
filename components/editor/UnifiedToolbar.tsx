@@ -158,35 +158,25 @@ function TableAddIcon() {
   );
 }
 
-function BlockAddIcon() {
+/** 전체 접기/펼치기 토글 — collapsed=true면 펼치기(바깥쪽 화살표), false면 접기(안쪽 화살표) */
+function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
   return (
     <svg {...SVG_PROPS}>
       {CORNER_BRACKETS}
-      <path d="M32 20 L32 44" />
       <path d="M20 32 L44 32" />
-    </svg>
-  );
-}
-
-function BlockSplitIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M18 32 L46 32" />
-      <path d="M24 26 L18 32 L24 38" />
-      <path d="M40 26 L46 32 L40 38" />
-    </svg>
-  );
-}
-
-function FormulaSplitIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M18 27 L36 27" />
-      <path d="M18 37 L36 37" />
-      <circle cx="42" cy="27" r="2.5" fill="currentColor" stroke="none" />
-      <circle cx="42" cy="37" r="2.5" fill="currentColor" stroke="none" />
+      {collapsed ? (
+        <>
+          {/* 펼치기: 위·아래로 벌어지는 화살표 */}
+          <path d="M26 24 L32 18 L38 24" />
+          <path d="M26 40 L32 46 L38 40" />
+        </>
+      ) : (
+        <>
+          {/* 접기: 가운데로 모이는 화살표 */}
+          <path d="M26 19 L32 25 L38 19" />
+          <path d="M26 45 L32 39 L38 45" />
+        </>
+      )}
     </svg>
   );
 }
@@ -253,11 +243,6 @@ const SPECIAL_CHAR_GROUPS: SpecialCharGroup[] = [
 // Props & 공통 스타일
 // ═══════════════════════════════════════════════
 
-export interface BlockTypeOption {
-  type: string;
-  label: string;
-}
-
 interface UnifiedToolbarProps {
   cursorInMath: boolean;
   showToolbar: boolean;
@@ -273,14 +258,11 @@ interface UnifiedToolbarProps {
   onRunProofread: () => void;
   ocrLoading: boolean;
   onOcrClick: () => void;
-  // 블록 영역
-  blockTypes: BlockTypeOption[];
-  onAddBlock: (type: string) => void;
-  onSplitBlock: () => void;
-  canSplitBlock: boolean;
-  onSplitMathLines: () => void;
+  // 블록 영역 — AI 완성은 맞춤법 검사 우측, 전체 접기 토글은 신설
   onAIComplete: () => void;
   aiLoading: boolean;
+  collapseMode: boolean;
+  onToggleCollapseAll: () => void;
 }
 
 const ICON_BTN_BASE: React.CSSProperties = {
@@ -533,82 +515,6 @@ function EmojiPickerDropdown({ onInsert }: { onInsert: (template: string, cursor
 }
 
 // ═══════════════════════════════════════════════
-// 블록 추가 풀다운
-// ═══════════════════════════════════════════════
-
-function BlockAddDropdown({
-  blockTypes, onAddBlock, disabled,
-}: {
-  blockTypes: BlockTypeOption[];
-  onAddBlock: (type: string) => void;
-  disabled: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <IconButton
-        title="블록 추가"
-        onClick={() => setOpen((v) => !v)}
-        active={open}
-        disabled={disabled}
-      >
-        <BlockAddIcon />
-      </IconButton>
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 4,
-            background: 'var(--bg-card)',
-            border: '1px solid var(--border-light)',
-            borderRadius: 8,
-            boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-            zIndex: 1000,
-            minWidth: 140,
-            overflow: 'hidden',
-          }}
-        >
-          {blockTypes.map((bt) => (
-            <div
-              key={bt.type}
-              onClick={() => {
-                onAddBlock(bt.type);
-                setOpen(false);
-              }}
-              style={{
-                padding: '7px 14px',
-                fontSize: 12,
-                cursor: 'pointer',
-                color: 'var(--text-primary)',
-                fontFamily: 'var(--font-ui)',
-                transition: 'background 0.1s',
-              }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-            >
-              {bt.label}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════
 // 표 삽입 다이얼로그
 // ═══════════════════════════════════════════════
 
@@ -823,13 +729,10 @@ export default function UnifiedToolbar({
   onRunProofread,
   ocrLoading,
   onOcrClick,
-  blockTypes,
-  onAddBlock,
-  onSplitBlock,
-  canSplitBlock,
-  onSplitMathLines,
   onAIComplete,
   aiLoading,
+  collapseMode,
+  onToggleCollapseAll,
 }: UnifiedToolbarProps) {
   const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
   const snippetBtnRef = useRef<HTMLButtonElement>(null);
@@ -919,6 +822,14 @@ export default function UnifiedToolbar({
       ),
     },
     {
+      key: 'ai',
+      node: (
+        <IconButton title="AI 완성 (⌘J)" onClick={onAIComplete} disabled={aiLoading}>
+          {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
+        </IconButton>
+      ),
+    },
+    {
       key: 'search',
       node: (
         <IconButton title="찾기 / 바꾸기 (Ctrl+F)" onClick={onToggleSearch} active={searchOpen}>
@@ -928,32 +839,14 @@ export default function UnifiedToolbar({
     },
     { key: 'd2', node: divider('d2') },
     {
-      key: 'addBlock',
+      key: 'collapseAll',
       node: (
-        <BlockAddDropdown blockTypes={blockTypes} onAddBlock={onAddBlock} disabled={!showToolbar} />
-      ),
-    },
-    {
-      key: 'splitBlock',
-      node: (
-        <IconButton title="블록 분할 (⌘B)" onClick={onSplitBlock} disabled={!canSplitBlock}>
-          <BlockSplitIcon />
-        </IconButton>
-      ),
-    },
-    {
-      key: 'splitMath',
-      node: (
-        <IconButton title="수식행 분할 (⌘⇧L)" onClick={onSplitMathLines}>
-          <FormulaSplitIcon />
-        </IconButton>
-      ),
-    },
-    {
-      key: 'ai',
-      node: (
-        <IconButton title="AI 완성 (⌘J)" onClick={onAIComplete} disabled={aiLoading}>
-          {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
+        <IconButton
+          title={collapseMode ? '전체 펼치기' : '전체 접기'}
+          onClick={onToggleCollapseAll}
+          active={collapseMode}
+        >
+          <CollapseAllIcon collapsed={collapseMode} />
         </IconButton>
       ),
     },
@@ -996,7 +889,7 @@ export default function UnifiedToolbar({
         <div style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
       </div>
 
-      {/* ── 우측: overflow 처리 ── */}
+      {/* ── 우측: overflow 처리 (전체 접기 토글 포함) ── */}
       <OverflowItems items={rightItems} leftWidth={leftWidth} rootRef={rootRef} />
 
       {/* 표 삽입 다이얼로그 (fixed overlay) */}

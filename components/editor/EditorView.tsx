@@ -15,6 +15,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
 import MathToolbar from '../editor/MathToolbar';
 import UnifiedToolbar from '../editor/UnifiedToolbar';
+import BlockBottomToolbar from '../editor/BlockBottomToolbar';
 import FolderPathBar from '../editor/FolderPathBar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
@@ -616,11 +617,16 @@ function SortableEditorBlock({
   isActive,
   canDelete,
   editorRefs,
+  collapseMode,
+  selected,
   onFocus,
   onChange,
   onTypeChange,
   onTitleChange,
   onDelete,
+  onToggleCollapse,
+  onSelect,
+  onToggleSelect,
   onMediaUpload,
   onImageWidthChange,
   onSaveSvgInitialView,
@@ -630,20 +636,27 @@ function SortableEditorBlock({
   problemId,
   onSnippetShortcut,
   onCursorActivity,
-  onAIComplete,
-  aiLoading,
   onSplitMathLines,
+  blockTypes,
+  onAddBlock,
+  onSplitBlock,
+  canSplitBlock,
 }: {
   block: LocalBlock;
   index: number;
   isActive: boolean;
   canDelete: boolean;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
+  collapseMode: boolean;
+  selected: boolean;
   onFocus: () => void;
   onChange: (val: string) => void;
   onTypeChange: (type: Block['type']) => void;
   onTitleChange: (title: string) => void;
   onDelete: () => void;
+  onToggleCollapse: () => void;
+  onSelect: () => void;
+  onToggleSelect: () => void;
   onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
@@ -653,19 +666,26 @@ function SortableEditorBlock({
   problemId: string;
   onSnippetShortcut: (index: number) => void;
   onCursorActivity?: (info: { line: number; offset: number; blockId: string }) => void;
-  onAIComplete?: () => void;
-  aiLoading?: boolean;
-  onSplitMathLines?: () => void;
+  onSplitMathLines: () => void;
+  blockTypes: { type: string; label: string }[];
+  onAddBlock: (type: string) => void;
+  onSplitBlock: () => void;
+  canSplitBlock: boolean;
 }) {
   const {
     attributes, listeners, setNodeRef, transform, transition, isDragging,
   } = useSortable({ id: block.id });
+
+  const isHeading = block.type === 'heading';
+  // 제목 블록은 접힘 시 좌측으로 14px 돌출 (마진으로 블록 자체를 밀고, 바 패딩으로 내용 위치 고정)
+  const headingJut = block.collapsed && isHeading ? 14 : 0;
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     marginBottom: 6,
+    marginLeft: -headingJut,
     // 단일 실제 테두리 (거터 배경이 덮지 않음 → 좌측 이중선 해소, 모서리 유지)
     // 0.5px = 레티나에서 1물리픽셀 헤어라인 (1px은 2물리픽셀이라 두껍게 보임)
     border: '0.5px solid var(--border-block)',
@@ -673,67 +693,115 @@ function SortableEditorBlock({
     background: isActive ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
     boxShadow: isActive ? 'var(--block-shadow-active)' : 'none',
+    // 다중선택 표시 (전체접기 모드 재배치용)
+    outline: selected ? '2px solid var(--accent-primary)' : 'none',
+    outlineOffset: '-1px',
   };
 
-  const isTextBased = TEXT_BASED_TYPES.has(block.type);
+  // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
+  const showBar = isActive || collapseMode;
+
+  // 접힌 상단바에 보여줄 첫 줄 미리보기 (## 등 마크다운 기호 제거)
+  const previewText = useMemo(() => {
+    const line = block.raw_text.split('\n').map((l) => l.trim()).find(Boolean) || '';
+    return line.replace(/^#{1,6}\s*/, '').replace(/[*_`>]/g, '').slice(0, 50);
+  }, [block.raw_text]);
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} data-editor-block-id={block.id}>
-      {/* ── Block Header — 활성 블록만 표시 ── */}
-      {isActive && (
+      {/* ── Block Header — 활성 블록 또는 전체접기 모드일 때 표시 ── */}
+      {showBar && (
       <div
+        onClick={(e) => { if (e.shiftKey) onToggleSelect(); else onSelect(); }}
+        onDoubleClick={() => { if (collapseMode) onToggleCollapse(); }}
         style={{
+          position: 'relative',
           display: 'flex', alignItems: 'center', gap: 4,
-          padding: '4px 8px', background: 'var(--block-bg-active)',
-          cursor: 'grab', fontSize: 12, color: 'var(--text-muted)',
+          // 돌출분(headingJut)만큼 좌측 패딩을 더해 내용물(grip·라벨) 절대위치 고정
+          padding: '4px 8px', paddingLeft: 8 + headingJut,
+          background: 'var(--block-bg-active)',
+          fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
-          // 헤더↔에디터 구분 하단선만 (블록 외곽선이 좌·우·위를 감쌈). 0.5px 헤어라인
-          borderBottom: '0.5px solid var(--border-primary)',
+          // 본문이 보일 때만 헤더↔에디터 구분선
+          borderBottom: !block.collapsed ? '0.5px solid var(--border-primary)' : 'none',
+          // 접힘 모드에서 첫 둥근 모서리 유지
+          borderTopLeftRadius: 12, borderTopRightRadius: 12,
         }}
-        {...listeners}
       >
-        <IconGrip size={12} />
-
-        <select
-          value={block.type}
-          onChange={(e) => onTypeChange(e.target.value as Block['type'])}
-          onPointerDown={(e) => e.stopPropagation()}
-          style={{
-            border: 'none', background: 'none', fontSize: 11,
-            color: 'var(--text-muted)', cursor: 'pointer', outline: 'none',
-            fontFamily: 'var(--font-ui)',
-          }}
-        >
-          {BLOCK_TYPES.map((t) => (
-            <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
-          ))}
-          {/* 기존 svg/ggb 블록은 옵션 목록에 없으므로 현재 값 보존용으로 표시 */}
-          {block.type === 'svg' && (
-            <option value="svg">{BLOCK_TYPE_LABELS.svg}</option>
-          )}
-          {block.type === 'ggb' && (
-            <option value="ggb">{BLOCK_TYPE_LABELS.ggb}</option>
-          )}
-        </select>
-
-        {block.type === 'text' && !block.raw_text && (
-          <EmptyBlockChips onPick={onTypeChange} />
+        {/* 제목 블록 접힘 시 좌측 돌출부 섹션마크 (돌출 패딩 안쪽에 배치 → 내용물 위치 불변) */}
+        {headingJut > 0 && (
+          <span style={{
+            position: 'absolute', left: 5, top: '50%', transform: 'translateY(-50%)',
+            fontSize: 13, fontWeight: 700, lineHeight: 1, color: 'var(--accent-primary)',
+            pointerEvents: 'none',
+          }}>§</span>
         )}
 
-        <div style={{ flex: 1 }} />
+        {/* 앞쪽 드래그 존 (여기서만 드래그 시작) */}
+        <span
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          title="드래그하여 이동"
+          style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '2px 2px' }}
+        >
+          <IconGrip size={12} />
+        </span>
 
-        {canDelete && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              border: 'none', background: 'none', cursor: 'pointer',
-              padding: 2, display: 'flex', color: 'var(--text-faint)',
-            }}
-            title="블록 삭제"
-          >
-            <IconTrash size={12} />
-          </button>
+        {block.collapsed ? (
+          <>
+            <span style={{ fontWeight: 600 }}>{BLOCK_TYPE_LABELS[block.type] || block.type}</span>
+            {previewText && (
+              <span style={{
+                color: 'var(--text-faint)', whiteSpace: 'nowrap', overflow: 'hidden',
+                textOverflow: 'ellipsis', flex: 1, minWidth: 0,
+              }}>{previewText}</span>
+            )}
+          </>
+        ) : (
+          <>
+            <select
+              value={block.type}
+              onChange={(e) => onTypeChange(e.target.value as Block['type'])}
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                border: 'none', background: 'none', fontSize: 11,
+                color: 'var(--text-muted)', cursor: 'pointer', outline: 'none',
+                fontFamily: 'var(--font-ui)',
+              }}
+            >
+              {BLOCK_TYPES.map((t) => (
+                <option key={t} value={t}>{BLOCK_TYPE_LABELS[t]}</option>
+              ))}
+              {/* 기존 svg/ggb 블록은 옵션 목록에 없으므로 현재 값 보존용으로 표시 */}
+              {block.type === 'svg' && (
+                <option value="svg">{BLOCK_TYPE_LABELS.svg}</option>
+              )}
+              {block.type === 'ggb' && (
+                <option value="ggb">{BLOCK_TYPE_LABELS.ggb}</option>
+              )}
+            </select>
+
+            {block.type === 'text' && !block.raw_text && (
+              <EmptyBlockChips onPick={onTypeChange} />
+            )}
+
+            <div style={{ flex: 1 }} />
+
+            {canDelete && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onPointerDown={(e) => e.stopPropagation()}
+                style={{
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  padding: 2, display: 'flex', color: 'var(--text-faint)',
+                }}
+                title="블록 삭제"
+              >
+                <IconTrash size={12} />
+              </button>
+            )}
+          </>
         )}
       </div>
       )}
@@ -764,6 +832,17 @@ function SortableEditorBlock({
             />
           )}
         </div>
+      )}
+
+      {/* ── Block Bottom Toolbar — 활성 + 펼친 블록만 ── */}
+      {isActive && !block.collapsed && (
+        <BlockBottomToolbar
+          blockTypes={blockTypes}
+          onAddBlock={onAddBlock}
+          onSplitBlock={onSplitBlock}
+          canSplitBlock={canSplitBlock}
+          onSplitMathLines={onSplitMathLines}
+        />
       )}
     </div>
   );
@@ -831,6 +910,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
   // Phase 25 Step 1: 활성 블록 커서가 $...$ / $$...$$ 내부인지 (구분자 안쪽만)
   const [cursorInMath, setCursorInMath] = useState(false);
+
+  // 전체 접기 모드 + 다중선택 (세션 한정, 새로고침/탭전환 시 초기화)
+  const [collapseMode, setCollapseMode] = useState(false);
+  const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1522,16 +1605,71 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
   }, [setCurrentBlocks]);
 
+  /* ─── 전체 접기 / 펼치기 토글 ─── */
+  const handleToggleCollapseAll = useCallback(() => {
+    setCollapseMode((on) => {
+      const next = !on;
+      setCurrentBlocks((prev) => prev.map((b) => ({ ...b, collapsed: next })));
+      if (!next) setSelectedBlockIds(new Set());
+      return next;
+    });
+  }, [setCurrentBlocks]);
+
+  /* ─── 개별 블록 접기/펼치기 (상단바 더블클릭) ─── */
+  const handleToggleBlockCollapse = useCallback((blockId: string) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, collapsed: !b.collapsed } : b))
+    );
+  }, [setCurrentBlocks]);
+
+  /* ─── 상단바 클릭: 단일 선택(활성화) / Ctrl+클릭: 다중선택 토글 ─── */
+  const handleSelectBlockBar = useCallback((blockId: string) => {
+    setActiveBlockId(blockId);
+    setSelectedBlockIds(new Set());
+  }, []);
+
+  const handleToggleSelectBlock = useCallback((blockId: string) => {
+    setSelectedBlockIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(blockId)) next.delete(blockId);
+      else next.add(blockId);
+      return next;
+    });
+  }, []);
+
   /* ─── DnD ─── */
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
     setCurrentBlocks((prev) => {
-      const oldIdx = prev.findIndex((b) => b.id === active.id);
-      const newIdx = prev.findIndex((b) => b.id === over.id);
-      return arrayMove(prev, oldIdx, newIdx);
+      // 다중선택 묶음 이동: 드래그한 블록이 선택집합에 포함되고 2개 이상일 때
+      const isGroupMove = selectedBlockIds.size > 1 && selectedBlockIds.has(activeId);
+      const movingIds = isGroupMove
+        ? prev.filter((b) => selectedBlockIds.has(b.id)).map((b) => b.id) // 문서 순서 유지
+        : [activeId];
+      const movingSet = new Set(movingIds);
+
+      // 묶음 내부로 드롭하면 무시
+      if (movingSet.has(overId) && isGroupMove) return prev;
+      if (!isGroupMove && activeId === overId) return prev;
+
+      const activeIdx = prev.findIndex((b) => b.id === activeId);
+      const overIdx = prev.findIndex((b) => b.id === overId);
+      if (activeIdx === -1 || overIdx === -1) return prev;
+
+      const movingBlocks = prev.filter((b) => movingSet.has(b.id));
+      const remaining = prev.filter((b) => !movingSet.has(b.id));
+      const overIdxInRemaining = remaining.findIndex((b) => b.id === overId);
+      if (overIdxInRemaining === -1) return prev;
+      // 아래로 이동이면 over 뒤에, 위로 이동이면 over 앞에 삽입
+      const insertAt = activeIdx < overIdx ? overIdxInRemaining + 1 : overIdxInRemaining;
+      remaining.splice(insertAt, 0, ...movingBlocks);
+      return remaining;
     });
-  }, [setCurrentBlocks]);
+  }, [setCurrentBlocks, selectedBlockIds]);
 
   /* ─── MathToolbar ─── */
   const handleInsert = (template: string, cursorOffset: number) => {
@@ -1687,6 +1825,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   /* ─── 블록 활성화 시 편집창에서 해당 블록 상단을 살짝 아래(80px)에 자동 스크롤 ─── */
   useEffect(() => {
     if (!activeBlockId) return;
+    // 전체접기 모드에선 자동 스크롤 비활성 — 선택 시 블록이 움직여 더블클릭(개별 펼침) 판정이 깨지는 문제 방지
+    if (collapseMode) return;
     const timer = setTimeout(() => {
       const container = editorPanelRef.current;
       if (!container) return;
@@ -1699,7 +1839,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       fastScrollTo(container, target);
     }, 80);
     return () => clearTimeout(timer);
-  }, [activeBlockId]);
+  }, [activeBlockId, collapseMode]);
 
   /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
   useEffect(() => {
@@ -1712,12 +1852,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId]);
 
-  /* ─── 탭 전환 시 activeBlockId 갱신 ─── */
+  /* ─── 탭 전환 시 activeBlockId 갱신 + 전체접기/선택 초기화 ─── */
   useEffect(() => {
     const blocks = allBlocks[activeTab] || [];
     if (blocks.length > 0 && !blocks.find((b) => b.id === activeBlockId)) {
       setActiveBlockId(blocks[0].id);
     }
+    setCollapseMode(false);
+    setSelectedBlockIds(new Set());
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 ──
@@ -2227,13 +2369,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onRunProofread={handleRunProofread}
           ocrLoading={ocrLoading}
           onOcrClick={handleOcrClick}
-          blockTypes={BLOCK_TYPES.map((t) => ({ type: t, label: BLOCK_TYPE_LABELS[t] }))}
-          onAddBlock={(type) => handleAddBlock(type as Block['type'])}
-          onSplitBlock={handleSplitBlock}
-          canSplitBlock={!!activeBlock && SPLITTABLE_TYPES.has(activeBlock.type)}
-          onSplitMathLines={() => handleSplitMathLines()}
           onAIComplete={() => handleAIComplete()}
           aiLoading={aiLoadingBlockId !== null}
+          collapseMode={collapseMode}
+          onToggleCollapseAll={handleToggleCollapseAll}
         />
         <input
           ref={ocrInputRef}
@@ -2409,11 +2548,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     isActive={activeBlockId === block.id}
                     canDelete={currentBlocks.length > 1}
                     editorRefs={editorRefs}
+                    collapseMode={collapseMode}
+                    selected={selectedBlockIds.has(block.id)}
                     onFocus={() => handleBlockFocus(block.id)}
                     onChange={(val) => handleBlockChange(block.id, val)}
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}
                     onTitleChange={(title) => handleBlockTitleChange(block.id, title)}
                     onDelete={() => handleDeleteBlock(block.id)}
+                    onToggleCollapse={() => handleToggleBlockCollapse(block.id)}
+                    onSelect={() => handleSelectBlockBar(block.id)}
+                    onToggleSelect={() => handleToggleSelectBlock(block.id)}
                     onMediaUpload={handleBlockMediaUpload}
                     onImageWidthChange={handleImageWidthChange}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
@@ -2423,9 +2567,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
                     onCursorActivity={handleCursorActivity}
-                    onAIComplete={() => handleAIComplete(block.id)}
-                    aiLoading={aiLoadingBlockId === block.id}
                     onSplitMathLines={() => handleSplitMathLines(block.id)}
+                    blockTypes={BLOCK_TYPES.map((t) => ({ type: t, label: BLOCK_TYPE_LABELS[t] }))}
+                    onAddBlock={(type) => handleAddBlock(type as Block['type'])}
+                    onSplitBlock={handleSplitBlock}
+                    canSplitBlock={SPLITTABLE_TYPES.has(block.type)}
                   />
                   {proofData && (
                     <ProofreadResultBox
