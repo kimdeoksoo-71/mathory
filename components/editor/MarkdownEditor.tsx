@@ -419,6 +419,29 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         { key: 'Mod-g', run: () => true, preventDefault: true },
       ]));
 
+      // $$ ... $$ 블록 삽입 시 상하에 정확히 빈 줄 1개씩 보장
+      // - 커서 좌·우의 공백(개행 포함)을 흡수해 그 자리에 정규화 삽입
+      // - 문서 시작/끝이면 그쪽 패딩은 생략
+      const insertDisplayMathBlock = (view: EditorView) => {
+        const doc = view.state.doc.toString();
+        const { from } = view.state.selection.main;
+        let left = from;
+        while (left > 0 && /\s/.test(doc[left - 1])) left--;
+        let right = from;
+        while (right < doc.length && /\s/.test(doc[right])) right++;
+        const atStart = left === 0;
+        const atEnd = right === doc.length;
+        const padBefore = atStart ? '' : '\n\n';
+        const padAfter = atEnd ? '' : '\n\n';
+        const insert = padBefore + '$$\n\n$$' + padAfter;
+        // cursor: 두 번째 '\n' 뒤(빈 줄 가운데) = padBefore + "$$\n" 다음
+        const cursor = left + padBefore.length + 3;
+        view.dispatch({
+          changes: { from: left, to: right, insert },
+          selection: { anchor: cursor },
+        });
+      };
+
       // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc + Ctrl+Alt+1~9 ──
       const mathShortcuts = Prec.highest(keymap.of([
         {
@@ -427,13 +450,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             if (chordPendingRef.current) {
               chordPendingRef.current = false;
               if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-
-              const { from, to } = view.state.selection.main;
-              const insertText = '\n$$\n\n$$\n';
-              view.dispatch({
-                changes: { from, to, insert: insertText },
-                selection: { anchor: from + 4 },
-              });
+              insertDisplayMathBlock(view);
               return true;
             }
 
@@ -528,13 +545,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             event.preventDefault();
             chordPendingRef.current = false;
             if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-
-            const { from, to } = view.state.selection.main;
-            const insertText = '\n$$\n\n$$\n';
-            view.dispatch({
-              changes: { from, to, insert: insertText },
-              selection: { anchor: from + 4 },
-            });
+            insertDisplayMathBlock(view);
             return true;
           }
 
