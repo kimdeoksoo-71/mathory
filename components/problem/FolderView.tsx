@@ -412,7 +412,7 @@ export default function FolderView({
         borderTop: '0.5px solid var(--border-content)',
         borderLeft: '0.5px solid var(--border-content)',
         borderRight: '0.5px solid var(--border-content)',
-        borderTopLeftRadius: 14, borderTopRightRadius: 14,
+        borderTopLeftRadius: 10, borderTopRightRadius: 10,
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
 

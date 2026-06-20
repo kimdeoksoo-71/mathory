@@ -606,7 +606,7 @@ export default function ProblemView({
           borderTop: '0.5px solid var(--border-content)',
           borderLeft: '0.5px solid var(--border-content)',
           borderRight: '0.5px solid var(--border-content)',
-          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+          borderTopLeftRadius: 10, borderTopRightRadius: 10,
           display: 'flex',
           // 패널 열림: 우측 정렬 → 컨텐츠 우측 끝이 경계선에 붙어 함께 왼쪽으로 이동(가려지지 않음)
           justifyContent: commentPanelTab ? 'unsafe flex-end' : 'center',

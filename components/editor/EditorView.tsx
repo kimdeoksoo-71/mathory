@@ -728,7 +728,7 @@ function SortableEditorBlock({
     // 단일 실제 테두리 (거터 배경이 덮지 않음 → 좌측 이중선 해소, 모서리 유지)
     // 0.5px = 레티나에서 1물리픽셀 헤어라인 (1px은 2물리픽셀이라 두껍게 보임)
     border: '0.5px solid var(--border-block)',
-    borderRadius: 12,
+    borderRadius: 8,
     background: isActive ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
     boxShadow: isActive ? 'var(--block-shadow-active)' : 'none',
@@ -764,7 +764,7 @@ function SortableEditorBlock({
           // 본문이 보일 때만 헤더↔에디터 구분선
           borderBottom: !block.collapsed ? '0.5px solid var(--border-primary)' : 'none',
           // 접힘 모드에서 첫 둥근 모서리 유지
-          borderTopLeftRadius: 12, borderTopRightRadius: 12,
+          borderTopLeftRadius: 8, borderTopRightRadius: 8,
         }}
       >
         {/* 제목 블록 접힘 시 좌측 돌출부 섹션마크 (돌출 패딩 안쪽에 배치 → 내용물 위치 불변) */}
@@ -2576,7 +2576,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           borderTop: '0.5px solid var(--border-content)',
           borderLeft: '0.5px solid var(--border-content)',
           borderRight: '0.5px solid var(--border-content)',
-          borderTopLeftRadius: 14, borderTopRightRadius: 14,
+          borderTopLeftRadius: 10, borderTopRightRadius: 10,
         }}>
 
         {/* ─── Left: Editor ─── */}

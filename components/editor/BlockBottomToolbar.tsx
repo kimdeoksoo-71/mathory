@@ -113,17 +113,29 @@ export default function BlockBottomToolbar({
   canSplitBlock: boolean;
   onSplitMathLines: () => void;
 }) {
-  const [addOpen, setAddOpen] = useState(false);
-  const addRef = useRef<HTMLDivElement>(null);
+  const [addPos, setAddPos] = useState<{ top: number; left: number } | null>(null);
+  const addBtnRef = useRef<HTMLDivElement>(null);
+  const addMenuRef = useRef<HTMLDivElement>(null);
+
+  const openAddMenu = () => {
+    if (addPos) { setAddPos(null); return; }
+    const el = addBtnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    // 블록 컨테이너가 overflow:hidden이라 fixed로 띄워 클리핑 우회
+    setAddPos({ top: r.bottom + 4, left: r.left });
+  };
 
   useEffect(() => {
-    if (!addOpen) return;
+    if (!addPos) return;
     const handler = (e: MouseEvent) => {
-      if (addRef.current && !addRef.current.contains(e.target as Node)) setAddOpen(false);
+      const t = e.target as Node;
+      if (addBtnRef.current?.contains(t) || addMenuRef.current?.contains(t)) return;
+      setAddPos(null);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [addOpen]);
+  }, [addPos]);
 
   return (
     <div
@@ -135,39 +147,40 @@ export default function BlockBottomToolbar({
         fontFamily: 'var(--font-ui)',
       }}
     >
-      {/* 블록 추가 (드롭다운) */}
-      <div ref={addRef} style={{ position: 'relative', display: 'flex' }}>
-        <BarButton title="블록 추가" onClick={() => setAddOpen((v) => !v)}>
+      {/* 블록 추가 (드롭다운 — fixed 좌표로 띄움) */}
+      <div ref={addBtnRef} style={{ display: 'flex' }}>
+        <BarButton title="블록 추가" onClick={openAddMenu}>
           <PlusGlyph />
         </BarButton>
-        {addOpen && (
-          <div
-            onPointerDown={(e) => e.stopPropagation()}
-            style={{
-              position: 'absolute', top: '100%', left: 0, marginTop: 4,
-              background: 'var(--bg-card)', border: '1px solid var(--border-light)',
-              borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
-              zIndex: 1000, minWidth: 140, overflow: 'hidden',
-            }}
-          >
-            {blockTypes.map((bt) => (
-              <div
-                key={bt.type}
-                onClick={(e) => { e.stopPropagation(); onAddBlock(bt.type); setAddOpen(false); }}
-                style={{
-                  padding: '7px 14px', fontSize: 12, cursor: 'pointer',
-                  color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-                  transition: 'background 0.1s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-              >
-                {bt.label}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
+      {addPos && (
+        <div
+          ref={addMenuRef}
+          onPointerDown={(e) => e.stopPropagation()}
+          style={{
+            position: 'fixed', top: addPos.top, left: addPos.left,
+            background: 'var(--bg-card)', border: '1px solid var(--border-light)',
+            borderRadius: 8, boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+            zIndex: 3000, minWidth: 140, overflow: 'hidden',
+          }}
+        >
+          {blockTypes.map((bt) => (
+            <div
+              key={bt.type}
+              onClick={(e) => { e.stopPropagation(); onAddBlock(bt.type); setAddPos(null); }}
+              style={{
+                padding: '7px 14px', fontSize: 12, cursor: 'pointer',
+                color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
+                transition: 'background 0.1s',
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+            >
+              {bt.label}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* 블록 분할 */}
       <BarButton title="블록 분할 (⌘B)" onClick={onSplitBlock} disabled={!canSplitBlock}>
