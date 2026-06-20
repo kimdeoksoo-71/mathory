@@ -1841,12 +1841,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => clearTimeout(timer);
   }, [activeBlockId, collapseMode]);
 
-  /* ─── 미리보기 하이라이트 cleanup + 편집창 선택 해제 (블록 전환 시) ─── */
+  /* ─── 블록 전환 시 다른 블록의 편집창 선택 해제 ─── */
+  // (미리보기 하이라이트는 각 EditorPreview의 자체 useEffect[activeMathId]가 관리하므로
+  //  여기서 querySelectorAll로 와이프하면 자식 effect가 막 적용한 cross-block 하이라이트가
+  //  부모 effect에 의해 즉시 제거되어 cross-block 포커싱이 깨졌음.)
   useEffect(() => {
-    if (!previewRef.current) return;
-    previewRef.current.querySelectorAll('.math-highlight-active').forEach((el) => {
-      el.classList.remove('math-highlight-active');
-    });
     for (const [id, ref] of Object.entries(editorRefs.current)) {
       if (id !== activeBlockId && ref) ref.clearSelection();
     }
@@ -2208,10 +2207,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
         .math-highlight-active {
-          /* 활성 행/거터와 동일한 웜 브라운 계열. 미리보기 배경(#F4EFE7)이 더 밝아
-             같은 강도가 더 도드라지므로 편집창보다 한 톤 약하게. */
-          background-color: rgba(184, 155, 120, 0.18) !important;
-          box-shadow: 0 0 0 1px rgba(184, 155, 120, 0.42);
+          /* 편집창 cm-math-hl과 동일한 연한 노랑으로 통일 */
+          background-color: rgba(255, 224, 51, 0.30) !important;
           border-radius: 3px;
         }
       `}</style>
