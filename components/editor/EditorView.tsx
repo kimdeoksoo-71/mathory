@@ -2591,7 +2591,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
               }}
             >
-              🤖{agentCount ? ` ${agentCount}` : ''}
+              <span style={{ fontWeight: 700, letterSpacing: 0.3 }}>AI</span>{agentCount ? ` ${agentCount}` : ''}
             </button>
           </>
         )}

@@ -735,7 +735,7 @@ export default function CommentPanel({
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-          {isCommentsMode ? '댓글' : 'agent'}
+          {isCommentsMode ? '댓글' : 'AI agent'}
         </div>
         <div style={{ flex: 1 }} />
         {/* Phase 47: 오너 댓글 제어 토글 스위치 (댓글 모드, 멤버에게만 적용) */}
