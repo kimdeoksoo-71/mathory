@@ -959,7 +959,8 @@ function ToggleSwitch({
       <span style={{
         position: 'relative', display: 'inline-block',
         width: 26, height: 15, borderRadius: 8,
-        background: on ? 'var(--accent-primary, #6b8f71)' : 'var(--border-content, #D2C8B8)',
+        // 배경(따뜻한 아이보리)과 조화되는 부드러운 탄 톤. OFF는 한 단계 옅은 클레이.
+        background: on ? 'var(--border-content-active, #B89B78)' : 'var(--bg-active, #E8E2D9)',
         transition: 'background 0.15s',
         flexShrink: 0,
       }}>
