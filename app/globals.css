@@ -197,17 +197,17 @@ textarea:focus-visible {
 /* ═══ List Styles — Ordered & Unordered ═══ */
 
 /* Unordered list: 점 내어쓰기 */
-/* ul — 마커는 3em에 hang out, 본문은 5em (원숫자 리스트와 동일 정렬) */
+/* ul — 불릿은 왼쪽 가장자리, 본문은 마커 폭(1.4em)만큼만 행잉 인덴트 */
 ul {
   list-style: none;
-  padding-left: 5em;
-  margin: 0.4em 0;
+  padding-left: 1.4em;        /* 불릿 행잉 인덴트 (마커 폭 기준) */
+  margin: 0.4em 0 0.4em 1em;  /* 좌측 1em 여백 — 가장자리에서 살짝 띄움 */
 }
 ul li::before {
   content: "•";
   display: inline-block;
-  width: 2em;
-  margin-left: -2em;
+  width: 1.4em;
+  margin-left: -1.4em;
   font-weight: var(--weight-semibold);
 }
 ul ul li::before {
@@ -240,7 +240,7 @@ p:has(.marker-giyeok) {
   text-indent: -2em;
 }
 
-/* ① ② ③ ... 원숫자 리스트 — 마커는 3em에 hang out, 본문은 5em */
+/* ① ② ③ ... 원숫자 리스트 — 마커는 왼쪽 가장자리, 본문은 마커 폭(2em)만큼만 */
 .marker-circled {
   display: inline-block;
   min-width: 2em;
@@ -248,8 +248,9 @@ p:has(.marker-giyeok) {
   text-indent: 0;
 }
 p:has(.marker-circled) {
-  padding-left: 5em !important;
+  padding-left: 2em !important;
   text-indent: -2em !important;
+  margin-left: 1em !important;   /* 좌측 1em 여백 (불릿과 동일 기준) */
 }
 
 /* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */
