@@ -9,19 +9,18 @@ import {
 import { db } from '../../lib/firebase';
 import {
   listAllComments, watchAllComments, addComment, editCommentContent, deleteComment,
-  buildThreads,
+  buildThreads, isCommentStream,
 } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
 import { getEnabledModels } from '../../lib/ai-models';
 import {
-  listSessions, createNormalSession, renameSession, deleteSession,
+  listSessions, createNormalSession, renameSession, deleteSession, ensureCommentSession,
 } from '../../lib/discussion-sessions';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 
-const LEGACY_SESSION_ID = '__legacy__';
 const HISTORY_LIMIT = 5;
 
 /** Phase 42: 다음 라운드 AI 입력으로 보내는 히스토리에서 대용량 첨부 제거.
@@ -41,6 +40,8 @@ interface CommentPanelProps {
   activeTabId: string;
   currentUid: string;
   canComment: boolean;
+  /** Phase 47: 'comments' = 사람 댓글(문항 단일 스레드, AI 없음) / 'agent' = AI 토론(세션 다수). 기본 'agent' */
+  mode?: 'comments' | 'agent';
   bodyFontSize?: number;
   onClose: () => void;
   onCommentsChange?: (comments: ProblemComment[]) => void;
@@ -82,12 +83,14 @@ interface DiscussRequestContext {
 
 export default function CommentPanel({
   problemId, ownerUid, tabs, activeTabId, currentUid, canComment,
+  mode = 'agent',
   bodyFontSize = 15,
   onClose, onCommentsChange, onInsertGraphBlock,
   width = '35em',
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
   const isOwner = currentUid === ownerUid;
+  const isCommentsMode = mode === 'comments';
 
   // ─── 데이터 ───
   const [comments, setComments] = useState<ProblemComment[]>([]);
@@ -102,7 +105,7 @@ export default function CommentPanel({
   const [inputHeight, setInputHeight] = useState(120);
   const [inputResizeHover, setInputResizeHover] = useState(false);
   const [inputResizeDragging, setInputResizeDragging] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string>(LEGACY_SESSION_ID);
+  const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]); // AI 칩 토글
   const [pendingAI, setPendingAI] = useState<PendingAI[]>([]); // 응답 대기 중
   const [creatingSession, setCreatingSession] = useState(false);
@@ -193,27 +196,51 @@ export default function CommentPanel({
     onCommentsChange(visible);
   }, [comments, sessions, onCommentsChange]);
 
-  // 초기 1회만 자동 선택: 세션이 있으면 첫 normal 세션, 없으면 legacy 유지
+  // ─── Phase 47: 세션 분류 ───
+  // 댓글 세션(문항당 1개) / agent(normal) 세션들
+  const commentSession = useMemo(
+    () => sessions.find((s) => s.type === 'comment') ?? null,
+    [sessions],
+  );
+  const commentSessionId = commentSession?.id ?? null;
+  const normalSessions = useMemo(
+    () => sessions.filter((s) => s.type === 'normal'),
+    [sessions],
+  );
+
+  // 댓글 모드: 오너가 패널을 열면 댓글 세션을 멱등 생성 (없을 때 1회)
+  const ensureDoneRef = useRef(false);
+  useEffect(() => {
+    if (ensureDoneRef.current) return;
+    if (loading) return;
+    if (isCommentsMode && isOwner && !commentSession) {
+      ensureDoneRef.current = true;
+      ensureCommentSession(problemId, ownerUid)
+        .then(() => refreshSessions())
+        .catch((e) => console.warn('댓글 세션 생성 실패:', e));
+    }
+  }, [loading, isCommentsMode, isOwner, commentSession, problemId, ownerUid, refreshSessions]);
+
+  // 초기 1회 자동 선택 — agent 모드만. 첫 normal 세션, 없으면 미선택('')
   const initialSelectionDoneRef = useRef(false);
   useEffect(() => {
     if (initialSelectionDoneRef.current) return;
     if (loading) return;
-    if (sessions.length > 0) {
-      setActiveSessionId(sessions[0].id);
+    if (!isCommentsMode) {
+      setActiveSessionId(normalSessions.length > 0 ? normalSessions[0].id : '');
     }
     initialSelectionDoneRef.current = true;
-  }, [loading, sessions]);
+  }, [loading, isCommentsMode, normalSessions]);
 
-  // ─── 필터 ───
+  // ─── 필터 (탭 필터 없음 — 문항 전체) ───
   const visibleComments = useMemo(() => {
-    return comments.filter((c) => {
-      if (c.tabId !== activeTabId) return false;
-      if (activeSessionId === LEGACY_SESSION_ID) {
-        return !c.discussionSessionId; // 세션 미할당 (legacy 댓글)
-      }
-      return c.discussionSessionId === activeSessionId;
-    });
-  }, [comments, activeTabId, activeSessionId]);
+    if (isCommentsMode) {
+      // 댓글 스트림: 댓글 세션 + legacy(null)
+      return comments.filter((c) => isCommentStream(c, commentSessionId));
+    }
+    // agent: 선택된 normal 세션의 메시지만
+    return comments.filter((c) => c.discussionSessionId === activeSessionId);
+  }, [comments, isCommentsMode, commentSessionId, activeSessionId]);
 
   const threads = useMemo(() => buildThreads(visibleComments), [visibleComments]);
   const visibleThreads = threads;
@@ -222,7 +249,8 @@ export default function CommentPanel({
     () => sessions.find((s) => s.id === activeSessionId) || null,
     [sessions, activeSessionId],
   );
-  const isAISession = !!activeSession && activeSession.aiEnabled;
+  // 댓글 모드는 AI 비활성. agent 모드에서 선택된 세션이 aiEnabled일 때만.
+  const isAISession = !isCommentsMode && !!activeSession && activeSession.aiEnabled;
 
   /** 현재 세션의 누적 비용 (USD) */
   const sessionCostUsd = useMemo(() => {
@@ -350,13 +378,14 @@ export default function CommentPanel({
   };
 
   const handleDeleteSession = async (s: DiscussionSession) => {
-    if (s.type === 'public') return;
+    if (s.type !== 'normal') return;  // 댓글/public 세션은 삭제 불가
     if (!confirm(`세션 "${s.name}"을(를) 삭제하시겠습니까?\n(메시지는 그대로 남되, 어느 세션에서도 보이지 않게 됩니다.)`)) return;
     try {
       await deleteSession(problemId, s.id);
       await refreshSessions();
       if (activeSessionId === s.id) {
-        setActiveSessionId(LEGACY_SESSION_ID);
+        const remaining = normalSessions.filter((n) => n.id !== s.id);
+        setActiveSessionId(remaining.length > 0 ? remaining[0].id : '');
       }
     } catch (e) {
       alert(e instanceof Error ? e.message : '세션 삭제 실패');
@@ -383,15 +412,29 @@ export default function CommentPanel({
     }
   }, [problemId]);
 
+  // Phase 47: agent 컨텍스트 = 문제 탭 + 풀이/extra 탭(들) 전체. 합산 15,000자 상한.
+  // question은 보존하고, 초과 시 나머지(풀이/참고)를 뒤에서 자른다.
+  const CONTEXT_CHAR_CAP = 15000;
   const buildContext = useCallback(async () => {
     const problemContent = await fetchTabBlocksText('question');
-    if (activeTabId === 'question') {
-      return { problemContent, currentTabContent: undefined, currentTabLabel: undefined };
+    const otherTabs = tabs.filter((t) => t.id !== 'question');
+    const parts: string[] = [];
+    for (const t of otherTabs) {
+      const txt = await fetchTabBlocksText(t.id);
+      if (txt) parts.push(`### [${t.label}]\n${txt}`);
     }
-    const currentTabContent = await fetchTabBlocksText(activeTabId);
-    const currentTabLabel = tabs.find((t) => t.id === activeTabId)?.label || activeTabId;
-    return { problemContent, currentTabContent, currentTabLabel };
-  }, [fetchTabBlocksText, activeTabId, tabs]);
+    let otherContent = parts.join('\n\n');
+    const room = Math.max(0, CONTEXT_CHAR_CAP - problemContent.length);
+    if (otherContent.length > room) {
+      otherContent = otherContent.slice(0, room);
+      console.warn(`[discuss] 컨텍스트 ${CONTEXT_CHAR_CAP}자 상한 초과 — 풀이/참고 탭 일부 잘림`);
+    }
+    return {
+      problemContent,
+      currentTabContent: otherContent || undefined,
+      currentTabLabel: otherContent ? '풀이·참고 전체' : undefined,
+    };
+  }, [fetchTabBlocksText, tabs]);
 
   const buildHistory = useCallback(() => {
     // 최근 5개 메시지 (현재 visible 기준), 답글 제외
@@ -483,6 +526,11 @@ export default function CommentPanel({
   const handleSendMessage = async (content: string) => {
     const myNickname = myProfile?.nickname || 'KDS';
 
+    // 쓰기 대상 세션: 댓글 모드 = 댓글 세션(없으면 legacy null), agent = 선택된 세션
+    const writeSessionId = isCommentsMode
+      ? (commentSessionId ?? undefined)
+      : (activeSessionId || undefined);
+
     // 답글 모드 — parentCommentId 설정 + AI 호출 안 함 (인라인 답글과 동일 의미)
     if (replyingTo) {
       const replyParentId = replyingTo;
@@ -491,25 +539,31 @@ export default function CommentPanel({
         problemId, tabId: activeTabId, authorUid: currentUid,
         content, parentCommentId: replyParentId,
         authorType: 'human',
-        discussionSessionId:
-          activeSessionId === LEGACY_SESSION_ID ? undefined : activeSessionId,
+        discussionSessionId: writeSessionId,
       });
       await refreshComments();
       return;
     }
 
-    // 1. 레거시 세션: AI 호출 없이 단순 댓글 추가
-    if (activeSessionId === LEGACY_SESSION_ID) {
+    // 1. 댓글 모드: AI 호출 없이 단순 댓글 추가
+    if (isCommentsMode) {
       await addComment({
         problemId, tabId: activeTabId, authorUid: currentUid,
         content, parentCommentId: null,
         authorType: 'human',
+        discussionSessionId: writeSessionId,
       });
       await refreshComments();
       return;
     }
 
-    // 2. 일반 세션 — AI 호출 가능
+    // 2. agent 모드 — 세션이 있어야 함
+    if (!activeSessionId) {
+      alert('먼저 세션을 만들어 주세요.');
+      return;
+    }
+
+    // 일반 세션 — AI 호출 가능
     const invokedIds = isAISession ? [...selectedModelIds] : [];
     const invokedModels = invokedIds
       .map((id) => aiModels.find((m) => m.modelId === id))
@@ -614,7 +668,7 @@ export default function CommentPanel({
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
       width: width, maxWidth: '90vw',
-      background: 'var(--bg-functional)',
+      background: isCommentsMode ? 'var(--bg-panel-comment)' : 'var(--bg-panel-agent)',
       display: 'flex', flexDirection: 'column',
       zIndex: 50,
       fontFamily: 'var(--font-ui)',
@@ -652,7 +706,7 @@ export default function CommentPanel({
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
-          토론 — {tabs.find((t) => t.id === activeTabId)?.label || activeTabId}
+          {isCommentsMode ? '댓글' : 'agent'}
         </div>
         <div style={{ flex: 1 }} />
         {isAISession && sessionCostUsd > 0 && (
@@ -680,9 +734,10 @@ export default function CommentPanel({
         >×</button>
       </div>
 
-      {/* ═══ 세션 바 ═══ */}
+      {/* ═══ 세션 바 (agent 모드 전용) ═══ */}
+      {!isCommentsMode && (
       <SessionTabBar
-        sessions={sessions}
+        sessions={normalSessions}
         activeSessionId={activeSessionId}
         currentUid={currentUid}
         isOwner={isOwner}
@@ -701,6 +756,7 @@ export default function CommentPanel({
         onSubmitRename={handleRenameSession}
         onDelete={handleDeleteSession}
       />
+      )}
 
       {/* ═══ 메시지 리스트 ═══ */}
       <div ref={messagesScrollRef} className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
@@ -710,11 +766,13 @@ export default function CommentPanel({
           </div>
         ) : visibleThreads.length === 0 && visiblePendingAI.length === 0 ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-            {activeSessionId === LEGACY_SESSION_ID
+            {isCommentsMode
               ? '댓글이 없습니다.'
-              : isAISession
-                ? 'AI를 선택하고 첫 메시지를 입력하세요.'
-                : '메시지가 없습니다.'}
+              : !activeSessionId
+                ? '세션을 만들어 토론을 시작하세요.'
+                : isAISession
+                  ? 'AI를 선택하고 첫 메시지를 입력하세요.'
+                  : '메시지가 없습니다.'}
           </div>
         ) : (
           <>
@@ -865,8 +923,7 @@ function SessionTabBar({
   onSubmitRename: (sessionId: string) => void;
   onDelete: (s: DiscussionSession) => void;
 }) {
-  // public 세션이 있으면 항상 최상단 (Phase 37에선 없음, Phase 38에서 자동 생성)
-  const publicSession = sessions.find((s) => s.type === 'public');
+  // Phase 47: agent(normal) 세션만 표시 (댓글/public 세션은 여기 오지 않음)
   const normalSessions = sessions.filter((s) => s.type === 'normal');
 
   return (
@@ -879,21 +936,6 @@ function SessionTabBar({
       overflowX: 'auto',
       flexShrink: 0,
     }}>
-      {/* legacy "댓글" pseudo-session */}
-      <SessionPill
-        label="💬 댓글"
-        active={activeSessionId === LEGACY_SESSION_ID}
-        onClick={() => onSelect(LEGACY_SESSION_ID)}
-      />
-
-      {publicSession && (
-        <SessionPill
-          label={`📢 ${publicSession.name}`}
-          active={activeSessionId === publicSession.id}
-          onClick={() => onSelect(publicSession.id)}
-        />
-      )}
-
       {normalSessions.map((s) => {
         const canManage = isOwner || s.createdBy === currentUid;
         const isRenaming = renamingSessionId === s.id;

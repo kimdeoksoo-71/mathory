@@ -35,6 +35,9 @@
   /* 영역 배경 */
   --bg-functional: #FEFDFB;   /* 아이보리: 기능 영역(사이드바·토론·제목/탭바) — 밝게 후퇴, 클레이와 대비 */
   --bg-content:    #F4EFE7;   /* 클레이: 가운데 컨텐츠 영역 (한 단계 진하게) */
+  /* Phase 47: 댓글/agent 패널 배경 차별화 */
+  --bg-panel-agent:   var(--bg-functional);  /* agent 패널 = 기존 아이보리 키 유지 */
+  --bg-panel-comment: #F6F3EE;               /* 댓글 패널 = 한 톤 차분한 회보라빛 아이보리 */
   /* 블록 */
   --block-bg:        var(--bg-content);  /* 비활성 블록 = 컨텐츠와 동일 클레이 */
   --block-bg-active: #EDE6DA;            /* 활성: 클레이 한 단계 더 진하게 */
