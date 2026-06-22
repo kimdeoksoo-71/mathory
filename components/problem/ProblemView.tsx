@@ -18,9 +18,10 @@ import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import SharePanel from '../editor/SharePanel';
 import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
-import { watchAllComments, countByTab } from '../../lib/comments';
+import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
+import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
-import { UserProfile, ProblemComment } from '../../types/problem';
+import { UserProfile, ProblemComment, DiscussionSession } from '../../types/problem';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
   IconDocLines,
@@ -141,17 +142,23 @@ export default function ProblemView({
   };
   // 저자 프로필
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
-  // 댓글 — 패널 열림 여부, 활성 탭, 카운트
-  const [commentPanelTab, setCommentPanelTab] = useState<string | null>(null);
+  // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
+  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
   // Phase 44: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
   const [panelWidth, setPanelWidth] = useState(420);
   const [resizeHover, setResizeHover] = useState(false);
   const [resizeDragging, setResizeDragging] = useState(false);
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
-  const commentCounts = useMemo(
-    () => countByTab(allComments, { unresolvedOnly: true }),
-    [allComments],
+  const [sessions, setSessions] = useState<DiscussionSession[]>([]);
+  const commentSessionId = useMemo(
+    () => sessions.find((s) => s.type === 'comment')?.id ?? null,
+    [sessions],
   );
+  const commentCount = useMemo(
+    () => countComments(allComments, commentSessionId, { unresolvedOnly: true }),
+    [allComments, commentSessionId],
+  );
+  const agentCount = useMemo(() => countAgentSessions(sessions), [sessions]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
 
@@ -187,6 +194,13 @@ export default function ProblemView({
     }
     return () => { if (unsub) unsub(); };
   }, [problemId]);
+
+  // Phase 47: 세션 목록 (댓글 세션 id · agent 카운트용). 패널 닫을 때 갱신.
+  const loadSessions = useCallback(() => {
+    if (!problemId) return;
+    listSessions(problemId).then(setSessions).catch(() => setSessions([]));
+  }, [problemId]);
+  useEffect(() => { loadSessions(); }, [loadSessions]);
 
   /* ─── 글꼴 크기 로드 ─── */
   useEffect(() => {
@@ -496,7 +510,7 @@ export default function ProblemView({
       <div style={{
         flexShrink: 0, background: 'var(--bg-functional)',
         minHeight: 98, // EditorView(제목 57 + 탭 41)와 가로 경계선 Y 일치
-        paddingRight: commentPanelTab ? `calc(${panelWidth}px + 24px)` : 0,
+        paddingRight: panelMode ? `calc(${panelWidth}px + 24px)` : 0,
         transition: 'padding-right 0.18s ease',
         display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
       }}>
@@ -584,6 +598,36 @@ export default function ProblemView({
           >
             <span>{problem.title}</span>
             <BlockchainBadge problem={problem} size={16} />
+            {/* Phase 47: 댓글 버튼 — 오너 OR (멤버 && 댓글 보임) */}
+            {user && (isOwnerView || (isMemberView && problem.commentsVisible !== false)) && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setPanelMode((m) => m === 'comments' ? null : 'comments'); }}
+                title="댓글 열기"
+                style={{
+                  marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 3,
+                  border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
+                  borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
+                  color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                }}
+              >
+                💬{commentCount ? ` ${commentCount}` : ''}
+              </button>
+            )}
+            {/* Phase 47: agent 버튼 — 오너 전용 */}
+            {user && isOwnerView && (
+              <button
+                onClick={(e) => { e.stopPropagation(); setPanelMode((m) => m === 'agent' ? null : 'agent'); }}
+                title="agent 열기"
+                style={{
+                  marginLeft: 2, display: 'inline-flex', alignItems: 'center', gap: 3,
+                  border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
+                  borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
+                  color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
+                }}
+              >
+                🤖{agentCount ? ` ${agentCount}` : ''}
+              </button>
+            )}
           </h1>
         </div>
       </div>
@@ -594,7 +638,7 @@ export default function ProblemView({
       {/* 외부 래퍼: 패널 자리 확보(아이보리 백드롭), 경계선 없음 — 패널과 컨텐츠가 절대 겹치지 않음 */}
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', minHeight: 0,
-        paddingRight: commentPanelTab ? `calc(${panelWidth}px + 24px)` : 0,
+        paddingRight: panelMode ? `calc(${panelWidth}px + 24px)` : 0,
         transition: 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
@@ -609,7 +653,7 @@ export default function ProblemView({
           borderTopLeftRadius: 10, borderTopRightRadius: 10,
           display: 'flex',
           // 패널 열림: 우측 정렬 → 컨텐츠 우측 끝이 경계선에 붙어 함께 왼쪽으로 이동(가려지지 않음)
-          justifyContent: commentPanelTab ? 'unsafe flex-end' : 'center',
+          justifyContent: panelMode ? 'unsafe flex-end' : 'center',
         }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
         <div style={{
@@ -662,27 +706,6 @@ export default function ProblemView({
                         >
                           {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
                         </button>
-                        {/* 댓글 버튼 — 로그인했고 본인 문항 OR 멤버일 때만 표시 */}
-                        {user && (isOwnerView || isMemberView) && (
-                          <button
-                            onClick={() => setCommentPanelTab((cur) => cur === tab.id ? null : tab.id)}
-                            title="댓글 열기"
-                            style={{
-                              display: 'flex', alignItems: 'center', gap: 2,
-                              border: 'none', background: 'none', cursor: 'pointer',
-                              padding: '2px 4px', borderRadius: 4,
-                              fontSize: 11, color: commentPanelTab === tab.id ? 'var(--accent-primary)' : 'var(--text-faint)',
-                              fontFamily: 'var(--font-ui)',
-                              transition: 'color 0.15s',
-                            }}
-                            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-                            onMouseLeave={(e) => {
-                              if (commentPanelTab !== tab.id) (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
-                            }}
-                          >
-                            💬{commentCounts[tab.id] ? ` ${commentCounts[tab.id]}` : ''}
-                          </button>
-                        )}
                       </div>
                       {isOpen && (
                         <div style={{
@@ -941,24 +964,25 @@ export default function ProblemView({
         isPrinting={isPrinting}
       />
 
-      {/* 댓글 패널 — 우측 슬라이드 */}
-      {commentPanelTab && user && (
+      {/* 댓글/agent 패널 — 우측 슬라이드 */}
+      {panelMode && user && (
         <CommentPanel
           problemId={problem.id}
           ownerUid={problem.authorUid || ''}
           tabs={tabs}
-          activeTabId={commentPanelTab}
+          activeTabId={tabs[0]?.id || 'question'}
           currentUid={user.uid}
           canComment={canCommentOnProblem(problem, user.uid)}
+          mode={panelMode}
           bodyFontSize={contentFontSize}
-          onClose={() => setCommentPanelTab(null)}
+          onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
           width={panelWidth}
         />
       )}
 
       {/* 댓글 패널 좌측변 드래그 리사이즈 핸들 (우측 패널만) */}
-      {commentPanelTab && (
+      {panelMode && (
         <div
           onPointerEnter={() => setResizeHover(true)}
           onPointerLeave={() => setResizeHover(false)}

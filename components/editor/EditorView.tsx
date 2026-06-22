@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
-import { watchAllComments, countByTab } from '../../lib/comments';
+import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
+import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
@@ -940,12 +941,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 토론 패널 (편집 중에도 AI 토론·댓글 참조 가능)
   // 활성 탭과 동기 — 사용자가 편집 탭을 바꾸면 토론 탭도 따라감
-  const [discussionOpen, setDiscussionOpen] = useState(false);
+  // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
+  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
+  const discussionOpen = panelMode !== null;
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
-  const commentCounts = useMemo(
-    () => countByTab(allComments, { unresolvedOnly: true }),
-    [allComments],
+  const [sessions, setSessions] = useState<DiscussionSession[]>([]);
+  const commentSessionId = useMemo(
+    () => sessions.find((s) => s.type === 'comment')?.id ?? null,
+    [sessions],
   );
+  const commentCount = useMemo(
+    () => countComments(allComments, commentSessionId, { unresolvedOnly: true }),
+    [allComments, commentSessionId],
+  );
+  const agentCount = useMemo(() => countAgentSessions(sessions), [sessions]);
+  const loadSessions = useCallback(() => {
+    if (!problem?.id) return;
+    listSessions(problem.id).then(setSessions).catch(() => setSessions([]));
+  }, [problem?.id]);
+  useEffect(() => { loadSessions(); }, [loadSessions]);
 
   // 활성 블록
   const [activeBlockId, setActiveBlockId] = useState<string | null>(null);
@@ -2537,28 +2551,49 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <IconPlus size={14} />
         </button>
 
-        {/* 토론 패널 토글 — ProblemView와 동일한 💬 스타일 */}
+        {/* Phase 47: 댓글 버튼 + agent 버튼 (편집 화면은 오너 전용이라 둘 다 노출) */}
         {user && problem && (
-          <button
-            onClick={() => setDiscussionOpen((v) => !v)}
-            title="토론 열기"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 2,
-              border: 'none', background: 'none', cursor: 'pointer',
-              padding: '2px 4px', borderRadius: 4,
-              fontSize: 11,
-              color: discussionOpen ? 'var(--accent-primary)' : 'var(--text-faint)',
-              fontFamily: 'var(--font-ui)',
-              transition: 'color 0.15s',
-              marginLeft: 'auto',
-            }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-            onMouseLeave={(e) => {
-              if (!discussionOpen) (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
-            }}
-          >
-            💬{commentCounts[activeTab] ? ` ${commentCounts[activeTab]}` : ''}
-          </button>
+          <>
+            <button
+              onClick={() => setPanelMode((m) => m === 'comments' ? null : 'comments')}
+              title="댓글 열기"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 2,
+                border: 'none', background: 'none', cursor: 'pointer',
+                padding: '2px 4px', borderRadius: 4,
+                fontSize: 11,
+                color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-faint)',
+                fontFamily: 'var(--font-ui)',
+                transition: 'color 0.15s',
+                marginLeft: 'auto',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+              onMouseLeave={(e) => {
+                if (panelMode !== 'comments') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+              }}
+            >
+              💬{commentCount ? ` ${commentCount}` : ''}
+            </button>
+            <button
+              onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
+              title="agent 열기"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 2,
+                border: 'none', background: 'none', cursor: 'pointer',
+                padding: '2px 4px', borderRadius: 4,
+                fontSize: 11,
+                color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-faint)',
+                fontFamily: 'var(--font-ui)',
+                transition: 'color 0.15s',
+              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+              onMouseLeave={(e) => {
+                if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+              }}
+            >
+              🤖{agentCount ? ` ${agentCount}` : ''}
+            </button>
+          </>
         )}
       </div>
 
@@ -2743,8 +2778,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       </div>
 
-      {/* 토론 패널 — 우측 슬라이드 (ProblemView와 동일 패턴) */}
-      {discussionOpen && user && problem && (
+      {/* 댓글/agent 패널 — 우측 슬라이드 (ProblemView와 동일 패턴) */}
+      {panelMode && user && problem && (
         <CommentPanel
           problemId={problem.id}
           ownerUid={problem.authorUid || ''}
@@ -2752,8 +2787,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           activeTabId={activeTab}
           currentUid={user.uid}
           canComment={canCommentOnProblem(problem, user.uid)}
+          mode={panelMode}
           bodyFontSize={contentFontSize}
-          onClose={() => setDiscussionOpen(false)}
+          onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
           onInsertGraphBlock={handleInsertGraphBlock}
           width={panelWidth}
