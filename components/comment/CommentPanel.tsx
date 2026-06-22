@@ -738,28 +738,15 @@ export default function CommentPanel({
           {isCommentsMode ? '댓글' : 'agent'}
         </div>
         <div style={{ flex: 1 }} />
-        {/* Phase 47: 오너 댓글 제어 토글 (댓글 모드) */}
-        {isCommentsMode && isOwner && (() => {
-          const pillStyle = (on: boolean): React.CSSProperties => ({
-            border: '1px solid var(--border-light)', borderRadius: 4,
-            padding: '2px 7px', fontSize: 11, cursor: 'pointer',
-            fontFamily: 'var(--font-ui)',
-            background: on ? 'var(--bg-active, #E8E2D9)' : 'transparent',
-            color: on ? 'var(--text-primary)' : 'var(--text-muted)',
-          });
-          return (
-            <>
-              <button onClick={toggleCommentsVisible} style={pillStyle(commentsVisibleFlag)}
-                title="멤버에게 댓글 보이기/숨김">
-                {commentsVisibleFlag ? '보임' : '숨김'}
-              </button>
-              <button onClick={toggleCommentsWritable} style={pillStyle(commentsWritableFlag)}
-                title="멤버 댓글 쓰기 허용/잠금">
-                {commentsWritableFlag ? '쓰기 허용' : '쓰기 잠금'}
-              </button>
-            </>
-          );
-        })()}
+        {/* Phase 47: 오너 댓글 제어 토글 스위치 (댓글 모드, 멤버에게만 적용) */}
+        {isCommentsMode && isOwner && (
+          <>
+            <ToggleSwitch label="보이기" on={commentsVisibleFlag} onToggle={toggleCommentsVisible}
+              title="멤버에게 댓글 보이기/숨김 (오너는 항상 보임)" />
+            <ToggleSwitch label="쓰기" on={commentsWritableFlag} onToggle={toggleCommentsWritable}
+              title="멤버 댓글 쓰기 허용/잠금 (오너는 항상 가능)" />
+          </>
+        )}
         {isAISession && sessionCostUsd > 0 && (
           <span
             title="이 세션의 AI 응답 누적 비용"
@@ -943,6 +930,48 @@ export default function CommentPanel({
         </div>
       )}
     </div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
+/* ToggleSwitch — 라벨 고정 + iOS형 on/off 스위치               */
+/* ═══════════════════════════════════════════════════════ */
+function ToggleSwitch({
+  label, on, onToggle, title,
+}: {
+  label: string;
+  on: boolean;
+  onToggle: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      title={title}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 5,
+        border: 'none', background: 'transparent', cursor: 'pointer',
+        padding: '2px 2px', fontFamily: 'var(--font-ui)',
+        fontSize: 11, color: on ? 'var(--text-primary)' : 'var(--text-muted)',
+      }}
+    >
+      <span>{label}</span>
+      <span style={{
+        position: 'relative', display: 'inline-block',
+        width: 26, height: 15, borderRadius: 8,
+        background: on ? 'var(--accent-primary, #6b8f71)' : 'var(--border-content, #D2C8B8)',
+        transition: 'background 0.15s',
+        flexShrink: 0,
+      }}>
+        <span style={{
+          position: 'absolute', top: 2, left: on ? 13 : 2,
+          width: 11, height: 11, borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.15s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+        }} />
+      </span>
+    </button>
   );
 }
 
