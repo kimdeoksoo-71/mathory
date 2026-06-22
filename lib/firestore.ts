@@ -60,6 +60,22 @@ export async function updateProblem(problemId: string, data: Partial<Problem>): 
   });
 }
 
+/** Phase 47: 댓글 가시성 토글 (오너 전용). false = 멤버에게 댓글 숨김 */
+export async function setCommentsVisible(problemId: string, visible: boolean): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    commentsVisible: visible,
+    updated_at: serverTimestamp(),
+  });
+}
+
+/** Phase 47: 댓글 쓰기 허용 토글 (오너 전용). false = 멤버 작성 동결 */
+export async function setCommentsWritable(problemId: string, writable: boolean): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    commentsWritable: writable,
+    updated_at: serverTimestamp(),
+  });
+}
+
 export async function deleteProblem(problemId: string): Promise<void> {
   // 탭 메타데이터 읽기 (없으면 기본 2탭)
   const problem = await getProblem(problemId);

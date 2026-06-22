@@ -1,11 +1,10 @@
 /**
  * Phase 37-D: 토론 세션 CRUD
  *
- * 세션 구조 (계획서 §1.3):
- *   - 'public' 세션: 공유 문제(Team/Public)에 자동 생성. AI 비활성. 이름변경/삭제 불가.
- *     Phase 37 단독 단계에선 생성하지 않음 — ensurePublicSession()은 시그니처만 정의해두고
- *     실제 호출은 Phase 38에서 공유 문제 생성 훅에 연결.
- *   - 'normal' 세션: 사용자가 + 버튼으로 생성. 이름 필수. AI 활성.
+ * 세션 구조 (Phase 47):
+ *   - 'comment' 세션: 댓글 스레드. 문항당 1개(ensureCommentSession 멱등). AI 비활성. 오너 생성.
+ *   - 'normal' 세션: agent. 사용자가 + 버튼으로 생성. 이름 필수. AI 활성.
+ *   - 'public' 세션: Phase 37/38 미구현 잔존. 신규 생성하지 않음.
  */
 
 import {
@@ -16,7 +15,9 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
+  limit,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -103,17 +104,28 @@ export async function listSessions(problemId: string): Promise<DiscussionSession
 }
 
 /**
- * 공개토론 세션 자동 생성 (Phase 38에서 호출 예정).
+ * Phase 47: 댓글 세션(type:'comment') 멱등 생성.
  *
- * Phase 37 단독 단계에선 호출하지 않음. 시그니처만 정의.
- * Phase 38에서 폴더 카테고리가 team/public_*로 바뀌는 시점, 또는 그 카테고리에서
- * 문제 생성 시 훅으로 호출하여 멱등하게 생성한다 (이미 있으면 no-op).
+ * 문항당 댓글 스레드는 1개만 존재한다. 이미 있으면 그 id를 반환, 없으면 생성 후 id 반환.
+ * 오너만 호출(보안 규칙: type 'comment' create는 isOwnerSess()).
  *
- * 보안 규칙상 'public' 타입은 클라이언트에서 직접 쓸 수 없으므로 Phase 38 구현 시
- * Firebase Admin SDK 기반 서버 라우트로 옮긴다.
- *
- * @throws Phase 37 단계에선 의도된 미구현 에러 (실수로 호출되지 않도록)
+ * @returns 댓글 세션 id
  */
-export async function ensurePublicSession(_problemId: string): Promise<void> {
-  throw new Error('ensurePublicSession: Phase 38에서 구현 예정');
+export async function ensureCommentSession(
+  problemId: string,
+  ownerUid: string,
+): Promise<string> {
+  const existing = await getDocs(
+    query(sessionsCol(problemId), where('type', '==', 'comment'), limit(1)),
+  );
+  if (!existing.empty) return existing.docs[0].id;
+  const ref = await addDoc(sessionsCol(problemId), {
+    type: 'comment',
+    name: '댓글',
+    aiEnabled: false,
+    createdBy: ownerUid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return ref.id;
 }

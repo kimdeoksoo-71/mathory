@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, TabComment, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
@@ -941,7 +941,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 토론 패널 (편집 중에도 AI 토론·댓글 참조 가능)
   // 활성 탭과 동기 — 사용자가 편집 탭을 바꾸면 토론 탭도 따라감
   const [discussionOpen, setDiscussionOpen] = useState(false);
-  const [allComments, setAllComments] = useState<TabComment[]>([]);
+  const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const commentCounts = useMemo(
     () => countByTab(allComments, { unresolvedOnly: true }),
     [allComments],

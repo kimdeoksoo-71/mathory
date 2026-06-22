@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import {
-  TabComment, TabMeta, UserProfile, DiscussionSession, AIModelConfig, Block,
+  ProblemComment, TabMeta, UserProfile, DiscussionSession, AIModelConfig, Block,
   tabSubcollection,
 } from '../../types/problem';
 import { db } from '../../lib/firebase';
@@ -43,7 +43,7 @@ interface CommentPanelProps {
   canComment: boolean;
   bodyFontSize?: number;
   onClose: () => void;
-  onCommentsChange?: (comments: TabComment[]) => void;
+  onCommentsChange?: (comments: ProblemComment[]) => void;
   initialTabId?: string;
   onTabChange?: (tabId: string) => void;
   /** Phase 42: AI 그래프 → 에디터 블록 저장 (편집 화면에서만 전달). 반환값은 토스트용 탭 이름 */
@@ -90,7 +90,7 @@ export default function CommentPanel({
   const isOwner = currentUid === ownerUid;
 
   // ─── 데이터 ───
-  const [comments, setComments] = useState<TabComment[]>([]);
+  const [comments, setComments] = useState<ProblemComment[]>([]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
@@ -264,7 +264,7 @@ export default function CommentPanel({
 
   // ─── displayInfo 헬퍼 ───
   const getDisplayInfo = useCallback(
-    (c: TabComment): DisplayInfo => {
+    (c: ProblemComment): DisplayInfo => {
       if (c.authorType === 'ai' && c.modelId) {
         const model = aiModels.find((m) => m.modelId === c.modelId);
         return {
@@ -1156,8 +1156,8 @@ function CommentThreadView({
   onEditSubmit, onDelete,
   graphAutoActivate, onSaveGraphAsBlock,
 }: {
-  thread: { parent: TabComment; replies: TabComment[] };
-  getDisplayInfo: (c: TabComment) => DisplayInfo;
+  thread: { parent: ProblemComment; replies: ProblemComment[] };
+  getDisplayInfo: (c: ProblemComment) => DisplayInfo;
   currentUid: string;
   isOwner: boolean;
   canComment: boolean;
@@ -1232,7 +1232,7 @@ function CommentItem({
   onEditSubmit, onDelete,
   graphAutoActivate, onSaveGraphAsBlock,
 }: {
-  comment: TabComment;
+  comment: ProblemComment;
   info: DisplayInfo;
   currentUid: string;
   isOwner: boolean;

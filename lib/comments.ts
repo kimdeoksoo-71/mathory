@@ -1,10 +1,10 @@
 import {
   collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
-  query, where, orderBy, serverTimestamp, Timestamp,
+  query, orderBy, serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { TabComment, AIUsage } from '../types/problem';
+import { ProblemComment, AIUsage, DiscussionSession } from '../types/problem';
 
 function toDateSafe(v: any, fallback?: Date): Date {
   if (!v) return fallback || new Date();
@@ -24,7 +24,7 @@ function commentDoc(problemId: string, commentId: string) {
   return doc(db, 'problems', problemId, 'tab_comments', commentId);
 }
 
-function mapDoc(d: any): TabComment {
+function mapDoc(d: any): ProblemComment {
   const data = d.data();
   const aiUsage: AIUsage | undefined = data.aiUsage
     ? {
@@ -88,7 +88,7 @@ export async function addComment(input: AddCommentInput): Promise<string> {
 }
 
 /** 한 문항의 모든 댓글 (탭 무관). 클라이언트에서 tabId·parentCommentId로 필터 */
-export async function listAllComments(problemId: string): Promise<TabComment[]> {
+export async function listAllComments(problemId: string): Promise<ProblemComment[]> {
   const snap = await getDocs(query(commentsCol(problemId), orderBy('createdAt', 'asc')));
   return snap.docs.map(mapDoc);
 }
@@ -101,7 +101,7 @@ export async function listAllComments(problemId: string): Promise<TabComment[]> 
  */
 export function watchAllComments(
   problemId: string,
-  callback: (comments: TabComment[]) => void,
+  callback: (comments: ProblemComment[]) => void,
 ): () => void {
   const q = query(commentsCol(problemId), orderBy('createdAt', 'asc'));
   return onSnapshot(
@@ -109,14 +109,6 @@ export function watchAllComments(
     (snap) => callback(snap.docs.map(mapDoc)),
     (err) => console.error('[comments] 실시간 구독 오류:', err),
   );
-}
-
-/** 특정 탭의 모든 댓글 */
-export async function listByTab(problemId: string, tabId: string): Promise<TabComment[]> {
-  const snap = await getDocs(
-    query(commentsCol(problemId), where('tabId', '==', tabId), orderBy('createdAt', 'asc')),
-  );
-  return snap.docs.map(mapDoc);
 }
 
 export async function editCommentContent(
@@ -141,8 +133,40 @@ export async function deleteComment(problemId: string, commentId: string): Promi
   await deleteDoc(commentDoc(problemId, commentId));
 }
 
-/** 탭별 댓글 개수(최상위 + 답글 모두 포함). 미해결만 카운트 옵션 */
-export function countByTab(comments: TabComment[], options?: { unresolvedOnly?: boolean }): Record<string, number> {
+/**
+ * Phase 47: 댓글 스트림에 속하는지 — 댓글 세션(sid==commentSessionId) 또는 legacy(sid==null).
+ * 그 외(agent/normal 세션 id)는 agent 스트림.
+ */
+export function isCommentStream(c: ProblemComment, commentSessionId: string | null): boolean {
+  const sid = c.discussionSessionId ?? null;
+  return sid === null || sid === commentSessionId;
+}
+
+/** 문항 전체 댓글 수(댓글 스트림: 댓글 세션 + legacy). 최상위+답글 포함, 미해결만 옵션 */
+export function countComments(
+  comments: ProblemComment[],
+  commentSessionId: string | null,
+  options?: { unresolvedOnly?: boolean },
+): number {
+  let n = 0;
+  for (const c of comments) {
+    if (!isCommentStream(c, commentSessionId)) continue;
+    if (options?.unresolvedOnly && c.resolved) continue;
+    n++;
+  }
+  return n;
+}
+
+/** agent 세션(대화) 개수 = type 'normal' 세션 수 */
+export function countAgentSessions(sessions: DiscussionSession[]): number {
+  return sessions.filter((s) => s.type === 'normal').length;
+}
+
+/**
+ * @deprecated Phase 47: 탭별 댓글 개수. 문항 단위 전환으로 폐기 예정.
+ * UI(per-tab 💬 버튼) 제거 시 countComments로 대체하고 삭제한다.
+ */
+export function countByTab(comments: ProblemComment[], options?: { unresolvedOnly?: boolean }): Record<string, number> {
   const out: Record<string, number> = {};
   for (const c of comments) {
     if (options?.unresolvedOnly && c.resolved) continue;
@@ -153,11 +177,11 @@ export function countByTab(comments: TabComment[], options?: { unresolvedOnly?: 
 
 /** 스레드 빌드: parentCommentId=null인 댓글을 부모로, 나머지를 답글로 묶음 */
 export interface CommentThread {
-  parent: TabComment;
-  replies: TabComment[];
+  parent: ProblemComment;
+  replies: ProblemComment[];
 }
 
-export function buildThreads(comments: TabComment[]): CommentThread[] {
+export function buildThreads(comments: ProblemComment[]): CommentThread[] {
   const parents = comments.filter((c) => !c.parentCommentId);
   const replies = comments.filter((c) => c.parentCommentId);
   return parents.map((p) => ({

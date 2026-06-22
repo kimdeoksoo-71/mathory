@@ -23,15 +23,20 @@ export interface Problem {
   members?: Record<string, MemberRole>;       // uid → role
   memberUids?: string[];                       // array-contains 쿼리용 (members.keys()와 동기화)
   memberTabVisibility?: Record<string, boolean>; // tabId → 공개 여부 (없으면 전부 공개)
+  // Phase 47: 문항 단위 댓글 제어 (오너 토글). 미설정 = true
+  commentsVisible?: boolean;                   // false = 댓글을 오너에게만
+  commentsWritable?: boolean;                  // false = 멤버 댓글 작성 동결(오너는 가능)
 }
 
 export type MemberRole = 'viewer' | 'commenter';
 
-// ═══ Stage 3: 탭 단위 댓글 ═══
+// ═══ Stage 3: 문항 단위 댓글 (Phase 47에서 탭 단위 → 문항 단위로 전환) ═══
 
-export interface TabComment {
+// 영속 식별자(Firestore 컬렉션 tab_comments, 필드 tabId)는 마이그레이션 회피를 위해
+// 이름을 유지한다. tabId는 이제 잔존 필드 — 필터·권한에 사용하지 않는다.
+export interface ProblemComment {
   id: string;
-  tabId: string;                       // 'question', 'solution', 'extra_0', ...
+  tabId: string;                       // (잔존) 작성 당시 열린 탭. 필터·권한 미사용
   authorUid: string;                   // human: Firebase uid, AI: 'ai:{modelId}'
   content: string;                     // markdown + KaTeX (인라인 수식)
   parentCommentId: string | null;      // null = 최상위, 값 = 답글
@@ -84,10 +89,12 @@ export interface AIModelConfig {
 export interface DiscussionSession {
   id: string;
   problemId: string;
-  type: 'public' | 'normal';            // 'public' = 공개토론(자동/잠금), 'normal' = 일반(사용자 생성)
-  name: string;                          // 'public'은 '공개토론' 고정, 'normal'은 사용자 입력
-  aiEnabled: boolean;                    // public=false, normal=true (Phase 38에서 문제 가시성 추가 체크)
-  createdBy: string;                     // 생성자 uid, 'public' 타입은 'system'
+  // Phase 47: 'comment' = 댓글 스레드(문항당 1개, AI 비활성), 'normal' = agent(사용자 생성, AI 활성)
+  // 'public' = Phase 37/38 미구현 잔존(신규 생성 안 함)
+  type: 'comment' | 'normal' | 'public';
+  name: string;                          // 'comment'는 고정 라벨, 'normal'은 사용자 입력
+  aiEnabled: boolean;                    // comment=false, normal=true
+  createdBy: string;                     // 생성자 uid (comment/normal 모두 오너)
   createdAt: Date;
   updatedAt: Date;
 }

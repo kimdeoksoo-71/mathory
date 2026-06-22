@@ -20,7 +20,7 @@ import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
 import { watchAllComments, countByTab } from '../../lib/comments';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
-import { UserProfile, TabComment } from '../../types/problem';
+import { UserProfile, ProblemComment } from '../../types/problem';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
   IconDocLines,
@@ -147,7 +147,7 @@ export default function ProblemView({
   const [panelWidth, setPanelWidth] = useState(420);
   const [resizeHover, setResizeHover] = useState(false);
   const [resizeDragging, setResizeDragging] = useState(false);
-  const [allComments, setAllComments] = useState<TabComment[]>([]);
+  const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const commentCounts = useMemo(
     () => countByTab(allComments, { unresolvedOnly: true }),
     [allComments],
