@@ -743,7 +743,7 @@ export default function CommentPanel({
           <>
             <ToggleSwitch label="보이기" on={commentsVisibleFlag} onToggle={toggleCommentsVisible}
               title="멤버에게 댓글 보이기/숨김 (오너는 항상 보임)" />
-            <ToggleSwitch label="쓰기" on={commentsWritableFlag} onToggle={toggleCommentsWritable}
+            <ToggleSwitch label="쓰기 허용" on={commentsWritableFlag} onToggle={toggleCommentsWritable}
               title="멤버 댓글 쓰기 허용/잠금 (오너는 항상 가능)" />
           </>
         )}
