@@ -27,6 +27,8 @@ interface CommentEditorProps {
   autoFocus?: boolean;
   /** 상단 바 좌측에 들어갈 노드(예: AI 모델 칩 리스트). 우측엔 수식·미리보기·작성 버튼이 붙는다. */
   headerLeft?: ReactNode;
+  /** true면 수식·OCR·그림 버튼을 상단 우측 대신 하단 바 좌측에 배치(글자수는 그 오른쪽). 댓글 모드용 */
+  toolsAtBottom?: boolean;
   /** 그림 업로드 시 Storage 경로용. 미지정 시 그림 버튼 숨김. */
   problemId?: string;
   /** 입력 글자수 상한 (기본 1000). 토론 답변이 지나치게 길어지는 것을 방지 */
@@ -43,6 +45,7 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
   clearOnSubmit = true,
   autoFocus = false,
   headerLeft,
+  toolsAtBottom = false,
   problemId,
   maxLength = 1000,
   inputHeight = 120,
@@ -140,19 +143,14 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
     }
   };
 
-  return (
-    <div style={{
-      fontFamily: 'var(--font-ui)',
-    }}>
-      {/* ── 상단 바: (좌) headerLeft(AI 모델 칩 등)  ·  (우) 수식·미리보기/편집·작성 ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>{headerLeft}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+  // 수식·OCR·그림 버튼 묶음 — 기본은 상단 우측, toolsAtBottom이면 하단 좌측에 배치
+  const toolButtons = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
           {/* Phase 40-4: 통일 수식 팔레트 (일반 텍스트라 $…$ 래핑, 위로 펼침) */}
           <MathSymbolPalette
             wrapInDollar
             openUp
-            alignRight
+            alignRight={!toolsAtBottom}
             onInsert={(text, offset) => editorRef.current?.insertAtCursor(text, offset)}
           />
           <button
@@ -246,8 +244,20 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
               />
             </>
           )}
+    </div>
+  );
+
+  return (
+    <div style={{
+      fontFamily: 'var(--font-ui)',
+    }}>
+      {/* ── 상단 바: (좌) headerLeft(AI 모델 칩 등)  ·  (우, 기본 배치) 수식·OCR·그림 ── */}
+      {(!toolsAtBottom || headerLeft) && (
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 6 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>{headerLeft}</div>
+          {!toolsAtBottom && toolButtons}
         </div>
-      </div>
+      )}
 
       {/* 에디터는 항상 마운트 상태 유지 (미리보기 토글 시 내용·커서·undo 히스토리 보존).
           미리보기 표시 중에는 CSS로만 숨김. */}
@@ -276,11 +286,12 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
         </div>
       )}
 
-      {/* ── 하단 바: (우) 미리보기·취소·작성 ── */}
+      {/* ── 하단 바: (좌, 댓글 모드) 수식·OCR·그림 + 글자수  ·  (우) 미리보기·취소·작성 ── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
         gap: 6, marginTop: 6,
       }}>
+        {toolsAtBottom && toolButtons}
         <span style={{
           fontSize: 11, marginRight: 'auto',
           color: value.length >= maxLength ? 'var(--accent-danger, #c0392b)' : 'var(--text-faint)',

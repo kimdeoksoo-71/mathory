@@ -908,6 +908,7 @@ export default function CommentPanel({
             placeholder=""
             inputHeight={inputHeight}
             onSubmit={handleSendMessage}
+            toolsAtBottom={isCommentsMode}
             headerLeft={isAISession ? (
               <AIChipBar
                 models={aiModels}
