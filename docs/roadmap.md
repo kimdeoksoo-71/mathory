@@ -1193,3 +1193,21 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 - 더블클릭 보호: 접기 모드에선 활성화 자동 스크롤 비활성(첫 클릭이 블록을 움직여 더블클릭 판정이 깨지던 문제 해소)
 - dnd-kit 다중 드래그 미지원 우회: 단일 고스트로 드래그 → 드롭 순간 그룹 relocate
 - 한계: 전체 접기 토글이 통합툴바 게이팅(`showToolbar`)을 따라 비텍스트 블록 활성 시 함께 비활성 (필요 시 항상-활성 분리 가능)
+
+## Phase 46: 콘텐츠 이미지 배경 treatment ✅
+
+이미지 블록 배경 처리(blend/frame) + 흑백 토글. 상세: `docs/phasedocs/Phase46 콘텐츠 이미지 배경 treatment.md`
+
+## Phase 47: 댓글 / agent 분리 ✅
+
+기존 통합 토론 패널을 **댓글**(사람 전용·문항 단일 스레드)과 **agent**(AI·문항 단위 다중 세션)로 분리. 토론이 문항 단위이므로 마이그레이션 없음. 영속 식별자(`tab_comments`/`tabId`)는 이름 유지, 코드 명칭만 리네임. 상세: `docs/phasedocs/Phase47 댓글·agent 분리.md`
+
+| 영역 | 변경 |
+|------|------|
+| 데이터·lib | `TabComment`→`ProblemComment` 전수 리네임. `DiscussionSession.type`에 `'comment'` 추가. `Problem`에 `commentsVisible`/`commentsWritable`. `ensureCommentSession`(멱등) 신설, `ensurePublicSession` 제거. `countComments`/`countAgentSessions` |
+| CommentPanel | `mode`('comments'\|'agent') 분기. 탭 필터 제거(문항 전체). 댓글 모드=세션바·LLM칩 숨김·AI 비활성. agent 컨텍스트=문제+풀이+extra 전탭(15,000자 상한). 패널 배경 토큰 분리 |
+| 진입 버튼 | ProblemView 제목행 [💬 댓글][🤖 agent](agent는 오너 전용), per-tab 💬 제거. EditorView 토론 버튼 → [댓글][agent] 2버튼 |
+| 보안 규칙 | 탭 가시성 검사 제거, read에 `commentsVisible()`. 멤버 댓글 create에 `commentsWritable()`+`isCommentSessionRef()`(agent 세션 차단). `'comment'` 세션 create 규칙, `'normal'`은 오너 전용. `resolved` 검사 유지 |
+| 오너 토글 | 댓글 모드 헤더에 보임/숨김·쓰기 허용/잠금 |
+
+- 알려진 한계: list 쿼리 제약상 멤버가 규칙 레벨에선 agent AI 메시지를 읽을 수 있음 → UI로 차단(공개 전 세션 단위 read 분리 재검토)
