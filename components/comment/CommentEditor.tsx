@@ -293,7 +293,9 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
       }}>
         {toolsAtBottom && toolButtons}
         <span style={{
-          fontSize: 11, marginRight: 'auto',
+          fontSize: 11,
+          // 댓글 모드: 버튼과 작성 버튼 사이 중앙 / 그 외: 좌측
+          ...(toolsAtBottom ? { margin: '0 auto' } : { marginRight: 'auto' }),
           color: value.length >= maxLength ? 'var(--accent-danger, #c0392b)' : 'var(--text-faint)',
         }}>
           {value.length}/{maxLength}
