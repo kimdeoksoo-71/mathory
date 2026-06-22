@@ -126,22 +126,31 @@ service cloud.firestore {
         function isCommenter() {
           return memberRole() == 'commenter';
         }
-        function tabAllowedForMemberCmt(tabId) {
-          return parentData().get('memberTabVisibility', {}).get(tabId, true) == true;
+        // Phase 47: 문항 단위 댓글 제어 (미설정 = true)
+        function commentsVisible() {
+          return parentData().get('commentsVisible', true) == true;
+        }
+        function commentsWritable() {
+          return parentData().get('commentsWritable', true) == true;
+        }
+        // Phase 47: 멤버는 댓글 세션(또는 legacy null)에만 작성. agent(normal) 세션 차단.
+        function isCommentSessionRef(sid) {
+          return sid == null
+            || get(/databases/$(database)/documents/problems/$(problemId)/discussion_sessions/$(sid)).data.type == 'comment';
         }
         function changedKeys() {
           return request.resource.data.diff(resource.data).affectedKeys();
         }
 
-        // 읽기: 오너 OR 멤버.
-        // (탭별 가시성을 read에 걸면 Firestore list 쿼리가 사전 검증 불가하여
-        //  멤버가 댓글 목록을 못 받는 문제가 생기므로, 읽기는 멤버 여부만 검사.
-        //  create 시점에는 탭 가시성·역할을 그대로 검증한다.)
-        allow read: if isOwnerCmt() || isMemberCmt();
+        // 읽기: 오너 OR (멤버 && 댓글 보임).
+        // (탭별 가시성을 read에 걸면 Firestore list 쿼리가 사전 검증 불가 → 탭 검사 제거.
+        //  commentsVisible는 부모 문서 기반이라 list 쿼리에서도 안전.
+        //  ⚠️ agent AI 메시지도 tab_comments에 있어 멤버가 규칙 레벨에선 읽을 수 있음 — UI로 차단(공개 전 재검토).)
+        allow read: if isOwnerCmt() || (isMemberCmt() && commentsVisible());
 
-        // 생성:
-        //  (a) 인간 댓글: 오너 OR commenter 역할. author 본인. 해당 탭 가시성 통과.
-        //  (b) AI 댓글 (Phase 37): 오너만 가능. authorUid='ai:*', authorType='ai'.
+        // 생성 (Phase 47):
+        //  (a) 인간 댓글: 오너 OR (commenter && 댓글 쓰기 허용 && 댓글 세션). author 본인.
+        //  (b) AI 댓글: 오너만 가능. authorUid='ai:*', authorType='ai'.
         allow create: if (
           // 인간 댓글
           (
@@ -150,8 +159,8 @@ service cloud.firestore {
             && request.resource.data.resolved == false
             && (
               isOwnerCmt()
-              || (isMemberCmt() && isCommenter()
-                  && tabAllowedForMemberCmt(request.resource.data.tabId))
+              || (isMemberCmt() && isCommenter() && commentsWritable()
+                  && isCommentSessionRef(request.resource.data.get('discussionSessionId', null)))
             )
           )
           ||
@@ -198,13 +207,13 @@ service cloud.firestore {
         );
       }
 
-      // ===== problems/{id}/discussion_sessions/{sid} (Phase 37) =====
+      // ===== problems/{id}/discussion_sessions/{sid} (Phase 37 / 47) =====
       // 권한 정책:
       //   - read: 오너 OR 멤버
-      //   - create: 오너 OR 멤버. type='normal'만. createdBy=본인. aiEnabled=true 강제.
-      //     ('public' 타입은 Phase 38에서 Admin SDK 기반 서버 라우트로만 생성)
+      //   - create: 'comment'(댓글, 오너만, aiEnabled=false) OR 'normal'(agent, 오너만, aiEnabled=true). createdBy=본인.
       //   - update: type='normal'만. 생성자 본인 OR 오너. name/updatedAt만 변경.
       //   - delete: type='normal'만. 생성자 본인 OR 오너.
+      //   ('comment' 세션은 ensureCommentSession 멱등 생성 — 이름변경/삭제 불가)
       match /discussion_sessions/{sessionId} {
         function pData() {
           return get(/databases/$(database)/documents/problems/$(problemId)).data;
@@ -222,10 +231,16 @@ service cloud.firestore {
 
         allow read: if isOwnerSess() || isMemberSess();
 
+        // 댓글 세션(comment): 오너만, AI 비활성
+        allow create: if request.resource.data.type == 'comment'
+          && request.resource.data.aiEnabled == false
+          && request.resource.data.createdBy == request.auth.uid
+          && isOwnerSess();
+        // agent 세션(normal): 오너만, AI 활성
         allow create: if request.resource.data.type == 'normal'
           && request.resource.data.aiEnabled == true
           && request.resource.data.createdBy == request.auth.uid
-          && (isOwnerSess() || isMemberSess());
+          && isOwnerSess();
 
         allow update: if resource.data.type == 'normal'
           && (resource.data.createdBy == request.auth.uid || isOwnerSess())

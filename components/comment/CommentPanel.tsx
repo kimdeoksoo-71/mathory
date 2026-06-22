@@ -16,6 +16,7 @@ import { getEnabledModels } from '../../lib/ai-models';
 import {
   listSessions, createNormalSession, renameSession, deleteSession, ensureCommentSession,
 } from '../../lib/discussion-sessions';
+import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
@@ -121,6 +122,9 @@ export default function CommentPanel({
   // 해당 댓글의 첫 그래프만 자동 활성화. 패널 재오픈/페이지 재진입 시엔 비어 있어
   // 모든 그래프가 placeholder로 시작 (GGB CDN 자동 로딩 방지).
   const [freshAiCommentId, setFreshAiCommentId] = useState<string | null>(null);
+  // Phase 47: 오너 댓글 제어 토글 (댓글 모드 헤더). 미설정 = true
+  const [commentsVisibleFlag, setCommentsVisibleFlag] = useState(true);
+  const [commentsWritableFlag, setCommentsWritableFlag] = useState(true);
 
   // ─── 로드 ───
   const refreshComments = useCallback(async () => {
@@ -220,6 +224,31 @@ export default function CommentPanel({
         .catch((e) => console.warn('댓글 세션 생성 실패:', e));
     }
   }, [loading, isCommentsMode, isOwner, commentSession, problemId, ownerUid, refreshSessions]);
+
+  // 댓글 모드 오너: 현재 댓글 제어 플래그 로드 (1회)
+  const flagsLoadedRef = useRef(false);
+  useEffect(() => {
+    if (flagsLoadedRef.current) return;
+    if (!isCommentsMode || !isOwner) return;
+    flagsLoadedRef.current = true;
+    getProblem(problemId).then((p) => {
+      setCommentsVisibleFlag(p?.commentsVisible !== false);
+      setCommentsWritableFlag(p?.commentsWritable !== false);
+    }).catch(() => {});
+  }, [isCommentsMode, isOwner, problemId]);
+
+  const toggleCommentsVisible = async () => {
+    const next = !commentsVisibleFlag;
+    setCommentsVisibleFlag(next);
+    try { await setCommentsVisible(problemId, next); }
+    catch (e) { setCommentsVisibleFlag(!next); console.error('댓글 보이기 토글 실패:', e); }
+  };
+  const toggleCommentsWritable = async () => {
+    const next = !commentsWritableFlag;
+    setCommentsWritableFlag(next);
+    try { await setCommentsWritable(problemId, next); }
+    catch (e) { setCommentsWritableFlag(!next); console.error('댓글 쓰기 토글 실패:', e); }
+  };
 
   // 초기 1회 자동 선택 — agent 모드만. 첫 normal 세션, 없으면 미선택('')
   const initialSelectionDoneRef = useRef(false);
@@ -709,6 +738,28 @@ export default function CommentPanel({
           {isCommentsMode ? '댓글' : 'agent'}
         </div>
         <div style={{ flex: 1 }} />
+        {/* Phase 47: 오너 댓글 제어 토글 (댓글 모드) */}
+        {isCommentsMode && isOwner && (() => {
+          const pillStyle = (on: boolean): React.CSSProperties => ({
+            border: '1px solid var(--border-light)', borderRadius: 4,
+            padding: '2px 7px', fontSize: 11, cursor: 'pointer',
+            fontFamily: 'var(--font-ui)',
+            background: on ? 'var(--bg-active, #E8E2D9)' : 'transparent',
+            color: on ? 'var(--text-primary)' : 'var(--text-muted)',
+          });
+          return (
+            <>
+              <button onClick={toggleCommentsVisible} style={pillStyle(commentsVisibleFlag)}
+                title="멤버에게 댓글 보이기/숨김">
+                {commentsVisibleFlag ? '보임' : '숨김'}
+              </button>
+              <button onClick={toggleCommentsWritable} style={pillStyle(commentsWritableFlag)}
+                title="멤버 댓글 쓰기 허용/잠금">
+                {commentsWritableFlag ? '쓰기 허용' : '쓰기 잠금'}
+              </button>
+            </>
+          );
+        })()}
         {isAISession && sessionCostUsd > 0 && (
           <span
             title="이 세션의 AI 응답 누적 비용"
