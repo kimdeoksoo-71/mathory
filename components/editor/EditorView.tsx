@@ -2600,7 +2600,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       {/* ═══ Row 3: Split View — 외부 래퍼(아이보리 백드롭, 토론 패널 자리 확보) ═══ */}
       <div style={{
         flex: 1, display: 'flex', minHeight: 0,
-        paddingRight: discussionOpen ? `calc(${panelWidth}px + 12px)` : 0, // 토론 패널 + 12px 여백
+        paddingRight: discussionOpen ? `calc(${panelWidth}px + 8px)` : 0, // 토론 패널 + 8px 여백
         transition: 'padding-right 0.2s',
       }}>
 
@@ -2804,7 +2804,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onPointerDown={handleResizeStart}
           style={{
             position: 'absolute', top: 0, bottom: 0,
-            right: `calc(${panelWidth}px + 7px)`, // U자 컨텐츠 우측 경계선(panelWidth+12) 위에 strip 걸침
+            right: `calc(${panelWidth}px + 3px)`, // U자 컨텐츠 우측 경계선(panelWidth+8) 위에 strip 걸침
             width: 10, zIndex: 100,
             cursor: 'col-resize',
             display: 'flex', justifyContent: 'center',

@@ -510,7 +510,7 @@ export default function ProblemView({
       <div style={{
         flexShrink: 0, background: 'var(--bg-functional)',
         minHeight: 98, // EditorView(제목 57 + 탭 41)와 가로 경계선 Y 일치
-        paddingRight: panelMode ? `calc(${panelWidth}px + 24px)` : 0,
+        paddingRight: panelMode ? `calc(${panelWidth}px + 8px)` : 0,
         transition: 'padding-right 0.18s ease',
         display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
       }}>
@@ -638,7 +638,7 @@ export default function ProblemView({
       {/* 외부 래퍼: 패널 자리 확보(아이보리 백드롭), 경계선 없음 — 패널과 컨텐츠가 절대 겹치지 않음 */}
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', minHeight: 0,
-        paddingRight: panelMode ? `calc(${panelWidth}px + 24px)` : 0,
+        paddingRight: panelMode ? `calc(${panelWidth}px + 8px)` : 0,
         transition: 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
@@ -989,7 +989,7 @@ export default function ProblemView({
           onPointerDown={handleResizeStart}
           style={{
             position: 'absolute', top: 0, bottom: 0,
-            right: `calc(${panelWidth}px + 19px)`, // U자 컨텐츠 우측 경계선(panelWidth+24) 위에 strip 걸침
+            right: `calc(${panelWidth}px + 3px)`, // U자 컨텐츠 우측 경계선(panelWidth+8) 위에 strip(10px) 걸침
             width: 10, zIndex: 100, cursor: 'col-resize',
             display: 'flex', justifyContent: 'center',
           }}
