@@ -8,7 +8,8 @@ import {
 } from '@dnd-kit/core';
 import { Problem, Block, Folder } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
-import { listAllComments } from '../../lib/comments';
+import { listAllComments, countComments, countAgentSessions } from '../../lib/comments';
+import { listSessions } from '../../lib/discussion-sessions';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -112,6 +113,7 @@ export default function FolderView({
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
   // 문항별 미해결 댓글 수
   const [commentCountsMap, setCommentCountsMap] = useState<Record<string, number>>({});
+  const [agentCountsMap, setAgentCountsMap] = useState<Record<string, number>>({});
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   // ⋮ 카드 메뉴
@@ -185,26 +187,33 @@ export default function FolderView({
     loadBlocks();
   }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 문항별 미해결 댓글 수 로드 (병렬, 실패는 0으로)
+  // Phase 47: 문항별 미해결 댓글 수 + agent 세션 수 로드 (병렬, 실패는 0으로)
   useEffect(() => {
-    if (folderProblems.length === 0) { setCommentCountsMap({}); return; }
+    if (folderProblems.length === 0) { setCommentCountsMap({}); setAgentCountsMap({}); return; }
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
         folderProblems.map(async (p) => {
           try {
-            const comments = await listAllComments(p.id);
-            const n = comments.filter((c) => !c.resolved).length;
-            return [p.id, n] as const;
+            const [comments, sessions] = await Promise.all([
+              listAllComments(p.id),
+              listSessions(p.id),
+            ]);
+            const commentSessionId = sessions.find((s) => s.type === 'comment')?.id ?? null;
+            const c = countComments(comments, commentSessionId, { unresolvedOnly: true });
+            const a = countAgentSessions(sessions);
+            return [p.id, c, a] as const;
           } catch {
-            return [p.id, 0] as const;
+            return [p.id, 0, 0] as const;
           }
         })
       );
       if (cancelled) return;
-      const map: Record<string, number> = {};
-      for (const [id, n] of entries) map[id] = n;
-      setCommentCountsMap(map);
+      const cMap: Record<string, number> = {};
+      const aMap: Record<string, number> = {};
+      for (const [id, c, a] of entries) { cMap[id] = c; aMap[id] = a; }
+      setCommentCountsMap(cMap);
+      setAgentCountsMap(aMap);
     })();
     return () => { cancelled = true; };
   }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -491,6 +500,20 @@ export default function FolderView({
                         }}
                       >
                         💬<span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
+                      </span>
+                    )}
+                    {(agentCountsMap[problem.id] ?? 0) > 0 && (
+                      <span
+                        title="AI agent 대화"
+                        style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 2,
+                          fontSize: 11, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-ui)', lineHeight: 1,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>
+                        <span style={{ marginLeft: 1 }}>{agentCountsMap[problem.id]}</span>
                       </span>
                     )}
                     <BlockchainBadge problem={problem} size={13} />
