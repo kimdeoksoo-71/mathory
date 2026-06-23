@@ -3,8 +3,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from 'firebase/auth';
-import { Problem, Folder } from '../../types/problem';
+import { Problem, Folder, UserProfile } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
+import ShareTree, { ShareGroup } from './ShareTree';
+import { ShareScope } from '../../lib/share-scope';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
   IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare,
@@ -651,6 +653,12 @@ export interface SidebarProps {
   unassignedCount: number;
   onSelectSharedWithMe: () => void;
   sharedCount: number;
+  // Phase 49: 공유 트리
+  receivedGroups: ShareGroup[];
+  sentGroups: ShareGroup[];
+  shareProfiles: Record<string, UserProfile>;
+  activeShareScopeKey: string | null;
+  onSelectShareScope: (scope: ShareScope) => void;
 }
 
 export default function Sidebar({
@@ -682,6 +690,11 @@ export default function Sidebar({
   unassignedCount,
   onSelectSharedWithMe,
   sharedCount,
+  receivedGroups,
+  sentGroups,
+  shareProfiles,
+  activeShareScopeKey,
+  onSelectShareScope,
 }: SidebarProps) {
   const router = useRouter();
   const [foldersOpen, setFoldersOpen] = useState(true);
@@ -966,35 +979,16 @@ export default function Sidebar({
             </button>
           )}
 
-          {/* 공유 받은 문항 (Stage 2) */}
+          {/* 공유 트리 (Phase 49) */}
           {!collapsed && foldersOpen && (
-            <button
-              onClick={onSelectSharedWithMe}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '8px 12px',
-                border: 'none', borderRadius: 8, cursor: 'pointer',
-                background: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
-                color: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontSize: 13.5,
-                fontWeight: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 700 : 500,
-                fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
-              }}
-              onMouseEnter={(e) => { if (activeFolderId !== SHARED_WITH_ME_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (activeFolderId !== SHARED_WITH_ME_FOLDER_ID) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === SHARED_WITH_ME_FOLDER_ID ? 1 : 0.75 }}>
-                <IconShare size={16} />
-              </span>
-              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                공유 받은 문항
-              </span>
-              {sharedCount > 0 && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)', borderRadius: 10, padding: '1px 7px' }}>
-                  {sharedCount}
-                </span>
-              )}
-            </button>
+            <ShareTree
+              receivedTotal={sharedCount}
+              receivedGroups={receivedGroups}
+              sentGroups={sentGroups}
+              profiles={shareProfiles}
+              activeScopeKey={activeShareScopeKey}
+              onSelectScope={onSelectShareScope}
+            />
           )}
 
           {/* 휴지통 (항상 맨 아래, 드래그 불가) */}

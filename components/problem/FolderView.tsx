@@ -68,6 +68,8 @@ interface FolderViewProps {
   onUpdated?: () => void;
   onSelectFolder?: (folder: Folder) => void;
   onMoveProblemToFolder?: (problem: Problem, folder: Folder) => void;
+  // Phase 49: problems prop을 folder_id 필터 없이 그대로 사용(공유 보낸 뷰 등)
+  passthrough?: boolean;
 }
 
 // ─── DnD 렌더프롭 래퍼 (문항 카드 드래그 / 하위 폴더 드롭) ───
@@ -108,6 +110,7 @@ function formatDateTime(d?: Date): string {
 
 export default function FolderView({
   folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder, onMoveProblemToFolder,
+  passthrough = false,
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
@@ -156,7 +159,7 @@ export default function FolderView({
 
   const folderProblems = problems
     .filter((p) => {
-      if (isSharedWithMe) return true; // problems prop이 이미 공유받은 문항만 들어옴
+      if (isSharedWithMe || passthrough) return true; // problems prop을 그대로 사용 (공유 받은/보낸 뷰)
       if (isTrash) return p.folder_id === TRASH_FOLDER_ID;
       if (isUnassigned) return !p.folder_id || p.folder_id === '';
       return p.folder_id === folder.id;

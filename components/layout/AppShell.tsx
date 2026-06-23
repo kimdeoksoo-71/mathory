@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { signInWithPopup, signOut } from 'firebase/auth';
 import { auth, googleProvider } from '../../lib/firebase';
 import useAuth from '../../hooks/useAuth';
-import { Problem, Folder } from '../../types/problem';
+import { Problem, Folder, UserProfile } from '../../types/problem';
 import { DIFFICULTIES } from '../../lib/constants';
 import {
   listProblems, listRecentProblems, listFolders,
@@ -16,8 +16,9 @@ import {
   TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID,
   getProblemSearchText,
 } from '../../lib/firestore';
-import { listSharedWithMe } from '../../lib/membership';
+import { listSharedWithMe, listSharedByMe } from '../../lib/membership';
 import { getUserProfile, needsNicknameSetup } from '../../lib/users';
+import { ShareScope, shareScopeKey } from '../../lib/share-scope';
 import NicknameSetupModal from '../user/NicknameSetupModal';
 import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
@@ -32,6 +33,7 @@ import EditorView from '../editor/EditorView';
 type ViewState =
   | { type: 'home' }
   | { type: 'folder'; folder: Folder }
+  | { type: 'share'; scope: ShareScope }
   | { type: 'problem'; problemId: string }
   | { type: 'editor'; problemId: string }
   | { type: 'new' };
@@ -83,6 +85,9 @@ export default function AppShell() {
   const [allProblems, setAllProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
   const [sharedProblems, setSharedProblems] = useState<Problem[]>([]);
+  // Phase 49: 내가 멤버 공유한 문항(보낸) + 공유 관련 사용자 프로필 캐시
+  const [sentProblems, setSentProblems] = useState<Problem[]>([]);
+  const [shareProfiles, setShareProfiles] = useState<Record<string, UserProfile>>({});
   // Phase 48: 닉네임 설정 진입 가드 (소프트 넛지 — 세션당 1회 자동, 닫기 가능)
   const [nicknameModal, setNicknameModal] = useState<{ uid: string; current?: string } | null>(null);
   const nicknameNudgedRef = useRef(false);
@@ -149,21 +154,28 @@ export default function AppShell() {
       setAllProblems([]);
       setRecentProblems([]);
       setSharedProblems([]);
+      setSentProblems([]);
+      setShareProfiles({});
       setFolders([]);
       setFolderCounts({});
       return;
     }
     try {
-      const [problems, recent, shared] = await Promise.all([
+      const [problems, recent, shared, sent] = await Promise.all([
         listProblems(user.uid),
         listRecentProblems(user.uid, 10),
         listSharedWithMe(user.uid).catch((err) => {
           console.error('공유받은 문항 로드 실패:', err);
           return [] as Problem[];
         }),
+        listSharedByMe(user.uid).catch((err) => {
+          console.error('공유보낸 문항 로드 실패:', err);
+          return [] as Problem[];
+        }),
       ]);
       setAllProblems(problems);
       setSharedProblems(shared);
+      setSentProblems(sent);
       // 최근 문항에서 휴지통 문항 제외
       setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
@@ -206,6 +218,49 @@ export default function AppShell() {
     })();
     return () => { cancelled = true; };
   }, [authLoading, user]);
+
+  // Phase 49: 공유 트리에 필요한 사용자 프로필 해석 (보낸 대상 + 받은 출처) — 캐시 재사용
+  useEffect(() => {
+    const uids = new Set<string>();
+    sharedProblems.forEach((p) => { if (p.authorUid) uids.add(p.authorUid); });
+    sentProblems.forEach((p) => (p.memberUids || []).forEach((u) => uids.add(u)));
+    const missing = [...uids].filter((u) => !shareProfiles[u]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const pairs = await Promise.all(
+        missing.map((u) => getUserProfile(u).then((p) => [u, p] as const).catch(() => [u, null] as const)),
+      );
+      if (cancelled) return;
+      setShareProfiles((cur) => {
+        const next = { ...cur };
+        for (const [u, p] of pairs) if (p) next[u] = p;
+        return next;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [sharedProblems, sentProblems, shareProfiles]);
+
+  // Phase 49: 사람별 그룹화 (받은 = authorUid 기준, 보낸 = recipient uid 기준)
+  const receivedByAuthor = useMemo(() => {
+    const m = new Map<string, Problem[]>();
+    for (const p of sharedProblems) {
+      const a = p.authorUid || '';
+      if (!a) continue;
+      (m.get(a) ?? m.set(a, []).get(a)!).push(p);
+    }
+    return m;
+  }, [sharedProblems]);
+
+  const sentByRecipient = useMemo(() => {
+    const m = new Map<string, Problem[]>();
+    for (const p of sentProblems) {
+      for (const u of p.memberUids || []) {
+        (m.get(u) ?? m.set(u, []).get(u)!).push(p);
+      }
+    }
+    return m;
+  }, [sentProblems]);
 
   const handleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); }
@@ -263,7 +318,11 @@ export default function AppShell() {
     setView({ type: 'folder', folder: { id: TRASH_FOLDER_ID, name: '휴지통', user_id: '', order: 99999 } });
   };
   const handleSelectSharedWithMe = () => {
-    setView({ type: 'folder', folder: { id: SHARED_WITH_ME_FOLDER_ID, name: '공유 받은 문항', user_id: '', order: 99997 } });
+    setView({ type: 'share', scope: { kind: 'received-all' } });
+  };
+  const handleSelectShareScope = (scope: ShareScope) => {
+    setView({ type: 'share', scope });
+    setCollapsed(false);
   };
   const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); setCollapsed(true); };
   const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
@@ -523,6 +582,19 @@ export default function AppShell() {
   }, [view]);
 
   const activeFolderId = view.type === 'folder' ? view.folder.id : null;
+  const activeShareScopeKey = view.type === 'share' ? shareScopeKey(view.scope) : null;
+  const receivedGroups = useMemo(() => {
+    const arr = [...receivedByAuthor.entries()].map(([uid, ps]) => ({ uid, count: ps.length }));
+    arr.sort((a, b) => (shareProfiles[a.uid]?.nickname || shareProfiles[a.uid]?.displayName || '')
+      .localeCompare(shareProfiles[b.uid]?.nickname || shareProfiles[b.uid]?.displayName || ''));
+    return arr;
+  }, [receivedByAuthor, shareProfiles]);
+  const sentGroups = useMemo(() => {
+    const arr = [...sentByRecipient.entries()].map(([uid, ps]) => ({ uid, count: ps.length }));
+    arr.sort((a, b) => (shareProfiles[a.uid]?.nickname || shareProfiles[a.uid]?.displayName || '')
+      .localeCompare(shareProfiles[b.uid]?.nickname || shareProfiles[b.uid]?.displayName || ''));
+    return arr;
+  }, [sentByRecipient, shareProfiles]);
   const isEditorMode = view.type === 'editor';
   const isProblemMode = view.type === 'problem';
 
@@ -557,12 +629,17 @@ export default function AppShell() {
         unassignedCount={folderCounts[UNASSIGNED_FOLDER_ID] ?? 0}
         onSelectSharedWithMe={handleSelectSharedWithMe}
         sharedCount={folderCounts[SHARED_WITH_ME_FOLDER_ID] ?? 0}
+        receivedGroups={receivedGroups}
+        sentGroups={sentGroups}
+        shareProfiles={shareProfiles}
+        activeShareScopeKey={activeShareScopeKey}
+        onSelectShareScope={handleSelectShareScope}
       />
 
       <main style={{
         flex: 1,
         position: 'relative',
-        overflow: isEditorMode || isProblemMode || view.type === 'folder' ? 'hidden' : 'auto',
+        overflow: isEditorMode || isProblemMode || view.type === 'folder' || view.type === 'share' ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -602,6 +679,42 @@ export default function AppShell() {
             onSelectFolder={handleSelectFolder}
             onMoveProblemToFolder={handleMoveProblemToFolder} />
         )}
+        {view.type === 'share' && (() => {
+          const scope = view.scope;
+          const labelFor = (uid: string) => {
+            const p = shareProfiles[uid];
+            return p?.nickname || p?.displayName || '사용자';
+          };
+          if (scope.kind === 'sent-web') {
+            return (
+              <div style={{ padding: 40, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14, lineHeight: 1.7 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>웹 전체공개</h2>
+                웹 링크 공유 관리는 Phase 50에서 제공됩니다.<br />
+                현재는 문항 편집 화면의 공유 패널에서 링크를 생성/해제할 수 있습니다.
+              </div>
+            );
+          }
+          const isReceived = scope.kind === 'received-all' || scope.kind === 'received-by';
+          const scopedProblems = scope.kind === 'received-all' ? sharedProblems
+            : scope.kind === 'received-by' ? (receivedByAuthor.get(scope.uid) ?? [])
+            : (sentByRecipient.get(scope.uid) ?? []);
+          const name = scope.kind === 'received-all' ? '공유 받은 문항'
+            : scope.kind === 'received-by' ? `${labelFor(scope.uid)}님이 공유한 문항`
+            : `${labelFor(scope.uid)}님에게 공유한 문항`;
+          const folderId = isReceived ? SHARED_WITH_ME_FOLDER_ID : '__sent__';
+          return (
+            <FolderView
+              key={shareScopeKey(scope)}
+              folder={{ id: folderId, name, user_id: '', order: 99996 }}
+              problems={scopedProblems}
+              folders={folders}
+              passthrough={!isReceived}
+              onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
+              onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
+              onSelectFolder={handleSelectFolder}
+              onMoveProblemToFolder={handleMoveProblemToFolder} />
+          );
+        })()}
         {view.type === 'problem' && (
           <ProblemView
             key={`${view.problemId}:${problemViewNonce}`}
