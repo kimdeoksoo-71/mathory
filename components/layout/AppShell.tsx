@@ -702,6 +702,9 @@ export default function AppShell() {
             : scope.kind === 'received-by' ? `${labelFor(scope.uid)}님이 공유한 문항`
             : `${labelFor(scope.uid)}님에게 공유한 문항`;
           const folderId = isReceived ? SHARED_WITH_ME_FOLDER_ID : '__sent__';
+          const listContext = scope.kind === 'sent-by'
+            ? { mode: 'sent' as const, recipientUid: scope.uid, profiles: shareProfiles }
+            : { mode: 'received' as const, profiles: shareProfiles };
           return (
             <FolderView
               key={shareScopeKey(scope)}
@@ -709,6 +712,7 @@ export default function AppShell() {
               problems={scopedProblems}
               folders={folders}
               passthrough={!isReceived}
+              listContext={listContext}
               onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
               onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
               onSelectFolder={handleSelectFolder}

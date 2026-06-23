@@ -6,10 +6,10 @@ import {
   useDraggable, useDroppable, closestCenter,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
-import { Problem, Block, Folder } from '../../types/problem';
+import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
-import { listAllComments, countComments, countAgentSessions } from '../../lib/comments';
-import { listSessions } from '../../lib/discussion-sessions';
+import { useCommentCounts } from '../../hooks/useCommentCounts';
+import ListView, { ListMode } from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -70,6 +70,8 @@ interface FolderViewProps {
   onMoveProblemToFolder?: (problem: Problem, folder: Folder) => void;
   // Phase 49: problems prop을 folder_id 필터 없이 그대로 사용(공유 보낸 뷰 등)
   passthrough?: boolean;
+  // Phase 49: 공유 뷰 리스트 컨텍스트 (받은=소유자 컬럼, 보낸=권한/공유중단)
+  listContext?: { mode: ListMode; recipientUid?: string; profiles?: Record<string, UserProfile> };
 }
 
 // ─── DnD 렌더프롭 래퍼 (문항 카드 드래그 / 하위 폴더 드롭) ───
@@ -110,17 +112,30 @@ function formatDateTime(d?: Date): string {
 
 export default function FolderView({
   folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder, onMoveProblemToFolder,
-  passthrough = false,
+  passthrough = false, listContext,
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [questionBlocksMap, setQuestionBlocksMap] = useState<Record<string, Block[]>>({});
-  // 문항별 미해결 댓글 수
-  const [commentCountsMap, setCommentCountsMap] = useState<Record<string, number>>({});
-  const [agentCountsMap, setAgentCountsMap] = useState<Record<string, number>>({});
   const [blocksLoading, setBlocksLoading] = useState(false);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   // ⋮ 카드 메뉴
   const [cardMenu, setCardMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
+
+  // Phase 49: 카드/리스트 보기 — 공유 뷰는 리스트 기본, 그 외 카드 기본. localStorage 영속.
+  const VIEWMODE_KEY = `mathory.viewMode.${folder.id}`;
+  const [viewMode, setViewMode] = useState<'card' | 'list'>(listContext ? 'list' : 'card');
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(VIEWMODE_KEY);
+      if (stored === 'card' || stored === 'list') setViewMode(stored);
+      else setViewMode(listContext ? 'list' : 'card');
+    } catch { setViewMode(listContext ? 'list' : 'card'); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [folder.id]);
+  const changeViewMode = (m: 'card' | 'list') => {
+    setViewMode(m);
+    try { localStorage.setItem(VIEWMODE_KEY, m); } catch {}
+  };
 
   // Phase 40: 문항 → 하위 폴더 드래그
   const [draggingProblem, setDraggingProblem] = useState<Problem | null>(null);
@@ -137,6 +152,9 @@ export default function FolderView({
   const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
   const isSharedWithMe = folder.id === SHARED_WITH_ME_FOLDER_ID;
   const isSpecial = isTrash || isUnassigned || isSharedWithMe;
+  // 휴지통/미지정은 리스트 보기 비허용(전용 메뉴가 달라서) → 카드 고정
+  const listAllowed = !isTrash && !isUnassigned;
+  const effectiveViewMode: 'card' | 'list' = listAllowed ? viewMode : 'card';
 
   // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
@@ -175,6 +193,7 @@ export default function FolderView({
   }, []);
 
   useEffect(() => {
+    if (effectiveViewMode !== 'card') { setBlocksLoading(false); return; } // 리스트 모드는 카드 프리뷰 불필요
     if (folderProblems.length === 0) { setBlocksLoading(false); return; }
     setBlocksLoading(true);
     const loadBlocks = async () => {
@@ -188,38 +207,10 @@ export default function FolderView({
       setBlocksLoading(false);
     };
     loadBlocks();
-  }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [folder.id, problems.length, effectiveViewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Phase 47: 문항별 미해결 댓글 수 + agent 세션 수 로드 (병렬, 실패는 0으로)
-  useEffect(() => {
-    if (folderProblems.length === 0) { setCommentCountsMap({}); setAgentCountsMap({}); return; }
-    let cancelled = false;
-    (async () => {
-      const entries = await Promise.all(
-        folderProblems.map(async (p) => {
-          try {
-            const [comments, sessions] = await Promise.all([
-              listAllComments(p.id),
-              listSessions(p.id),
-            ]);
-            const commentSessionId = sessions.find((s) => s.type === 'comment')?.id ?? null;
-            const c = countComments(comments, commentSessionId, { unresolvedOnly: true });
-            const a = countAgentSessions(sessions);
-            return [p.id, c, a] as const;
-          } catch {
-            return [p.id, 0, 0] as const;
-          }
-        })
-      );
-      if (cancelled) return;
-      const cMap: Record<string, number> = {};
-      const aMap: Record<string, number> = {};
-      for (const [id, c, a] of entries) { cMap[id] = c; aMap[id] = a; }
-      setCommentCountsMap(cMap);
-      setAgentCountsMap(aMap);
-    })();
-    return () => { cancelled = true; };
-  }, [folder.id, problems.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Phase 49: 미해결 댓글 수 + agent 세션 수 (ListView와 공유하는 훅)
+  const { commentCounts: commentCountsMap, agentCounts: agentCountsMap } = useCommentCounts(folderProblems, folder.id);
 
   /** 카드 ⋮ 메뉴 열기 — 버튼 위치 기준 */
   const openCardMenu = (e: React.MouseEvent<HTMLButtonElement>, problem: Problem) => {
@@ -359,7 +350,8 @@ export default function FolderView({
             ({folderProblems.length})
           </span>
           <div style={{ flex: 1 }} />
-          <SortControls sort={sort} onChange={updateSort} />
+          {listAllowed && <ViewModeToggle mode={effectiveViewMode} onChange={changeViewMode} />}
+          {effectiveViewMode === 'card' && <SortControls sort={sort} onChange={updateSort} />}
           {isTrash && folderProblems.length > 0 && onEmptyTrash && (
             <button onClick={onEmptyTrash} style={{
               border: 'none', background: 'none',
@@ -432,14 +424,28 @@ export default function FolderView({
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
         )}
-        {!blocksLoading && folderProblems.length === 0 && childFolders.length === 0 && (
+        {effectiveViewMode === 'card' && !blocksLoading && folderProblems.length === 0 && childFolders.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
             {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
           </div>
         )}
 
+        {/* ═══ 리스트 보기 (Phase 49) ═══ */}
+        {effectiveViewMode === 'list' && (
+          <ListView
+            problems={folderProblems}
+            scopeKey={folder.id}
+            mode={listContext?.mode ?? 'my'}
+            recipientUid={listContext?.recipientUid}
+            profiles={listContext?.profiles}
+            onView={onView}
+            onProblemAction={onProblemAction}
+            onChanged={() => onUpdated?.()}
+          />
+        )}
+
         {/* ═══ 카드 그리드 — 카드 폭 고정(35em), 브라우저 폭에 따라 1~2열 자동 ═══ */}
-        {!blocksLoading && folderProblems.length > 0 && (
+        {effectiveViewMode === 'card' && !blocksLoading && folderProblems.length > 0 && (
           <div style={{
             display: 'grid',
             // 카드 폭 고정 px → 컬럼 수가 글꼴 크기와 무관하게 '폭'에만 의존 (35em@15 ≈ 525 기준 520)
@@ -590,6 +596,22 @@ export default function FolderView({
       ) : null}
     </DragOverlay>
     </DndContext>
+  );
+}
+
+/* ═══ 카드/리스트 토글 (Phase 49) ═══ */
+function ViewModeToggle({ mode, onChange }: { mode: 'card' | 'list'; onChange: (m: 'card' | 'list') => void }) {
+  const btn = (active: boolean): React.CSSProperties => ({
+    border: 'none', cursor: 'pointer', fontSize: 12, padding: '3px 8px', borderRadius: 6,
+    fontFamily: 'var(--font-ui)', fontWeight: active ? 600 : 400,
+    background: active ? 'var(--bg-active)' : 'transparent',
+    color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+  });
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 6 }}>
+      <button onClick={() => onChange('card')} style={btn(mode === 'card')} title="카드 보기">카드</button>
+      <button onClick={() => onChange('list')} style={btn(mode === 'list')} title="리스트 보기">리스트</button>
+    </div>
   );
 }
 
