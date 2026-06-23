@@ -19,6 +19,7 @@ import {
 import { listSharedWithMe } from '../../lib/membership';
 import { getUserProfile, needsNicknameSetup } from '../../lib/users';
 import NicknameSetupModal from '../user/NicknameSetupModal';
+import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
@@ -85,6 +86,8 @@ export default function AppShell() {
   // Phase 48: 닉네임 설정 진입 가드 (소프트 넛지 — 세션당 1회 자동, 닫기 가능)
   const [nicknameModal, setNicknameModal] = useState<{ uid: string; current?: string } | null>(null);
   const nicknameNudgedRef = useRef(false);
+  // Phase 49: 공유 대상 관리 모달
+  const [shareModalProblem, setShareModalProblem] = useState<Problem | null>(null);
   // 검색 인덱스: problemId → 본문 텍스트(소문자). 첫 검색 시 lazy 로드.
   const [searchTextIndex, setSearchTextIndex] = useState<Record<string, string>>({});
   const [searchIndexLoading, setSearchIndexLoading] = useState(false);
@@ -449,6 +452,10 @@ export default function AppShell() {
         }
         break;
       }
+      case 'share': {
+        setShareModalProblem(problem);
+        break;
+      }
       case 'move': {
         const folderOptions = folders.map((f) => `${f.name}`).join(', ');
         const target = prompt(`이동할 폴더 이름 (${folderOptions}):`);
@@ -634,6 +641,14 @@ export default function AppShell() {
           currentNickname={nicknameModal.current}
           onClose={() => setNicknameModal(null)}
           onSaved={() => setNicknameModal(null)}
+        />
+      )}
+
+      {shareModalProblem && (
+        <ShareTargetModal
+          problem={shareModalProblem}
+          onClose={() => setShareModalProblem(null)}
+          onChanged={() => loadData()}
         />
       )}
     </div>

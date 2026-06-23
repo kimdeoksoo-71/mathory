@@ -234,6 +234,7 @@ export default function FolderView({
       { label: '공유 받기 해제', icon: <IconShare size={14} />, action: 'leave_shared', danger: true },
     ];
     return [
+      { label: '공유', icon: <IconShare size={14} />, action: 'share' },
       { label: '사본 만들기', icon: <IconCopy size={14} />, action: 'duplicate' },
       { label: '휴지통', icon: <IconTrash size={14} />, action: 'trash', danger: true },
     ];
