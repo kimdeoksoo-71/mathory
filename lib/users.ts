@@ -111,16 +111,21 @@ export async function updateNickname(uid: string, raw: string): Promise<void> {
     const newResRef = doc(db, 'nicknames', lower);
 
     // 트랜잭션: 모든 read를 write보다 먼저 수행
+    const userSnap = await tx.get(userRef);
+    const oldLower: string | undefined = userSnap.data()?.nickname_lower;
+    const oldResRef = oldLower && oldLower !== lower ? doc(db, 'nicknames', oldLower) : null;
+
     const newResSnap = await tx.get(newResRef);
+    // 옛 예약은 '실제로 존재하고 내 것일 때만' 삭제 — 존재하지 않는 문서(예: 기본값 'kds')를
+    // delete 하면 규칙이 resource(null)를 평가하다 권한 거부로 트랜잭션이 통째로 실패한다.
+    const oldResSnap = oldResRef ? await tx.get(oldResRef) : null;
+
     if (newResSnap.exists() && newResSnap.data().uid !== uid) {
       throw new Error('이미 사용 중인 닉네임입니다.');
     }
 
-    const userSnap = await tx.get(userRef);
-    const oldLower: string | undefined = userSnap.data()?.nickname_lower;
-
-    if (oldLower && oldLower !== lower) {
-      tx.delete(doc(db, 'nicknames', oldLower)); // 옛 예약 해제
+    if (oldResRef && oldResSnap?.exists() && oldResSnap.data().uid === uid) {
+      tx.delete(oldResRef); // 옛 예약 해제
     }
     tx.set(newResRef, { uid });
     tx.update(userRef, { nickname, nickname_lower: lower });
