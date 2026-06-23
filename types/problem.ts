@@ -67,6 +67,8 @@ export interface UserProfile {
   createdAt: Date;
   // Phase 37: 토론용 닉네임. 기본값 'KDS'. AI 예약 닉네임(ai_models.nickname 전체) 사용 불가 — updateNickname()에서 검증
   nickname?: string;
+  // Phase 48: 검색·전역 유일성 정규화 키 (= nickname.trim().toLowerCase())
+  nickname_lower?: string;
 }
 
 // ═══ Phase 37: AI 토론 ═══

@@ -58,6 +58,49 @@ export async function lookupUserByEmail(email: string): Promise<UserProfile | nu
   };
 }
 
+/**
+ * 이메일 또는 닉네임 prefix 통합 검색 (dedupe by uid, 최대 SEARCH_LIMIT건). Phase 48.
+ * 전제: 저장 이메일은 소문자(구글 로그인 기준). 대문자 섞인 이메일은 누락될 수 있음.
+ */
+export async function searchUsers(queryStr: string): Promise<UserProfile[]> {
+  const q = queryStr.trim().toLowerCase();
+  if (q.length < 2) return [];
+
+  const byEmail = query(
+    collection(db, 'users'),
+    where('email', '>=', q),
+    where('email', '<', q + '\uf8ff'),
+    orderBy('email'),
+    limit(SEARCH_LIMIT),
+  );
+  const byNick = query(
+    collection(db, 'users'),
+    where('nickname_lower', '>=', q),
+    where('nickname_lower', '<', q + '\uf8ff'),
+    orderBy('nickname_lower'),
+    limit(SEARCH_LIMIT),
+  );
+
+  const [es, ns] = await Promise.all([getDocs(byEmail), getDocs(byNick)]);
+  const map = new Map<string, UserProfile>();
+  // email 매칭을 먼저 채우고 nick 매칭을 뒤에 병합 후 SEARCH_LIMIT으로 자른다.
+  for (const d of [...es.docs, ...ns.docs]) {
+    if (map.has(d.id)) continue;
+    const x = d.data();
+    map.set(d.id, {
+      uid: d.id,
+      displayName: x.displayName || '',
+      email: x.email || '',
+      photoURL: x.photoURL || '',
+      createdAt: (x.createdAt as Timestamp)?.toDate() || new Date(),
+      nickname: typeof x.nickname === 'string' ? x.nickname : undefined,
+      nickname_lower: typeof x.nickname_lower === 'string' ? x.nickname_lower : undefined,
+    });
+  }
+  return [...map.values()].slice(0, SEARCH_LIMIT);
+}
+
+
 // ═══════════════════════════════════════════════════════
 // 멤버 관리 (problems 문서의 members 맵 + memberUids 배열 동기 유지)
 // ═══════════════════════════════════════════════════════
@@ -152,6 +195,30 @@ export async function listSharedWithMe(uid: string): Promise<Problem[]> {
   list.sort((a, b) => (b.updated_at?.getTime() || 0) - (a.updated_at?.getTime() || 0));
   return list;
 }
+
+/**
+ * 내가 멤버 공유한 문항 (보낸·개인). authorUid==me 중 멤버가 1명 이상.
+ * Phase 48 (Phase 49 공유 트리에서 사용). 정렬은 클라이언트(array 필드라 복합 인덱스 회피).
+ */
+export async function listSharedByMe(uid: string): Promise<Problem[]> {
+  const snap = await getDocs(query(
+    collection(db, 'problems'),
+    where('authorUid', '==', uid),
+  ));
+  const list = snap.docs.map((d) => {
+    const data = d.data();
+    return {
+      id: d.id,
+      ...data,
+      created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
+      updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
+    } as Problem;
+  });
+  return list
+    .filter((p) => (p.memberUids?.length ?? 0) > 0)
+    .sort((a, b) => (b.updated_at?.getTime() || 0) - (a.updated_at?.getTime() || 0));
+}
+
 
 // ═══════════════════════════════════════════════════════
 // 권한 헬퍼 (UI에서 분기용)

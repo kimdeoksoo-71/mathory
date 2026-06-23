@@ -21,6 +21,18 @@ service cloud.firestore {
       }
     }
 
+    // ===== nicknames 컬렉션 (Phase 48: 닉네임 전역 유일성 예약) =====
+    // 문서 ID = nickname_lower, { uid }. updateNickname() 트랜잭션이 교체(delete+create).
+    match /nicknames/{nick} {
+      allow read: if request.auth != null;                  // 중복확인·검색 (users read와 동일 정책)
+      allow create: if request.auth != null
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['uid']);
+      allow delete: if request.auth != null
+        && resource.data.uid == request.auth.uid;
+      allow update: if false;                                // 교체 = delete + create
+    }
+
     // ===== problems 컬렉션 =====
     match /problems/{problemId} {
 

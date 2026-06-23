@@ -17,6 +17,8 @@ import {
   getProblemSearchText,
 } from '../../lib/firestore';
 import { listSharedWithMe } from '../../lib/membership';
+import { getUserProfile, needsNicknameSetup } from '../../lib/users';
+import NicknameSetupModal from '../user/NicknameSetupModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
@@ -80,6 +82,9 @@ export default function AppShell() {
   const [allProblems, setAllProblems] = useState<Problem[]>([]);
   const [recentProblems, setRecentProblems] = useState<Problem[]>([]);
   const [sharedProblems, setSharedProblems] = useState<Problem[]>([]);
+  // Phase 48: 닉네임 설정 진입 가드 (소프트 넛지 — 세션당 1회 자동, 닫기 가능)
+  const [nicknameModal, setNicknameModal] = useState<{ uid: string; current?: string } | null>(null);
+  const nicknameNudgedRef = useRef(false);
   // 검색 인덱스: problemId → 본문 텍스트(소문자). 첫 검색 시 lazy 로드.
   const [searchTextIndex, setSearchTextIndex] = useState<Record<string, string>>({});
   const [searchIndexLoading, setSearchIndexLoading] = useState(false);
@@ -179,6 +184,25 @@ export default function AppShell() {
   useEffect(() => {
     if (!authLoading) loadData();
   }, [authLoading, loadData]);
+
+  // Phase 48: 로그인 후 닉네임 설정 가드 — 세션당 1회만 자동 노출
+  useEffect(() => {
+    if (authLoading || !user || nicknameNudgedRef.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const profile = await getUserProfile(user.uid);
+        if (cancelled || nicknameNudgedRef.current) return;
+        if (needsNicknameSetup(profile)) {
+          nicknameNudgedRef.current = true;
+          setNicknameModal({ uid: user.uid, current: profile?.nickname });
+        }
+      } catch (err) {
+        console.error('닉네임 프로필 확인 실패:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authLoading, user]);
 
   const handleLogin = async () => {
     try { await signInWithPopup(auth, googleProvider); }
@@ -601,6 +625,15 @@ export default function AppShell() {
           onRequestIndex={buildSearchIndex}
           onClose={() => setShowSearch(false)}
           onSelect={handleViewProblem}
+        />
+      )}
+
+      {nicknameModal && (
+        <NicknameSetupModal
+          uid={nicknameModal.uid}
+          currentNickname={nicknameModal.current}
+          onClose={() => setNicknameModal(null)}
+          onSaved={() => setNicknameModal(null)}
         />
       )}
     </div>
