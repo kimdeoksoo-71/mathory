@@ -37,23 +37,33 @@ export default function ShareTree({
   };
 
   return (
-    <div style={{ marginTop: 4 }}>
-      {/* 공유 카테고리 헤더 */}
-      <button
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-          padding: '8px 12px', border: 'none', borderRadius: 8, cursor: 'pointer',
-          background: 'transparent', color: 'var(--text-secondary)',
-          fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
-          fontFamily: 'var(--font-ui)',
-        }}
-      >
-        <span style={{ flexShrink: 0, display: 'flex', transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .15s' }}>
+    <div>
+      {/* 공유 카테고리 헤더 — My 헤더와 동일 스타일(동렬 최상위) */}
+      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          style={{
+            flex: 1, display: 'flex', alignItems: 'center',
+            border: 'none', background: 'none', cursor: 'pointer',
+            fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)',
+            letterSpacing: 0.3, fontFamily: 'var(--font-ui)', padding: '4px 0',
+            textAlign: 'left',
+          }}
+        >
+          공유
+        </button>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          title={open ? '접기' : '펼치기'}
+          style={{
+            border: 'none', background: 'none', cursor: 'pointer', display: 'flex',
+            color: 'var(--text-muted)', padding: 2,
+            transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s',
+          }}
+        >
           <IconChevron size={12} />
-        </span>
-        <span style={{ flex: 1, textAlign: 'left' }}>공유</span>
-      </button>
+        </button>
+      </div>
 
       {open && (
         <div>

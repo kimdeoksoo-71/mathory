@@ -979,18 +979,6 @@ export default function Sidebar({
             </button>
           )}
 
-          {/* 공유 트리 (Phase 49) */}
-          {!collapsed && foldersOpen && (
-            <ShareTree
-              receivedTotal={sharedCount}
-              receivedGroups={receivedGroups}
-              sentGroups={sentGroups}
-              profiles={shareProfiles}
-              activeScopeKey={activeShareScopeKey}
-              onSelectScope={onSelectShareScope}
-            />
-          )}
-
           {/* 휴지통 (항상 맨 아래, 드래그 불가) */}
           {!collapsed && foldersOpen && (
             <button
@@ -1040,6 +1028,20 @@ export default function Sidebar({
             </button>
           )}
         </div>
+
+        {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
+        {!collapsed && (
+          <div style={{ padding: '0 12px' }}>
+            <ShareTree
+              receivedTotal={sharedCount}
+              receivedGroups={receivedGroups}
+              sentGroups={sentGroups}
+              profiles={shareProfiles}
+              activeScopeKey={activeShareScopeKey}
+              onSelectScope={onSelectShareScope}
+            />
+          </div>
+        )}
 
         {/* ═══ Section 3: Recent Problems ═══ */}
         <div style={{ flex: 1, padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
