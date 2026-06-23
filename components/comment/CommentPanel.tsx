@@ -19,6 +19,7 @@ import {
 import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
+import { AIBrandIcon } from './AIBrandIcon';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 
@@ -57,6 +58,7 @@ interface CommentPanelProps {
 interface DisplayInfo {
   name: string;
   emoji?: string;
+  provider?: string;
   photoURL?: string;
   isAI: boolean;
   modelDisplayName?: string;
@@ -66,6 +68,7 @@ interface PendingAI {
   modelId: string;
   nickname: string;
   emoji: string;
+  provider?: string;
   /** 이 호출이 시작된 세션 ID — 다른 세션으로 전환해도 알림은 원래 세션에서만 보여야 함 */
   sessionId: string;
   error?: string;
@@ -327,6 +330,7 @@ export default function CommentPanel({
         return {
           name: model?.nickname || '?',
           emoji: model?.avatarEmoji,
+          provider: model?.provider,
           isAI: true,
           modelDisplayName: model?.displayName,
         };
@@ -635,6 +639,7 @@ export default function CommentPanel({
         modelId: m.modelId,
         nickname: m.nickname,
         emoji: m.avatarEmoji,
+        provider: m.provider,
         sessionId: sessionAtSend,
       })),
     ]);
@@ -655,7 +660,7 @@ export default function CommentPanel({
     setPendingAI((prev) =>
       prev.map((p) =>
         p.modelId === modelId && p.sessionId === sessionId
-          ? { modelId: p.modelId, nickname: p.nickname, emoji: p.emoji, sessionId: p.sessionId }
+          ? { modelId: p.modelId, nickname: p.nickname, emoji: p.emoji, provider: p.provider, sessionId: p.sessionId }
           : p,
       ),
     );
@@ -1205,7 +1210,7 @@ function AIChipBar({
               transition: 'all 0.12s',
             }}
           >
-            <span style={{ fontSize: 13 }}>{m.avatarEmoji}</span>
+            <AIBrandIcon provider={m.provider} size={14} fallbackEmoji={m.avatarEmoji} />
             <span>{m.nickname}</span>
           </button>
         );
@@ -1237,7 +1242,7 @@ function PendingAIBubble({
         fontSize: 12, color: pending.error ? '#c44' : 'var(--text-muted)',
       }}
     >
-      <span style={{ fontSize: 16 }}>{pending.emoji}</span>
+      <AIBrandIcon provider={pending.provider} size={16} fallbackEmoji={pending.emoji} />
       <span style={{ fontWeight: 600 }}>{pending.nickname}</span>
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {pending.error ? `응답 실패: ${pending.error}` : '생각 중…'}
@@ -1448,12 +1453,11 @@ function CommentItem({
             title={info.modelDisplayName}
             style={{
               width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-              background: 'rgba(184,132,92,0.18)',
+              background: 'transparent',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11,
             }}
           >
-            {info.emoji || '🤖'}
+            <AIBrandIcon provider={info.provider} size={16} fallbackEmoji={info.emoji} />
           </div>
         ) : info.photoURL ? (
           // eslint-disable-next-line @next/next/no-img-element
