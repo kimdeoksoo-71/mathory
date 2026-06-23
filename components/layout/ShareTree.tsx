@@ -70,7 +70,7 @@ export default function ShareTree({
           {/* ── 받은 ── */}
           <ParentRow
             label="공유 받은 문항"
-            icon={<IconShare size={15} />}
+            icon={<span style={{ display: 'flex', transform: 'scaleX(-1)' }}><IconShare size={15} /></span>}
             count={receivedTotal}
             active={activeScopeKey === 'received-all'}
             expandable={receivedGroups.length > 0}
@@ -103,7 +103,7 @@ export default function ShareTree({
           {sentOpen && (
             <>
               <SubRow
-                label="웹 전체공개"
+                label="웹에 공개"
                 active={activeScopeKey === 'sent-web'}
                 onClick={() => onSelectScope({ kind: 'sent-web' })}
               />
@@ -120,7 +120,7 @@ export default function ShareTree({
                 />
               ))}
               {sentGroups.length === 0 && (
-                <div style={{ padding: '4px 12px 4px 46px', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <div style={{ padding: '4px 12px 4px 58px', fontSize: 11.5, color: 'var(--text-muted)' }}>
                   공유한 문항이 없습니다
                 </div>
               )}
@@ -206,7 +206,7 @@ function PersonRow({
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-        padding: `5px 12px 5px ${indent === 2 ? 46 : 34}px`, border: 'none', borderRadius: 8,
+        padding: `5px 12px 5px ${indent === 2 ? 58 : 34}px`, border: 'none', borderRadius: 8,
         cursor: 'pointer', background: rowBg(active),
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         fontSize: 12.5, fontWeight: active ? 700 : 500, fontFamily: 'var(--font-ui)',

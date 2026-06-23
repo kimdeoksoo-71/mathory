@@ -688,7 +688,7 @@ export default function AppShell() {
           if (scope.kind === 'sent-web') {
             return (
               <div style={{ padding: 40, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14, lineHeight: 1.7 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>웹 전체공개</h2>
+                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>웹에 공개</h2>
                 웹 링크 공유 관리는 Phase 50에서 제공됩니다.<br />
                 현재는 문항 편집 화면의 공유 패널에서 링크를 생성/해제할 수 있습니다.
               </div>
