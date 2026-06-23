@@ -66,6 +66,13 @@ export function normalizeDisplayMathSpacing(text: string): string {
       content = content.replace(/\s+$/, '');
       if (content.length > 0) content = content + '\n\n';
     }
+    // 두 수식이 연달아 있고 사이 텍스트가 공백뿐이면 빈 줄 1개로 분리 보존
+    // (보존하지 않으면 $$$$ 직결로 마크다운 파서가 깨짐)
+    if (prev?.type === 'math' && next?.type === 'math' && content.length === 0) {
+      content = '\n\n';
+    }
+    // 2개 이상의 연속된 빈 줄(= \n 3개 이상)을 빈 줄 1개로 통합
+    content = content.replace(/\n{3,}/g, '\n\n');
     out.push(content);
   }
   return out.join('');
