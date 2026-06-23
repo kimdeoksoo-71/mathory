@@ -731,6 +731,7 @@ export default function AppShell() {
             onTrash={(p) => handleProblemAction('trash', p)}
             onUpdated={() => loadData()}
             onNavigateFolder={handleNavigateFolder}
+            onManageShare={(p) => setShareModalProblem(p)}
           />
         )}
         {view.type === 'editor' && (

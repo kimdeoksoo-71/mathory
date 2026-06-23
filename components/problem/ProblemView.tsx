@@ -15,7 +15,7 @@ import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
-import SharePanel from '../editor/SharePanel';
+import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
 import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
@@ -42,6 +42,8 @@ interface ProblemViewProps {
   onTrash?: (problem: ProblemWithBlocks) => void;
   onUpdated?: () => void;
   onNavigateFolder?: (folderId: string) => void;
+  // Phase 49: 공유 대상 관리 모달 열기 (AppShell의 ShareTargetModal)
+  onManageShare?: (problem: ProblemWithBlocks) => void;
 }
 
 function formatDate(d?: Date): string {
@@ -98,7 +100,7 @@ function CompactRow({ label, children }: { label: string; children: React.ReactN
 }
 
 export default function ProblemView({
-  problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated, onNavigateFolder,
+  problemId, folders, onRename, onEdit, onDuplicate, onTrash, onUpdated, onNavigateFolder, onManageShare,
 }: ProblemViewProps) {
   const { user } = useAuth();
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
@@ -829,10 +831,10 @@ export default function ProblemView({
                 </button>
                 {isShare && isExpanded && user && (
                   <div style={{ padding: '6px 10px 10px' }}>
-                    <SharePanel
+                    <ShareSettingsPanel
                       problemId={problem.id}
-                      ownerUid={user.uid}
                       tabs={allTabs}
+                      onManageMembers={() => onManageShare?.(problem)}
                     />
                   </div>
                 )}
