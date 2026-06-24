@@ -69,13 +69,13 @@ export default function SharedPage() {
           rel="noopener noreferrer"
           title="Mathory로 가기"
           style={{
-            flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 10,
+            flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
             textDecoration: 'none',
           }}
         >
           <span style={{
             fontSize: 19, fontWeight: 500, color: 'var(--text-primary, #222)',
-            letterSpacing: -0.5, fontFamily: 'var(--font-logo)',
+            letterSpacing: -0.5, fontFamily: 'var(--font-logo)', lineHeight: 1.1,
           }}>
             Mathory
           </span>
