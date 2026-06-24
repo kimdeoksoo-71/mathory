@@ -151,10 +151,16 @@ type: data.type === 'comment' ? 'comment'
 ```
 > 수정 후 **회귀 확인 필수**: 에디터 agent 패널에 점령 "댓글" 카드가 없는지, `countAgentSessions`(normal 카운트)가 정확한지. 이 버그가 현재 댓글 필터를 "전부 null-sid라 우연히 동작"하게 만들고 있으니, 고친 뒤 기존 댓글/AI 배지 동작을 재검증한다.
 
-### 5-4. SSR 메타데이터 / Open Graph (`app/p/[problemId]/page.tsx`, P7 — 최신 트렌드 핵심)
-`/p/[problemId]`를 **서버 컴포넌트**로 만들고 `generateMetadata`로 문항 제목/설명/썸네일을 OG 태그에 주입(카카오톡·메신저·검색 미리보기). 그 안에서 client `PublicProblemView` 렌더.
-- 서버 read: **firebase-admin 미사용**(레포에 없음). 공개 문항은 world-readable이므로 **Firestore REST**(`.../documents/problems/{id}`)로 generateMetadata에서 fetch(공개 read 규칙 적용). 비공개면 메타 생략/기본값.
-- 본문·댓글의 onSnapshot은 client에서.
+### 5-4. SSR 메타데이터 / Open Graph (`app/p/[problemId]/page.tsx`, P7 — 2차 검토 반영)
+`/p/[problemId]`를 **서버 컴포넌트**로 만들고 `generateMetadata`로 OG 태그(제목/설명/고정 이미지)를 주입한다. 목적은 **메신저 링크 미리보기**(카카오톡 등)다. 그 안에서 client `PublicProblemView`를 렌더.
+> **범위 잠금(L1·L2):** ① OG 이미지는 **정적 기본 1장**(`public/og-default.png`, 로고+슬로건) — `types/problem.ts`에 thumbnail/description 필드가 **없어** 문항별 동적 썸네일은 데이터원이 없음(v2). ② generateMetadata가 주는 건 **OG 메타뿐** — 본문은 client `onSnapshot` 렌더라 **검색엔진 본문 인덱싱은 v1 비목표**(메신저 카드만). 본문 SSR(검색 인덱싱)은 v2.
+- 서버 read: **firebase-admin 미설치(`firebase` ^12.9.0만)** → **Firestore REST**로만. 공개 문항은 world-readable이라 비인증 REST가 `isPublic()` 통과.
+  - URL: `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/problems/${id}` (`projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID`, 서버 접근 가능). `(default)`는 경로에 그대로.
+  - 파싱: `data.fields?.title?.stringValue` (옵셔널 체이닝 — `fields`/`title`/`stringValue` 어느 단계든 없을 수 있음).
+  - **`fetch(url, { cache: 'no-store' })` 필수** — Next 14 서버 fetch 기본 캐시라, 비공개 전환 후 stale 방지.
+  - `generateMetadata`는 `async` + try/catch로 실패/비공개 시 **기본 메타(서비스명) fallback**(절대 throw 금지 — 페이지 전체가 죽음).
+  - `metadata.metadataBase = new URL('https://mathory.app')` 설정(정적 OG 이미지 경로가 절대 URL로 풀리도록).
+- 본문·댓글의 onSnapshot은 client(`PublicProblemView`)에서. 페이지(서버)는 `problemId`만 전달.
 
 ### 5-5. 뷰어 동작 (`PublicProblemView`, client)
 - `problems/{id}`(public read) 구독 + visible 탭마다 `watchTabBlocks` 구독 → 편집 즉시 반영.
@@ -167,14 +173,16 @@ type: data.type === 'comment' ? 'comment'
 ## 6. 오너 UI (`ShareSettingsPanel` → "문항 공개")
 - 현 '웹에 공개' 섹션을 **"문항 공개"**로 개편. 방식 **라디오: ○ 스냅샷으로 공개  ○ 실시간 공개**.
   - 스냅샷: 만료 프리셋(기본 무기한) → `createShare(...)` → `/shared/{id}`.
-  - 실시간: `updateProblem(id,{visibility:'public', publishedAt})` → `/p/{id}`. 댓글 허용/표시 토글(`commentsWritable`/`commentsVisible`).
+  - 실시간: `updateProblem(id,{visibility:'public', publishedAt})` → `/p/{id}`. 댓글 허용/표시 토글(`commentsWritable`/`commentsVisible`)을 **실시간 공개 UI에 명시 노출**(오너가 기본값=허용을 인지·끌 수 있게).
+  - **실시간 공개 ON 시 `ensureCommentSession(id, ownerUid)` 1회 호출**(2차 검토): `CommentPanel:223`은 오너가 댓글 패널을 열 때만 세션을 만들므로, 패널을 안 열고 공개만 켜면 `commentSessionId`가 비어 §4-5 포인터가 늦게 채워진다. 공개 토글 핸들러에서 선제 호출해 포인터 일관성 보장(없어도 깨지진 않으나 권장).
 - 공개 탭은 기존 "공유할 탭" 체크박스 공통. 라벨로 "스냅샷=동결 / 실시간=반영·댓글" 명시.
+- 주의: `commentsVisible`/`commentsWritable`는 멤버·공개 **공용 필드**(기본 true) — "공개만 댓글 OFF" 같은 분리는 불가(§10 알려진 제약).
 
 ## 7. (참고) Phase 50 자산 개편 맵
 `WebShareList`→`PublishList`(두 소스+방식 배지) · ShareTree/AppShell "웹에 공개"→"문항 공개" · ShareSettingsPanel '웹에 공개'→"문항 공개"(방식 라디오). 스냅샷 로직(`lib/shares.ts`, `/shared`)은 유지.
 
 ## 8. 결정 (확정)
-- D1 public 블록 탭 필터 적용 · D2 public 댓글 read/create 추가 · D3 agent 누출=UI 필터 한정 · D4 오너 모더레이션 delete · D5 새 경량 PublicProblemView · D6 방식별 하위 노드 없음(단일 "문항 공개") · D7 비로그인 댓글 불가 · D8 스냅샷·실시간 "문항 공개" 통합 · **D9(신규) `publishedAt` 스탬프로 live 정렬(P9)** · **D10(신규) `/p` SSR+OG(P7)**.
+- D1 public 블록 탭 필터 적용 · D2 public 댓글 read/create 추가 · D3 agent 누출=UI 필터 한정 · D4 오너 모더레이션 delete · D5 새 경량 PublicProblemView · D6 방식별 하위 노드 없음(단일 "문항 공개") · D7 비로그인 댓글 불가 · D8 스냅샷·실시간 "문항 공개" 통합 · **D9 `publishedAt` 스탬프로 live 정렬(P9)** · **D10 `/p` SSR+OG = 메신저 링크 미리보기 한정(정적 OG 이미지), 검색 본문 인덱싱은 v2(L1·L2)**.
 
 ## 9. 단계 (단계별 커밋)
 1. **규칙 + load-bearing 3건(P1·P2·P3)**: §4-1~4-4 규칙 + §5-2 commentSessionId 포인터 + §5-3 `mapDoc` 'comment' 보존 + §5-1 `watchTabBlocks` 신설. **mapDoc 수정 후 기존 댓글/AI 배지 회귀 재검증.** 규칙 스모크 테스트.
@@ -193,6 +201,9 @@ type: data.type === 'comment' ? 'comment'
 - **P9 정렬**: `updated_at` 대신 `publishedAt`(편집마다 순서 튐 방지).
 - **P10 단일 세션 충돌**: 공개 뷰어 로그인이 에디터 탭을 로그아웃시키지 않는지 확인.
 - **regression**: 멤버 공유/스냅샷/기존 댓글 회귀 점검.
+- **publishedAt 갱신 정책**: `serverTimestamp()` 1회 스탬프, 비공개→재공개 시 갱신(리스트 상단 복귀). §3 반영.
+- **PublishList 댓글 수 비용**: 실시간 행마다 `tab_comments` 읽어 `countComments` → 공개 문항 많아지면 비용↑. v1 수용, 필요 시 펼침 lazy 로드.
+- **v2 스코프(명시)**: ① 문항별 동적 OG 이미지(미리보기 렌더), ② 본문 SSR 검색 인덱싱, ③ 멤버용≠공개용 탭/댓글 분리, ④ 서버측 레이트리밋·신고/차단.
 
 ## 11. 수락 기준
 - [ ] "문항 공개" 노드 하나에 스냅샷·실시간이 방식 배지로 한 리스트에 보임(publishedAt 정렬)
@@ -201,7 +212,8 @@ type: data.type === 'comment' ? 'comment'
 - [ ] 로그인 사용자(비멤버) 댓글 작성/조회, **agent 메시지 비노출(`commentSessionId` 포인터 필터)**
 - [ ] `mapDoc` 수정 후 에디터 댓글/AI 배지 회귀 없음
 - [ ] 오너 악성 댓글 삭제(모더레이션), AI-삭제 분기 회귀 없음
-- [ ] `/p/{id}` 공유 시 OG 미리보기(제목/설명) 노출
+- [ ] `/p/{id}` 메신저 공유 시 OG 링크 카드(제목/설명/고정 이미지) 노출 (검색 본문 인덱싱은 v1 비목표)
+- [ ] 비공개 전환 후 재공유 시 OG 메타가 stale하지 않음(`cache: 'no-store'`)
 - [ ] 비공개 전환 시 뷰 차단 + 안내
 - [ ] build 통과, 규칙 스모크 테스트 통과, 기존 멤버/스냅샷/댓글 회귀 없음
 
