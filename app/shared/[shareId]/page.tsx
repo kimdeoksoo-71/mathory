@@ -61,8 +61,21 @@ export default function SharedPage() {
       <div style={{
         background: '#fff', borderBottom: '1px solid #e0e0e0',
         padding: '14px 24px',
-        display: 'flex', alignItems: 'center', gap: 12,
+        display: 'flex', alignItems: 'center', gap: 14,
       }}>
+        <a
+          href="https://mathory.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Mathory 방문"
+          style={{
+            flexShrink: 0, fontSize: 16, fontWeight: 800, letterSpacing: -0.3,
+            color: 'var(--accent-primary, #B8845C)', textDecoration: 'none',
+          }}
+        >
+          Mathory
+        </a>
+        <div style={{ width: 1, height: 22, background: '#e0e0e0', flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 18, fontWeight: 600, color: '#222',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -139,12 +152,30 @@ export default function SharedPage() {
           </>
         )}
 
-        <div style={{
-          marginTop: 24, padding: '12px 16px', fontSize: 11,
-          color: '#aaa', textAlign: 'center',
-        }}>
-          Mathory 공유 페이지
-        </div>
+        {/* 회원가입 유도 CTA */}
+        <a
+          href="https://mathory.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'block', width: 'calc(35em + 72px)', maxWidth: '100%',
+            boxSizing: 'border-box', marginTop: 28, padding: '18px 24px',
+            background: '#fff', border: '1px solid #e0e0e0', borderRadius: 10,
+            textAlign: 'center', textDecoration: 'none',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#222' }}>
+            Mathory로 수학 문제를 만들어 보세요
+          </div>
+          <div style={{ fontSize: 12, color: '#888', marginTop: 6, lineHeight: 1.5 }}>
+            수식 편집 · 문항 관리 · 공유까지 한 곳에서.
+            <br />
+            <span style={{ color: 'var(--accent-primary, #B8845C)', fontWeight: 600 }}>
+              mathory.app 에서 무료로 시작하기 →
+            </span>
+          </div>
+        </a>
       </div>
     </div>
   );
