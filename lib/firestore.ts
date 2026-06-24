@@ -12,6 +12,7 @@ import {
   serverTimestamp,
   Timestamp,
   limit,
+  onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../types/problem';
@@ -246,6 +247,29 @@ export async function getPreviewBlocks(problemId: string, tabs: TabMeta[]): Prom
     }
   }
   return [];
+}
+
+/**
+ * Phase 51(P2): 한 탭의 블록을 실시간 구독 (공개 live 뷰어용).
+ * 비공개 탭은 규칙(4-1)이 막아 permission-denied → 에러 콜백에서 무시(빈 상태 유지).
+ * live 뷰어는 getPreviewBlocks를 쓰지 말 것(첫 탭만 반환 + 권한 에러 silent → 다중 탭 부적합).
+ * visible 탭마다 watchTabBlocks를 구독한다.
+ * @returns 구독 해제 함수
+ */
+export function watchTabBlocks(
+  problemId: string,
+  tabId: string,
+  callback: (blocks: Block[]) => void,
+): () => void {
+  const q = query(
+    collection(db, 'problems', problemId, tabSubcollection(tabId)),
+    orderBy('order'),
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block))),
+    (err) => console.warn(`[watchTabBlocks] ${tabId} 구독 오류:`, err),
+  );
 }
 
 async function saveBlock(

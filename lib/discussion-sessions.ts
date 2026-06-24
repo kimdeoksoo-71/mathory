@@ -47,7 +47,11 @@ function mapDoc(problemId: string, d: { id: string; data: () => Record<string, u
   return {
     id: d.id,
     problemId,
-    type: data.type === 'public' ? 'public' : 'normal',
+    // Phase 51(P3): 'comment' 타입 보존. 과거 버그는 'comment'를 'normal'로 뭉개
+    // CommentPanel의 댓글 세션 탐색을 영구 null로 만들고 agent 패널에 유령 카드를 노출시켰다.
+    type: data.type === 'comment' ? 'comment'
+        : data.type === 'public' ? 'public'
+        : 'normal',
     name: String(data.name ?? ''),
     aiEnabled: data.aiEnabled === true,
     createdBy: String(data.createdBy ?? ''),
@@ -118,14 +122,18 @@ export async function ensureCommentSession(
   const existing = await getDocs(
     query(sessionsCol(problemId), where('type', '==', 'comment'), limit(1)),
   );
-  if (!existing.empty) return existing.docs[0].id;
-  const ref = await addDoc(sessionsCol(problemId), {
-    type: 'comment',
-    name: '댓글',
-    aiEnabled: false,
-    createdBy: ownerUid,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  return ref.id;
+  const sid = !existing.empty
+    ? existing.docs[0].id
+    : (await addDoc(sessionsCol(problemId), {
+        type: 'comment',
+        name: '댓글',
+        aiEnabled: false,
+        createdBy: ownerUid,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      })).id;
+  // Phase 51(P1): 공개 뷰어가 problem 문서에서 읽도록 commentSessionId 포인터 비정규화(멱등 보정).
+  // 순환참조 회피로 firestore.ts의 updateProblem 대신 updateDoc 직접 사용. 실패해도 세션 자체는 유효.
+  await updateDoc(doc(db, 'problems', problemId), { commentSessionId: sid }).catch(() => {});
+  return sid;
 }

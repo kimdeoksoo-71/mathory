@@ -26,6 +26,9 @@ export interface Problem {
   // Phase 47: 문항 단위 댓글 제어 (오너 토글). 미설정 = true
   commentsVisible?: boolean;                   // false = 댓글을 오너에게만
   commentsWritable?: boolean;                  // false = 멤버 댓글 작성 동결(오너는 가능)
+  // Phase 51: 문항 공개(실시간)
+  publishedAt?: Date;                          // 실시간 공개 ON 시 스탬프 (PublishList 정렬용)
+  commentSessionId?: string;                   // 댓글 세션 id 포인터(비정규화). 공개 뷰어 isCommentStream 필터용
 }
 
 export type MemberRole = 'viewer' | 'commenter';

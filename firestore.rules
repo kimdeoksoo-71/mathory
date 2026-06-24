@@ -99,15 +99,20 @@ service cloud.firestore {
           return parentData().get('memberTabVisibility', {})
             .get(tabIdFromSubcol(), true) == true;
         }
+        // Phase 51(4-1): 공개 문항도 memberTabVisibility 탭 게이트 적용(멤버·공개 공용 필드)
+        function tabAllowedForPublic() {
+          return parentData().get('memberTabVisibility', {})
+            .get(tabIdFromSubcol(), true) == true;
+        }
         function isCommentsCol() {
           return subcollection == 'tab_comments';
         }
 
-        // 탭 블록(xxx_blocks): 멤버는 해당 탭이 공개일 때만 읽기
+        // 탭 블록(xxx_blocks): 멤버·공개 모두 해당 탭이 공개일 때만 읽기
         // tab_comments는 별도 매치에서 처리하므로 여기선 항상 false
         allow read: if !isCommentsCol() && (
           parentOwner()
-          || parentIsPublic()
+          || (parentIsPublic() && (!isBlocksSubcol() || tabAllowedForPublic()))
           || (parentIsMember() && (!isBlocksSubcol() || tabAllowedForMember()))
         );
         // 쓰기는 오너만 (tab_comments 제외)
@@ -116,11 +121,11 @@ service cloud.firestore {
 
       // ===== problems/{id}/tab_comments/{commentId} (Stage 3) =====
       // 권한 정책:
-      //   - read: 오너 OR 멤버 (단, 멤버는 해당 탭이 공개일 때만)
-      //   - create: 오너 또는 commenter 역할 멤버 (author는 본인)
+      //   - read: 오너 OR (멤버 && 댓글 보임) OR (공개 문항 && 댓글 보임) — 공개는 비로그인 포함(Phase 51)
+      //   - create: 오너 또는 commenter 역할 멤버 (author는 본인) — 공개 작성은 미지원(멤버 전용)
       //   - update content: 작성 본인만 (content + updatedAt만 변경)
       //   - update resolved: 작성자 또는 오너 (resolved + updatedAt만 변경)
-      //   - delete: 작성 본인만 (오너도 남의 댓글 삭제 불가, resolve로 정리)
+      //   - delete: 작성 본인 OR 오너(모더레이션, Phase 51) / AI는 오너만
       match /tab_comments/{commentId} {
         function parentData() {
           return get(/databases/$(database)/documents/problems/$(problemId)).data;
@@ -138,6 +143,10 @@ service cloud.firestore {
         function isCommenter() {
           return memberRole() == 'commenter';
         }
+        // Phase 51(4-2): 공개 문항이면 비로그인 포함 누구나 댓글 읽기 허용
+        function parentIsPublic() {
+          return parentData().get('visibility', 'private') == 'public';
+        }
         // Phase 47: 문항 단위 댓글 제어 (미설정 = true)
         function commentsVisible() {
           return parentData().get('commentsVisible', true) == true;
@@ -154,11 +163,15 @@ service cloud.firestore {
           return request.resource.data.diff(resource.data).affectedKeys();
         }
 
-        // 읽기: 오너 OR (멤버 && 댓글 보임).
+        // 읽기: 오너 OR (멤버 && 댓글 보임) OR (공개 && 댓글 보임).
         // (탭별 가시성을 read에 걸면 Firestore list 쿼리가 사전 검증 불가 → 탭 검사 제거.
         //  commentsVisible는 부모 문서 기반이라 list 쿼리에서도 안전.
-        //  ⚠️ agent AI 메시지도 tab_comments에 있어 멤버가 규칙 레벨에선 읽을 수 있음 — UI로 차단(공개 전 재검토).)
-        allow read: if isOwnerCmt() || (isMemberCmt() && commentsVisible());
+        //  Phase 51: 공개 문항은 비로그인 포함 누구나 댓글 읽기 가능(isSignedIn 미요구) — 본문 열람과 일관.
+        //  ⚠️ D3: agent AI 메시지도 tab_comments에 있어 공개 열람자가 규칙 레벨에선 읽을 수 있음 →
+        //     뷰어가 isCommentStream(commentSessionId)으로 UI 차단. 민감 문항 공개 금지 안내. 완전 차단은 별도 Phase.)
+        allow read: if isOwnerCmt()
+          || (isMemberCmt() && commentsVisible())
+          || (parentIsPublic() && commentsVisible());
 
         // 생성 (Phase 47):
         //  (a) 인간 댓글: 오너 OR (commenter && 댓글 쓰기 허용 && 댓글 세션). author 본인.
@@ -208,11 +221,12 @@ service cloud.firestore {
         );
 
         // 삭제:
-        //  - 인간 댓글: 작성 본인만
+        //  - 인간 댓글: 작성 본인 OR 오너(Phase 51 모더레이션 — 댓글이 공개로 노출되므로
+        //    오너가 부적절 멤버 댓글을 내릴 수 있어야 함. 기존 "오너도 남의 댓글 삭제 불가" 정책 폐기)
         //  - AI 댓글: 문제 오너만 (길거나 잘린 AI 답변 정리용, Phase 41)
         allow delete: if (
           resource.data.get('authorType', 'human') == 'human'
-          && resource.data.authorUid == request.auth.uid
+          && (resource.data.authorUid == request.auth.uid || isOwnerCmt())
         ) || (
           resource.data.authorType == 'ai'
           && isOwnerCmt()
