@@ -1211,3 +1211,22 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 | 오너 토글 | 댓글 모드 헤더에 보임/숨김·쓰기 허용/잠금 |
 
 - 알려진 한계: list 쿼리 제약상 멤버가 규칙 레벨에선 agent AI 메시지를 읽을 수 있음 → UI로 차단(공개 전 세션 단위 read 분리 재검토)
+
+> Phase 48~50(공유 개편 A·B·C)은 roadmap 미기재 — 상세는 `docs/phasedocs/Phase48~50 *.md` 참조.
+
+## Phase 51: 문항 공개 — 스냅샷+실시간+댓글 공개 열람 ✅
+
+Phase 50 "웹에 공개(스냅샷)"를 흡수해 하나의 **"문항 공개"** 개념으로 통합. **실시간 공개**(원본 편집 즉시 반영)와 **댓글 공개 열람**(비로그인 포함 누구나 읽기, 작성은 멤버 전용) 추가. 상세: `docs/phasedocs/Phase51 문항 공개·실시간·댓글 공개 열람.md`
+
+| 영역 | 변경 |
+|------|------|
+| 보안 규칙 | §4-1 공개 블록 탭 필터(`tabAllowedForPublic`), §4-2 공개 댓글 read(비로그인 포함, `isSignedIn` 미요구), §4-4 오너 모더레이션 delete. create는 멤버 전용 유지 |
+| lib | `watchTabBlocks`/`watchProblem`(onSnapshot 신설), `setProblemPublic`(publishedAt 스탬프), `ensureCommentSession`이 `commentSessionId` 포인터 비정규화(P1), `mapDoc` 'comment' 보존 버그픽스(P3) |
+| 타입 | `Problem`에 `publishedAt`·`commentSessionId` 추가 |
+| 리스트 | `WebShareList`→`PublishList`(스냅샷+실시간 통합, 방식 배지, publishedAt 정렬). 라벨 "웹에 공개"→"문항 공개" |
+| 오너 UI | `ShareSettingsPanel` "문항 공개" 방식 라디오(실시간/스냅샷) + 댓글 표시 토글 |
+| Live 뷰어 | `app/p/[problemId]` 서버 컴포넌트(generateMetadata/OG, Firestore REST+no-store) + `PublicProblemView`(읽기 전용, watchTabBlocks) + `PublicComments`(읽기 전용, isCommentStream 필터) |
+| 테스트 | `npm run test:rules` 규칙 스모크 하니스 신설(`@firebase/rules-unit-testing`, 11케이스) |
+
+- 알려진 제약(v1 수용): ① 비로그인 방문자는 작성자명 '익명'(users read 규칙) — v2 authorName 비정규화로 해소 ② agent 메시지 규칙 레벨 누출은 UI 필터 의존(민감 문항 공개 금지) ③ 멤버용≠공개용 탭/댓글 분리 불가(`memberTabVisibility`/`commentsVisible` 공용)
+- 덕수 TODO: `firebase deploy --only firestore:rules`, `public/og-default.png` 추가, `git push`
