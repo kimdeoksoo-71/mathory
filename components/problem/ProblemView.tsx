@@ -796,23 +796,21 @@ export default function ProblemView({
         </div>
       </div>
 
-      {/* ═══ 오른쪽 단 열기 버튼 (닫혔을 때만, 글자크기 버튼 한 줄 아래, 박스 없음) ═══ */}
-      {!rightOpen && (
-        <button
-          onClick={() => setRightOpen(true)}
-          title="우측 패널 열기"
-          style={{
-            position: 'absolute', top: 52,
-            right: 14 + (panelMode ? panelWidth + 8 : 0),
-            zIndex: 10, width: 26, height: 26,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: 'none', background: 'transparent', cursor: 'pointer',
-            color: 'var(--text-muted)', transition: 'right 0.18s ease',
-          }}
-        >
-          <IconChevronLeft size={16} />
-        </button>
-      )}
+      {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══ */}
+      <button
+        onClick={() => setRightOpen((o) => !o)}
+        title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
+        style={{
+          position: 'absolute', top: 52,
+          right: 16 + (panelMode ? panelWidth + 8 : 0) + (rightOpen ? 220 : 0),
+          zIndex: 11, width: 26, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          color: 'var(--text-muted)', transition: 'right 0.18s ease',
+        }}
+      >
+        {rightOpen ? <IconChevron size={16} /> : <IconChevronLeft size={16} />}
+      </button>
 
       {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
       {rightOpen && <div style={{
@@ -825,24 +823,7 @@ export default function ProblemView({
         position: 'relative',
         display: 'flex', flexDirection: 'column',
       }}>
-        {/* 우측 패널 닫기 버튼 */}
-        <button
-          onClick={() => setRightOpen(false)}
-          title="우측 패널 닫기"
-          style={{
-            position: 'absolute', top: 8, right: 8,
-            width: 26, height: 26,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: 'none', borderRadius: 6,
-            background: 'transparent', cursor: 'pointer',
-            color: 'var(--text-faint)',
-            transition: 'background 0.15s, color 0.15s',
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-faint)'; }}
-        >
-          <IconChevron size={14} />
-        </button>
+        {/* 닫기 버튼은 상단 토글 버튼으로 통합됨 (글자크기 버튼 아래 행) */}
         {/* ───── 메뉴 모음 (편집/사본/PDF/MD/휴지통 → spacer → 공유) ───── */}
         <div style={{ marginBottom: 18 }}>
           {menuItems.map((item, i) => {
