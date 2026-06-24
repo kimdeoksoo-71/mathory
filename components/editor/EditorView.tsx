@@ -2692,7 +2692,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-content)', minHeight: 0 }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
             <div style={activeTab === 'question' ? {
               background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
             } : undefined}>

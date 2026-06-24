@@ -412,7 +412,9 @@ export default function EditorPreview({
       backgroundColor: borderless ? 'transparent' : '#ffffff',
       border: borderless ? 'none' : '1px solid #ddd',
       borderRadius: borderless ? '0' : '8px',
-      overflow: borderless ? 'visible' : 'auto', fontSize: '15px', lineHeight: '1.8',
+      overflow: borderless ? 'visible' : 'auto',
+      // CSS 변수 기반 → 상자/선택지 내부 중첩 EditorPreview까지 동일 스케일 (없으면 15px)
+      fontSize: 'var(--content-font-size, 15px)', lineHeight: '1.8',
       fontFamily: 'var(--font-ui)',
     }}>
       {/* 독립행 수식: 위는 기존 KaTeX 기본값(1em), 아래는 1.8배 */}

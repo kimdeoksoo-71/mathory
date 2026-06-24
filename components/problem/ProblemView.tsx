@@ -30,6 +30,9 @@ import {
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
+const FONT_SIZE_MIN = 11;
+const FONT_SIZE_MAX = 24;
+const FONT_SIZE_STEP = 1;
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 interface ProblemViewProps {
@@ -220,6 +223,15 @@ export default function ProblemView({
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  /* ─── 글꼴 크기 조절 ─── */
+  const handleFontSizeChange = (delta: number) => {
+    setContentFontSize((prev) => {
+      const next = Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, prev + delta));
+      localStorage.setItem(FONT_SIZE_KEY, String(next));
+      return next;
+    });
+  };
 
   /* ─── 탭 토글 ─── */
   const toggleTab = (tabId: string) => {
@@ -719,8 +731,7 @@ export default function ProblemView({
                             marginLeft: -24,
                           } : {}),
                         }}>
-                          <div className="problem-content-scaled problem-content-toned">
-                            <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>
+                          <div className="problem-content-scaled problem-content-toned" style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}>
                             {renderBlocks(blocks)}
                           </div>
                         </div>
@@ -738,21 +749,68 @@ export default function ProblemView({
         </div>
       </div>
 
-      {/* ═══ 오른쪽 단 열기 버튼 (닫혔을 때만) ═══ */}
+      {/* ═══ 글자크기 조절 (콘텐츠 우상단, 패널 열려도 콘텐츠 옆에 유지) ═══ */}
+      <div style={{
+        position: 'absolute', top: 16,
+        right: 16 + (panelMode ? panelWidth + 8 : 0) + (rightOpen ? 220 : 0),
+        zIndex: 10, display: 'flex', alignItems: 'center', gap: 4,
+        transition: 'right 0.18s ease',
+      }}>
+        <span style={{
+          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
+          minWidth: 18, textAlign: 'right', userSelect: 'none',
+        }}>{contentFontSize}</span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <button
+            onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
+            disabled={contentFontSize >= FONT_SIZE_MAX}
+            title="글꼴 확대"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 5 L5 1 L9 5" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
+            disabled={contentFontSize <= FONT_SIZE_MIN}
+            title="글꼴 축소"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 1 L5 5 L9 1" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ═══ 오른쪽 단 열기 버튼 (닫혔을 때만, 글자크기 버튼 한 줄 아래, 박스 없음) ═══ */}
       {!rightOpen && (
         <button
           onClick={() => setRightOpen(true)}
           title="우측 패널 열기"
           style={{
-            position: 'absolute', top: 16, right: 16, zIndex: 10,
-            width: 32, height: 32,
+            position: 'absolute', top: 52,
+            right: 14 + (panelMode ? panelWidth + 8 : 0),
+            zIndex: 10, width: 26, height: 26,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            border: '1px solid var(--border-light)', borderRadius: 8,
-            background: 'var(--bg-card)', cursor: 'pointer',
-            color: 'var(--text-muted)',
+            border: 'none', background: 'transparent', cursor: 'pointer',
+            color: 'var(--text-muted)', transition: 'right 0.18s ease',
           }}
         >
-          <IconChevronLeft size={14} />
+          <IconChevronLeft size={16} />
         </button>
       )}
 

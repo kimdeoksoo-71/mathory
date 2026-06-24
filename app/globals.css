@@ -191,7 +191,7 @@ textarea:focus-visible {
 /* KaTeX \text{} 폰트를 본문(Pretendard)과 동일하게 */
 .katex .text {
   font-family: var(--font-content) !important;
-  font-size: 15px !important;
+  font-size: var(--content-font-size, 15px) !important;
 }
 
 /* ═══ List Styles — Ordered & Unordered ═══ */
