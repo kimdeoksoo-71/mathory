@@ -187,6 +187,23 @@ function findMathRegion(doc: string, cursor: number): { start: number; end: numb
   return null;
 }
 
+// 수식 영역 내 다음 { 안으로 커서 이동 (끝이면 처음으로 순회). Alt-Tab / Command 더블탭 공용.
+function jumpToNextBrace(view: EditorView): boolean {
+  const doc = view.state.doc.toString();
+  const cursor = view.state.selection.main.head;
+  const region = findMathRegion(doc, cursor);
+  if (!region) return false;
+  const bracePositions: number[] = [];
+  for (let k = region.start; k < region.end; k++) {
+    if (doc[k] === '{') bracePositions.push(k + 1);
+  }
+  if (bracePositions.length === 0) return false;
+  let nextPos = bracePositions.find((p) => p > cursor);
+  if (nextPos === undefined) nextPos = bracePositions[0];
+  view.dispatch({ selection: { anchor: nextPos } });
+  return true;
+}
+
 // ── LaTeX 자동완성 소스 ──────────────────────────────────
 function latexCompletionSource(context: CompletionContext) {
   const word = context.matchBefore(/\\[a-zA-Z{]*/);
@@ -246,6 +263,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     const tabStopsRef = useRef<boolean>(false);
     const chordPendingRef = useRef<boolean>(false);
     const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastMetaDownRef = useRef<number>(0); // Command 더블탭 감지용
 
     // 최신 콜백을 ref로 유지 (CodeMirror 초기화 이후에도 최신값 참조)
     const snippetCallbackRef = useRef(onSnippetShortcut);
@@ -478,33 +496,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             return false;
           },
         },
-        // ── Alt+Tab: 수식 내 중괄호 순회 ──
+        // ── Alt+Tab: 수식 내 중괄호 순회 (Command 더블탭과 동일 동작) ──
         {
           key: 'Alt-Tab',
-          run: (view) => {
-            const doc = view.state.doc.toString();
-            const cursor = view.state.selection.main.head;
-            const region = findMathRegion(doc, cursor);
-            if (!region) return false;
-
-            // 수식 영역 내 모든 { 위치 수집 (커서를 { 바로 안쪽에 놓기 위해 +1)
-            const bracePositions: number[] = [];
-            for (let k = region.start; k < region.end; k++) {
-              if (doc[k] === '{') {
-                bracePositions.push(k + 1);
-              }
-            }
-            if (bracePositions.length === 0) return false;
-
-            // 현재 커서 다음 중괄호로 이동, 끝이면 처음으로 순회
-            let nextPos = bracePositions.find((p) => p > cursor);
-            if (nextPos === undefined) {
-              nextPos = bracePositions[0];
-            }
-
-            view.dispatch({ selection: { anchor: nextPos } });
-            return true;
-          },
+          run: (view) => jumpToNextBrace(view),
         },
         // ── Ctrl+Alt+1 ~ Ctrl+Alt+9 (수식 상용구 단축키) ──
         ...Array.from({ length: 9 }, (_, i) => ({
@@ -555,6 +550,28 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         },
       });
 
+      // ── Command(Meta) 더블탭: 수식 내 다음 중괄호로 이동 ──
+      const metaListener = EditorView.domEventHandlers({
+        keydown(event, view) {
+          if (event.key === 'Meta') {
+            const now = Date.now();
+            if (now - lastMetaDownRef.current < 400) {
+              lastMetaDownRef.current = 0;
+              if (jumpToNextBrace(view)) {
+                event.preventDefault();
+                return true;
+              }
+              return false;
+            }
+            lastMetaDownRef.current = now;
+            return false;
+          }
+          // Meta 외 다른 키 → 더블탭 추적 리셋 (Cmd+C 등 오발 방지)
+          lastMetaDownRef.current = 0;
+          return false;
+        },
+      });
+
       // ── LaTeX 자동완성 설정 ──
       const latexAutocompletion = autocompletion({
         override: [latexCompletionSource],
@@ -570,6 +587,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           disableBuiltinSearch,
           mathShortcuts,
           chordListener,
+          metaListener,
           tabHandler,
           basicSetup,
           latexAutocompletion,
