@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { watchProblem, watchTabBlocks } from '../../lib/firestore';
 import ProblemTabContent from './ProblemTabContent';
+import PublicComments from './PublicComments';
 import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
 
 /**
@@ -126,7 +127,10 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
               <ProblemTabContent blocks={tabBlocks[activeTab] || []} />
             </div>
 
-            {/* Phase 51 5단계: 읽기 전용 댓글 영역이 여기 들어간다 */}
+            {/* 읽기 전용 댓글 (commentsVisible=false면 공개에 숨김 — 규칙도 차단) */}
+            {problem.commentsVisible !== false && (
+              <PublicComments problemId={problemId} commentSessionId={problem.commentSessionId ?? null} />
+            )}
           </>
         )}
       </div>
