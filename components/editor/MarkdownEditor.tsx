@@ -578,6 +578,27 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             const doc = view.state.doc.toString();
             const inMath = isInsideMath(doc, from);
 
+            // ── \left( / \bigl[ / \Bigl| 등: 좌측 구분자 입력 시 \right 쌍 자동 완성 ──
+            const PAIR: Record<string, [string, string]> = {
+              '(': ['(', ')'], '[': ['[', ']'], '{': ['\\{', '\\}'], '|': ['|', '|'],
+            };
+            if (inMath && PAIR[text]) {
+              const before = doc.slice(Math.max(0, from - 6), from);
+              const lm = before.match(/\\(left|bigl|Bigl|biggl|Biggl)$/);
+              if (lm) {
+                const RIGHT: Record<string, string> = {
+                  left: 'right', bigl: 'bigr', Bigl: 'Bigr', biggl: 'biggr', Biggl: 'Biggr',
+                };
+                const [open, close] = PAIR[text];
+                const insert = `${open}\\${RIGHT[lm[1]]}${close}`;
+                view.dispatch({
+                  changes: { from, to, insert },
+                  selection: { anchor: from + open.length }, // 여는 구분자 바로 뒤
+                });
+                return true;
+              }
+            }
+
             // 소괄호·대괄호: 수식 밖에서 자동닫기 차단
             if (text === '(' || text === '[') {
               if (inMath) return false; // 수식 안 → closeBrackets가 처리
