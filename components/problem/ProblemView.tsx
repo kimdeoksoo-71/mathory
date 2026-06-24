@@ -872,6 +872,7 @@ export default function ProblemView({
                   <div style={{ padding: '6px 10px 10px' }}>
                     <ShareSettingsPanel
                       problemId={problem.id}
+                      ownerUid={user.uid}
                       tabs={allTabs}
                       onManageMembers={() => onManageShare?.(problem)}
                     />

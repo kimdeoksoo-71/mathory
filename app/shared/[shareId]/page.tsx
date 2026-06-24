@@ -27,7 +27,7 @@ export default function SharedPage() {
         if (!s) {
           setError('존재하지 않거나 해제된 공유 링크입니다.');
         } else if (isShareExpired(s)) {
-          setError('만료된 공유 링크입니다.');
+          setError('공개가 종료되었습니다.');
         } else {
           setShare(s);
           // 첫 공개 탭 선택
