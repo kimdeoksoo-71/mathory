@@ -446,6 +446,9 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
   //   - 로마 숫자 in parens: (i), (ii), (iii), (iv), (v), (vi)... 대소문자 모두
   addAll(/\([a-zA-Z]\)/g);
   addAll(/\([ivxlcdmIVXLCDM]{1,5}\)/g);
+  // 본문에 그대로 쓰인 로마 숫자 (괄호 없이): i, ii, iii, iv, v, vi, vii, viii, ix, x, xi…xx
+  // — 양옆이 영숫자가 아닐 때만. 긴 패턴부터 매칭(alternation 우선순위)
+  addAll(/(?<![A-Za-z0-9])(?:xviii|xvii|xvi|xv|xiv|xiii|xii|xi|viii|vii|vi|iv|iii|ii|ix|xx|x|v|i)(?![A-Za-z0-9])/g);
 
   const inProtected = (pos: number) =>
     protectedRanges.some(([s, e]) => pos >= s && pos < e);
