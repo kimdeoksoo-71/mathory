@@ -80,7 +80,7 @@ export default function SharedPage() {
             Mathory
           </span>
           <span style={{
-            fontSize: 12, color: 'var(--text-muted, #888)', fontStyle: 'italic',
+            fontSize: 10.5, color: 'var(--text-muted, #888)', fontStyle: 'italic',
             fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
           }}>
             Write the logic. Preserve the insight.
