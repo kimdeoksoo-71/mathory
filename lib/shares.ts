@@ -16,6 +16,10 @@ const generateShareId = customAlphabet(SHARE_ID_ALPHABET, 12);
 export const DEFAULT_EXPIRY_HOURS = 72;
 export const MAX_EXPIRY_DAYS = 30;
 
+// Phase 50: 웹에 공개 만료 프리셋 (일 단위, null = 무기한), 기본 무기한
+export const EXPIRY_PRESET_DAYS: (number | null)[] = [3, 7, 30, null];
+export const DEFAULT_EXPIRY_DAYS: number | null = null;
+
 /** Firestore Timestamp / 플레인 {seconds,nanoseconds} / Date / null 모두 안전하게 Date로 변환 */
 function toDateSafe(v: any, fallback?: Date): Date {
   if (!v) return fallback || new Date();
@@ -36,6 +40,21 @@ function toDateSafe(v: any, fallback?: Date): Date {
 function toDateOrNull(v: any): Date | null {
   if (v === null || v === undefined) return null;
   return toDateSafe(v);
+}
+
+/** Firestore share 문서 → ShareWithSnapshot (getShare/getShareByProblem/listSharesByOwner 공용) */
+function mapShareDoc(id: string, data: any): ShareWithSnapshot {
+  return {
+    id,
+    problemId: data.problemId,
+    ownerUid: data.ownerUid,
+    createdAt: toDateSafe(data.createdAt),
+    expiresAt: toDateOrNull(data.expiresAt),
+    tabVisibility: data.tabVisibility || {},
+    snapshot: data.snapshot || { title: '', tabs: [], tabBlocks: {} },
+    ownerDisplayName: data.ownerDisplayName || '',
+    ownerPhotoURL: data.ownerPhotoURL || '',
+  };
 }
 
 // 공유 문서에 저장하는 스냅샷 — 뷰어가 읽는 데이터 원천 (P7: 비로그인도 접근 가능)
@@ -146,18 +165,15 @@ export async function createShare(input: CreateShareInput): Promise<ShareWithSna
 export async function getShare(shareId: string): Promise<ShareWithSnapshot | null> {
   const snap = await getDoc(doc(db, 'shares', shareId));
   if (!snap.exists()) return null;
-  const data = snap.data();
-  return {
-    id: snap.id,
-    problemId: data.problemId,
-    ownerUid: data.ownerUid,
-    createdAt: toDateSafe(data.createdAt),
-    expiresAt: toDateOrNull(data.expiresAt),
-    tabVisibility: data.tabVisibility || {},
-    snapshot: data.snapshot || { title: '', tabs: [], tabBlocks: {} },
-    ownerDisplayName: data.ownerDisplayName || '',
-    ownerPhotoURL: data.ownerPhotoURL || '',
-  };
+  return mapShareDoc(snap.id, snap.data());
+}
+
+/** Phase 50: 내가 웹 공개한 share 목록 (createdAt 내림차순, 클라 정렬 — 인덱스 회피) */
+export async function listSharesByOwner(uid: string): Promise<ShareWithSnapshot[]> {
+  const snap = await getDocs(query(collection(db, 'shares'), where('ownerUid', '==', uid)));
+  return snap.docs
+    .map((d) => mapShareDoc(d.id, d.data()))
+    .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
 }
 
 export async function revokeShare(shareId: string): Promise<void> {
@@ -182,16 +198,5 @@ export async function getShareByProblem(
   const snap = await getDocs(q);
   if (snap.empty) return null;
   const d = snap.docs[0];
-  const data = d.data();
-  return {
-    id: d.id,
-    problemId: data.problemId,
-    ownerUid: data.ownerUid,
-    createdAt: toDateSafe(data.createdAt),
-    expiresAt: toDateOrNull(data.expiresAt),
-    tabVisibility: data.tabVisibility || {},
-    snapshot: data.snapshot || { title: '', tabs: [], tabBlocks: {} },
-    ownerDisplayName: data.ownerDisplayName || '',
-    ownerPhotoURL: data.ownerPhotoURL || '',
-  };
+  return mapShareDoc(d.id, d.data());
 }

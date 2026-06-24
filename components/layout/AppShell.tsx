@@ -19,7 +19,9 @@ import {
 import { listSharedWithMe, listSharedByMe } from '../../lib/membership';
 import { getUserProfile, needsNicknameSetup } from '../../lib/users';
 import { ShareScope, shareScopeKey } from '../../lib/share-scope';
+import { listSharesByOwner, ShareWithSnapshot } from '../../lib/shares';
 import NicknameSetupModal from '../user/NicknameSetupModal';
+import WebShareList from '../share/WebShareList';
 import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
@@ -88,6 +90,8 @@ export default function AppShell() {
   // Phase 49: 내가 멤버 공유한 문항(보낸) + 공유 관련 사용자 프로필 캐시
   const [sentProblems, setSentProblems] = useState<Problem[]>([]);
   const [shareProfiles, setShareProfiles] = useState<Record<string, UserProfile>>({});
+  // Phase 50: 내가 웹 공개한 share 목록
+  const [webShares, setWebShares] = useState<ShareWithSnapshot[]>([]);
   // Phase 48: 닉네임 설정 진입 가드 (소프트 넛지 — 세션당 1회 자동, 닫기 가능)
   const [nicknameModal, setNicknameModal] = useState<{ uid: string; current?: string } | null>(null);
   const nicknameNudgedRef = useRef(false);
@@ -156,12 +160,13 @@ export default function AppShell() {
       setSharedProblems([]);
       setSentProblems([]);
       setShareProfiles({});
+      setWebShares([]);
       setFolders([]);
       setFolderCounts({});
       return;
     }
     try {
-      const [problems, recent, shared, sent] = await Promise.all([
+      const [problems, recent, shared, sent, webs] = await Promise.all([
         listProblems(user.uid),
         listRecentProblems(user.uid, 10),
         listSharedWithMe(user.uid).catch((err) => {
@@ -172,10 +177,15 @@ export default function AppShell() {
           console.error('공유보낸 문항 로드 실패:', err);
           return [] as Problem[];
         }),
+        listSharesByOwner(user.uid).catch((err) => {
+          console.error('웹 공개 목록 로드 실패:', err);
+          return [] as ShareWithSnapshot[];
+        }),
       ]);
       setAllProblems(problems);
       setSharedProblems(shared);
       setSentProblems(sent);
+      setWebShares(webs);
       // 최근 문항에서 휴지통 문항 제외
       setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
@@ -687,10 +697,11 @@ export default function AppShell() {
           };
           if (scope.kind === 'sent-web') {
             return (
-              <div style={{ padding: 40, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)', fontSize: 14, lineHeight: 1.7 }}>
-                <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px', color: 'var(--text-primary)' }}>웹에 공개</h2>
-                웹 링크 공유 관리는 Phase 50에서 제공됩니다.<br />
-                현재는 문항 편집 화면의 공유 패널에서 링크를 생성/해제할 수 있습니다.
+              <div style={{ height: '100%', overflowY: 'auto' }}>
+                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+                  웹에 공개
+                </h2>
+                <WebShareList shares={webShares} onChanged={() => loadData()} />
               </div>
             );
           }
