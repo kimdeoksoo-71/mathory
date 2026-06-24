@@ -123,6 +123,8 @@ export async function listProblems(userId: string, filter?: ProblemFilter): Prom
       ...data,
       created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
+      // Phase 51: 실시간 공개 정렬용. 없으면 undefined(PublishList가 created_at으로 폴백)
+      publishedAt: (data.publishedAt as Timestamp | undefined)?.toDate(),
     } as Problem;
   });
 

@@ -21,7 +21,7 @@ import { getUserProfile, needsNicknameSetup } from '../../lib/users';
 import { ShareScope, shareScopeKey } from '../../lib/share-scope';
 import { listSharesByOwner, ShareWithSnapshot } from '../../lib/shares';
 import NicknameSetupModal from '../user/NicknameSetupModal';
-import WebShareList from '../share/WebShareList';
+import PublishList from '../share/PublishList';
 import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
@@ -696,12 +696,13 @@ export default function AppShell() {
             return p?.nickname || p?.displayName || '사용자';
           };
           if (scope.kind === 'sent-web') {
+            const publicProblems = allProblems.filter((p) => p.visibility === 'public');
             return (
               <div style={{ height: '100%', overflowY: 'auto' }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
-                  웹에 공개
+                  문항 공개
                 </h2>
-                <WebShareList shares={webShares} onChanged={() => loadData()} />
+                <PublishList shares={webShares} publicProblems={publicProblems} onChanged={() => loadData()} />
               </div>
             );
           }

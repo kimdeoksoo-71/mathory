@@ -103,7 +103,7 @@ export default function ShareTree({
           {sentOpen && (
             <>
               <SubRow
-                label="웹에 공개"
+                label="문항 공개"
                 active={activeScopeKey === 'sent-web'}
                 onClick={() => onSelectScope({ kind: 'sent-web' })}
               />
