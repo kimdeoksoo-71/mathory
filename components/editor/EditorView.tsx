@@ -1691,11 +1691,83 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
   }, [setCurrentBlocks]);
 
+  // 블록 활성화 시 스크롤 지속 시간 (수식/검색 220ms 대비 길게 — 타자 흐름 방해 최소화)
+  const BLOCK_SCROLL_MS = 450;
+  // 다음 useEffect[activeBlockId]의 기본 스크롤을 1회 스킵 (핸들러가 직접 처리한 경우)
+  const skipNextBlockScrollRef = useRef<boolean>(false);
+
+  /* ─── 미리보기: 블록 상단을 미리보기 상단 ~80px 아래로 스크롤 (상단바 클릭용) ─── */
+  const scrollPreviewToBlockTop = useCallback((blockId: string) => {
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
+        if (!blockPreview) return;
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = blockPreview.getBoundingClientRect();
+        const offset = targetRect.top - containerRect.top + container.scrollTop;
+        const target = offset - 80;
+        fastScrollTo(container, target, BLOCK_SCROLL_MS);
+      });
+    }, 50);
+  }, []);
+
+  /* ─── 편집창: 블록 상단을 편집창 상단 ~80px 아래로 스크롤 (상단바 클릭용) ─── */
+  const scrollEditorToBlockTop = useCallback((blockId: string) => {
+    setTimeout(() => {
+      const container = editorPanelRef.current;
+      if (!container) return;
+      const blockEl = container.querySelector(`[data-editor-block-id="${blockId}"]`) as HTMLElement | null;
+      if (!blockEl) return;
+      const containerRect = container.getBoundingClientRect();
+      const blockRect = blockEl.getBoundingClientRect();
+      const blockTop = blockRect.top - containerRect.top + container.scrollTop;
+      fastScrollTo(container, blockTop - 80, BLOCK_SCROLL_MS);
+    }, 50);
+  }, []);
+
+  /* ─── 편집창: 커서 라인을 편집창 세로 중앙으로 스크롤 (콘텐츠 클릭용) ─── */
+  const scrollEditorToCursorCenter = useCallback((blockId: string) => {
+    setTimeout(() => {
+      const ref = editorRefs.current[blockId];
+      const container = editorPanelRef.current;
+      if (!ref || !container) return;
+      const coords = ref.getCursorCoords();
+      if (!coords) return;
+      const containerRect = container.getBoundingClientRect();
+      const cursorRelativeTop = coords.top - containerRect.top + container.scrollTop;
+      const center = cursorRelativeTop - containerRect.height / 2;
+      fastScrollTo(container, center, BLOCK_SCROLL_MS);
+    }, 50);
+  }, []);
+
+  /* ─── 미리보기: 블록을 미리보기 세로 중앙으로 스크롤 (콘텐츠 클릭용)
+        — 정확한 행 매핑이 없으므로 블록 단위 중앙 정렬 ─── */
+  const scrollPreviewToBlockCenter = useCallback((blockId: string) => {
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
+        if (!blockPreview) return;
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = blockPreview.getBoundingClientRect();
+        const blockCenter = targetRect.top - containerRect.top + container.scrollTop + targetRect.height / 2;
+        fastScrollTo(container, blockCenter - containerRect.height / 2, BLOCK_SCROLL_MS);
+      });
+    }, 50);
+  }, []);
+
   /* ─── 상단바 클릭: 단일 선택(활성화) / Ctrl+클릭: 다중선택 토글 ─── */
   const handleSelectBlockBar = useCallback((blockId: string) => {
+    // 상단바 클릭: 블록 상단을 양쪽 패널 상단 ~80px 아래로
+    skipNextBlockScrollRef.current = true;
     setActiveBlockId(blockId);
     setSelectedBlockIds(new Set());
-  }, []);
+    scrollEditorToBlockTop(blockId);
+    scrollPreviewToBlockTop(blockId);
+  }, [scrollEditorToBlockTop, scrollPreviewToBlockTop]);
 
   const handleToggleSelectBlock = useCallback((blockId: string) => {
     setSelectedBlockIds((prev) => {
@@ -1806,24 +1878,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
-  /* ─── 미리보기에서 해당 블록의 첫 줄을 세로 중앙으로 스크롤 ─── */
-  const scrollPreviewToBlockTop = useCallback((blockId: string) => {
-    setTimeout(() => {
-      requestAnimationFrame(() => {
-        const container = previewRef.current;
-        if (!container) return;
-        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
-        if (!blockPreview) return;
-        const containerRect = container.getBoundingClientRect();
-        const targetRect = blockPreview.getBoundingClientRect();
-        const offset = targetRect.top - containerRect.top + container.scrollTop;
-        // 블록 최상단을 미리보기 상단에서 살짝 아래(약 80px)로 위치
-        const target = offset - 80;
-        fastScrollTo(container, target);
-      });
-    }, 50);
-  }, []);
-
   /* ─── 커서 활동 → 수식 하이라이트(시각용)만. 미리보기 동기화는 onFocus에서 처리 ─── */
   const handleCursorActivity = useCallback((info: { line: number; offset: number; docChanged: boolean; blockId: string }) => {
     const ref = editorRefs.current[info.blockId];
@@ -1838,18 +1892,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId]);
 
-  /* ─── 블록 포커스 진입 → 미리보기 동기화 (다른 블록 진입 시에만) ─── */
+  /* ─── 블록 포커스 진입 (콘텐츠 클릭): 커서 라인 / 블록을 양쪽 패널 세로 중앙으로 ─── */
   const handleBlockFocus = useCallback((blockId: string) => {
     if (blockId !== activeBlockId) {
+      skipNextBlockScrollRef.current = true;
       setActiveBlockId(blockId);
-      scrollPreviewToBlockTop(blockId);
+      scrollEditorToCursorCenter(blockId);
+      scrollPreviewToBlockCenter(blockId);
     }
     // Phase 25 Step 1: 포커스 진입 시 즉시 수식 안/밖 갱신
     const ref = editorRefs.current[blockId];
     if (ref) {
       setCursorInMath(isInsideMath(ref.getContent(), ref.getCursorPosition()));
     }
-  }, [activeBlockId, scrollPreviewToBlockTop]);
+  }, [activeBlockId, scrollEditorToCursorCenter, scrollPreviewToBlockCenter]);
 
   /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
@@ -1891,11 +1947,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 100);
   }, [setCurrentBlocks]);
 
-  /* ─── 블록 활성화 시 편집창에서 해당 블록 상단을 살짝 아래(80px)에 자동 스크롤 ─── */
+  /* ─── 블록 활성화 시 기본 자동 스크롤 (탭 전환·초기 진입 등) ─── */
+  // 핸들러(handleBlockFocus / handleSelectBlockBar)가 직접 스크롤을 처리한 경우엔 skip
   useEffect(() => {
     if (!activeBlockId) return;
-    // 전체접기 모드에선 자동 스크롤 비활성 — 선택 시 블록이 움직여 더블클릭(개별 펼침) 판정이 깨지는 문제 방지
     if (collapseMode) return;
+    if (skipNextBlockScrollRef.current) {
+      skipNextBlockScrollRef.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       const container = editorPanelRef.current;
       if (!container) return;
@@ -1904,8 +1964,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const containerRect = container.getBoundingClientRect();
       const blockRect = (blockEl as HTMLElement).getBoundingClientRect();
       const blockTop = blockRect.top - containerRect.top + container.scrollTop;
-      const target = blockTop - 80;
-      fastScrollTo(container, target);
+      fastScrollTo(container, blockTop - 80, BLOCK_SCROLL_MS);
     }, 80);
     return () => clearTimeout(timer);
   }, [activeBlockId, collapseMode]);
