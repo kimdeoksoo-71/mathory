@@ -2,3 +2,7 @@ node_modules/
 .next/
 .env.local
 tsconfig.tsbuildinfo
+
+# macOS
+.DS_Store
+**/.DS_Store
