@@ -69,6 +69,18 @@ export async function setCommentsVisible(problemId: string, visible: boolean): P
   });
 }
 
+/**
+ * Phase 51: 실시간 공개 ON/OFF (오너 전용).
+ * 공개 시 publishedAt을 1회 스탬프(비공개→재공개 시 갱신 → PublishList 상단 복귀).
+ * 일반 편집(updateProblem)은 publishedAt을 건드리지 않으므로 정렬이 출렁이지 않는다.
+ * 비공개 전환 시 publishedAt은 보존(재공개 때 갱신).
+ */
+export async function setProblemPublic(problemId: string, isPublic: boolean): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), isPublic
+    ? { visibility: 'public', publishedAt: serverTimestamp(), updated_at: serverTimestamp() }
+    : { visibility: 'private', updated_at: serverTimestamp() });
+}
+
 /** Phase 47: 댓글 쓰기 허용 토글 (오너 전용). false = 멤버 작성 동결 */
 export async function setCommentsWritable(problemId: string, writable: boolean): Promise<void> {
   await updateDoc(doc(db, 'problems', problemId), {
