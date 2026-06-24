@@ -264,6 +264,33 @@ export async function getPreviewBlocks(problemId: string, tabs: TabMeta[]): Prom
 }
 
 /**
+ * Phase 51: problems/{id} 문서 실시간 구독 (공개 live 뷰어용).
+ * 비공개 문항을 비오너가 구독하면 permission-denied → onError로 전달(뷰어가 "비공개" 안내).
+ * @returns 구독 해제 함수
+ */
+export function watchProblem(
+  problemId: string,
+  callback: (problem: Problem | null) => void,
+  onError?: (err: Error) => void,
+): () => void {
+  return onSnapshot(
+    doc(db, 'problems', problemId),
+    (snap) => {
+      if (!snap.exists()) { callback(null); return; }
+      const data = snap.data();
+      callback({
+        id: snap.id,
+        ...data,
+        created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
+        updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
+        publishedAt: (data.publishedAt as Timestamp | undefined)?.toDate(),
+      } as Problem);
+    },
+    (err) => onError?.(err),
+  );
+}
+
+/**
  * Phase 51(P2): 한 탭의 블록을 실시간 구독 (공개 live 뷰어용).
  * 비공개 탭은 규칙(4-1)이 막아 permission-denied → 에러 콜백에서 무시(빈 상태 유지).
  * live 뷰어는 getPreviewBlocks를 쓰지 말 것(첫 탭만 반환 + 권한 에러 silent → 다중 탭 부적합).

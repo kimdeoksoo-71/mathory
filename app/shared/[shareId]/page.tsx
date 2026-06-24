@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import EditorPreview from '../../../components/editor/EditorPreview';
-import ChoicesBlock from '../../../components/editor/ChoicesBlock';
+import ProblemTabContent from '../../../components/share/ProblemTabContent';
 import { getShare, isShareExpired, ShareWithSnapshot } from '../../../lib/shares';
-import { Block } from '../../../types/problem';
-import { imageTreatmentStyle } from '../../../lib/imageTreatment';
-
-const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 export default function SharedPage() {
   const params = useParams<{ shareId: string }>();
@@ -156,7 +151,7 @@ export default function SharedPage() {
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
               boxSizing: 'border-box',
             }}>
-              <TabContent
+              <ProblemTabContent
                 blocks={share.snapshot.tabBlocks[activeTab] || []}
               />
             </div>
@@ -164,58 +159,6 @@ export default function SharedPage() {
         )}
 
       </div>
-    </div>
-  );
-}
-
-function TabContent({ blocks }: { blocks: Block[] }) {
-  const sorted = [...blocks].sort((a, b) => a.order - b.order);
-  return (
-    <div>
-      {sorted.map((block, i) => {
-        const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
-
-        if (block.type === 'image') {
-          const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
-          return (
-            <div key={block.id} style={{ textAlign: 'center', margin: '0.8em 0' }}>
-              {src ? (
-                <img src={src} alt="" style={{
-                  width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
-                  ...imageTreatmentStyle(block),
-                }} />
-              ) : (
-                <span style={{ color: '#888', fontSize: 12 }}>(이미지 없음)</span>
-              )}
-            </div>
-          );
-        }
-
-        if (BORDERED_TYPES.has(block.type)) {
-          return (
-            <div key={block.id} style={{
-              border: '1.5px solid var(--text-muted, #888)',
-              borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
-            }}>
-              <EditorPreview content={block.raw_text} borderless locale="ko" />
-            </div>
-          );
-        }
-
-        if (block.type === 'choices') {
-          return (
-            <div key={block.id}>
-              <ChoicesBlock rawText={block.raw_text} locale="ko" />
-            </div>
-          );
-        }
-
-        return (
-          <div key={block.id} style={{ paddingTop: headingTopPad }}>
-            <EditorPreview content={block.raw_text} borderless locale="ko" />
-          </div>
-        );
-      })}
     </div>
   );
 }
