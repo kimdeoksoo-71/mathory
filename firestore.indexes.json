@@ -24,6 +24,30 @@
         { "fieldPath": "authorUid", "order": "ASCENDING" },
         { "fieldPath": "folder_id", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "bazaar_posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tags", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bazaar_posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "ownerUid", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "bazaar_posts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "authorNickname_lower", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

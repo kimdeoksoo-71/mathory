@@ -159,6 +159,18 @@ service cloud.firestore {
           return sid == null
             || get(/databases/$(database)/documents/problems/$(problemId)/discussion_sessions/$(sid)).data.type == 'comment';
         }
+        // Phase 52(C3/F6): 공개 작성자는 문항의 댓글 세션 포인터(commentSessionId)를
+        //   '정확히' 참조해야 한다. null 우회 차단 + agent 세션 차단을 추가 get() 없이 보장.
+        //   (commentSessionId는 ensureCommentSession이 게시 시 비정규화 — §6-2 load-bearing)
+        function isThePublicCommentSession(sid) {
+          return sid != null && sid == parentData().get('commentSessionId', null);
+        }
+        // Phase 52(N1): 공개 댓글 작성 전용 opt-in 플래그(미설정 = false).
+        //   멤버 작성 동결용 commentsWritable과 분리 — 두 청중(멤버/공개)을 독립 제어.
+        //   기존 public 문항은 이 필드가 없어 기본 차단(자동 개방 방지).
+        function publicCommentsEnabled() {
+          return parentData().get('publicCommentsEnabled', false) == true;
+        }
         function changedKeys() {
           return request.resource.data.diff(resource.data).affectedKeys();
         }
@@ -186,6 +198,12 @@ service cloud.firestore {
               isOwnerCmt()
               || (isMemberCmt() && isCommenter() && commentsWritable()
                   && isCommentSessionRef(request.resource.data.get('discussionSessionId', null)))
+              // Phase 52(C3): 공개 문항이면 로그인한 누구나 댓글 작성.
+              //   N1: publicCommentsEnabled(전용 opt-in) — 기존 public 문항 자동개방 차단·멤버와 분리.
+              //   F5: commentsVisible까지 요구 — 숨긴 댓글을 못 읽으면서 쓰는 모순 방지.
+              //   F6: 문항 commentSessionId 정확 참조(null·agent 세션 우회 차단).
+              || (parentIsPublic() && publicCommentsEnabled() && commentsVisible()
+                  && isThePublicCommentSession(request.resource.data.get('discussionSessionId', null)))
             )
           )
           ||
@@ -297,6 +315,54 @@ service cloud.firestore {
 
       // 수정은 금지 (재발급 = delete + create)
       allow update: if false;
+    }
+
+    // ===== bazaar_posts 컬렉션 (Phase 52: 공용 광장 피드) =====
+    //   - "광장 게시"는 공개(visibility)와 별개의 명시적 행위(C1). 등록해야 피드에 노출.
+    //   - read: 로그인 사용자 전체(광장은 인증 카테고리). 개별 뷰어(/p·/shared)는
+    //     기존 problems/shares 규칙으로 비로그인도 접근 가능.
+    //   - create: 본인 소유 문항 + author 본인 + 형태 검증(F7).
+    //       live는 게시 시점에 문항이 이미 public이어야 함(F1) — /p 뷰어 read가 isPublic 의존.
+    //   - update: 게시자 본인, 태그·제목 비정규화만(사후 태그 편집). mode/problemId/ownerUid/shareId 불변.
+    //   - delete: 게시자 본인(중단). 관리자 모더레이션(bazaar_reports + admin takedown)은 Phase 53.
+    //   - 개수 제한(live 1·snapshot 2)은 규칙으로 강제 불가(list 불가) → 클라 검사(§리스크 R3).
+    match /bazaar_posts/{postId} {
+      function bp() { return request.resource.data; }
+      function problemData(pid) {
+        return get(/databases/$(database)/documents/problems/$(pid)).data;
+      }
+      // create 형태 검증: 필드 타입 + mode/shareId 정합 + 태그 개수 한도(array-contains-any 10)
+      function validCreateShape() {
+        return bp().ownerUid == request.auth.uid
+          && bp().mode in ['live', 'snapshot']
+          && bp().problemId is string
+          && bp().title is string
+          && bp().title_lower is string
+          && bp().authorNickname is string
+          && bp().authorNickname_lower is string
+          && bp().tags is list && bp().tags.size() <= 10
+          && (
+            (bp().mode == 'snapshot' && ('shareId' in bp().keys()) && bp().shareId is string)
+            || (bp().mode == 'live' && !('shareId' in bp().keys()))
+          );
+      }
+
+      allow read: if request.auth != null;
+
+      allow create: if request.auth != null
+        && validCreateShape()
+        && problemData(bp().problemId).authorUid == request.auth.uid
+        // F1: live 게시는 문항이 이미 공개 상태여야 함(스냅샷은 shares 자체가 비로그인 접근).
+        && (bp().mode == 'snapshot'
+            || problemData(bp().problemId).get('visibility', 'private') == 'public');
+
+      allow update: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['tags', 'title', 'title_lower']);
+
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
     }
 
     // ===== sessions 컬렉션 (단일 활성 세션) =====

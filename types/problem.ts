@@ -29,6 +29,8 @@ export interface Problem {
   // Phase 51: 문항 공개(실시간)
   publishedAt?: Date;                          // 실시간 공개 ON 시 스탬프 (PublishList 정렬용)
   commentSessionId?: string;                   // 댓글 세션 id 포인터(비정규화). 공개 뷰어 isCommentStream 필터용
+  // Phase 52(N1): 공개 댓글 작성 opt-in. 미설정 = false. commentsWritable(멤버용)과 분리.
+  publicCommentsEnabled?: boolean;             // true = 로그인 누구나 공개 댓글 작성 허용
 }
 
 export type MemberRole = 'viewer' | 'commenter';
@@ -41,6 +43,9 @@ export interface ProblemComment {
   id: string;
   tabId: string;                       // (잔존) 작성 당시 열린 탭. 필터·권한 미사용
   authorUid: string;                   // human: Firebase uid, AI: 'ai:{modelId}'
+  // Phase 52(F3): 작성 시점 닉네임 비정규화. 공개 댓글에서 비로그인 열람자도 이름 표시.
+  // 미설정(기존 댓글) = 프로필 백필 → '익명'. addComment/mapDoc 배선은 5단계.
+  authorName?: string;
   content: string;                     // markdown + KaTeX (인라인 수식)
   parentCommentId: string | null;      // null = 최상위, 값 = 답글
   resolved: boolean;                   // 오너 또는 작성자가 토글
@@ -195,6 +200,30 @@ export interface Share {
   createdAt: Date;
   expiresAt: Date | null;              // null = 무기한
   tabVisibility: ShareTabVisibility;   // 탭 id → 공개 여부
+}
+
+// ═══ Phase 52: Bazaar 공용 광장 ═══
+
+export type BazaarMode = 'live' | 'snapshot';
+
+/**
+ * 광장 게시물. 공개(visibility)와 별개의 명시적 등록(C1).
+ * mode='live' → /p/{problemId} (실시간), mode='snapshot' → /shared/{shareId} (동결본).
+ * 표시·검색용 비정규화 필드(authorNickname/title/tags)는 게시 시점 스냅샷 — 원본 변경 시 어긋날 수 있음(R4·R8).
+ */
+export interface BazaarPost {
+  id: string;
+  mode: BazaarMode;
+  problemId: string;                   // 원본 문항(정렬·중복검사·실시간 라우팅)
+  shareId?: string;                    // mode='snapshot'일 때만 존재 (shares/{shareId})
+  ownerUid: string;
+  authorNickname: string;              // 게시 시점 닉네임(비정규화). 피드 표시용
+  authorNickname_lower: string;        // 검색용(= UserProfile.nickname_lower)
+  title: string;                       // 비정규화(피드·검색)
+  title_lower: string;                 // 제목 prefix 검색용(= title.trim().toLowerCase())
+  tags: string[];                      // '#' 제거·정규화·중복제거. 최대 10개. 빈 배열 허용
+  createdAt: Date;
+  expiresAt?: Date | null;             // snapshot: share.expiresAt 동기화(만료 숨김). live: null
 }
 
 export interface ProblemWithBlocks extends Problem {
