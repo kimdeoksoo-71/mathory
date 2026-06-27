@@ -2,13 +2,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import EditorPreview from '../editor/EditorPreview';
-import { watchAllComments, isCommentStream, buildThreads } from '../../lib/comments';
+import { watchCommentStream, isCommentStream, buildThreads } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
 import { ProblemComment, UserProfile } from '../../types/problem';
 
 /**
  * Phase 51 5단계: 공개 문항의 읽기 전용 댓글.
- * - commentSessionId(problem 문서 비정규화 포인터)로 isCommentStream 필터 → 오너/멤버 댓글만, agent 메시지 제외
+ * - Phase 52(B1): watchCommentStream(commentStream==true 필터 쿼리)로 구독 → agent('normal' 세션)
+ *   메시지는 규칙·쿼리 모두에서 제외(규칙레벨 노출 차단). isCommentStream은 방어적 2차 필터로 유지.
  * - 작성 입력창·답글·해결·삭제 등 쓰기 UI 없음(완전 읽기 전용)
  * - 작성자 표시명: users 문서는 비로그인 read 불가(규칙) → 비로그인 방문자에겐 '익명'으로 폴백
  *   (v2: 작성 시 authorName 비정규화로 해소 가능)
@@ -24,7 +25,7 @@ export default function PublicComments({
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
 
   useEffect(() => {
-    const unsub = watchAllComments(problemId, setComments);
+    const unsub = watchCommentStream(problemId, setComments);
     return () => unsub();
   }, [problemId]);
 

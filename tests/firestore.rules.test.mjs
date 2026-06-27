@@ -24,6 +24,10 @@
  *   28) 본인명의 신고 create 허용  29) reporterUid 위조 거부  30) 비로그인 거부
  *   31) 비관리자 read 거부  32) 관리자 read 허용  33) 비관리자 delete 거부
  *   34) 관리자 delete 허용  35) 관리자 bazaar_posts takedown 허용
+ *   [Phase 52 B1: 공개 뷰어 agent 메시지 차단 (commentStream)]
+ *   36) agent 메시지 공개 read 거부(핵심)  37) 스트림 댓글 공개 read 허용
+ *   38) 필터 LIST 허용  39) 미필터 LIST 거부  40) 멤버 미필터 LIST 허용  41) 공개 작성 commentStream 누락 거부
+ *   42) 오너 commentStream 백필 update 허용  43) 비오너 거부
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -32,7 +36,10 @@ import {
   assertFails,
   assertSucceeds,
 } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, deleteDoc, updateDoc } from 'firebase/firestore';
+import {
+  doc, setDoc, getDoc, deleteDoc, updateDoc,
+  collection, getDocs, query, where, orderBy,
+} from 'firebase/firestore';
 
 const PROJECT_ID = 'mathory-rules-test';
 const OWNER = 'ownerUid';
@@ -71,10 +78,23 @@ before(async () => {
     await setDoc(doc(db, 'problems/pub/tab_comments/c_human'), {
       tabId: 'question', authorType: 'human', authorUid: OTHER_AUTHOR,
       content: 'hello', parentCommentId: null, resolved: false,
+      commentStream: true,                         // B1: 댓글 스트림 → 공개 read 대상
     });
     await setDoc(doc(db, 'problems/pub/tab_comments/c_ai'), {
       tabId: 'question', authorType: 'ai', authorUid: 'ai:claude',
       content: 'ai answer', parentCommentId: null, resolved: false,
+    });
+    // B1: agent('normal' 세션) 메시지 — commentStream 없음 → 공개 read 거부 대상
+    await setDoc(doc(db, 'problems/pub/tab_comments/c_agent'), {
+      tabId: 'question', authorType: 'human', authorUid: OWNER,
+      content: 'agent note', parentCommentId: null, resolved: false,
+      discussionSessionId: 'agentSess',
+    });
+    // B1: 삭제 테스트 영향 없는 스트림 댓글(공개 read 허용 검증용)
+    await setDoc(doc(db, 'problems/pub/tab_comments/c_stream'), {
+      tabId: 'question', authorType: 'human', authorUid: OTHER_AUTHOR,
+      content: 'stream note', parentCommentId: null, resolved: false,
+      commentStream: true,
     });
 
     // 공개지만 댓글 숨김
@@ -192,6 +212,7 @@ test('11. 오너가 AI 댓글 삭제 허용 (기존 보존)', async () => {
 const pubComment = (uid, sid) => ({
   tabId: '', authorType: 'human', authorUid: uid,
   content: 'public note', parentCommentId: null, resolved: false,
+  commentStream: true,                            // B1: 공개 작성분은 스트림 플래그 필수
   ...(sid !== undefined ? { discussionSessionId: sid } : {}),
 });
 
@@ -295,4 +316,39 @@ test('34. 관리자 신고 delete 허용', async () => {
 });
 test('35. 관리자 bazaar_posts takedown(삭제) 허용', async () => {
   await assertSucceeds(deleteDoc(doc(as(ADMIN), 'bazaar_posts/adminTarget')));
+});
+
+// ══ Phase 52(B1): 공개 뷰어 agent 메시지 규칙레벨 차단 ══
+test('36. 공개·비로그인 agent 메시지(commentStream 없음) read 거부 (B1 핵심)', async () => {
+  await assertFails(getDoc(doc(anon(), 'problems/pub/tab_comments/c_agent')));
+});
+test('37. 공개·비로그인 commentStream 댓글 read 허용 (백필분)', async () => {
+  await assertSucceeds(getDoc(doc(anon(), 'problems/pub/tab_comments/c_stream')));
+});
+test('38. 공개·비로그인 필터 LIST(commentStream==true) 허용', async () => {
+  await assertSucceeds(getDocs(query(
+    collection(anon(), 'problems/pub/tab_comments'),
+    where('commentStream', '==', true), orderBy('createdAt', 'asc'),
+  )));
+});
+test('39. 공개·비로그인 미필터 LIST 거부 (규칙이 필터 강제, agent 노출 차단)', async () => {
+  await assertFails(getDocs(query(
+    collection(anon(), 'problems/pub/tab_comments'), orderBy('createdAt', 'asc'),
+  )));
+});
+test('40. 멤버 미필터 LIST 허용 (멤버 가지 무제약 — 협업 회귀 없음)', async () => {
+  await assertSucceeds(getDocs(query(
+    collection(as(COMMENTER), 'problems/pub/tab_comments'), orderBy('createdAt', 'asc'),
+  )));
+});
+test('41. 공개 작성 시 commentStream 누락 create 거부 (B1 정합)', async () => {
+  const { commentStream, ...noStream } = pubComment(STRANGER, 'cs1');
+  await assertFails(setDoc(
+    doc(as(STRANGER), 'problems/pubBazaar/tab_comments/pc41'), noStream));
+});
+test('42. 오너가 commentStream 플래그만 갱신 허용 (백필)', async () => {
+  await assertSucceeds(updateDoc(doc(as(OWNER), 'problems/pub/tab_comments/c_agent'), { commentStream: true }));
+});
+test('43. 비오너의 commentStream 갱신 거부', async () => {
+  await assertFails(updateDoc(doc(as(STRANGER), 'problems/pub/tab_comments/c_stream'), { commentStream: false }));
 });

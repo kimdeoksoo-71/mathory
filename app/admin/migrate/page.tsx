@@ -90,6 +90,44 @@ export default function MigratePage() {
     }
   };
 
+  // Phase 52(B1): 공개 문항의 기존 댓글에 commentStream 플래그 백필.
+  //   addComment는 신규 댓글에 자동 세팅하므로, 배포 이전 댓글만 대상.
+  //   미실행 시 기존 공개 댓글이 공개 뷰어(필터 쿼리)에서 안 보임.
+  const handleBackfillCommentStream = async () => {
+    setMigrating(true);
+    setLog([]);
+    try {
+      appendLog('B1 백필 시작: 공개 문항 댓글 스트림 플래그…');
+      const pubSnap = await getDocs(query(
+        collection(db, 'problems'),
+        where('authorUid', '==', user.uid),
+        where('visibility', '==', 'public'),
+      ));
+      appendLog(`공개 문항: ${pubSnap.size}개`);
+      let scanned = 0, updated = 0;
+      for (const pd of pubSnap.docs) {
+        const csid = (pd.data().commentSessionId ?? null) as string | null;
+        const cSnap = await getDocs(collection(db, 'problems', pd.id, 'tab_comments'));
+        for (const cd of cSnap.docs) {
+          const c = cd.data();
+          scanned += 1;
+          if (c.commentStream === true) continue;          // 이미 플래그됨
+          if (c.authorType === 'ai') continue;             // AI/agent 메시지 제외
+          const sid = typeof c.discussionSessionId === 'string' ? c.discussionSessionId : null;
+          const isStream = sid === null || sid === csid;   // 댓글세션/legacy만 스트림
+          if (!isStream) continue;                         // agent('normal') 세션 제외
+          await updateDoc(doc(db, 'problems', pd.id, 'tab_comments', cd.id), { commentStream: true });
+          updated += 1;
+        }
+      }
+      appendLog(`백필 완료: ${scanned}개 검사, ${updated}개 갱신`);
+    } catch (e: any) {
+      appendLog(`백필 실패: ${e?.message || e}`);
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   return (
     <div style={{ maxWidth: 800, margin: '40px auto', padding: 24, fontFamily: 'system-ui' }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>Stage 0 데이터 마이그레이션</h1>
@@ -111,6 +149,20 @@ export default function MigratePage() {
           style={btn(!result || migrating || scanning, '#e8a23a')}
         >
           {migrating ? '마이그레이션 중...' : '2. 마이그레이션 실행'}
+        </button>
+      </div>
+
+      <div style={{ borderTop: '1px solid #eee', paddingTop: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+          Phase 52(B1): 공개 문항 기존 댓글에 <code>commentStream</code> 플래그 백필
+          (미실행 시 기존 공개 댓글이 공개 뷰어에서 안 보임). 신규 댓글은 자동.
+        </div>
+        <button
+          onClick={handleBackfillCommentStream}
+          disabled={migrating || scanning}
+          style={btn(migrating || scanning, '#43a047')}
+        >
+          {migrating ? '백필 중...' : 'B1: commentStream 백필'}
         </button>
       </div>
 

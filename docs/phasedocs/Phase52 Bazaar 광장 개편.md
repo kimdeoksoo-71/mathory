@@ -49,6 +49,7 @@
   - `shares` read = `if true`(nanoid 비밀 전제) → Bazaar 노출 시 비밀성 깨짐(R2).
   - 신규 `bazaar_posts` match(§4-1). ✓ 완료
   - 신규 `bazaar_reports` match + `admins/{uid}` + 전역 `isAdmin()` + `bazaar_posts` admin delete 가지(§4-4, A2). ✓ 완료
+  - **B1: `tab_comments` read 공개 가지에 `commentStream==true` + 공개 create에 요구 + 오너 commentStream 백필 update 가지. 인덱스 `tab_comments(commentStream,createdAt)` 추가. ✓ 완료(재배포 필요)**
 - `lib/firestore.ts` — `setProblemPublic`(L78, `visibility`+`publishedAt`), `watchProblem`(L271), `watchTabBlocks`(L300), `listProblems`(L116, **owner-scoped → 피드 불가**).
 - `lib/shares.ts` — `createShare`(L124), `listSharesByOwner`(L172), `revokeShare`(L179, =문서삭제), `isShareExpired`(L183), `getShareByProblem`(L189). `ShareWithSnapshot`(L76).
 - `lib/comments.ts` — `AddCommentInput`(L55)·`addComment`(L69, `resolved:false`/`authorType:'human'` 자동) → **`authorName` 추가(F3, 5단계)**. `mapDoc`(L27)에 `authorName` 매핑 추가(F3, 5단계). `watchAllComments`(L102)·`isCommentStream`(L140)·`buildThreads`(L184) 재사용.
@@ -383,7 +384,7 @@ onShare():
 - **R3 개수 우회**: 클라 검사. 우회 시 피드 중복뿐. v2 Cloud Function.
 - **R4 live 제목 stale / R8 닉네임 stale**: 비정규화 → 원본 변경 시 어긋남. 클릭 시 뷰어가 최신. v2 동기화.
 - **R5/D4 단일 세션 충돌**: `/p` 로그인 = 메인 도메인 팝업/리다이렉트.
-- **R6 agent 메시지 노출**: 뷰어 `isCommentStream`로 UI 차단(Phase 51 방어 유지). 민감 문항 공개 금지 안내.
+- **R6 agent 메시지 노출 → B1로 규칙레벨 차단(2026-06-27, 해결).** 공개(비멤버) `tab_comments` read가 `commentStream==true`만 허용 → 공개 뷰어는 `watchCommentStream`(필터 쿼리)로 구독, agent('normal' 세션) 메시지는 규칙·쿼리 모두에서 제외. `isCommentStream`은 방어적 2차 필터로 유지. **멤버(초대 협업자)는 무제약 — 멤버 노출 차단은 별도 후속.** 기존 공개 문항 댓글은 `/admin/migrate` B1 백필 필요(신규는 자동).
 - **R7 N탭 2단**: 정확히 2탭만 2단. 1·3+ 단일 폴백.
 - **R9 인스타·`/shared` 메타**: 인스타 직접공유 불가, `/shared` OG 없음 → v1 공유 `/p` 우선.
 
@@ -425,12 +426,12 @@ onShare():
 
 | 파일 | 변경 | 검증 |
 |---|---|---|
-| `firestore.rules` | `bazaar_posts` match + `tab_comments` 공개 가지 + 헬퍼(`isThePublicCommentSession`·`publicCommentsEnabled`) **+ 전역 `isAdmin()` + `admins/{uid}` + `bazaar_reports` match + `bazaar_posts` admin delete 가지(A2)** | 에뮬레이터 37/37 |
-| `types/problem.ts` | `BazaarPost`·`BazaarMode` + `Problem.publicCommentsEnabled?` + `ProblemComment.authorName?` | tsc(가산 변경) |
-| `firestore.indexes.json` | 복합 인덱스 3개 | — |
-| `tests/firestore.rules.test.mjs` | 시드(+admin·report·adminTarget) + 26 케이스(공개댓글·bazaar_posts·**bazaar_reports A2**) | 37/37 |
+| `firestore.rules` | `bazaar_posts` match + `tab_comments` 공개 가지 + 헬퍼(`isThePublicCommentSession`·`publicCommentsEnabled`) + 전역 `isAdmin()` + `admins/{uid}` + `bazaar_reports` match + `bazaar_posts` admin delete 가지(A2) **+ B1(공개 read `commentStream==true`·공개 create 요구·오너 백필 update)** | 에뮬레이터 45/45 |
+| `types/problem.ts` | `BazaarPost`·`BazaarMode` + `Problem.publicCommentsEnabled?` + `ProblemComment.authorName?` **+ `ProblemComment.commentStream?`(B1)** | tsc(가산 변경) |
+| `firestore.indexes.json` | 복합 인덱스 4개(bazaar_posts 3 + **tab_comments(commentStream,createdAt) B1**) | — |
+| `tests/firestore.rules.test.mjs` | 시드(+admin·report·adminTarget·c_agent·c_stream) + 케이스(공개댓글·bazaar_posts·bazaar_reports A2·**B1 36~43**) | 45/45 |
 
-> **남은 1단계 작업**: 덕수가 ① `firebase deploy --only firestore:rules,firestore:indexes`로 단독 배포 후 검증, ② **Firebase 콘솔에서 `admins/{본인uid}` 문서 1개 생성**(A2 takedown 활성화 — 없으면 신고 적재는 되나 열람·삭제 불가). 커밋(`Phase 52 1단계 …`)·푸시는 덕수.
+> **남은 배포 작업**: 덕수가 ① `firebase deploy --only firestore:rules,firestore:indexes`(B1 인덱스 포함 재배포), ② `admins/{본인uid}` 문서(A2, 완료), ③ **`/admin/migrate`에서 'B1: commentStream 백필' 실행**(기존 공개 문항 댓글이 공개 뷰어에 보이도록). 커밋·푸시는 덕수.
 
 ---
 

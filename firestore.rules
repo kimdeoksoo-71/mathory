@@ -195,11 +195,12 @@ service cloud.firestore {
         // (탭별 가시성을 read에 걸면 Firestore list 쿼리가 사전 검증 불가 → 탭 검사 제거.
         //  commentsVisible는 부모 문서 기반이라 list 쿼리에서도 안전.
         //  Phase 51: 공개 문항은 비로그인 포함 누구나 댓글 읽기 가능(isSignedIn 미요구) — 본문 열람과 일관.
-        //  ⚠️ D3: agent AI 메시지도 tab_comments에 있어 공개 열람자가 규칙 레벨에선 읽을 수 있음 →
-        //     뷰어가 isCommentStream(commentSessionId)으로 UI 차단. 민감 문항 공개 금지 안내. 완전 차단은 별도 Phase.)
+        //  Phase 52(B1): 공개(비멤버) read는 commentStream==true 메시지만 — agent('normal' 세션)
+        //     메시지의 규칙레벨 노출 차단. LIST 쿼리는 where('commentStream','==',true) 강제(정적 리터럴).
+        //     오너·멤버는 제약 없음(에디터 전체 열람). 기존 댓글은 백필 필요(공개 문항 한정).
         allow read: if isOwnerCmt()
           || (isMemberCmt() && commentsVisible())
-          || (parentIsPublic() && commentsVisible());
+          || (parentIsPublic() && commentsVisible() && resource.data.commentStream == true);
 
         // 생성 (Phase 47):
         //  (a) 인간 댓글: 오너 OR (commenter && 댓글 쓰기 허용 && 댓글 세션). author 본인.
@@ -218,8 +219,10 @@ service cloud.firestore {
               //   N1: publicCommentsEnabled(전용 opt-in) — 기존 public 문항 자동개방 차단·멤버와 분리.
               //   F5: commentsVisible까지 요구 — 숨긴 댓글을 못 읽으면서 쓰는 모순 방지.
               //   F6: 문항 commentSessionId 정확 참조(null·agent 세션 우회 차단).
+              //   B1: commentStream==true 요구 — 공개 작성분이 공개 read 규칙·필터 쿼리에 일관되게 노출.
               || (parentIsPublic() && publicCommentsEnabled() && commentsVisible()
-                  && isThePublicCommentSession(request.resource.data.get('discussionSessionId', null)))
+                  && isThePublicCommentSession(request.resource.data.get('discussionSessionId', null))
+                  && request.resource.data.get('commentStream', false) == true)
             )
           )
           ||
@@ -252,6 +255,11 @@ service cloud.firestore {
           resource.data.authorType == 'ai'
           && isOwnerCmt()
           && changedKeys().hasOnly(['resolved', 'updatedAt'])
+        ) || (
+          // Phase 52(B1): 오너가 commentStream 플래그만 갱신(기존 댓글 백필용).
+          //   본인 문항 댓글에 한정. 공개 노출 여부는 오너 본인 콘텐츠 결정이라 안전.
+          isOwnerCmt()
+          && changedKeys().hasOnly(['commentStream'])
         );
 
         // 삭제:

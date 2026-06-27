@@ -48,6 +48,14 @@
         { "fieldPath": "authorNickname_lower", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "tab_comments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "commentStream", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -46,6 +46,10 @@ export interface ProblemComment {
   // Phase 52(F3): 작성 시점 닉네임 비정규화. 공개 댓글에서 비로그인 열람자도 이름 표시.
   // 미설정(기존 댓글) = 프로필 백필 → '익명'. addComment/mapDoc 배선은 5단계.
   authorName?: string;
+  // Phase 52(B1): 댓글 스트림(공개 대상) 여부 비정규화. true = 댓글세션/legacy 메시지.
+  //   agent('normal' 세션) 메시지는 미설정(false) → 공개 뷰어 필터 쿼리·규칙에서 제외.
+  //   addComment가 자동 세팅. 기존 댓글은 백필 필요(공개 문항 한정).
+  commentStream?: boolean;
   content: string;                     // markdown + KaTeX (인라인 수식)
   parentCommentId: string | null;      // null = 최상위, 값 = 답글
   resolved: boolean;                   // 오너 또는 작성자가 토글

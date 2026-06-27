@@ -1,6 +1,6 @@
 import {
-  collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
-  query, orderBy, serverTimestamp,
+  collection, doc, getDocs, getDoc, addDoc, updateDoc, deleteDoc,
+  query, where, orderBy, serverTimestamp,
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -47,6 +47,7 @@ function mapDoc(d: any): ProblemComment {
     modelId: typeof data.modelId === 'string' ? data.modelId : undefined,
     discussionSessionId:
       typeof data.discussionSessionId === 'string' ? data.discussionSessionId : undefined,
+    commentStream: data.commentStream === true ? true : undefined,
     invokedModelIds: Array.isArray(data.invokedModelIds) ? data.invokedModelIds : undefined,
     aiUsage,
   };
@@ -64,9 +65,30 @@ export interface AddCommentInput {
   discussionSessionId?: string;
   invokedModelIds?: string[];
   aiUsage?: AIUsage;
+  // Phase 52(B1): 댓글세션 포인터(알면 전달 → commentStream 계산 시 추가 read 회피).
+  commentSessionId?: string | null;
+}
+
+/**
+ * Phase 52(B1): 이 메시지가 댓글 스트림(공개 대상)인지 판정.
+ *   discussionSessionId가 null(legacy) 또는 댓글세션이면 true, agent('normal') 세션이면 false.
+ *   commentSessionId 미제공 시 문항 문서에서 조회(없으면 보수적으로 false).
+ */
+async function resolveCommentStream(input: AddCommentInput): Promise<boolean> {
+  const sid = input.discussionSessionId ?? null;
+  if (sid === null) return true;
+  if (input.commentSessionId !== undefined) return sid === input.commentSessionId;
+  try {
+    const ps = await getDoc(doc(db, 'problems', input.problemId));
+    const csid = ps.data()?.commentSessionId;
+    return typeof csid === 'string' && sid === csid;
+  } catch {
+    return false;
+  }
 }
 
 export async function addComment(input: AddCommentInput): Promise<string> {
+  const commentStream = await resolveCommentStream(input);
   const payload: Record<string, unknown> = {
     tabId: input.tabId,
     authorUid: input.authorUid,
@@ -74,6 +96,7 @@ export async function addComment(input: AddCommentInput): Promise<string> {
     content: input.content,
     parentCommentId: input.parentCommentId ?? null,
     resolved: false,
+    commentStream,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
@@ -108,6 +131,28 @@ export function watchAllComments(
     q,
     (snap) => callback(snap.docs.map(mapDoc)),
     (err) => console.error('[comments] 실시간 구독 오류:', err),
+  );
+}
+
+/**
+ * Phase 52(B1): 공개 뷰어 전용 — 댓글 스트림(commentStream==true)만 구독.
+ *   agent('normal' 세션) 메시지는 쿼리·규칙 모두에서 제외 → 규칙레벨 노출 차단.
+ *   (비멤버 공개 read 규칙이 commentStream==true 필터를 강제하므로 watchAllComments는 거부됨.)
+ *   복합 인덱스 필요: tab_comments (commentStream ASC, createdAt ASC).
+ */
+export function watchCommentStream(
+  problemId: string,
+  callback: (comments: ProblemComment[]) => void,
+): () => void {
+  const q = query(
+    commentsCol(problemId),
+    where('commentStream', '==', true),
+    orderBy('createdAt', 'asc'),
+  );
+  return onSnapshot(
+    q,
+    (snap) => callback(snap.docs.map(mapDoc)),
+    (err) => console.error('[comments] 공개 스트림 구독 오류:', err),
   );
 }
 
