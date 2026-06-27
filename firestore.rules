@@ -3,6 +3,22 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===== 전역 헬퍼 =====
+    // Phase 52(A2): 관리자 식별 — admins/{uid} 문서 존재 여부.
+    //   uid를 규칙에 하드코딩하지 않음(public 레포 비노출). 관리자 추가/제거는
+    //   콘솔에서 admins 문서 생성/삭제로 처리(규칙 재배포 불요). exists()는 read 규칙과 무관.
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // ===== admins 컬렉션 (Phase 52: 관리자 화이트리스트) =====
+    // 문서 ID = 관리자 uid, 내용 무관(빈 문서로 충분). 콘솔에서만 관리.
+    // 클라이언트 read/write 모두 차단 — isAdmin()의 exists()는 이 규칙을 우회해 동작.
+    match /admins/{uid} {
+      allow read, write: if false;
+    }
+
     // ===== users 컬렉션 =====
     // 누구나 다른 사용자의 표시명/사진 조회 가능 (공유 시 작성자 표시용)
     // 단, 본인 문서만 쓰기 가능
@@ -324,7 +340,7 @@ service cloud.firestore {
     //   - create: 본인 소유 문항 + author 본인 + 형태 검증(F7).
     //       live는 게시 시점에 문항이 이미 public이어야 함(F1) — /p 뷰어 read가 isPublic 의존.
     //   - update: 게시자 본인, 태그·제목 비정규화만(사후 태그 편집). mode/problemId/ownerUid/shareId 불변.
-    //   - delete: 게시자 본인(중단). 관리자 모더레이션(bazaar_reports + admin takedown)은 Phase 53.
+    //   - delete: 게시자 본인(중단) OR 관리자(takedown, A2 — bazaar_reports와 함께 Phase 52 포함).
     //   - 개수 제한(live 1·snapshot 2)은 규칙으로 강제 불가(list 불가) → 클라 검사(§리스크 R3).
     match /bazaar_posts/{postId} {
       function bp() { return request.resource.data; }
@@ -361,8 +377,22 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys()
             .hasOnly(['tags', 'title', 'title_lower']);
 
-      allow delete: if request.auth != null
-        && resource.data.ownerUid == request.auth.uid;
+      // 삭제: 게시자 본인(중단) OR 관리자(takedown, A2).
+      allow delete: if isAdmin()
+        || (request.auth != null && resource.data.ownerUid == request.auth.uid);
+    }
+
+    // ===== bazaar_reports 컬렉션 (Phase 52: 제3자 신고 + 관리자 takedown, A2) =====
+    //   - "신고만 받고 조치 불가"인 중간 상태를 피하려 신고 적재 + admin 삭제를 함께 도입.
+    //   - create: 로그인 사용자가 본인 명의로 신고 적재(reporterUid 본인, postId 문자열).
+    //   - read/delete: 관리자만(콘솔 admins 화이트리스트). 일반 사용자는 자기 신고도 못 읽음.
+    //   - update: 금지(신고는 불변 — 재신고는 새 문서).
+    match /bazaar_reports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.reporterUid == request.auth.uid
+        && request.resource.data.postId is string;
+      allow read, delete: if isAdmin();
+      allow update: if false;
     }
 
     // ===== sessions 컬렉션 (단일 활성 세션) =====

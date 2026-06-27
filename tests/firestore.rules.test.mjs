@@ -20,6 +20,10 @@
  *   20) 남의 문항 등록 거부  21) snapshot+shareId 누락 거부(F7)  22) live+shareId 존재 거부(F7)
  *   23) snapshot은 private여도 허용(F1 우회 정상)  24) tags 11개 거부(F7)  25) ownerUid 위조 거부
  *   26) update: tags만 허용·mode 변경 거부  27) delete: 본인 허용·타인 거부
+ *   [Phase 52 §4-4 bazaar_reports + 관리자 takedown (A2)]
+ *   28) 본인명의 신고 create 허용  29) reporterUid 위조 거부  30) 비로그인 거부
+ *   31) 비관리자 read 거부  32) 관리자 read 허용  33) 비관리자 delete 거부
+ *   34) 관리자 delete 허용  35) 관리자 bazaar_posts takedown 허용
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -35,6 +39,7 @@ const OWNER = 'ownerUid';
 const COMMENTER = 'commenterUid';
 const STRANGER = 'strangerUid';
 const OTHER_AUTHOR = 'otherAuthorUid';
+const ADMIN = 'adminUid';                 // admins/adminUid 시드 보유(A2)
 
 let testEnv;
 
@@ -112,6 +117,18 @@ before(async () => {
       mode: 'live', problemId: 'pub', ownerUid: OWNER,
       authorNickname: 'kds', authorNickname_lower: 'kds',
       title: 'Seed', title_lower: 'seed', tags: ['x'], createdAt: new Date(),
+    });
+    // admin takedown 테스트용 게시물(OWNER 소유, 별도 — seedLive는 #27b에서 삭제됨)
+    await setDoc(doc(db, 'bazaar_posts/adminTarget'), {
+      mode: 'live', problemId: 'pub', ownerUid: OWNER,
+      authorNickname: 'kds', authorNickname_lower: 'kds',
+      title: 'T', title_lower: 't', tags: [], createdAt: new Date(),
+    });
+
+    // ── Phase 52(A2) 시드: 관리자 화이트리스트 + 기존 신고 ──
+    await setDoc(doc(db, 'admins/adminUid'), {});                 // 빈 문서로 충분
+    await setDoc(doc(db, 'bazaar_reports/seedReport'), {
+      reporterUid: STRANGER, postId: 'seedLive', createdAt: new Date(),
     });
   });
 });
@@ -248,4 +265,34 @@ test('27a. 타인 게시물 삭제 거부', async () => {
 });
 test('27b. 본인 게시물 삭제 허용 (중단)', async () => {
   await assertSucceeds(deleteDoc(doc(as(OWNER), 'bazaar_posts/seedLive')));
+});
+
+// ══ Phase 52(A2): bazaar_reports 신고 적재 + 관리자 takedown ══
+const report = (over = {}) => ({
+  reporterUid: STRANGER, postId: 'seedLive', createdAt: new Date(), ...over,
+});
+
+test('28. 로그인 사용자 본인명의 신고 create 허용', async () => {
+  await assertSucceeds(setDoc(doc(as(STRANGER), 'bazaar_reports/r28'), report()));
+});
+test('29. reporterUid 위조(타인 명의) 신고 create 거부', async () => {
+  await assertFails(setDoc(doc(as(STRANGER), 'bazaar_reports/r29'), report({ reporterUid: OWNER })));
+});
+test('30. 비로그인 신고 create 거부', async () => {
+  await assertFails(setDoc(doc(anon(), 'bazaar_reports/r30'), report()));
+});
+test('31. 비관리자 신고 read 거부 (본인 신고도 불가)', async () => {
+  await assertFails(getDoc(doc(as(STRANGER), 'bazaar_reports/seedReport')));
+});
+test('32. 관리자 신고 read 허용', async () => {
+  await assertSucceeds(getDoc(doc(as(ADMIN), 'bazaar_reports/seedReport')));
+});
+test('33. 비관리자 신고 delete 거부', async () => {
+  await assertFails(deleteDoc(doc(as(STRANGER), 'bazaar_reports/seedReport')));
+});
+test('34. 관리자 신고 delete 허용', async () => {
+  await assertSucceeds(deleteDoc(doc(as(ADMIN), 'bazaar_reports/seedReport')));
+});
+test('35. 관리자 bazaar_posts takedown(삭제) 허용', async () => {
+  await assertSucceeds(deleteDoc(doc(as(ADMIN), 'bazaar_posts/adminTarget')));
 });

@@ -20,7 +20,7 @@
 **2차 (CLI 검토 D1~D5 + 웹 Claude 보완)**
 - **D1 — 공개 댓글 기본 = opt-in. → N1 플래그 방식으로 확정.** 공개 작성 전용 필드 `Problem.publicCommentsEnabled`(기본 false)를 신설하고 공개 작성 규칙이 이를 요구. 멤버용 `commentsWritable`과 **분리**. ⇒ 1단계 규칙을 단독 배포해도 **기존 public 문항은 자동 개방되지 않는다**(테스트 #16). 3단계 등록 모달의 "공개 댓글 허용" 토글이 이 필드를 세팅.
 - **D2 — 고아/끊긴 게시물 = cascade + 피드 필터.** visibility 해제·share revoke·문항 삭제 시 관련 `bazaar_posts` best-effort 삭제 + 피드에서 끊긴 행 숨김(F1·F2). **N4: 피드 행마다 조인 read는 비싸므로 `bazaar_posts.hidden` 비정규화 불리언을 두고 cascade가 갱신, 피드 쿼리는 그 필드로 필터.** 조인검사는 폴백.
-- **D3 — takedown(제3자 신고 + 관리자 삭제)는 Phase 53으로 이전. → N2 확정.** "신고만 받고 조치 불가"인 중간 상태를 피하기 위해 `bazaar_reports` 컬렉션과 admin delete를 **함께** Phase 53에 둔다. Phase 52는 오너 본인 삭제(중단)만.
+- **D3 — takedown(제3자 신고 + 관리자 삭제)를 Phase 52 1단계에 포함. → N2 재확정(A2, 2026-06-27).** "신고만 받고 조치 불가"인 중간 상태를 피하기 위해 `bazaar_reports` 컬렉션 + admin delete를 **함께** 1단계에 둔다(§4-4). 관리자는 **`admins/{uid}` 컬렉션 + `exists()` 체크**로 식별 — uid를 규칙에 하드코딩하지 않아 public 레포 비노출, 추가/제거는 콘솔에서(규칙 재배포 불요). 오너 본인 삭제(중단)는 유지. ⇒ **에뮬레이터 37/37 통과.**
 - **D4 — `/p` 댓글용 로그인은 메인 도메인 팝업/리다이렉트 후 복귀.** `/p` 인라인 로그인 지양(단일 세션 P10 재현 방지). `/shared`는 로그인 버튼 미노출.
 - **D5 — 스냅샷 게시물 만료 = 무기한 기본, 사용자 명시 시에만 만료.** 만료 시 피드에서 자동 숨김.
 
@@ -30,7 +30,7 @@
 
 **3차 보완 (CLI 재검토 N1~N4)**
 - **N1** → D1 확정안(전용 플래그). **구현·검증 완료.**
-- **N2** → D3 확정안(Phase 53 이전). **Phase 52 규칙에서 제외.**
+- **N2** → **A2(2026-06-27)로 재확정: Phase 52 1단계에 포함.** `bazaar_reports`(신고 적재) + `bazaar_posts` admin delete 가지 + `admins/{uid}` 화이트리스트. **구현·검증 완료(37/37).** ~~(구안: Phase 53 이전)~~
 - **N3** — `bazaar_posts` 형태 검증의 shareId 키 검사는 **테스트로 검증된 `('shareId' in bp().keys())` 형태로 확정**(맵 멤버십 형태 대신). **구현·검증 완료.**
 - **N4** → D2에 반영(`hidden` 비정규화 필드). **3~4단계 구현.**
 
@@ -48,6 +48,7 @@
   - `tab_comments` read/delete = Phase 51 정책 유지(공개 읽기 + 오너 모더레이션 삭제). ✓
   - `shares` read = `if true`(nanoid 비밀 전제) → Bazaar 노출 시 비밀성 깨짐(R2).
   - 신규 `bazaar_posts` match(§4-1). ✓ 완료
+  - 신규 `bazaar_reports` match + `admins/{uid}` + 전역 `isAdmin()` + `bazaar_posts` admin delete 가지(§4-4, A2). ✓ 완료
 - `lib/firestore.ts` — `setProblemPublic`(L78, `visibility`+`publishedAt`), `watchProblem`(L271), `watchTabBlocks`(L300), `listProblems`(L116, **owner-scoped → 피드 불가**).
 - `lib/shares.ts` — `createShare`(L124), `listSharesByOwner`(L172), `revokeShare`(L179, =문서삭제), `isShareExpired`(L183), `getShareByProblem`(L189). `ShareWithSnapshot`(L76).
 - `lib/comments.ts` — `AddCommentInput`(L55)·`addComment`(L69, `resolved:false`/`authorType:'human'` 자동) → **`authorName` 추가(F3, 5단계)**. `mapDoc`(L27)에 `authorName` 매핑 추가(F3, 5단계). `watchAllComments`(L102)·`isCommentStream`(L140)·`buildThreads`(L184) 재사용.
@@ -74,7 +75,8 @@
 6. **SNS 공유 버튼 v1**(X intent + Web Share API + 링크복사).
 
 **비목표(Phase 53 후보)**
-- 본문 전문검색 / 태그 다중 AND 서버쿼리(v1 단일 태그) / 카카오톡 리치 공유 / `/shared` SSR OG 메타 / 동적 OG 이미지 / **제3자 신고·관리자 takedown(`bazaar_reports`+admin delete, N2)**.
+- 본문 전문검색 / 태그 다중 AND 서버쿼리(v1 단일 태그) / 카카오톡 리치 공유 / `/shared` SSR OG 메타 / 동적 OG 이미지.
+- (참고) 제3자 신고·관리자 takedown은 **Phase 52 1단계에 포함됨**(A2 재확정). 신고 UI(신고 버튼)는 4~5단계, 관리자 콘솔/리스트는 Phase 53.
 
 ---
 
@@ -82,7 +84,7 @@
 
 | 단계 | 내용 | 주요 파일 | 상태 |
 |---|---|---|---|
-| **1** | 규칙(`bazaar_posts`·공개 댓글 N1) + 모델·타입·인덱스·테스트 (**load-bearing**) | `firestore.rules`, `firestore.indexes.json`, `types/problem.ts`, `tests/firestore.rules.test.mjs` | **✅ 구현·검증 완료(29/29)** |
+| **1** | 규칙(`bazaar_posts`·공개 댓글 N1·`bazaar_reports`+admin takedown A2) + 모델·타입·인덱스·테스트 (**load-bearing**) | `firestore.rules`, `firestore.indexes.json`, `types/problem.ts`, `tests/firestore.rules.test.mjs` | **✅ 구현·검증 완료(37/37)** |
 | **2** | 사이드바 Bazaar 승격 (sent-web 원자 제거, F8) | `ShareTree.tsx`, `share-scope.ts`, `AppShell.tsx` | 대기 |
 | **3** | 등록/삭제 UI + 개수 제한 + 해시태그 + 세션 보장 + cascade(D2) | `lib/bazaar.ts`, `ShareSettingsPanel.tsx`/신규 `BazaarPublishModal.tsx` | 대기 |
 | **4** | Bazaar 피드 + 검색/필터 (PublishList 흡수) + 피드 필터(D2/N4) | 신규 `BazaarView.tsx`, `lib/bazaar.ts`, `AppShell.tsx` | 대기 |
@@ -158,7 +160,7 @@ parseTagInput(text): /[\s,]+/ 분리 → normalizeTag → 빈값·중복 제거 
 
 ---
 
-## 4. 보안 규칙 (`firestore.rules`) — 검증 완료(에뮬레이터 29 케이스)
+## 4. 보안 규칙 (`firestore.rules`) — 검증 완료(에뮬레이터 37 케이스)
 
 > **부분 머지 원칙(R1)**: `tab_comments` create 블록 통째 교체 금지. 공개 가지 1개만 머지.
 
@@ -199,8 +201,9 @@ match /bazaar_posts/{postId} {
     && request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(['tags', 'title', 'title_lower']);
 
-  allow delete: if request.auth != null
-    && resource.data.ownerUid == request.auth.uid;
+  // 삭제: 게시자 본인(중단) OR 관리자(takedown, A2 — §4-4).
+  allow delete: if isAdmin()
+    || (request.auth != null && resource.data.ownerUid == request.auth.uid);
 }
 ```
 > **N4 주의**: 피드 필터용 `hidden`을 3~4단계에서 도입하면, owner의 hidden 토글을 위해 update `hasOnly`에 `'hidden'` 추가 또는 cascade를 client write로 처리. cascade는 owner write라 owner 게이트로 충분.
@@ -240,13 +243,48 @@ function publicCommentsEnabled() {
 - 멤버 가지는 `isCommentSessionRef`(legacy null 허용) 유지 → 회귀 방지. 공개 가지만 엄격(세션 정확·플래그·visible).
 - `update`/`delete`는 Phase 51 정책 유지(변경 없음).
 
-### 4-3. 검증 — 테스트 케이스(`tests/firestore.rules.test.mjs`, 29/29 통과)
+### 4-3. 검증 — 테스트 케이스(`tests/firestore.rules.test.mjs`, 37/37 통과)
 
-시드: `pubBazaar`(commentSessionId=cs1, **publicCommentsEnabled=true**), `pubNoFlag`(플래그 없음=기존 public 시뮬), `pubHidden`(플래그 ON+visible=false), `otherPub`(타인소유), `bazaar_posts/seedLive`.
+시드: `pubBazaar`(commentSessionId=cs1, **publicCommentsEnabled=true**), `pubNoFlag`(플래그 없음=기존 public 시뮬), `pubHidden`(플래그 ON+visible=false), `otherPub`(타인소유), `bazaar_posts/seedLive`, `bazaar_posts/adminTarget`(takedown용), `admins/adminUid`, `bazaar_reports/seedReport`.
 
 - 공개 댓글: **#12 플래그ON+세션일치+비멤버 로그인 허용(핵심)** / #13 비로그인 거부 / #14 잘못된 세션 거부(F6) / #15 sid=null 거부(F6) / **#16 플래그 없음 거부(N1 자동개방 차단)** / #17 visible=false 거부(F5)
 - bazaar_posts: #18 public live 허용 / **#19 private live 거부(F1)** / #20 남의 문항 거부 / #21 snapshot+shareId 누락 거부(F7) / #22 live+shareId 거부(F7) / #23 snapshot은 private여도 허용 / #24 tags 11개 거부(F7) / #25 ownerUid 위조 거부 / #26 update tags만·mode 변경 거부 / #27 delete 본인만
+- bazaar_reports(A2): #28 본인명의 신고 허용 / #29 reporterUid 위조 거부 / #30 비로그인 거부 / #31 비관리자 read 거부 / #32 관리자 read 허용 / #33 비관리자 delete 거부 / #34 관리자 delete 허용 / **#35 관리자 bazaar_posts takedown 허용**
 - 기존 11 케이스 회귀 없음(특히 #7 비멤버 멤버전용 거부 유지).
+
+### 4-4. 신규 `bazaar_reports` + `admins/{uid}` + 전역 `isAdmin()` (A2)
+
+> 결정: takedown(신고 + 관리자 삭제)을 "신고만 받고 조치 불가"인 중간 상태 없이 **1단계에 함께** 도입(D3/N2 재확정). 관리자 식별은 `admins/{uid}` 존재 검사 — public 레포에 uid를 박지 않고 콘솔에서 관리.
+
+**(a) 전역 헬퍼(문서 루트 `match` 직속, 모든 컬렉션 가시):**
+```
+function isAdmin() {
+  return request.auth != null
+    && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+}
+```
+
+**(b) `admins/{uid}` match (콘솔 전용):**
+```
+match /admins/{uid} {
+  allow read, write: if false;   // 클라 차단. isAdmin()의 exists()는 read 규칙 우회.
+}
+```
+
+**(c) `bazaar_reports/{reportId}` match (`bazaar_posts` 다음):**
+```
+match /bazaar_reports/{reportId} {
+  allow create: if request.auth != null
+    && request.resource.data.reporterUid == request.auth.uid
+    && request.resource.data.postId is string;
+  allow read, delete: if isAdmin();   // 일반 사용자는 자기 신고도 못 읽음
+  allow update: if false;             // 신고 불변(재신고 = 새 문서)
+}
+```
+
+**(d) `bazaar_posts` delete에 admin 가지 추가**(§4-1 반영): `allow delete: if isAdmin() || (본인)`.
+
+> **배포 후 필수**: 덕수가 Firebase 콘솔에서 `admins/{본인uid}` 문서 1개 생성(빈 문서면 충분). 없으면 `isAdmin()`이 항상 false → takedown·신고열람 불가(신고 적재는 정상). uid는 채팅에 적지 않아도 됨.
 
 ---
 
@@ -289,6 +327,7 @@ cascadeOnUnpublish(problemId)  // D2/N4: visibility 해제·share revoke·문항
 - 해시태그 입력(`parseTagInput`) — 게시 시 + 사후 편집.
 - **"공개 댓글 허용" 토글(D1/N1)** → `Problem.publicCommentsEnabled` 세팅. 기본 OFF.
 - 개수 초과 시 안내문(스냅샷 2 / 실시간 1).
+- **닉네임 게이트(B3, 3단계 클라 강제)** — 등록 진입 시 `UserProfile.nickname`이 미설정/기본값이면 **등록 차단 + 닉네임 설정 유도**. `bazaar_posts.authorNickname`/`_lower`가 게시 시점 비정규화(R8)이므로, 고유 닉이 없으면 닉네임 검색이 기본값끼리 충돌·표시가 빈약해짐. `createBazaarPost`가 닉 보유를 선결 검사(Phase 48 `nicknames` 예약으로 전역 유일성 보장). 규칙으로는 닉 고유성 강제 불가 → 클라 게이트.
 - `lib/comments.ts` `addComment`·`mapDoc`에 `authorName` 배선(F3).
 
 ### 6-2. 댓글 세션 보장 (load-bearing for C3)
@@ -352,14 +391,15 @@ onShare():
 
 ## 10. 수락 기준
 
-**단계 1 (규칙·모델) — ✅ 완료(29/29)**
+**단계 1 (규칙·모델) — ✅ 완료(37/37)**
 - [x] `bazaar_posts` create/update/delete 본인 소유만. private live 거부(F1), snapshot/live+shareId 정합(F7), tags≤10.
 - [x] 공개+플래그ON+visible+writable·정확 commentSessionId 참조 시 비멤버 로그인 작성 성공.
 - [x] sid=null·잘못된 세션·**플래그 없음(N1)**·visible=false 거부(F5·F6). 비로그인 거부, 읽기 성공.
+- [x] **`bazaar_reports` 본인명의 신고 허용·위조/비로그인 거부, 관리자만 read/delete, 관리자 `bazaar_posts` takedown 허용(A2).**
 - [x] 멤버/오너 기존 경로 회귀 없음.
-- [ ] (배포) 1단계 규칙·인덱스 단독 배포 후 하드 리프레시.
+- [ ] (배포) 1단계 규칙·인덱스 단독 배포 후 하드 리프레시. **+ 콘솔에서 `admins/{덕수uid}` 문서 생성(A2 takedown 활성화).**
 
-**단계 2~3** — 트리 최상단 Bazaar, sent-web 제거 후 **빌드 통과(F8)** / 실시간 게시 시 `setProblemPublic→ensureCommentSession→createBazaarPost` 순서로 `commentSessionId` 채워짐 / 스냅샷 3·실시간 2 차단 + 안내 / 등록 모달 "공개 댓글 허용" 토글(D1/N1) / 해시태그 `#a #b, c`→`['a','b','c']`.
+**단계 2~3** — 트리 최상단 Bazaar, sent-web 제거 후 **빌드 통과(F8)** / 실시간 게시 시 `setProblemPublic→ensureCommentSession→createBazaarPost` 순서로 `commentSessionId` 채워짐 / 스냅샷 3·실시간 2 차단 + 안내 / 등록 모달 "공개 댓글 허용" 토글(D1/N1) / **닉네임 미설정 시 등록 차단·설정 유도(B3)** / 해시태그 `#a #b, c`→`['a','b','c']`.
 
 **단계 4** — 타 사용자 게시물 피드 노출, 태그·닉네임·제목 검색 / 끊긴 행 숨김(D2/N4) / "내 게시물" 중단·복사(PublishList 흡수).
 
@@ -370,7 +410,8 @@ onShare():
 ## 11. 커밋 & 푸시
 
 - 단계별 1커밋:
-  - `Phase 52 1단계: bazaar_posts 규칙 + 공개 댓글 작성(N1·F1·F5·F6·F7) + 타입/인덱스/테스트`
+  - `Phase 52 1단계: bazaar_posts 규칙 + 공개 댓글 작성(N1·F1·F5·F6·F7) + 타입/인덱스/테스트` *(완료, 6e02bde)*
+  - `Phase 52 1단계 보강: bazaar_reports·admin takedown(A2) + 닉네임 게이트 명문화(B3) + 문서 정정` *(이번 커밋 — 규칙·테스트·확정판 문서)*
   - `Phase 52 2단계: 사이드바 Bazaar 승격(sent-web 원자 제거)`
   - `Phase 52 3단계: Bazaar 등록/삭제 + 개수 제한 + 해시태그 + 세션 보장 + cascade`
   - `Phase 52 4단계: Bazaar 전역 피드 + 검색/필터 + 피드 필터`
@@ -380,16 +421,16 @@ onShare():
 
 ---
 
-## 12. 1단계 구현 상태 (2026-06-25)
+## 12. 1단계 구현 상태 (2026-06-25, A2 보강 2026-06-27)
 
 | 파일 | 변경 | 검증 |
 |---|---|---|
-| `firestore.rules` | `bazaar_posts` match + `tab_comments` 공개 가지 + 헬퍼(`isThePublicCommentSession`·`publicCommentsEnabled`) | 에뮬레이터 29/29 |
+| `firestore.rules` | `bazaar_posts` match + `tab_comments` 공개 가지 + 헬퍼(`isThePublicCommentSession`·`publicCommentsEnabled`) **+ 전역 `isAdmin()` + `admins/{uid}` + `bazaar_reports` match + `bazaar_posts` admin delete 가지(A2)** | 에뮬레이터 37/37 |
 | `types/problem.ts` | `BazaarPost`·`BazaarMode` + `Problem.publicCommentsEnabled?` + `ProblemComment.authorName?` | tsc(가산 변경) |
 | `firestore.indexes.json` | 복합 인덱스 3개 | — |
-| `tests/firestore.rules.test.mjs` | 시드 + 18 케이스(공개댓글·bazaar_posts) | 29/29 |
+| `tests/firestore.rules.test.mjs` | 시드(+admin·report·adminTarget) + 26 케이스(공개댓글·bazaar_posts·**bazaar_reports A2**) | 37/37 |
 
-> **남은 1단계 작업**: 덕수가 `firebase deploy --only firestore:rules,firestore:indexes`로 단독 배포 후 검증. 커밋(`Phase 52 1단계 …`)·푸시는 덕수.
+> **남은 1단계 작업**: 덕수가 ① `firebase deploy --only firestore:rules,firestore:indexes`로 단독 배포 후 검증, ② **Firebase 콘솔에서 `admins/{본인uid}` 문서 1개 생성**(A2 takedown 활성화 — 없으면 신고 적재는 되나 열람·삭제 불가). 커밋(`Phase 52 1단계 …`)·푸시는 덕수.
 
 ---
 
@@ -398,5 +439,5 @@ onShare():
 1. `/shared` SSR OG 메타(server component 전환) + 스냅샷 SNS 카드.
 2. 동적 OG 이미지(`@vercel/og` `ImageResponse`).
 3. 카카오톡 리치 공유(JS SDK + 앱키 + 도메인 2곳 등록).
-4. **`bazaar_reports` + admin takedown**(N2/D3): 신고 적재 컬렉션 + uid 화이트리스트 관리자 삭제 규칙(`bazaar_reports` read/delete + `bazaar_posts` admin delete 가지). "신고-조치 일치"를 한 Phase에서 완결.
+4. ~~`bazaar_reports` + admin takedown~~ → **Phase 52 1단계로 당겨 구현 완료(A2, §4-4).** Phase 53에는 **관리자 콘솔/신고 리스트 UI**와 신고 사유 분류·중복 집계만 남김(규칙·적재는 52에서 완결).
 5. (검토) 피드 이상 — 추천·정렬·랭킹.
