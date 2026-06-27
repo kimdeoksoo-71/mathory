@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
-import { IconChevron, IconShare } from '../ui/Icons';
+import { IconChevron, IconShare, IconBlockchain } from '../ui/Icons';
 
 export interface ShareGroup {
   uid: string;
@@ -20,13 +20,15 @@ interface ShareTreeProps {
 }
 
 /**
- * Phase 49: 좌측 `공유` 트리 — 받은(출처별)·보낸(대상별) 그룹 + 웹 전체공개 노드.
+ * Phase 49: 좌측 `공유` 트리 — 받은(출처별)·보낸(대상별) 그룹.
+ * Phase 52(2단계): 최상단 `Bazaar`(전체/내 게시물) 승격. 기존 `문항 공개`(sent-web) 제거.
  * 카테고리 [+]/DnD는 보류(카드 '공유' 버튼이 정식 경로).
  */
 export default function ShareTree({
   receivedTotal, receivedGroups, sentGroups, profiles, activeScopeKey, onSelectScope,
 }: ShareTreeProps) {
   const [open, setOpen] = useState(true);
+  const [bazaarOpen, setBazaarOpen] = useState(true);
   const [receivedOpen, setReceivedOpen] = useState(true);
   const [sentOpen, setSentOpen] = useState(true);
 
@@ -67,6 +69,32 @@ export default function ShareTree({
 
       {open && (
         <div>
+          {/* ── Bazaar (Phase 52: 문항 공개 승격, 최상단) ── */}
+          <ParentRow
+            label="Bazaar"
+            icon={<IconBlockchain size={15} />}
+            count={0}
+            active={activeScopeKey === 'bazaar:all'}
+            expandable
+            expanded={bazaarOpen}
+            onToggleExpand={() => setBazaarOpen((v) => !v)}
+            onClick={() => onSelectScope({ kind: 'bazaar', filter: 'all' })}
+          />
+          {bazaarOpen && (
+            <>
+              <SubRow
+                label="전체"
+                active={activeScopeKey === 'bazaar:all'}
+                onClick={() => onSelectScope({ kind: 'bazaar', filter: 'all' })}
+              />
+              <SubRow
+                label="내 게시물"
+                active={activeScopeKey === 'bazaar:mine'}
+                onClick={() => onSelectScope({ kind: 'bazaar', filter: 'mine' })}
+              />
+            </>
+          )}
+
           {/* ── 받은 ── */}
           <ParentRow
             label="공유 받은 문항"
@@ -102,11 +130,6 @@ export default function ShareTree({
           />
           {sentOpen && (
             <>
-              <SubRow
-                label="문항 공개"
-                active={activeScopeKey === 'sent-web'}
-                onClick={() => onSelectScope({ kind: 'sent-web' })}
-              />
               <SubRow label="개인" muted />
               {sentGroups.map((g) => (
                 <PersonRow

@@ -695,14 +695,28 @@ export default function AppShell() {
             const p = shareProfiles[uid];
             return p?.nickname || p?.displayName || '사용자';
           };
-          if (scope.kind === 'sent-web') {
-            const publicProblems = allProblems.filter((p) => p.visibility === 'public');
+          if (scope.kind === 'bazaar') {
+            // Phase 52(2단계): 사이드바 승격. 전역 피드(filter='all')는 4단계 BazaarView에서 구현.
+            //   지금은 '내 게시물'(filter='mine')에 기존 공개·공유 관리(PublishList)를 흡수.
+            if (scope.filter === 'mine') {
+              const publicProblems = allProblems.filter((p) => p.visibility === 'public');
+              return (
+                <div style={{ height: '100%', overflowY: 'auto' }}>
+                  <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+                    Bazaar · 내 게시물
+                  </h2>
+                  <PublishList shares={webShares} publicProblems={publicProblems} onChanged={() => loadData()} />
+                </div>
+              );
+            }
             return (
               <div style={{ height: '100%', overflowY: 'auto' }}>
                 <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
-                  문항 공개
+                  Bazaar
                 </h2>
-                <PublishList shares={webShares} publicProblems={publicProblems} onChanged={() => loadData()} />
+                <div style={{ padding: '24px 16px', color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, fontFamily: 'var(--font-ui)' }}>
+                  전역 피드는 곧 공개됩니다. 지금은 <b>내 게시물</b>에서 공개·공유한 문항을 관리할 수 있습니다.
+                </div>
               </div>
             );
           }

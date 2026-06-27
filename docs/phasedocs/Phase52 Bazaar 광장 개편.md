@@ -85,7 +85,7 @@
 | 단계 | 내용 | 주요 파일 | 상태 |
 |---|---|---|---|
 | **1** | 규칙(`bazaar_posts`·공개 댓글 N1·`bazaar_reports`+admin takedown A2) + 모델·타입·인덱스·테스트 (**load-bearing**) | `firestore.rules`, `firestore.indexes.json`, `types/problem.ts`, `tests/firestore.rules.test.mjs` | **✅ 구현·검증 완료(37/37)** |
-| **2** | 사이드바 Bazaar 승격 (sent-web 원자 제거, F8) | `ShareTree.tsx`, `share-scope.ts`, `AppShell.tsx` | 대기 |
+| **2** | 사이드바 Bazaar 승격 (sent-web 원자 제거, F8) | `ShareTree.tsx`, `share-scope.ts`, `AppShell.tsx` | **✅ 구현 완료(tsc·build 통과)** |
 | **3** | 등록/삭제 UI + 개수 제한 + 해시태그 + 세션 보장 + cascade(D2) | `lib/bazaar.ts`, `ShareSettingsPanel.tsx`/신규 `BazaarPublishModal.tsx` | 대기 |
 | **4** | Bazaar 피드 + 검색/필터 (PublishList 흡수) + 피드 필터(D2/N4) | 신규 `BazaarView.tsx`, `lib/bazaar.ts`, `AppShell.tsx` | 대기 |
 | **5** | 뷰어 레이아웃 개편 + 공개 댓글 작성 + SNS 공유 v1 | `PublicProblemView.tsx`, `app/shared/[shareId]/page.tsx`, 신규 `PublicViewerShell.tsx`·`ShareButton.tsx`, `PublicComments.tsx`, `lib/comments.ts` | 대기 |
@@ -397,9 +397,9 @@ onShare():
 - [x] sid=null·잘못된 세션·**플래그 없음(N1)**·visible=false 거부(F5·F6). 비로그인 거부, 읽기 성공.
 - [x] **`bazaar_reports` 본인명의 신고 허용·위조/비로그인 거부, 관리자만 read/delete, 관리자 `bazaar_posts` takedown 허용(A2).**
 - [x] 멤버/오너 기존 경로 회귀 없음.
-- [ ] (배포) 1단계 규칙·인덱스 단독 배포 후 하드 리프레시. **+ 콘솔에서 `admins/{덕수uid}` 문서 생성(A2 takedown 활성화).**
+- [x] (배포) 1단계 규칙·인덱스 단독 배포 완료. **콘솔 `admins/{덕수uid}` 문서 생성 완료(A2 takedown 활성화).**
 
-**단계 2~3** — 트리 최상단 Bazaar, sent-web 제거 후 **빌드 통과(F8)** / 실시간 게시 시 `setProblemPublic→ensureCommentSession→createBazaarPost` 순서로 `commentSessionId` 채워짐 / 스냅샷 3·실시간 2 차단 + 안내 / 등록 모달 "공개 댓글 허용" 토글(D1/N1) / **닉네임 미설정 시 등록 차단·설정 유도(B3)** / 해시태그 `#a #b, c`→`['a','b','c']`.
+**단계 2~3** — [x] 트리 최상단 Bazaar, sent-web 제거 후 **빌드 통과(F8)**(2단계 완료) / 실시간 게시 시 `setProblemPublic→ensureCommentSession→createBazaarPost` 순서로 `commentSessionId` 채워짐 / 스냅샷 3·실시간 2 차단 + 안내 / 등록 모달 "공개 댓글 허용" 토글(D1/N1) / **닉네임 미설정 시 등록 차단·설정 유도(B3)** / 해시태그 `#a #b, c`→`['a','b','c']`.
 
 **단계 4** — 타 사용자 게시물 피드 노출, 태그·닉네임·제목 검색 / 끊긴 행 숨김(D2/N4) / "내 게시물" 중단·복사(PublishList 흡수).
 
