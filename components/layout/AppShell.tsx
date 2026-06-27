@@ -19,9 +19,8 @@ import {
 import { listSharedWithMe, listSharedByMe } from '../../lib/membership';
 import { getUserProfile, needsNicknameSetup } from '../../lib/users';
 import { ShareScope, shareScopeKey } from '../../lib/share-scope';
-import { listSharesByOwner, ShareWithSnapshot } from '../../lib/shares';
 import NicknameSetupModal from '../user/NicknameSetupModal';
-import PublishList from '../share/PublishList';
+import BazaarView from '../share/BazaarView';
 import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
@@ -91,7 +90,6 @@ export default function AppShell() {
   const [sentProblems, setSentProblems] = useState<Problem[]>([]);
   const [shareProfiles, setShareProfiles] = useState<Record<string, UserProfile>>({});
   // Phase 50: 내가 웹 공개한 share 목록
-  const [webShares, setWebShares] = useState<ShareWithSnapshot[]>([]);
   // Phase 48: 닉네임 설정 진입 가드 (소프트 넛지 — 세션당 1회 자동, 닫기 가능)
   const [nicknameModal, setNicknameModal] = useState<{ uid: string; current?: string } | null>(null);
   const nicknameNudgedRef = useRef(false);
@@ -160,13 +158,12 @@ export default function AppShell() {
       setSharedProblems([]);
       setSentProblems([]);
       setShareProfiles({});
-      setWebShares([]);
       setFolders([]);
       setFolderCounts({});
       return;
     }
     try {
-      const [problems, recent, shared, sent, webs] = await Promise.all([
+      const [problems, recent, shared, sent] = await Promise.all([
         listProblems(user.uid),
         listRecentProblems(user.uid, 10),
         listSharedWithMe(user.uid).catch((err) => {
@@ -177,15 +174,10 @@ export default function AppShell() {
           console.error('공유보낸 문항 로드 실패:', err);
           return [] as Problem[];
         }),
-        listSharesByOwner(user.uid).catch((err) => {
-          console.error('웹 공개 목록 로드 실패:', err);
-          return [] as ShareWithSnapshot[];
-        }),
       ]);
       setAllProblems(problems);
       setSharedProblems(shared);
       setSentProblems(sent);
-      setWebShares(webs);
       // 최근 문항에서 휴지통 문항 제외
       setRecentProblems(recent.filter((p) => p.folder_id !== TRASH_FOLDER_ID));
 
@@ -696,29 +688,8 @@ export default function AppShell() {
             return p?.nickname || p?.displayName || '사용자';
           };
           if (scope.kind === 'bazaar') {
-            // Phase 52(2단계): 사이드바 승격. 전역 피드(filter='all')는 4단계 BazaarView에서 구현.
-            //   지금은 '내 게시물'(filter='mine')에 기존 공개·공유 관리(PublishList)를 흡수.
-            if (scope.filter === 'mine') {
-              const publicProblems = allProblems.filter((p) => p.visibility === 'public');
-              return (
-                <div style={{ height: '100%', overflowY: 'auto' }}>
-                  <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
-                    Bazaar · 내 게시물
-                  </h2>
-                  <PublishList shares={webShares} publicProblems={publicProblems} onChanged={() => loadData()} />
-                </div>
-              );
-            }
-            return (
-              <div style={{ height: '100%', overflowY: 'auto' }}>
-                <h2 style={{ fontSize: 16, fontWeight: 700, margin: 0, padding: '14px 16px 4px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
-                  Bazaar
-                </h2>
-                <div style={{ padding: '24px 16px', color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.7, fontFamily: 'var(--font-ui)' }}>
-                  전역 피드는 곧 공개됩니다. 지금은 <b>내 게시물</b>에서 공개·공유한 문항을 관리할 수 있습니다.
-                </div>
-              </div>
-            );
+            // Phase 52(4단계): 전역 피드 + 검색/필터. 내 게시물(filter='mine')은 bazaar_posts 직접 조회.
+            return user ? <BazaarView uid={user.uid} filter={scope.filter} /> : null;
           }
           const isReceived = scope.kind === 'received-all' || scope.kind === 'received-by';
           const scopedProblems = scope.kind === 'received-all' ? sharedProblems

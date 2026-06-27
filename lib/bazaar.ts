@@ -5,7 +5,8 @@
 
 import {
   collection, doc, addDoc, getDocs, deleteDoc, updateDoc,
-  query, where, serverTimestamp, Timestamp,
+  query, where, orderBy, limit, startAfter, serverTimestamp, Timestamp,
+  type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { BazaarPost, BazaarMode } from '../types/problem';
@@ -73,6 +74,63 @@ export async function listBazaarPostsByProblem(problemId: string): Promise<Bazaa
 export async function countOwnerPosts(problemId: string, mode: BazaarMode): Promise<number> {
   const posts = await listBazaarPostsByProblem(problemId);
   return posts.filter((p) => p.mode === mode).length;
+}
+
+const FEED_PAGE_SIZE = 20;
+
+export interface BazaarFeedQuery {
+  cursor?: QueryDocumentSnapshot | null;
+  pageSize?: number;
+  ownerUid?: string;       // 내 게시물(설정 시 검색·태그 무시)
+  tag?: string;            // 단일 태그(array-contains)
+  nickname?: string;       // 닉네임 정확 일치(= nickname_lower)
+  titlePrefix?: string;    // 제목 prefix(F4: createdAt 정렬 불가 → title_lower 정렬)
+}
+
+export interface BazaarFeedPage {
+  posts: BazaarPost[];
+  cursor: QueryDocumentSnapshot | null;
+  hasMore: boolean;
+}
+
+/**
+ * 전역 피드/검색(4단계). 단일 필터만 활성(UI가 보장): ownerUid > tag > nickname > titlePrefix > 최신.
+ * 끊긴 행(고아)은 3단계 cascade가 1차 제거 — 드물게 남으면 클릭 시 뷰어가 not-found 처리(D2 v1).
+ */
+export async function listBazaarFeed(q: BazaarFeedQuery = {}): Promise<BazaarFeedPage> {
+  const pageSize = q.pageSize ?? FEED_PAGE_SIZE;
+  const col = collection(db, 'bazaar_posts');
+  const parts: any[] = [];
+
+  if (q.ownerUid) {
+    parts.push(where('ownerUid', '==', q.ownerUid), orderBy('createdAt', 'desc'));
+  } else if (q.tag) {
+    parts.push(where('tags', 'array-contains', q.tag), orderBy('createdAt', 'desc'));
+  } else if (q.nickname) {
+    parts.push(where('authorNickname_lower', '==', q.nickname), orderBy('createdAt', 'desc'));
+  } else if (q.titlePrefix) {
+    const p = q.titlePrefix;
+    parts.push(
+      where('title_lower', '>=', p),
+      where('title_lower', '<=', p + '\uf8ff'),
+      orderBy('title_lower', 'asc'),
+    );
+  } else {
+    parts.push(orderBy('createdAt', 'desc'));
+  }
+
+  if (q.cursor) parts.push(startAfter(q.cursor));
+  parts.push(limit(pageSize + 1));
+
+  const snap = await getDocs(query(col, ...parts));
+  const docs = snap.docs;
+  const hasMore = docs.length > pageSize;
+  const page = hasMore ? docs.slice(0, pageSize) : docs;
+  return {
+    posts: page.map((d) => mapBazaarDoc(d.id, d.data())),
+    cursor: page.length > 0 ? page[page.length - 1] : null,
+    hasMore,
+  };
 }
 
 export interface CreateBazaarPostInput {
