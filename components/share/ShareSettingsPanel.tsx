@@ -1,10 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TabMeta } from '../../types/problem';
+import { TabMeta, BazaarPost } from '../../types/problem';
 import { setMemberTabVisibility } from '../../lib/membership';
-import { getProblem, setProblemPublic, setCommentsVisible } from '../../lib/firestore';
+import { getProblem, setProblemPublic, setCommentsVisible, setPublicCommentsEnabled } from '../../lib/firestore';
 import { ensureCommentSession } from '../../lib/discussion-sessions';
+import { getUserProfile, needsNicknameSetup } from '../../lib/users';
+import {
+  listBazaarPostsByProblem, createBazaarPost, deleteBazaarPost,
+  updateBazaarTags, parseTagInput, cascadeOnUnpublish,
+} from '../../lib/bazaar';
 import {
   createShare, getShareByProblem, revokeShare, isShareExpired,
   ShareWithSnapshot, EXPIRY_PRESET_DAYS, DEFAULT_EXPIRY_DAYS,
@@ -52,13 +57,29 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
   const [webBusy, setWebBusy] = useState(false);
   const [expiryDays, setExpiryDays] = useState<number | null>(DEFAULT_EXPIRY_DAYS);
 
+  // Bazaar 게시 상태 (Phase 52, 3단계)
+  const [bazaarPosts, setBazaarPosts] = useState<BazaarPost[]>([]);
+  const [needsNick, setNeedsNick] = useState(false);
+  const [pubComments, setPubComments] = useState(false);   // publicCommentsEnabled (N1/D1)
+  const [tagInput, setTagInput] = useState('');
+  const [bazaarBusy, setBazaarBusy] = useState(false);
+
+  const liveBPost = bazaarPosts.find((p) => p.mode === 'live') ?? null;
+  const snapBPost = bazaarPosts.find((p) => p.mode === 'snapshot' && p.shareId === webShare?.id) ?? null;
+
+  const reloadBazaar = async () => {
+    try { setBazaarPosts(await listBazaarPostsByProblem(problemId)); } catch { /* 무시 */ }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [problem, existing] = await Promise.all([
+        const [problem, existing, profile, posts] = await Promise.all([
           getProblem(problemId),
           getShareByProblem(problemId, ownerUid).catch(() => null),
+          getUserProfile(ownerUid).catch(() => null),
+          listBazaarPostsByProblem(problemId).catch(() => []),
         ]);
         if (cancelled) return;
         const mtv = problem?.memberTabVisibility;
@@ -70,6 +91,9 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
         const pub = problem?.visibility === 'public';
         setIsPublic(pub);
         setCommentsVis(problem?.commentsVisible !== false);
+        setPubComments(problem?.publicCommentsEnabled === true);
+        setNeedsNick(needsNicknameSetup(profile));
+        setBazaarPosts(posts);
         // 초기 방식: 실시간 공개 중이면 실시간, 아니면 스냅샷이 있을 때만 스냅샷, 기본 실시간
         setMode(pub ? 'live' : activeShare ? 'snapshot' : 'live');
       } catch (e) {
@@ -124,9 +148,18 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
   };
 
   const handleUnpublishLive = async () => {
-    if (!confirm('실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단됩니다.')) return;
+    const msg = liveBPost
+      ? '실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단되고 Bazaar 게시도 함께 내려갑니다.'
+      : '실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단됩니다.';
+    if (!confirm(msg)) return;
     setLiveBusy(true); setError(null);
-    try { await setProblemPublic(problemId, false); setIsPublic(false); }
+    try {
+      await setProblemPublic(problemId, false);
+      // D2: 공개 해제 시 관련 live 게시물 best-effort 삭제(고아 방지).
+      await cascadeOnUnpublish(problemId, { mode: 'live' });
+      setIsPublic(false);
+      await reloadBazaar();
+    }
     catch (e) { setError(e instanceof Error ? e.message : '중단 실패'); }
     finally { setLiveBusy(false); }
   };
@@ -156,14 +189,139 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
 
   const handleRevokeSnapshot = async () => {
     if (!webShare) return;
-    if (!confirm('스냅샷 공개를 중단하시겠습니까? 링크가 즉시 무효화됩니다.')) return;
+    const msg = snapBPost
+      ? '스냅샷 공개를 중단하시겠습니까? 링크가 즉시 무효화되고 Bazaar 게시도 함께 내려갑니다.'
+      : '스냅샷 공개를 중단하시겠습니까? 링크가 즉시 무효화됩니다.';
+    if (!confirm(msg)) return;
     setWebBusy(true); setError(null);
-    try { await revokeShare(webShare.id); setWebShare(null); }
+    try {
+      const sid = webShare.id;
+      await revokeShare(sid);
+      // D2: share revoke 시 해당 snapshot 게시물 best-effort 삭제.
+      await cascadeOnUnpublish(problemId, { mode: 'snapshot', shareId: sid });
+      setWebShare(null);
+      await reloadBazaar();
+    }
     catch (e) { setError(e instanceof Error ? e.message : '중단 실패'); }
     finally { setWebBusy(false); }
   };
 
+  // ── Bazaar 게시 (Phase 52, 3단계) ──
+  const handleRegisterBazaar = async (mode: PublishMode) => {
+    setBazaarBusy(true); setError(null);
+    try {
+      const tags = parseTagInput(tagInput);
+      if (mode === 'live') {
+        // D1/N1: 공개 댓글 허용 토글값을 게시 시점에 반영.
+        await setPublicCommentsEnabled(problemId, pubComments);
+        await createBazaarPost({ mode: 'live', problemId, ownerUid, tags });
+      } else {
+        if (!webShare) throw new Error('스냅샷 공개가 먼저 필요합니다.');
+        await createBazaarPost({
+          mode: 'snapshot', problemId, ownerUid, tags,
+          shareId: webShare.id, expiresAt: webShare.expiresAt,
+        });
+      }
+      await reloadBazaar();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Bazaar 게시 실패');
+    } finally { setBazaarBusy(false); }
+  };
+
+  const handleUnregisterBazaar = async (postId: string) => {
+    if (!confirm('Bazaar 게시를 내리시겠습니까? (공개 자체는 유지됩니다)')) return;
+    setBazaarBusy(true); setError(null);
+    try { await deleteBazaarPost(postId); await reloadBazaar(); }
+    catch (e) { setError(e instanceof Error ? e.message : '게시 내리기 실패'); }
+    finally { setBazaarBusy(false); }
+  };
+
+  const handleSaveTags = async (postId: string) => {
+    setBazaarBusy(true); setError(null);
+    try { await updateBazaarTags(postId, parseTagInput(tagInput)); await reloadBazaar(); }
+    catch (e) { setError(e instanceof Error ? e.message : '태그 저장 실패'); }
+    finally { setBazaarBusy(false); }
+  };
+
+  const handleTogglePubComments = async (next: boolean) => {
+    const prev = pubComments;
+    setPubComments(next); setBazaarBusy(true); setError(null);
+    try { await setPublicCommentsEnabled(problemId, next); }
+    catch (e) { setPubComments(prev); setError(e instanceof Error ? e.message : '공개 댓글 설정 실패'); }
+    finally { setBazaarBusy(false); }
+  };
+
   const anyTabVisible = Object.values(tabVis).some((v) => v);
+
+  // 등록된 게시물의 태그를 입력창에 프리필(모드/게시물 전환 시 동기화).
+  useEffect(() => {
+    const post = mode === 'live' ? liveBPost : snapBPost;
+    setTagInput(post ? post.tags.map((t) => `#${t}`).join(' ') : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, liveBPost?.id, snapBPost?.id]);
+
+  const renderBazaar = (m: PublishMode) => {
+    const post = m === 'live' ? liveBPost : snapBPost;
+    const tagField = (
+      <input
+        value={tagInput}
+        onChange={(e) => setTagInput(e.target.value)}
+        disabled={bazaarBusy}
+        placeholder="#태그 (공백·쉼표 구분, 최대 10개)"
+        style={tagInputStyle}
+      />
+    );
+    const commentToggle = m === 'live' && (
+      <label style={{ ...toggleRowStyle, marginTop: 8 }}>
+        <input
+          type="checkbox"
+          checked={pubComments}
+          disabled={bazaarBusy}
+          onChange={(e) => (post ? handleTogglePubComments(e.target.checked) : setPubComments(e.target.checked))}
+          style={{ accentColor: 'var(--accent-primary, #B8845C)' }}
+        />
+        <span>공개 댓글 허용 (로그인 누구나)</span>
+      </label>
+    );
+    return (
+      <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-light, #eee)' }}>
+        <SectionLabel>Bazaar 광장 게시</SectionLabel>
+        {needsNick ? (
+          <div style={bazaarNoticeStyle}>
+            Bazaar 게시에는 닉네임이 필요합니다.{' '}
+            <a href="/settings" style={{ color: 'var(--accent-primary, #B8845C)', fontWeight: 600 }}>설정에서 지정</a>
+          </div>
+        ) : post ? (
+          <div>
+            <div style={{ fontSize: 11, color: 'var(--accent-primary, #B8845C)', fontWeight: 700, marginBottom: 6 }}>
+              ✓ Bazaar 게시 중
+            </div>
+            {tagField}
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <button onClick={() => handleSaveTags(post.id)} disabled={bazaarBusy} style={{ ...primaryBtnStyle(bazaarBusy), flex: 1 }}>
+                태그 저장
+              </button>
+              <button onClick={() => handleUnregisterBazaar(post.id)} disabled={bazaarBusy} style={{ ...dangerBtnStyle(bazaarBusy), width: 'auto', padding: '6px 12px' }}>
+                게시 내리기
+              </button>
+            </div>
+            {commentToggle}
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginBottom: 6, lineHeight: 1.5 }}>
+              광장에 등록하면 모든 로그인 사용자가 피드에서 발견할 수 있습니다(공개와 별개).
+            </div>
+            {tagField}
+            {commentToggle}
+            <button onClick={() => handleRegisterBazaar(m)} disabled={bazaarBusy} style={{ ...primaryBtnStyle(bazaarBusy), marginTop: 8 }}>
+              {bazaarBusy ? '게시 중…' : 'Bazaar에 등록'}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div style={{ fontFamily: 'var(--font-ui)' }}>
@@ -258,6 +416,7 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
                 <button onClick={handleUnpublishLive} disabled={liveBusy} style={dangerBtnStyle(liveBusy)}>
                   실시간 공개 중단
                 </button>
+                {renderBazaar('live')}
               </div>
             ) : (
               <div>
@@ -299,6 +458,7 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
                 <button onClick={handleRevokeSnapshot} disabled={webBusy} style={dangerBtnStyle(webBusy)}>
                   스냅샷 공개 중단
                 </button>
+                {renderBazaar('snapshot')}
               </div>
             ) : (
               <div>
@@ -385,6 +545,18 @@ const copyBtnStyle: React.CSSProperties = {
 const toggleRowStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px',
   fontSize: 12, color: 'var(--text-primary)', cursor: 'pointer',
+};
+
+const tagInputStyle: React.CSSProperties = {
+  width: '100%', padding: '6px 8px', fontSize: 12,
+  border: '1px solid var(--border-light, #ddd)', borderRadius: 6,
+  background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)',
+  fontFamily: 'var(--font-ui)', boxSizing: 'border-box',
+};
+
+const bazaarNoticeStyle: React.CSSProperties = {
+  padding: '8px 10px', borderRadius: 6, background: 'var(--bg-input, #f8f8f8)',
+  fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5,
 };
 
 function primaryBtnStyle(busy: boolean): React.CSSProperties {

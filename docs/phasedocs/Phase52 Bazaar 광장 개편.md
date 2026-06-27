@@ -86,7 +86,7 @@
 |---|---|---|---|
 | **1** | 규칙(`bazaar_posts`·공개 댓글 N1·`bazaar_reports`+admin takedown A2) + 모델·타입·인덱스·테스트 (**load-bearing**) | `firestore.rules`, `firestore.indexes.json`, `types/problem.ts`, `tests/firestore.rules.test.mjs` | **✅ 구현·검증 완료(37/37)** |
 | **2** | 사이드바 Bazaar 승격 (sent-web 원자 제거, F8) | `ShareTree.tsx`, `share-scope.ts`, `AppShell.tsx` | **✅ 구현 완료(tsc·build 통과)** |
-| **3** | 등록/삭제 UI + 개수 제한 + 해시태그 + 세션 보장 + cascade(D2) | `lib/bazaar.ts`, `ShareSettingsPanel.tsx`/신규 `BazaarPublishModal.tsx` | 대기 |
+| **3** | 등록/삭제 UI + 개수 제한 + 해시태그 + 세션 보장 + cascade(D2) + 닉네임 게이트(B3) | `lib/bazaar.ts`, `lib/firestore.ts`, `ShareSettingsPanel.tsx` | **✅ 구현 완료(tsc·build 통과)** |
 | **4** | Bazaar 피드 + 검색/필터 (PublishList 흡수) + 피드 필터(D2/N4) | 신규 `BazaarView.tsx`, `lib/bazaar.ts`, `AppShell.tsx` | 대기 |
 | **5** | 뷰어 레이아웃 개편 + 공개 댓글 작성 + SNS 공유 v1 | `PublicProblemView.tsx`, `app/shared/[shareId]/page.tsx`, 신규 `PublicViewerShell.tsx`·`ShareButton.tsx`, `PublicComments.tsx`, `lib/comments.ts` | 대기 |
 

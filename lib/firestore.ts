@@ -89,6 +89,14 @@ export async function setCommentsWritable(problemId: string, writable: boolean):
   });
 }
 
+// Phase 52(N1): 공개 댓글 작성 opt-in. 멤버용 commentsWritable과 분리(두 청중 독립 제어).
+export async function setPublicCommentsEnabled(problemId: string, enabled: boolean): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    publicCommentsEnabled: enabled,
+    updated_at: serverTimestamp(),
+  });
+}
+
 export async function deleteProblem(problemId: string): Promise<void> {
   // 탭 메타데이터 읽기 (없으면 기본 2탭)
   const problem = await getProblem(problemId);
