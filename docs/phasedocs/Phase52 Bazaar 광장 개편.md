@@ -90,7 +90,7 @@
 | **3** | 등록/삭제 UI + 개수 제한 + 해시태그 + 세션 보장 + cascade(D2) + 닉네임 게이트(B3) | `lib/bazaar.ts`, `lib/firestore.ts`, `ShareSettingsPanel.tsx` | **✅ 구현 완료(tsc·build 통과)** |
 | **4** | Bazaar 피드 + 검색/필터 (PublishList 흡수) + 끊긴 행 cascade 의존(D2 v1) | 신규 `BazaarView.tsx`, `lib/bazaar.ts`, `AppShell.tsx` | **✅ 구현 완료(tsc·build 통과)** |
 | **5a** | 공개 댓글 작성(인라인 팝업 로그인) + `authorName`(F3) + SNS 공유 버튼(O1) | `PublicComments.tsx`, 신규 `ShareButton.tsx`, `lib/comments.ts`, `PublicProblemView.tsx`, `app/shared/[shareId]/page.tsx` | **✅ 구현 완료(tsc·build 통과)** |
-| **5b** | 뷰어 레이아웃 개편(공통 `PublicViewerShell`: sticky 헤더·2단·분리 스크롤·슬라이딩 패널·슬로건 이동) | 신규 `PublicViewerShell.tsx`, `PublicProblemView.tsx`, `app/shared/[shareId]/page.tsx` | 대기(시각 재설계 — 별도 검증) |
+| **5b** | 뷰어 레이아웃 개편(공통 `PublicViewerShell`: sticky 헤더·2단·분리 스크롤·슬라이딩 패널·슬로건 이동) | 신규 `PublicViewerShell.tsx`, `PublicProblemView.tsx`, `app/shared/[shareId]/page.tsx` | **✅ 구현 완료(tsc·build·시각 검증)** |
 
 > 1단계 없이 3~5단계 동작 불가. 규칙 롤백 비용이 크므로 1단계 단독 배포·검증 후 진행.
 

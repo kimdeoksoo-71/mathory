@@ -112,7 +112,7 @@ export default function PublicComments({
 
   return (
     <div style={{
-      width: 'calc(35em + 72px)', margin: '20px 0 0', boxSizing: 'border-box',
+      width: '100%', boxSizing: 'border-box',
       fontFamily: 'var(--font-ui, sans-serif)',
     }}>
       <div style={{ fontSize: 13, fontWeight: 700, color: '#444', margin: '0 0 10px' }}>
