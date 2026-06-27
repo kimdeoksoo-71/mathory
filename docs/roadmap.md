@@ -1230,3 +1230,19 @@ Phase 50 "웹에 공개(스냅샷)"를 흡수해 하나의 **"문항 공개"** �
 
 - 알려진 제약(v1 수용): ① 비로그인 방문자는 작성자명 '익명'(users read 규칙) — v2 authorName 비정규화로 해소 ② agent 메시지 규칙 레벨 누출은 UI 필터 의존(민감 문항 공개 금지) ③ 멤버용≠공개용 탭/댓글 분리 불가(`memberTabVisibility`/`commentsVisible` 공용)
 - 덕수 TODO: `firebase deploy --only firestore:rules`, `public/og-default.png` 추가, `git push`
+
+## Phase 52: Bazaar — 문항 공개 → 공용 광장 ✅
+
+Phase 51 "문항 공개"를 **모든 로그인 사용자가 탐색·소통하는 공용 광장 "Bazaar"**로 승격. 등록(공개와 별개의 명시적 행위)·전역 피드·검색/필터·공개 댓글 작성·SNS 공유·뷰어 레이아웃 개편. 상세: `docs/phasedocs/Phase52 Bazaar 광장 개편.md`
+
+| 영역 | 변경 |
+|------|------|
+| 보안 규칙 | `bazaar_posts`(본인소유·F1 live=public·태그≤10) + 공개 댓글 create(N1 `publicCommentsEnabled` opt-in·F6 세션정확참조) + A2(`bazaar_reports`·`admins/{uid}` 화이트리스트·admin takedown) + **B1**(공개 read `commentStream==true` 강제 → agent 메시지 규칙레벨 차단). 에뮬레이터 45/45 |
+| lib | 신규 `lib/bazaar.ts`(태그정규화·createBazaarPost[닉네임게이트 B3·개수제한·세션보장]·cascade·listBazaarFeed). `comments.ts` `commentStream`/`authorName`/`watchCommentStream`. `setPublicCommentsEnabled` |
+| 타입·인덱스 | `BazaarPost`·`BazaarMode`, `Problem.publicCommentsEnabled`, `ProblemComment.commentStream`/`authorName`. 복합 인덱스 4(bazaar_posts 3 + tab_comments) |
+| 사이드바·피드 | `ShareScope` sent-web→bazaar(F8), 트리 최상단 Bazaar. 신규 `BazaarView`(전역 피드·제목/닉네임 검색·태그칩·내 게시물). `PublishList` 흡수 |
+| 등록 UI | `ShareSettingsPanel`에 "Bazaar 광장 게시" 섹션(해시태그·공개댓글 토글·닉네임 게이트·cascade 배선) |
+| 공개 뷰어 | 공개 댓글 **작성**(인라인 팝업 로그인) + `ShareButton`(navigator.share/X/링크복사) + 공통 `PublicViewerShell`(고정헤더·2단·분리스크롤·슬라이딩 댓글 패널·슬로건 이동) |
+
+- 남은 후속: 멤버(비오너) agent 메시지 노출(공개만 차단), Phase 53(/shared SSR OG·동적 OG·카카오·신고 UI), BazaarView 댓글 수·끊긴 행 join-check(현재 cascade 의존)
+- 덕수 완료: rules·indexes 재배포, `admins/{uid}` 생성, `/admin/migrate` B1 백필. `git push` 남음
