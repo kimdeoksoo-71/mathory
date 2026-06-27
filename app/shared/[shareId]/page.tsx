@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import ProblemTabContent from '../../../components/share/ProblemTabContent';
+import ShareButton from '../../../components/share/ShareButton';
 import { getShare, isShareExpired, ShareWithSnapshot } from '../../../lib/shares';
 
 export default function SharedPage() {
@@ -93,6 +94,12 @@ export default function SharedPage() {
               : `만료: ${share.expiresAt.toLocaleString('ko-KR')} · 공유 스냅샷`}
           </div>
         </div>
+        <ShareButton
+          url={typeof window !== 'undefined' ? `${window.location.origin}/shared/${shareId}` : `/shared/${shareId}`}
+          title={share.snapshot.title || 'Mathory 문항'}
+          tags={share.snapshot.tags || []}
+          compact
+        />
         <OwnerBadge
           displayName={share.ownerDisplayName}
           photoURL={share.ownerPhotoURL}

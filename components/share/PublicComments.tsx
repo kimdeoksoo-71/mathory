@@ -1,9 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { signInWithPopup } from 'firebase/auth';
 import EditorPreview from '../editor/EditorPreview';
-import { watchCommentStream, isCommentStream, buildThreads } from '../../lib/comments';
+import LatexInputEditor, { LatexInputEditorHandle } from '../comment/LatexInputEditor';
+import { watchCommentStream, isCommentStream, buildThreads, addComment } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
+import { auth, googleProvider } from '../../lib/firebase';
+import useAuth from '../../hooks/useAuth';
 import { ProblemComment, UserProfile } from '../../types/problem';
 
 /**
@@ -17,17 +21,60 @@ import { ProblemComment, UserProfile } from '../../types/problem';
 export default function PublicComments({
   problemId,
   commentSessionId,
+  writeEnabled = false,
 }: {
   problemId: string;
   commentSessionId: string | null;
+  /** publicCommentsEnabled && commentsVisible (작성 허용). 부모가 계산해 전달. */
+  writeEnabled?: boolean;
 }) {
+  const { user } = useAuth();
   const [comments, setComments] = useState<ProblemComment[]>([]);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
+  const [myNickname, setMyNickname] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const editorRef = useRef<LatexInputEditorHandle>(null);
 
   useEffect(() => {
     const unsub = watchCommentStream(problemId, setComments);
     return () => unsub();
   }, [problemId]);
+
+  // 로그인 사용자 닉네임(authorName 비정규화용)
+  useEffect(() => {
+    if (!user) { setMyNickname(null); return; }
+    let cancelled = false;
+    getUserProfile(user.uid).then((p) => {
+      if (!cancelled) setMyNickname(p?.nickname || user.displayName || null);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [user]);
+
+  const canWrite = writeEnabled && !!commentSessionId;
+
+  const handleLogin = async () => {
+    setWriteError(null);
+    try { await signInWithPopup(auth, googleProvider); }
+    catch (e) { setWriteError(e instanceof Error ? e.message : '로그인 실패'); }
+  };
+
+  const handleSubmit = async () => {
+    const content = draft.trim();
+    if (!content || !user || !commentSessionId || submitting) return;
+    setSubmitting(true); setWriteError(null);
+    try {
+      await addComment({
+        problemId, tabId: '', authorUid: user.uid, content,
+        authorName: myNickname || undefined,
+        discussionSessionId: commentSessionId, commentSessionId,
+      });
+      setDraft(''); editorRef.current?.setValue('');
+    } catch (e) {
+      setWriteError(e instanceof Error ? e.message : '댓글 작성 실패');
+    } finally { setSubmitting(false); }
+  };
 
   // 댓글 스트림(오너/멤버 댓글 + legacy)만, AI 방어적 제외
   const stream = useMemo(
@@ -54,8 +101,10 @@ export default function PublicComments({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream]);
 
-  const nameOf = (uid: string) => {
-    const p = profiles[uid];
+  // 표시명: authorName(작성 시점 비정규화) 우선 → 프로필 백필 → '익명'
+  const nameOf = (c: ProblemComment) => {
+    if (c.authorName) return c.authorName;
+    const p = profiles[c.authorUid];
     return p?.nickname || (p?.email || '').split('@')[0] || p?.displayName || '익명';
   };
 
@@ -84,11 +133,11 @@ export default function PublicComments({
               background: '#fff', borderRadius: 8, padding: '14px 16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
-              <CommentRow c={parent} name={nameOf(parent.authorUid)} />
+              <CommentRow c={parent} name={nameOf(parent)} />
               {replies.length > 0 && (
                 <div style={{ marginTop: 10, paddingLeft: 14, borderLeft: '2px solid #eee', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {replies.map((r) => (
-                    <CommentRow key={r.id} c={r} name={nameOf(r.authorUid)} />
+                    <CommentRow key={r.id} c={r} name={nameOf(r)} />
                   ))}
                 </div>
               )}
@@ -96,8 +145,66 @@ export default function PublicComments({
           ))}
         </div>
       )}
+
+      {/* ── 작성 영역 (Phase 52 5a) ── */}
+      <div style={{ marginTop: 14 }}>
+        {!canWrite ? (
+          <div style={{ fontSize: 11.5, color: '#999', padding: '8px 2px' }}>
+            이 문항은 공개 댓글을 받지 않습니다.
+          </div>
+        ) : !user ? (
+          <div style={{
+            background: '#fff', borderRadius: 8, padding: 16, textAlign: 'center',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          }}>
+            <div style={{ fontSize: 12.5, color: '#666', marginBottom: 10 }}>댓글을 쓰려면 로그인하세요.</div>
+            <button onClick={handleLogin} style={loginBtnStyle}>Google로 로그인</button>
+          </div>
+        ) : (
+          <div style={{ background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+            <LatexInputEditor
+              ref={editorRef}
+              fontSize={13}
+              minHeight={64}
+              placeholder="댓글을 입력하세요 (수식: $…$)"
+              onChange={setDraft}
+              onSubmit={handleSubmit}
+              maxLength={2000}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+              <span style={{ fontSize: 11, color: '#aaa' }}>
+                {myNickname ? `${myNickname} 님으로 작성` : ''}
+              </span>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || !draft.trim()}
+                style={submitBtnStyle(submitting || !draft.trim())}
+              >
+                {submitting ? '작성 중…' : '댓글 작성'}
+              </button>
+            </div>
+          </div>
+        )}
+        {writeError && (
+          <div style={{ marginTop: 8, fontSize: 11.5, color: '#a4322a' }}>{writeError}</div>
+        )}
+      </div>
     </div>
   );
+}
+
+const loginBtnStyle: React.CSSProperties = {
+  padding: '8px 18px', border: '1px solid var(--border-light, #ddd)', borderRadius: 8,
+  background: '#fff', color: '#333', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+  fontFamily: 'var(--font-ui)',
+};
+function submitBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    padding: '7px 16px', border: 'none', borderRadius: 7,
+    background: disabled ? '#ccc' : 'var(--accent-primary, #B8845C)', color: '#fff',
+    fontSize: 12, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
+    fontFamily: 'var(--font-ui)',
+  };
 }
 
 function fmt(d: Date): string {

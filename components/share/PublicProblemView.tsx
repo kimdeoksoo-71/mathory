@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { watchProblem, watchTabBlocks } from '../../lib/firestore';
 import ProblemTabContent from './ProblemTabContent';
 import PublicComments from './PublicComments';
+import ShareButton from './ShareButton';
 import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
 
 /**
@@ -90,6 +91,11 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
           </div>
           <div style={{ fontSize: 11, color: '#888', marginTop: 4 }}>실시간 공개 · 편집 즉시 반영</div>
         </div>
+        <ShareButton
+          url={typeof window !== 'undefined' ? `${window.location.origin}/p/${problemId}` : `/p/${problemId}`}
+          title={problem.title || 'Mathory 문항'}
+          tags={problem.tags || []}
+        />
       </div>
 
       {/* 본문 */}
@@ -127,9 +133,13 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
               <ProblemTabContent blocks={tabBlocks[activeTab] || []} />
             </div>
 
-            {/* 읽기 전용 댓글 (commentsVisible=false면 공개에 숨김 — 규칙도 차단) */}
+            {/* 댓글 (commentsVisible=false면 공개에 숨김 — 규칙도 차단). 작성은 publicCommentsEnabled일 때. */}
             {problem.commentsVisible !== false && (
-              <PublicComments problemId={problemId} commentSessionId={problem.commentSessionId ?? null} />
+              <PublicComments
+                problemId={problemId}
+                commentSessionId={problem.commentSessionId ?? null}
+                writeEnabled={problem.publicCommentsEnabled === true}
+              />
             )}
           </>
         )}

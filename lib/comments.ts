@@ -37,6 +37,7 @@ function mapDoc(d: any): ProblemComment {
     id: d.id,
     tabId: data.tabId,
     authorUid: data.authorUid,
+    authorName: typeof data.authorName === 'string' ? data.authorName : undefined,
     content: data.content || '',
     parentCommentId: data.parentCommentId ?? null,
     resolved: !!data.resolved,
@@ -67,6 +68,8 @@ export interface AddCommentInput {
   aiUsage?: AIUsage;
   // Phase 52(B1): 댓글세션 포인터(알면 전달 → commentStream 계산 시 추가 read 회피).
   commentSessionId?: string | null;
+  // Phase 52(F3): 작성 시점 닉네임 비정규화(공개 댓글 비로그인 열람자 표시용).
+  authorName?: string;
 }
 
 /**
@@ -100,6 +103,7 @@ export async function addComment(input: AddCommentInput): Promise<string> {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   };
+  if (input.authorName) payload.authorName = input.authorName;
   if (input.modelId) payload.modelId = input.modelId;
   if (input.discussionSessionId) payload.discussionSessionId = input.discussionSessionId;
   if (input.invokedModelIds && input.invokedModelIds.length > 0) {
