@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
-import { IconChevron, IconShare, IconBlockchain } from '../ui/Icons';
+import { IconChevron, IconShare, IconBazaar } from '../ui/Icons';
 
 export interface ShareGroup {
   uid: string;
@@ -72,9 +72,9 @@ export default function ShareTree({
           {/* ── Bazaar (Phase 52: 문항 공개 승격, 최상단) ── */}
           <ParentRow
             label="Bazaar"
-            icon={<IconBlockchain size={15} />}
+            icon={<IconBazaar size={15} />}
             count={0}
-            active={activeScopeKey === 'bazaar:all'}
+            active={false}
             expandable
             expanded={bazaarOpen}
             onToggleExpand={() => setBazaarOpen((v) => !v)}
@@ -130,7 +130,6 @@ export default function ShareTree({
           />
           {sentOpen && (
             <>
-              <SubRow label="개인" muted />
               {sentGroups.map((g) => (
                 <PersonRow
                   key={g.uid}

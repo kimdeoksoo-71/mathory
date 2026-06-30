@@ -37,6 +37,19 @@ export function IconBlockchain({ size = 14, color = 'currentColor' }: IconProps)
   );
 }
 
+// Phase 52: Bazaar(공용 광장) — 차양 천막(장터) 아이콘
+export function IconBazaar({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 4 L21 4 L21 8 L3 8 Z" />                              {/* 차양 틀 */}
+      <path d="M3 8 q3 3 6 0 q3 -3 6 0 q3 3 6 0 q3 -3 6 0" />            {/* 차양 물결 */}
+      <path d="M5 8 L5 20 M19 8 L19 20 M5 20 L19 20" />                 {/* 좌우 벽 + 바닥 */}
+      <path d="M10 20 L10 14 L14 14 L14 20" />                          {/* 출입구 */}
+    </svg>
+  );
+}
+
 export function IconPlus({ size = 18, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">

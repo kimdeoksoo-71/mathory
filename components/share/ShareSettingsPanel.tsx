@@ -512,20 +512,20 @@ function ModeRadio({ label, hint, active, badge, onClick }: {
         fontFamily: 'var(--font-ui)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <span style={{ fontSize: 12.5, fontWeight: 700, color: active ? 'var(--accent-primary, #B8845C)' : 'var(--text-primary)' }}>
-          {label}
-        </span>
-        {badge && (
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: active ? 'var(--accent-primary, #B8845C)' : 'var(--text-primary)' }}>
+        {label}
+      </span>
+      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 1 }}>{hint}</div>
+      {badge && (
+        <div style={{ marginTop: 4 }}>
           <span style={{
-            fontSize: 9, fontWeight: 700, padding: '0 4px', borderRadius: 4,
+            fontSize: 9, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
             background: 'var(--accent-primary, #B8845C)', color: '#fff', lineHeight: 1.6,
           }}>
             {badge}
           </span>
-        )}
-      </div>
-      <div style={{ fontSize: 9.5, color: 'var(--text-muted)', marginTop: 1 }}>{hint}</div>
+        </div>
+      )}
     </button>
   );
 }
