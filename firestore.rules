@@ -343,8 +343,8 @@ service cloud.firestore {
 
     // ===== bazaar_posts 컬렉션 (Phase 52: 공용 광장 피드) =====
     //   - "광장 게시"는 공개(visibility)와 별개의 명시적 행위(C1). 등록해야 피드에 노출.
-    //   - read: 로그인 사용자 전체(광장은 인증 카테고리). 개별 뷰어(/p·/shared)는
-    //     기존 problems/shares 규칙으로 비로그인도 접근 가능.
+    //   - read: 비로그인 포함 공개(D1). 공개 Bazaar 랜딩(/bazaar)에서 익명 열람.
+    //     게시는 "명시적 공개 동의"라 /p·/shared(이미 비로그인 공개)와 일관.
     //   - create: 본인 소유 문항 + author 본인 + 형태 검증(F7).
     //       live는 게시 시점에 문항이 이미 public이어야 함(F1) — /p 뷰어 read가 isPublic 의존.
     //   - update: 게시자 본인, 태그·제목 비정규화만(사후 태그 편집). mode/problemId/ownerUid/shareId 불변.
@@ -371,7 +371,7 @@ service cloud.firestore {
           );
       }
 
-      allow read: if request.auth != null;
+      allow read: if true;   // D1: 비로그인 포함 공개 열람
 
       allow create: if request.auth != null
         && validCreateShape()

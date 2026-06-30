@@ -47,12 +47,16 @@ export default function PublicViewerShell({
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f4f4f4', fontFamily: 'var(--font-ui, sans-serif)' }}>
-      {/* ── 고정 헤더 (로고만) ── */}
+      {/* ── 고정 헤더 (Mathory | Bazaar | 제목) ── */}
       <header style={headerStyle}>
-        <a href="https://mathory.app" target="_blank" rel="noopener noreferrer" title="Mathory로 가기" style={logoLinkStyle}>
+        <a href="/" title="Mathory 메인으로" style={logoLinkStyle}>
           <span style={logoTextStyle}>Mathory</span>
         </a>
-        <div style={{ width: 1, height: 22, background: '#e0e0e0', flexShrink: 0 }} />
+        <div style={dividerStyle} />
+        <a href="/bazaar" title="Bazaar 광장으로" style={logoLinkStyle}>
+          <span style={bazaarTextStyle}>Bazaar</span>
+        </a>
+        <div style={dividerStyle} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={titleStyle}>{title || '제목 없음'}</div>
           {meta && <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>{meta}</div>}
@@ -164,6 +168,11 @@ const logoTextStyle: React.CSSProperties = {
   fontSize: 19, fontWeight: 500, color: 'var(--text-primary, #222)',
   letterSpacing: -0.5, fontFamily: 'var(--font-logo)', lineHeight: 1.1,
 };
+const bazaarTextStyle: React.CSSProperties = {
+  fontSize: 16, fontWeight: 600, color: 'var(--accent-primary, #B8845C)',
+  letterSpacing: -0.3, fontFamily: 'var(--font-logo)', lineHeight: 1.1,
+};
+const dividerStyle: React.CSSProperties = { width: 1, height: 22, background: '#e0e0e0', flexShrink: 0 };
 const titleStyle: React.CSSProperties = {
   fontSize: 17, fontWeight: 600, color: '#222',
   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

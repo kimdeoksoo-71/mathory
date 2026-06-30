@@ -221,6 +221,18 @@ export default function AppShell() {
     return () => { cancelled = true; };
   }, [authLoading, user]);
 
+  // Phase 52(D5): 공개 랜딩(/bazaar)에서 로그인 후 리다이렉트된 경우 ?view=bazaar → Bazaar 전체로 진입
+  const bazaarDeepLinkRef = useRef(false);
+  useEffect(() => {
+    if (!user || bazaarDeepLinkRef.current) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('view') === 'bazaar') {
+      bazaarDeepLinkRef.current = true;
+      setView({ type: 'share', scope: { kind: 'bazaar', filter: 'all' } });
+      window.history.replaceState({}, '', '/');
+    }
+  }, [user]);
+
   // Phase 49: 공유 트리에 필요한 사용자 프로필 해석 (보낸 대상 + 받은 출처) — 캐시 재사용
   useEffect(() => {
     const uids = new Set<string>();

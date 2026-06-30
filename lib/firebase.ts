@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
-import { getAuth, GoogleAuthProvider, browserSessionPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -15,11 +15,12 @@ const app = initializeApp(firebaseConfig);
 export { app };
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-// Phase 35: 탭 단위 인증 격리 (단일 활성 세션의 전제)
-// — IndexedDB 공유 대신 sessionStorage 사용 → 한 탭의 signOut이 다른 탭에 영향 X
-// — F5 시에는 유지, 탭 종료/브라우저 재시작 시 재로그인 필요
+// Phase 52: 지속 로그인 — localStorage 사용. 새 탭/공개 페이지(/p·/shared·/bazaar)에서도
+//   로그인 유지(이전 sessionStorage는 새 탭마다 로그아웃). 단일 활성 세션(sessions/{uid})은
+//   claim/watch로 유지 — watch 충돌 시 kick(view 리셋)만 하고 signOut은 안 하므로 연쇄 로그아웃 없음.
+//   명시적 로그아웃 시에만 전 탭 로그아웃.
 if (typeof window !== 'undefined') {
-  setPersistence(auth, browserSessionPersistence).catch((e) => {
+  setPersistence(auth, browserLocalPersistence).catch((e) => {
     console.error('Auth persistence 설정 실패:', e);
   });
 }

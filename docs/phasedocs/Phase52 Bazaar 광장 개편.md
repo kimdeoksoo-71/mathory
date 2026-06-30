@@ -409,6 +409,25 @@ onShare():
 
 ---
 
+## 10-b. 다듬기 & 공개 랜딩 (2026-06-30)
+
+**UI 다듬기**
+- 사이드바 Bazaar 부모 행 `active=false` — "전체"/"내 게시물" 클릭 시 해당 행만 강조(중복 하이라이트 제거). "공유 보낸 문항"의 "개인" 행 제거.
+- Bazaar 아이콘 전용 `IconBazaar`(장터 천막) 신설 — 저작권용 `IconBlockchain`과 중복 해소.
+- `BazaarView` 피드를 표 형태(열 헤더 + 1줄/행: 방식·제목·게시자·일시·태그)로. 제목 말줄임, 좁아지면 태그→일시 순 숨김(ResizeObserver), "내 게시물" 액션은 hover 우측 노출.
+- `ShareSettingsPanel` 방식 라디오의 "공개 중" 배지를 라벨 아래 줄로(좁은 폭 2줄 깨짐 해소).
+- 공개 뷰어 헤더 `Mathory │ Bazaar │ 제목` — 구분선을 긴 선 스타일 2개로 통일.
+
+**D1~D5: 공개 Bazaar 랜딩 (`/bazaar`)**
+- **D1 — `bazaar_posts` read를 `if true`(공개)로.** 비로그인도 피드 열람(게시는 명시적 공개 동의라 /p·/shared와 일관). "광장은 인증 카테고리" 초안 결정을 뒤집음. 에뮬레이터 47/47(비로그인 read/list 허용 #44·#45). **배포 완료.**
+- **D2~D5** — 신규 public 라우트 `app/bazaar/page.tsx`: 비로그인은 미니 사이드바(공유>Bazaar>전체[+내 게시물]) + 피드, 로그인은 `/?view=bazaar`로 리다이렉트→`AppShell`이 딥링크 읽어 Bazaar 전체 진입. 공개 뷰어 헤더의 `Bazaar`→`/bazaar`, `Mathory`→`/`(상대경로 — origin 보존).
+
+**지속 로그인**
+- `lib/firebase.ts` 인증 지속성을 `browserSessionPersistence`→**`browserLocalPersistence`**. 새 탭·공개 페이지·브라우저 재시작에도 로그인 유지(Phase 35 탭격리 반전). 단일 활성 세션은 유지(watch kick은 signOut 안 함 → 연쇄 로그아웃 없음), 명시적 로그아웃 시에만 전 탭 로그아웃.
+- 공개 헤더 링크를 상대경로(`/`·`/bazaar`)로 — cross-origin 로그아웃 방지(dev·프로덕션 공통).
+
+---
+
 ## 11. 커밋 & 푸시
 
 - 단계별 1커밋:

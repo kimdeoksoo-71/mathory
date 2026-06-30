@@ -28,6 +28,8 @@
  *   36) agent 메시지 공개 read 거부(핵심)  37) 스트림 댓글 공개 read 허용
  *   38) 필터 LIST 허용  39) 미필터 LIST 거부  40) 멤버 미필터 LIST 허용  41) 공개 작성 commentStream 누락 거부
  *   42) 오너 commentStream 백필 update 허용  43) 비오너 거부
+ *   [Phase 52 D1: 공개 Bazaar 피드 비로그인 열람]
+ *   44) 비로그인 bazaar_posts 단건 read 허용  45) 비로그인 피드 LIST 허용
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -143,6 +145,12 @@ before(async () => {
       mode: 'live', problemId: 'pub', ownerUid: OWNER,
       authorNickname: 'kds', authorNickname_lower: 'kds',
       title: 'T', title_lower: 't', tags: [], createdAt: new Date(),
+    });
+    // D1: 공개 read 검증용(삭제 테스트 영향 없음)
+    await setDoc(doc(db, 'bazaar_posts/readSeed'), {
+      mode: 'live', problemId: 'pub', ownerUid: OWNER,
+      authorNickname: 'kds', authorNickname_lower: 'kds',
+      title: 'R', title_lower: 'r', tags: ['r'], createdAt: new Date(),
     });
 
     // ── Phase 52(A2) 시드: 관리자 화이트리스트 + 기존 신고 ──
@@ -351,4 +359,14 @@ test('42. 오너가 commentStream 플래그만 갱신 허용 (백필)', async ()
 });
 test('43. 비오너의 commentStream 갱신 거부', async () => {
   await assertFails(updateDoc(doc(as(STRANGER), 'problems/pub/tab_comments/c_stream'), { commentStream: false }));
+});
+
+// ══ Phase 52 D1: 공개 Bazaar 피드 비로그인 열람 ══
+test('44. 비로그인 bazaar_posts 단건 read 허용 (D1)', async () => {
+  await assertSucceeds(getDoc(doc(anon(), 'bazaar_posts/readSeed')));
+});
+test('45. 비로그인 bazaar_posts 피드 LIST 허용 (D1)', async () => {
+  await assertSucceeds(getDocs(query(
+    collection(anon(), 'bazaar_posts'), orderBy('createdAt', 'desc'),
+  )));
 });
