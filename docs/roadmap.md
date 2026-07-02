@@ -1246,3 +1246,19 @@ Phase 51 "문항 공개"를 **모든 로그인 사용자가 탐색·소통하는
 
 - 남은 후속: 멤버(비오너) agent 메시지 노출(공개만 차단), Phase 53(/shared SSR OG·동적 OG·카카오·신고 UI), BazaarView 댓글 수·끊긴 행 join-check(현재 cascade 의존)
 - 덕수 완료: rules·indexes 재배포, `admins/{uid}` 생성, `/admin/migrate` B1 백필. `git push` 남음
+
+## Phase 53: Bazaar UI 통일 개편 + OG (A~D 완료 · E 대기)
+
+Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 앱 셸과 시각 통합 + `/shared` SSR OG. **규칙 변경 0**(기존 스코프 read/write 유지). 상세: `docs/phasedocs/Phase53 Bazaar UI 개편·OG 추가.md`
+
+| 단계 | 변경 |
+|------|------|
+| A | `--bg-bazaar`(#F2E3D5 테라코타) 토큰. `BazaarView` 아이보리 고정 헤더 / U-프레임(radius 10·무테) 2분할. MiniShell 세로선 제거 |
+| B | OG: `/shared` server/client 분리 + `generateMetadata`(shares REST·snapshot.title·만료검사·no-store). `public/og-default.png` 배치(404 해소). 동적 OG 이미지는 후속 |
+| C | `MiniShell` 추출(bazaar 사이드바 공용). `/p`·`/shared` 비로그인·비멤버를 MiniShell로 감쌈. `PublicViewerShell` 중복 네비 제거 + U6(100dvh→100%). 오너 편집 진입점(`?view=p&id=`) |
+| D | 공개 뷰어 3종 클레이 리스타일(하드코딩 색→앱 토큰). 데이터 훅 불변(R10) |
+| E(대기) | 앱 셸 내 공개 뷰어 임베드(원 스펙 1.2 회복) — A~D 안착 후 착수, 스코프 가드 |
+
+- 설계 핵심: `CommentPanel`/`ProblemView`는 `watchAllComments`·`listSessions`가 오너/멤버 전용(규칙)이라 공개·익명에서 깨짐 → 공개 개조 폐기, 규칙 정합 공개 뷰어(`watchCommentStream`·`problem.commentSessionId`) 리스타일로 대체
+- 후속 과제: E(임베드), **U8 모바일 소형 화면 적응**(C·D는 데스크톱·태블릿 기준 — 232px 사이드바), 동적 OG 이미지(satori·한글 폰트), 카카오 리치 공유
+- 덕수 완료 필요: `git push`(→ Vercel 자동 배포)
