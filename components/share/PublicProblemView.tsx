@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { watchProblem, watchTabBlocks } from '../../lib/firestore';
+import useAuth from '../../hooks/useAuth';
 import PublicViewerShell from './PublicViewerShell';
 import PublicComments from './PublicComments';
 import ShareButton from './ShareButton';
@@ -14,6 +15,7 @@ import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
  * - 댓글(읽기 전용)은 5단계에서 추가
  */
 export default function PublicProblemView({ problemId }: { problemId: string }) {
+  const { user } = useAuth();
   const [problem, setProblem] = useState<Problem | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'unavailable'>('loading');
   const [tabBlocks, setTabBlocks] = useState<Record<string, Block[]>>({});
@@ -59,6 +61,8 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
   }
 
   const url = typeof window !== 'undefined' ? `${window.location.origin}/p/${problemId}` : `/p/${problemId}`;
+  // 오너 전용 편집 진입점(U1). E단계 딥링크(?view=p&id=) 전이라도 앱 홈으로 안전 착지.
+  const isOwner = !!user && user.uid === problem.authorUid;
 
   return (
     <PublicViewerShell
@@ -67,7 +71,12 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
       tabs={visibleTabs}
       tabBlocks={tabBlocks}
       rightSlot={
-        <ShareButton url={url} title={problem.title || 'Mathory 문항'} tags={problem.tags || []} compact />
+        <>
+          {isOwner && (
+            <a href={`/?view=p&id=${problemId}`} title="내 작업실에서 열기·편집" style={editEntryStyle}>편집</a>
+          )}
+          <ShareButton url={url} title={problem.title || 'Mathory 문항'} tags={problem.tags || []} compact />
+        </>
       }
       commentsSlot={problem.commentsVisible !== false ? (
         <PublicComments
@@ -80,10 +89,18 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
   );
 }
 
+const editEntryStyle: React.CSSProperties = {
+  flexShrink: 0, padding: '6px 12px', borderRadius: 8,
+  border: '1px solid var(--accent-primary, #c96442)',
+  background: 'var(--accent-primary, #c96442)', color: '#fff',
+  fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
+  fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+};
+
 function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: '#666', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
     }}>
       {children}

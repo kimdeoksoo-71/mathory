@@ -46,20 +46,13 @@ export default function PublicViewerShell({
   const twoColumn = wide && tabs.length === 2;
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f4f4f4', fontFamily: 'var(--font-ui, sans-serif)' }}>
-      {/* ── 고정 헤더 (Mathory | Bazaar | 제목) ── */}
+    // U6(Phase 53): 100dvh → 100% — MiniShell/앱 셸의 콘텐츠 영역에 임베드 가능한 형태
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--bg-content)', fontFamily: 'var(--font-ui, sans-serif)' }}>
+      {/* ── 제목 바 (브랜딩·네비는 MiniShell 좌측 사이드바가 담당) ── */}
       <header style={headerStyle}>
-        <a href="/" title="Mathory 메인으로" style={logoLinkStyle}>
-          <span style={logoTextStyle}>Mathory</span>
-        </a>
-        <div style={dividerStyle} />
-        <a href="/bazaar" title="Bazaar 광장으로" style={logoLinkStyle}>
-          <span style={bazaarTextStyle}>Bazaar</span>
-        </a>
-        <div style={dividerStyle} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={titleStyle}>{title || '제목 없음'}</div>
-          {meta && <div style={{ fontSize: 11, color: '#888', marginTop: 3 }}>{meta}</div>}
+          {meta && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 3 }}>{meta}</div>}
         </div>
         {rightSlot}
         {commentsSlot && (
@@ -160,21 +153,11 @@ function BubbleIcon() {
 }
 
 const headerStyle: React.CSSProperties = {
-  flexShrink: 0, background: '#fff', borderBottom: '1px solid #e0e0e0',
+  flexShrink: 0, background: 'var(--bg-functional)', borderBottom: '1px solid var(--border-light, #e0e0e0)',
   padding: '12px 24px', display: 'flex', alignItems: 'center', gap: 14,
 };
-const logoLinkStyle: React.CSSProperties = { flexShrink: 0, textDecoration: 'none' };
-const logoTextStyle: React.CSSProperties = {
-  fontSize: 19, fontWeight: 500, color: 'var(--text-primary, #222)',
-  letterSpacing: -0.5, fontFamily: 'var(--font-logo)', lineHeight: 1.1,
-};
-const bazaarTextStyle: React.CSSProperties = {
-  fontSize: 16, fontWeight: 600, color: 'var(--accent-primary, #B8845C)',
-  letterSpacing: -0.3, fontFamily: 'var(--font-logo)', lineHeight: 1.1,
-};
-const dividerStyle: React.CSSProperties = { width: 1, height: 22, background: '#e0e0e0', flexShrink: 0 };
 const titleStyle: React.CSSProperties = {
-  fontSize: 17, fontWeight: 600, color: '#222',
+  fontSize: 17, fontWeight: 600, color: 'var(--text-primary)',
   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 const tabBarStyle: React.CSSProperties = {

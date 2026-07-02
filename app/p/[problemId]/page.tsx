@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import PublicProblemView from '../../../components/share/PublicProblemView';
+import MiniShell from '../../../components/layout/MiniShell';
 
 const SITE = 'https://mathory.app';
 const OG_IMAGE = '/og-default.png'; // Phase 51 L1: 정적 기본 1장(로고+슬로건). 동적 썸네일은 v2.
@@ -53,5 +54,9 @@ export async function generateMetadata(
 }
 
 export default function PublicProblemPage({ params }: { params: { problemId: string } }) {
-  return <PublicProblemView problemId={params.problemId} />;
+  return (
+    <MiniShell>
+      <PublicProblemView problemId={params.problemId} />
+    </MiniShell>
+  );
 }

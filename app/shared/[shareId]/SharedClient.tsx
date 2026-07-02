@@ -91,7 +91,7 @@ function OwnerBadge({ displayName, photoURL }: { displayName: string; photoURL: 
 function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      height: '100%', minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
       color: '#666', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
     }}>
       {children}

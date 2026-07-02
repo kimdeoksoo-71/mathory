@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import SharedClient from './SharedClient';
+import MiniShell from '../../../components/layout/MiniShell';
 
 const SITE = 'https://mathory.app';
 const OG_IMAGE = '/og-default.png'; // Phase 53 B단계: 정적 브랜드 카드(1200×630). 동적 썸네일은 후속.
@@ -62,5 +63,9 @@ export async function generateMetadata(
 }
 
 export default function SharedPage({ params }: { params: { shareId: string } }) {
-  return <SharedClient shareId={params.shareId} />;
+  return (
+    <MiniShell>
+      <SharedClient shareId={params.shareId} />
+    </MiniShell>
+  );
 }
