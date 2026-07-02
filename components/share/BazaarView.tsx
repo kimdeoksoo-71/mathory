@@ -101,75 +101,93 @@ export default function BazaarView({ uid, filter }: { uid: string; filter: 'all'
     : activeTitle ? `“${activeTitle}”` : null;
 
   return (
-    <div ref={containerRef} style={{ height: '100%', overflowY: 'auto' }}>
-      <h2 style={h2Style}>{filter === 'mine' ? 'Bazaar · 내 게시물' : 'Bazaar'}</h2>
+    <div
+      ref={containerRef}
+      style={{
+        height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0,
+        background: 'var(--bg-functional)',
+      }}
+    >
+      {/* ─── 아이보리 헤더 (고정) — 앱 공통 문법: 기능 영역은 아이보리로 후퇴 ─── */}
+      <div style={{ flexShrink: 0, background: 'var(--bg-functional)' }}>
+        <h2 style={h2Style}>{filter === 'mine' ? 'Bazaar · 내 게시물' : 'Bazaar'}</h2>
 
-      {filter === 'all' && (
-        <div style={{ padding: '0 16px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <select value={searchMode} onChange={(e) => setSearchMode(e.target.value as 'title' | 'nickname')} style={selectStyle}>
-              <option value="title">제목</option>
-              <option value="nickname">닉네임</option>
-            </select>
-            <input
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
-              placeholder={searchMode === 'nickname' ? '닉네임 정확히' : '제목 시작 글자'}
-              style={searchInputStyle}
-            />
-            <button onClick={submitSearch} style={searchBtnStyle}>검색</button>
-          </div>
-          {activeFilterLabel && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
-              <span>필터: <b style={{ color: 'var(--accent-primary, #B8845C)' }}>{activeFilterLabel}</b></span>
-              <button onClick={clearFilters} style={clearBtnStyle}>해제</button>
+        {filter === 'all' && (
+          <div style={{ padding: '0 16px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <select value={searchMode} onChange={(e) => setSearchMode(e.target.value as 'title' | 'nickname')} style={selectStyle}>
+                <option value="title">제목</option>
+                <option value="nickname">닉네임</option>
+              </select>
+              <input
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
+                placeholder={searchMode === 'nickname' ? '닉네임 정확히' : '제목 시작 글자'}
+                style={searchInputStyle}
+              />
+              <button onClick={submitSearch} style={searchBtnStyle}>검색</button>
             </div>
-          )}
-        </div>
-      )}
-
-      {error && (
-        <div style={{ margin: '0 16px 10px', padding: 8, borderRadius: 6, background: '#fdecea', color: '#a4322a', fontSize: 11.5 }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{ padding: '0 16px 16px' }}>
-        <div style={tableStyle}>
-          {/* 열 헤더 */}
-          <div style={headerRowStyle}>
-            <span style={{ ...cellBadge, color: 'var(--text-faint, #bbb)' }}>방식</span>
-            <span style={{ ...cellTitle, fontWeight: 600 }}>제목</span>
-            <span style={cellNick}>게시자</span>
-            {showDate && <span style={cellDate}>일시</span>}
-            {showTags && <span style={cellTags}>태그</span>}
+            {activeFilterLabel && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <span>필터: <b style={{ color: 'var(--accent-primary, #B8845C)' }}>{activeFilterLabel}</b></span>
+                <button onClick={clearFilters} style={clearBtnStyle}>해제</button>
+              </div>
+            )}
           </div>
-
-          {posts.map((p) => (
-            <BazaarRow
-              key={p.id}
-              post={p}
-              mine={filter === 'mine'}
-              showDate={showDate}
-              showTags={showTags}
-              onPickTag={pickTag}
-              onPickNickname={pickNickname}
-              onTakedown={handleTakedown}
-            />
-          ))}
-
-          {!loading && posts.length === 0 && (
-            <div style={emptyStyle}>
-              {filter === 'mine' ? '아직 Bazaar에 게시한 문항이 없습니다.' : '게시물이 없습니다.'}
-            </div>
-          )}
-        </div>
-
-        {loading && <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>불러오는 중…</div>}
-        {hasMore && !loading && (
-          <button onClick={() => load(false)} style={moreBtnStyle}>더 보기</button>
         )}
+      </div>
+
+      {/* ─── U-프레임 (스크롤) — Bazaar 테라코타 워시, 상단 라운드 10·무테 ─── */}
+      <div
+        style={{
+          flex: 1, minHeight: 0, overflowY: 'auto',
+          background: 'var(--bg-bazaar)',
+          borderTopLeftRadius: 10, borderTopRightRadius: 10,
+        }}
+      >
+        <div style={{ padding: 16 }}>
+          {error && (
+            <div style={{ marginBottom: 10, padding: 8, borderRadius: 6, background: '#fdecea', color: '#a4322a', fontSize: 11.5 }}>
+              {error}
+            </div>
+          )}
+
+          <div style={tableStyle}>
+            {/* 열 헤더 */}
+            <div style={headerRowStyle}>
+              <span style={{ ...cellBadge, color: 'var(--text-faint, #bbb)' }}>방식</span>
+              <span style={{ ...cellTitle, fontWeight: 600 }}>제목</span>
+              <span style={cellNick}>게시자</span>
+              {showDate && <span style={cellDate}>일시</span>}
+              {showTags && <span style={cellTags}>태그</span>}
+            </div>
+
+            {posts.map((p) => (
+              <BazaarRow
+                key={p.id}
+                post={p}
+                mine={filter === 'mine'}
+                showDate={showDate}
+                showTags={showTags}
+                onPickTag={pickTag}
+                onPickNickname={pickNickname}
+                onTakedown={handleTakedown}
+              />
+            ))}
+
+            {!loading && posts.length === 0 && (
+              <div style={emptyStyle}>
+                {filter === 'mine' ? '아직 Bazaar에 게시한 문항이 없습니다.' : '게시물이 없습니다.'}
+              </div>
+            )}
+          </div>
+
+          {loading && <div style={{ padding: 16, textAlign: 'center', fontSize: 12, color: 'var(--text-muted)' }}>불러오는 중…</div>}
+          {hasMore && !loading && (
+            <button onClick={() => load(false)} style={moreBtnStyle}>더 보기</button>
+          )}
+        </div>
       </div>
     </div>
   );

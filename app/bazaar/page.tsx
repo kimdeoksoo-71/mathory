@@ -71,7 +71,8 @@ export default function BazaarLandingPage() {
 }
 
 const sidebarStyle: React.CSSProperties = {
-  width: 232, flexShrink: 0, borderRight: '1px solid var(--border-light, #eee)',
+  // Phase 53: 하드 세로선 제거 — 앱 본체와 동일하게 배경색(아이보리)·U-프레임으로 구분
+  width: 232, flexShrink: 0,
   background: 'var(--bg-functional, #fafafa)', padding: '16px 12px',
   display: 'flex', flexDirection: 'column',
 };
