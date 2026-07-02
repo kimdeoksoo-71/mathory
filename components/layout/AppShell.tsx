@@ -21,6 +21,8 @@ import { getUserProfile, needsNicknameSetup } from '../../lib/users';
 import { ShareScope, shareScopeKey } from '../../lib/share-scope';
 import NicknameSetupModal from '../user/NicknameSetupModal';
 import BazaarView from '../share/BazaarView';
+import PublicProblemView from '../share/PublicProblemView';
+import SnapshotView from '../share/SnapshotView';
 import ShareTargetModal from '../share/ShareTargetModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
@@ -37,7 +39,10 @@ type ViewState =
   | { type: 'share'; scope: ShareScope }
   | { type: 'problem'; problemId: string }
   | { type: 'editor'; problemId: string }
-  | { type: 'new' };
+  | { type: 'new' }
+  // Phase 53 E: 앱 셸 내 공개 뷰어 임베드 (비오너·비멤버 열람 / 스냅샷)
+  | { type: 'public-problem'; problemId: string }
+  | { type: 'public-shared'; shareId: string };
 
 function getDifficultyLabel(value: number): string {
   const found = DIFFICULTIES.find((d) => d.value === value);
@@ -221,14 +226,25 @@ export default function AppShell() {
     return () => { cancelled = true; };
   }, [authLoading, user]);
 
-  // Phase 52(D5): 공개 랜딩(/bazaar)에서 로그인 후 리다이렉트된 경우 ?view=bazaar → Bazaar 전체로 진입
+  // Phase 52(D5)/53(E): 로그인 후 딥링크 진입
+  //  ?view=bazaar → Bazaar 전체 / ?view=p&id= → 공개 문항 임베드 / ?view=shared&id= → 스냅샷 임베드
   const bazaarDeepLinkRef = useRef(false);
   useEffect(() => {
     if (!user || bazaarDeepLinkRef.current) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get('view') === 'bazaar') {
+    const v = params.get('view');
+    const id = params.get('id');
+    if (v === 'bazaar') {
       bazaarDeepLinkRef.current = true;
       setView({ type: 'share', scope: { kind: 'bazaar', filter: 'all' } });
+      window.history.replaceState({}, '', '/');
+    } else if (v === 'p' && id) {
+      bazaarDeepLinkRef.current = true;
+      setView({ type: 'public-problem', problemId: id });
+      window.history.replaceState({}, '', '/');
+    } else if (v === 'shared' && id) {
+      bazaarDeepLinkRef.current = true;
+      setView({ type: 'public-shared', shareId: id });
       window.history.replaceState({}, '', '/');
     }
   }, [user]);
@@ -653,7 +669,8 @@ export default function AppShell() {
       <main style={{
         flex: 1,
         position: 'relative',
-        overflow: isEditorMode || isProblemMode || view.type === 'folder' || view.type === 'share' ? 'hidden' : 'auto',
+        overflow: isEditorMode || isProblemMode || view.type === 'folder' || view.type === 'share'
+          || view.type === 'public-problem' || view.type === 'public-shared' ? 'hidden' : 'auto',
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
@@ -701,7 +718,22 @@ export default function AppShell() {
           };
           if (scope.kind === 'bazaar') {
             // Phase 52(4단계): 전역 피드 + 검색/필터. 내 게시물(filter='mine')은 bazaar_posts 직접 조회.
-            return user ? <BazaarView uid={user.uid} filter={scope.filter} /> : null;
+            // Phase 53(E): 게시물 클릭 → 인앱 전환(오너·live=ProblemView, 그 외=공개 뷰어 임베드).
+            return user ? (
+              <BazaarView
+                uid={user.uid}
+                filter={scope.filter}
+                onOpenPost={(post) => {
+                  if (post.mode === 'snapshot' && post.shareId) {
+                    setView({ type: 'public-shared', shareId: post.shareId });
+                  } else if (post.ownerUid === user.uid) {
+                    setView({ type: 'problem', problemId: post.problemId });
+                  } else {
+                    setView({ type: 'public-problem', problemId: post.problemId });
+                  }
+                }}
+              />
+            ) : null;
           }
           const isReceived = scope.kind === 'received-all' || scope.kind === 'received-by';
           const scopedProblems = scope.kind === 'received-all' ? sharedProblems
@@ -745,6 +777,19 @@ export default function AppShell() {
         )}
         {view.type === 'editor' && (
           <EditorView problemId={view.problemId} folders={folders} onBack={handleEditorBack} />
+        )}
+        {view.type === 'public-problem' && (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <PublicProblemView
+              problemId={view.problemId}
+              onOwnerEdit={() => setView({ type: 'problem', problemId: view.problemId })}
+            />
+          </div>
+        )}
+        {view.type === 'public-shared' && (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <SnapshotView shareId={view.shareId} />
+          </div>
         )}
         {view.type === 'new' && (
           <NewProblemCreating onBack={() => { setView({ type: 'home' }); setCollapsed(false); }} />

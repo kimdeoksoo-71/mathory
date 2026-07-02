@@ -12,7 +12,14 @@ import {
  * - filter='mine': 내 게시물. 링크복사·게시 내리기(hover 노출)·스냅샷 만료칩.
  * - 표 형태(1줄/행): 방식·제목·게시자·일시·태그. 좁아지면 태그→일시 순으로 숨김.
  */
-export default function BazaarView({ uid, filter }: { uid: string; filter: 'all' | 'mine' }) {
+export default function BazaarView({
+  uid, filter, onOpenPost,
+}: {
+  uid: string;
+  filter: 'all' | 'mine';
+  /** Phase 53 E: 앱 셸 내부(로그인)에서 게시물 클릭 → 인앱 뷰 전환. 미전달(=/bazaar 랜딩·익명)이면 새 탭 앵커 유지. */
+  onOpenPost?: (post: BazaarPost) => void;
+}) {
   const [posts, setPosts] = useState<BazaarPost[]>([]);
   const [cursor, setCursor] = useState<BazaarFeedPage['cursor']>(null);
   const [hasMore, setHasMore] = useState(false);
@@ -173,6 +180,7 @@ export default function BazaarView({ uid, filter }: { uid: string; filter: 'all'
                 onPickTag={pickTag}
                 onPickNickname={pickNickname}
                 onTakedown={handleTakedown}
+                onOpenPost={onOpenPost}
               />
             ))}
 
@@ -194,7 +202,7 @@ export default function BazaarView({ uid, filter }: { uid: string; filter: 'all'
 }
 
 function BazaarRow({
-  post, mine, showDate, showTags, onPickTag, onPickNickname, onTakedown,
+  post, mine, showDate, showTags, onPickTag, onPickNickname, onTakedown, onOpenPost,
 }: {
   post: BazaarPost;
   mine: boolean;
@@ -203,6 +211,7 @@ function BazaarRow({
   onPickTag: (t: string) => void;
   onPickNickname: (n: string) => void;
   onTakedown: (p: BazaarPost) => void;
+  onOpenPost?: (post: BazaarPost) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -225,9 +234,19 @@ function BazaarRow({
       <span style={cellBadge}>
         <span style={badgeStyle(post.mode)}>{post.mode === 'live' ? '실시간' : '스냅샷'}</span>
       </span>
-      <a href={path} target="_blank" rel="noreferrer" style={{ ...cellTitle, ...titleLinkStyle }}>
-        {post.title || '(제목 없음)'}
-      </a>
+      {onOpenPost ? (
+        <button
+          onClick={() => onOpenPost(post)}
+          style={{ ...cellTitle, ...titleLinkStyle, border: 'none', background: 'none', cursor: 'pointer', padding: 0, textAlign: 'left' }}
+          title="앱에서 열기"
+        >
+          {post.title || '(제목 없음)'}
+        </button>
+      ) : (
+        <a href={path} target="_blank" rel="noreferrer" style={{ ...cellTitle, ...titleLinkStyle }}>
+          {post.title || '(제목 없음)'}
+        </a>
+      )}
       <button onClick={() => onPickNickname(post.authorNickname)} style={{ ...cellNick, ...nickStyle }} title="이 닉네임으로 검색">
         {post.authorNickname || '익명'}
       </button>

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import SharedClient from './SharedClient';
+import SnapshotView from '../../../components/share/SnapshotView';
 import MiniShell from '../../../components/layout/MiniShell';
 
 const SITE = 'https://mathory.app';
@@ -65,7 +65,7 @@ export async function generateMetadata(
 export default function SharedPage({ params }: { params: { shareId: string } }) {
   return (
     <MiniShell>
-      <SharedClient shareId={params.shareId} />
+      <SnapshotView shareId={params.shareId} />
     </MiniShell>
   );
 }

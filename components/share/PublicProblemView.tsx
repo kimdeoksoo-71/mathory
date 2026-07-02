@@ -14,7 +14,14 @@ import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
  * - 비공개 전환/삭제 시 permission-denied → 안내
  * - 댓글(읽기 전용)은 5단계에서 추가
  */
-export default function PublicProblemView({ problemId }: { problemId: string }) {
+export default function PublicProblemView({
+  problemId, onOwnerEdit,
+}: {
+  problemId: string;
+  /** 앱 셸 임베드(E단계)에서 오너 '편집' 클릭 시 호출 → 앱 내 ProblemView 전환.
+   *  미전달(스탠드얼론 /p)이면 앱 홈 딥링크로 폴백. */
+  onOwnerEdit?: () => void;
+}) {
   const { user } = useAuth();
   const [problem, setProblem] = useState<Problem | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'unavailable'>('loading');
@@ -73,7 +80,9 @@ export default function PublicProblemView({ problemId }: { problemId: string }) 
       rightSlot={
         <>
           {isOwner && (
-            <a href={`/?view=p&id=${problemId}`} title="내 작업실에서 열기·편집" style={editEntryStyle}>편집</a>
+            onOwnerEdit
+              ? <button onClick={onOwnerEdit} title="편집 화면으로" style={editEntryStyle}>편집</button>
+              : <a href={`/?view=p&id=${problemId}`} title="내 작업실에서 열기·편집" style={editEntryStyle}>편집</a>
           )}
           <ShareButton url={url} title={problem.title || 'Mathory 문항'} tags={problem.tags || []} compact />
         </>
@@ -94,7 +103,7 @@ const editEntryStyle: React.CSSProperties = {
   border: '1px solid var(--accent-primary, #c96442)',
   background: 'var(--accent-primary, #c96442)', color: '#fff',
   fontSize: 12.5, fontWeight: 600, textDecoration: 'none',
-  fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+  fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap', cursor: 'pointer',
 };
 
 function Centered({ children }: { children: React.ReactNode }) {

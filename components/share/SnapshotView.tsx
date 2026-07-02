@@ -1,16 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import PublicViewerShell from '../../../components/share/PublicViewerShell';
-import ShareButton from '../../../components/share/ShareButton';
-import { getShare, isShareExpired, ShareWithSnapshot } from '../../../lib/shares';
+import PublicViewerShell from './PublicViewerShell';
+import ShareButton from './ShareButton';
+import { getShare, isShareExpired, ShareWithSnapshot } from '../../lib/shares';
 
 /**
- * Phase 53 B단계: /shared SSR 메타(server page.tsx) + client 뷰어 분리.
- * 기존 page.tsx의 'use client' 로직을 그대로 이관하되 shareId를 prop으로 받는다.
- * (server page가 generateMetadata를 담당하므로 useParams 대신 prop 사용)
+ * Phase 53: 공유 스냅샷(`/shared/{id}`) 뷰어. 완전 읽기 전용(동결본).
+ * - `/shared` 라우트(MiniShell 안)와 앱 셸 임베드(E단계) 양쪽에서 공용.
+ * - getShare로 스냅샷 로드 → 만료/부재 안내. 댓글 없음(C2).
  */
-export default function SharedClient({ shareId }: { shareId: string }) {
+export default function SnapshotView({ shareId }: { shareId: string }) {
   const [share, setShare] = useState<ShareWithSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +83,7 @@ function OwnerBadge({ displayName, photoURL }: { displayName: string; photoURL: 
           {(displayName || '?').charAt(0).toUpperCase()}
         </div>
       )}
-      <span style={{ fontSize: 13, color: '#444' }}>{displayName || '익명'}</span>
+      <span style={{ fontSize: 13, color: 'var(--text-secondary, #444)' }}>{displayName || '익명'}</span>
     </div>
   );
 }
