@@ -69,7 +69,7 @@ export default function PublicViewerShell({
       {/* ── 본문(분리 스크롤) ── */}
       <main style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         {tabs.length === 0 ? (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontSize: 14 }}>
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted, #888)', fontSize: 14 }}>
             공개된 탭이 없습니다.
           </div>
         ) : twoColumn ? (
@@ -115,7 +115,7 @@ function ScrollColumn({ children, divider }: { children: React.ReactNode; divide
   return (
     <div style={{
       flex: 1, minWidth: 0, overflow: 'auto',
-      borderLeft: divider ? '1px solid #e6e6e6' : undefined,
+      borderLeft: divider ? '1px solid var(--border-light, #e6e6e6)' : undefined,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       padding: '24px 24px 0',
     }}>
@@ -127,7 +127,7 @@ function ScrollColumn({ children, divider }: { children: React.ReactNode; divide
 function ContentCard({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      width: '100%', maxWidth: 'calc(35em + 72px)', background: '#fff', borderRadius: 8,
+      width: '100%', maxWidth: 'calc(35em + 72px)', background: 'var(--bg-card, #fff)', borderRadius: 8,
       padding: '32px 36px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box',
       fontSize: 15,
     }}>
@@ -138,7 +138,7 @@ function ContentCard({ children }: { children: React.ReactNode }) {
 
 function Slogan() {
   return (
-    <div style={{ padding: '16px 0 28px', textAlign: 'center', fontSize: 11, color: '#bbb', fontStyle: 'italic' }}>
+    <div style={{ padding: '16px 0 28px', textAlign: 'center', fontSize: 11, color: 'var(--text-faint, #bbb)', fontStyle: 'italic' }}>
       Write the logic. Preserve the insight.
     </div>
   );
@@ -162,18 +162,18 @@ const titleStyle: React.CSSProperties = {
 };
 const tabBarStyle: React.CSSProperties = {
   width: '100%', maxWidth: 'calc(35em + 72px)', display: 'flex', gap: 4,
-  marginBottom: 12, borderBottom: '1px solid #ddd',
+  marginBottom: 12, borderBottom: '1px solid var(--border-light, #ddd)',
 };
 const commentPanelStyle: React.CSSProperties = {
-  flexShrink: 0, width: 380, maxWidth: '90vw', background: '#f7f7f7',
-  borderLeft: '1px solid #e0e0e0', height: '100%',
+  flexShrink: 0, width: 380, maxWidth: '90vw', background: 'var(--bg-panel-comment, #f7f7f7)',
+  borderLeft: '1px solid var(--border-light, #e0e0e0)', height: '100%',
 };
 function tabBtnStyle(active: boolean): React.CSSProperties {
   return {
     padding: '8px 16px', border: 'none', background: 'transparent', cursor: 'pointer',
     fontSize: 13, fontWeight: 600,
-    color: active ? 'var(--accent-primary, #B8845C)' : '#888',
-    borderBottom: active ? '2px solid var(--accent-primary, #B8845C)' : '2px solid transparent',
+    color: active ? 'var(--accent-primary, #c96442)' : 'var(--text-muted, #888)',
+    borderBottom: active ? '2px solid var(--accent-primary, #c96442)' : '2px solid transparent',
     marginBottom: -1,
   };
 }
@@ -182,7 +182,7 @@ function commentToggleStyle(active: boolean): React.CSSProperties {
     flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
     width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
     border: '1px solid var(--border-light, #ddd)',
-    background: active ? 'var(--accent-primary, #B8845C)' : '#fff',
+    background: active ? 'var(--accent-primary, #c96442)' : 'var(--bg-card, #fff)',
     color: active ? '#fff' : 'var(--text-secondary, #555)',
   };
 }

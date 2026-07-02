@@ -115,14 +115,14 @@ export default function PublicComments({
       width: '100%', boxSizing: 'border-box',
       fontFamily: 'var(--font-ui, sans-serif)',
     }}>
-      <div style={{ fontSize: 13, fontWeight: 700, color: '#444', margin: '0 0 10px' }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #444)', margin: '0 0 10px' }}>
         댓글 {total > 0 && <span style={{ color: 'var(--accent-primary, #B8845C)' }}>{total}</span>}
       </div>
 
       {threads.length === 0 ? (
         <div style={{
-          background: '#fff', borderRadius: 8, padding: 24, textAlign: 'center',
-          color: '#999', fontSize: 13, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+          background: 'var(--bg-card, #fff)', borderRadius: 8, padding: 24, textAlign: 'center',
+          color: 'var(--text-muted, #999)', fontSize: 13, boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
         }}>
           아직 댓글이 없습니다.
         </div>
@@ -130,12 +130,12 @@ export default function PublicComments({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {threads.map(({ parent, replies }) => (
             <div key={parent.id} style={{
-              background: '#fff', borderRadius: 8, padding: '14px 16px',
+              background: 'var(--bg-card, #fff)', borderRadius: 8, padding: '14px 16px',
               boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
             }}>
               <CommentRow c={parent} name={nameOf(parent)} />
               {replies.length > 0 && (
-                <div style={{ marginTop: 10, paddingLeft: 14, borderLeft: '2px solid #eee', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ marginTop: 10, paddingLeft: 14, borderLeft: '2px solid var(--border-light, #eee)', display: 'flex', flexDirection: 'column', gap: 10 }}>
                   {replies.map((r) => (
                     <CommentRow key={r.id} c={r} name={nameOf(r)} />
                   ))}
@@ -149,19 +149,19 @@ export default function PublicComments({
       {/* ── 작성 영역 (Phase 52 5a) ── */}
       <div style={{ marginTop: 14 }}>
         {!canWrite ? (
-          <div style={{ fontSize: 11.5, color: '#999', padding: '8px 2px' }}>
+          <div style={{ fontSize: 11.5, color: 'var(--text-muted, #999)', padding: '8px 2px' }}>
             이 문항은 공개 댓글을 받지 않습니다.
           </div>
         ) : !user ? (
           <div style={{
-            background: '#fff', borderRadius: 8, padding: 16, textAlign: 'center',
+            background: 'var(--bg-card, #fff)', borderRadius: 8, padding: 16, textAlign: 'center',
             boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
           }}>
-            <div style={{ fontSize: 12.5, color: '#666', marginBottom: 10 }}>댓글을 쓰려면 로그인하세요.</div>
+            <div style={{ fontSize: 12.5, color: 'var(--text-secondary, #666)', marginBottom: 10 }}>댓글을 쓰려면 로그인하세요.</div>
             <button onClick={handleLogin} style={loginBtnStyle}>Google로 로그인</button>
           </div>
         ) : (
-          <div style={{ background: '#fff', borderRadius: 8, padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: 'var(--bg-card, #fff)', borderRadius: 8, padding: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
             <LatexInputEditor
               ref={editorRef}
               fontSize={13}
@@ -172,7 +172,7 @@ export default function PublicComments({
               maxLength={2000}
             />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-              <span style={{ fontSize: 11, color: '#aaa' }}>
+              <span style={{ fontSize: 11, color: 'var(--text-faint, #aaa)' }}>
                 {myNickname ? `${myNickname} 님으로 작성` : ''}
               </span>
               <button
@@ -195,7 +195,7 @@ export default function PublicComments({
 
 const loginBtnStyle: React.CSSProperties = {
   padding: '8px 18px', border: '1px solid var(--border-light, #ddd)', borderRadius: 8,
-  background: '#fff', color: '#333', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+  background: 'var(--bg-card, #fff)', color: 'var(--text-primary, #333)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
   fontFamily: 'var(--font-ui)',
 };
 function submitBtnStyle(disabled: boolean): React.CSSProperties {
@@ -227,8 +227,8 @@ function CommentRow({ c, name }: { c: ProblemComment; name: string }) {
         }}>
           {(name || '?').charAt(0).toUpperCase()}
         </div>
-        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#333' }}>{name}</span>
-        <span style={{ fontSize: 11, color: '#aaa' }}>{fmt(c.createdAt)}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary, #333)' }}>{name}</span>
+        <span style={{ fontSize: 11, color: 'var(--text-faint, #aaa)' }}>{fmt(c.createdAt)}</span>
         {c.resolved && (
           <span style={{ fontSize: 10, color: '#888', border: '1px solid #ddd', borderRadius: 4, padding: '0 4px' }}>
             해결됨
