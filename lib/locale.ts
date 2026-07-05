@@ -71,6 +71,45 @@ function insertMarkerLineBreaks(text: string): string {
   return result.join('\n');
 }
 
+/** 하위 케이스 리스트 뒤 새 `**Case …**` 라벨이 lazy continuation으로
+ *  직전 리스트 항목에 흡수되는 것을 방지 (D7, Phase 54).
+ *  - 대상: 행 시작이 `**Case <숫자>…**` 인 "최상위" 라벨 행
+ *    (리스트 마커 `- ` 로 시작하는 하위 케이스 행은 `^\*\*` 에 걸리지 않으므로 자동 제외)
+ *  - 이전 행이 비어있지 않을 때만 빈 줄 삽입 (insertMarkerLineBreaks와 동일 패턴)
+ *  - 최상위 Case 문단 앞 빈 줄 삽입은 항상 무해 → 진입 케이스에도 부작용 없음
+ *  - 수식이 placeholder로 보호된 뒤 호출되어야 안전 (preprocess() 배치 참조)
+ *  - ⚠️ 렌더 파이프라인 전용 — raw_text 저장 경로 호출 금지 (D8)
+ *
+ *  한계: `**Case …**` 형태가 아닌 자유 문단이 하위 케이스 뒤에 빈 줄 없이
+ *  이어지면 여전히 CommonMark 표준대로 흡수됨(일반 리스트와 동일 동작).
+ *  지배 사례인 "연속된 Case 라벨"만 이 함수로 보증. */
+export function normalizeCaseBoundaries(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  for (const line of lines) {
+    // 최상위 Case 라벨: 행 시작 `**Case 1.**` / `**Case 1a.**` (리스트 `- ` 없음)
+    const isTopCaseLabel = /^\*\*Case\s+\d+[a-z]?\.\*\*/.test(line);
+    const prev = out.length > 0 ? out[out.length - 1] : '';
+    if (isTopCaseLabel && prev.trim() !== '') {
+      out.push('');
+    }
+    out.push(line);
+  }
+  return out.join('\n');
+}
+
+/** 하위 케이스 라벨 → marker span (불릿 숨김 + 들여쓰기 타게팅용)
+ *  `- **Case 1a.** …` 형태의 최상위 리스트 항목만 매칭.
+ *  상위 케이스(`**Case 1.**`, 리스트 밖)는 변환하지 않음.
+ *  로케일 무관 → preprocessLocale 밖에서 무조건 호출됨 (D4).
+ *  ⚠️ 렌더 파이프라인 전용 — raw_text 저장 경로 호출 금지 (D8) */
+export function convertSubcaseMarkers(text: string): string {
+  return text.replace(
+    /^(-\s+)\*\*(Case\s+\d+[a-z])\.\*\*/gm,
+    (_, bullet, label) => `${bullet}<span class="marker-case-sub">**${label}.**</span>`
+  );
+}
+
 /** (a) → (가) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만 */
 function convertAlphaList(text: string): string {
   let result = text.replace(/^\(([a-e])\)/gm, (_, ch) => {

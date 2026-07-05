@@ -10,7 +10,14 @@
  * (EditorPreview는 자체 인라인 전처리를 사용)
  */
 
-import { preprocessLocale, Locale } from './locale';
+import {
+  preprocessLocale,
+  Locale,
+  protectMath,
+  restoreMath,
+  normalizeCaseBoundaries,
+  convertSubcaseMarkers,
+} from './locale';
 
 /**
  * Setext heading 방지
@@ -175,8 +182,14 @@ export function preprocess(text: string, locale: Locale = 'international'): stri
   // 2단계: 로케일 변환 (수식 보호 → 텍스트 치환 → 복원)
   const localized = preprocessLocale(safe, locale);
 
+  // 2.5단계: 하위 케이스 경계 정규화(D7) + marker span (로케일 무관 — D4)
+  //   수식 내부 오변환 방지를 위해 protectMath 보호 구간 안에서 실행
+  const { cleaned, placeholders } = protectMath(localized);
+  const bounded = normalizeCaseBoundaries(cleaned);       // lazy continuation 방지
+  const withSubcase = restoreMath(convertSubcaseMarkers(bounded), placeholders);
+
   // 3단계: 수식 문법 변환 (\tag{}, \ref{}, 표기법, displaystyle)
-  const processed = preprocessMath(localized);
+  const processed = preprocessMath(withSubcase);
 
   return processed;
 }
