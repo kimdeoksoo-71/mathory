@@ -13,6 +13,13 @@ interface MathSnippetMenuProps {
   onClose: () => void;
 }
 
+// 내장 구조 템플릿 (사용자 상용구와 별개 · 단축키 미소비 · Phase 54)
+const STRUCTURE_TEMPLATES: { label: string; insert: string }[] = [
+  { label: 'Case (상위)',   insert: '**Case 1.** ' },
+  { label: 'Case 하위 (a)', insert: '- **Case 1a.** ' },
+  { label: 'Case 하위 (b)', insert: '- **Case 1b.** ' },
+];
+
 // 사용 중인 단축키 번호 목록에서 다음 빈 번호 찾기
 function getNextAvailableIndex(snippets: MathSnippet[]): number {
   const used = new Set(snippets.map((s) => s.shortcutIndex));
@@ -162,6 +169,24 @@ export default function MathSnippetMenu({
       {/* ─── 리스트 모드 ─── */}
       {mode === 'list' && (
         <>
+          {/* 내장 구조 템플릿 (Phase 54) */}
+          <div style={{ padding: '4px 0', borderBottom: '1px solid #f0efe9', flexShrink: 0 }}>
+            <div style={{ padding: '4px 14px', fontSize: 11, color: '#aaa' }}>구조 템플릿</div>
+            {STRUCTURE_TEMPLATES.map((t) => (
+              <div
+                key={t.label}
+                title="새 줄에서 삽입하는 것을 권장합니다"
+                style={{ display: 'flex', alignItems: 'center', padding: '7px 14px', cursor: 'pointer', gap: 8 }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = '#f5f4f0'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
+                onClick={() => { onInsert(t.insert); onClose(); }}
+              >
+                <span style={{ flex: 1, fontSize: 13, color: '#3D3929' }}>{t.label}</span>
+                <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'monospace' }}>{t.insert.trim()}</span>
+              </div>
+            ))}
+          </div>
+
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {snippets.length === 0 ? (
               <div style={{ padding: '20px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
