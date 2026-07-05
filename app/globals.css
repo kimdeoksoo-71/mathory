@@ -214,6 +214,15 @@ ul li::before {
 ul ul li::before {
   content: "◦";
 }
+/* ─── Case 하위 케이스(sub-case) — 불릿 숨김 들여쓰기 (Phase 54) ───
+   tight list: li > span / loose list: li > p > span → 두 구조 모두 커버.
+   자식 결합자로 (혹시 모를) 중첩 span이 상위 li 매칭을 트리거하지 않도록 함.
+   들여쓰기 자체는 기존 top-level ul 규칙이 제공 → 추가 padding/margin 금지 (D2).
+   특이도: li:has(> .marker-case-sub)::before = (0,1,2) > 기존 ul li::before (0,0,3). */
+li:has(> .marker-case-sub)::before,
+li:has(> p:first-child > .marker-case-sub)::before {
+  content: none;
+}
 /* loose list (항목 사이 빈 줄)에서 ReactMarkdown이 <li> 내용을 <p>로 감싸,
    첫 <p>가 block이라 불릿과 줄이 분리되던 문제 해결.
    첫 <p>만 inline 처리하여 불릿과 같은 행에 흐르게 하고,
