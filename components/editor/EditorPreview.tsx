@@ -111,6 +111,27 @@ function preprocessLocale(text: string): string {
   }
   t = forced.join('\n');
 
+  // 2.5. 하위 케이스 경계 정규화(D7) — 최상위 `**Case …**` 라벨 행 앞 빈 줄 강제
+  //      (lib/locale.ts normalizeCaseBoundaries와 로직·정규식 동일 — 두 곳 반드시 일치)
+  {
+    const bl = t.split('\n');
+    const acc: string[] = [];
+    for (const ln of bl) {
+      const isTopCase = /^\*\*Case\s+\d+[a-z]?\.\*\*/.test(ln);
+      const pv = acc.length > 0 ? acc[acc.length - 1] : '';
+      if (isTopCase && pv.trim() !== '') acc.push('');
+      acc.push(ln);
+    }
+    t = acc.join('\n');
+  }
+
+  // 2.6. 하위 케이스 라벨 → marker span (수식 보호 구간 내에서 실행)
+  //      (lib/locale.ts convertSubcaseMarkers와 정규식 동일 — 두 곳 반드시 일치)
+  t = t.replace(
+    /^(-\s+)\*\*(Case\s+\d+[a-z])\.\*\*/gm,
+    (_, bullet, label) => `${bullet}<span class="marker-case-sub">**${label}.**</span>`
+  );
+
   // 3. (a)~(e) → (가)~(마) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만
   const gana: Record<string, string> = { a: '가', b: '나', c: '다', d: '라', e: '마' };
   t = t.replace(/^\(([a-e])\)/gm, (_, ch) =>
