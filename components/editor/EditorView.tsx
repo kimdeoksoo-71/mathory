@@ -204,6 +204,36 @@ function fastScrollTo(container: HTMLElement, top: number, duration = 220) {
   requestAnimationFrame(step);
 }
 
+/* ─── 블록 상단 가시성을 보장하는 스크롤 타깃 계산 ───────────────
+   커서를 세로 중앙에 두되, "활성 블록의 상단이 패널 밖(클레이 상단 경계선/툴바 뒤)으로
+   밀려나지 않도록" 상단 가시성을 최우선 보장한다.
+   - center: 이상적 중앙 정렬값
+   - topVisibleMax: 이 값을 넘겨 스크롤하면 블록 상단이 가려짐 → 상한
+   - caretVisibleMin: 이 값보다 작으면 커서가 패널 아래로 넘침 → 하한
+   우선순위: (1) 블록 상단 가시성 → (2) 커서 가시성.
+   블록이 뷰포트보다 커서 둘을 동시에 만족 못하면 커서 가시성을 택함(깊은 편집 정상 동작).
+   첫 블록은 topVisibleMax≈0 이므로 항상 scrollTop 0 으로 수렴 → 상단이 절대 가려지지 않음.
+   ⚠️ 편집창 자동 스크롤은 반드시 이 함수를 거칠 것 — 중앙 정렬 버그 재발 방지의 단일 지점. */
+function computeBlockAwareScrollTop(
+  container: HTMLElement,
+  blockEl: HTMLElement,
+  cursorViewportTop: number,
+): number {
+  const containerRect = container.getBoundingClientRect();
+  const blockRect = blockEl.getBoundingClientRect();
+  const blockTop = blockRect.top - containerRect.top + container.scrollTop;
+  const cursorRelativeTop = cursorViewportTop - containerRect.top + container.scrollTop;
+  const height = containerRect.height;
+
+  const center = cursorRelativeTop - height / 2;
+  const topVisibleMax = blockTop - 8;                         // 상단 8px 여백 유지
+  const caretVisibleMin = cursorRelativeTop - (height - 60);  // 커서 하단 60px 여백 유지
+
+  let target = Math.min(center, topVisibleMax);  // 블록 상단 가시성 우선
+  target = Math.max(target, caretVisibleMin);    // 그 다음 커서 가시성
+  return target;
+}
+
 function getStoredFontSize(): number {
   if (typeof window === 'undefined') return FONT_SIZE_DEFAULT;
   const stored = localStorage.getItem(FONT_SIZE_KEY);
@@ -1727,18 +1757,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 50);
   }, []);
 
-  /* ─── 편집창: 커서 라인을 편집창 세로 중앙으로 스크롤 (콘텐츠 클릭용) ─── */
+  /* ─── 편집창: 커서 라인을 편집창 세로 중앙으로 스크롤 (콘텐츠 클릭용)
+        — 단, 활성 블록 상단이 가려지지 않도록 computeBlockAwareScrollTop 로 클램프 ─── */
   const scrollEditorToCursorCenter = useCallback((blockId: string) => {
     setTimeout(() => {
       const ref = editorRefs.current[blockId];
       const container = editorPanelRef.current;
       if (!ref || !container) return;
       const coords = ref.getCursorCoords();
-      if (!coords) return;
-      const containerRect = container.getBoundingClientRect();
-      const cursorRelativeTop = coords.top - containerRect.top + container.scrollTop;
-      const center = cursorRelativeTop - containerRect.height / 2;
-      fastScrollTo(container, center, BLOCK_SCROLL_MS);
+      const blockEl = container.querySelector(`[data-editor-block-id="${blockId}"]`) as HTMLElement | null;
+      if (!coords || !blockEl) return;
+      const target = computeBlockAwareScrollTop(container, blockEl, coords.top);
+      fastScrollTo(container, target, BLOCK_SCROLL_MS);
     }, 50);
   }, []);
 
@@ -1934,14 +1964,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ref.focus();
 
       // 편집 패널에서 선택된 수식을 세로 중앙으로 스크롤
+      // — 단, 활성 블록 상단이 가려지지 않도록 computeBlockAwareScrollTop 로 클램프
       requestAnimationFrame(() => {
         const coords = ref.getCursorCoords();
         const container = editorPanelRef.current;
-        if (coords && container) {
-          const containerRect = container.getBoundingClientRect();
-          const cursorRelativeTop = coords.top - containerRect.top + container.scrollTop;
-          const center = cursorRelativeTop - containerRect.height / 2;
-          fastScrollTo(container, center);
+        const blockEl = container?.querySelector(`[data-editor-block-id="${blockId}"]`) as HTMLElement | null;
+        if (coords && container && blockEl) {
+          const target = computeBlockAwareScrollTop(container, blockEl, coords.top);
+          fastScrollTo(container, target);
         }
       });
     }, 100);

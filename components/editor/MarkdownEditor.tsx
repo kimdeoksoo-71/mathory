@@ -671,7 +671,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               backgroundColor: 'transparent',
             },
             '.cm-scroller': {
-              overflow: 'auto',
+              // 내부 자체 스크롤 없음 — 모든 세로 스크롤은 외곽 컨테이너(.scaled-editor)가 담당.
+              // (auto로 두면 CM viewport가 상단 라인을 숨긴 채 멈춰 외곽 스크롤로 복구 안 되는 버그 발생)
+              overflow: 'visible',
               // 기본 = Pretendard (일반 텍스트). 수식 영역은 cm-math-region이 D2Coding으로 오버라이드
               fontFamily: 'var(--font-ui)',
             },

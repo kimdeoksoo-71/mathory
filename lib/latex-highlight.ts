@@ -63,30 +63,41 @@ function buildDecorations(view: EditorView): DecorationSet {
       continue;
     }
 
-    // $$ 블록 수식
+    // $$ 블록 수식 — $$ 도 예외 없이 항상 수식 구분자로 취급
     if (doc[i] === '$' && doc[i + 1] === '$') {
       const start = i;
       const innerStart = i + 2;
       const end = doc.indexOf('$$', innerStart);
-      if (end === -1) { i++; continue; }
 
       if (start > lastMathEnd) {
         decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
       }
 
-      decorations.push({ from: start, to: end + 2, deco: mathRegionStyle });
-      decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-      decorations.push({ from: end, to: end + 2, deco: delimiterStyle });
-
-      highlightMathContent(doc, innerStart, end, decorations);
-
-      lastMathEnd = end + 2;
-      i = end + 2;
+      if (end !== -1) {
+        // 닫는 $$ 있음 → 정상 블록 수식
+        decorations.push({ from: start, to: end + 2, deco: mathRegionStyle });
+        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
+        decorations.push({ from: end, to: end + 2, deco: delimiterStyle });
+        highlightMathContent(doc, innerStart, end, decorations);
+        lastMathEnd = end + 2;
+        i = end + 2;
+      } else {
+        // 닫는 $$ 없음 → 여는 $$ 로 보고 줄 끝까지 수식 영역으로 일관 처리.
+        // (인라인 $ 와 동일한 경계 규칙 — 아래 줄까지 번지는 요동 방지)
+        let lineEnd = innerStart;
+        while (lineEnd < doc.length && doc[lineEnd] !== '\n') lineEnd++;
+        decorations.push({ from: start, to: lineEnd, deco: mathRegionStyle });
+        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
+        highlightMathContent(doc, innerStart, lineEnd, decorations);
+        lastMathEnd = lineEnd;
+        i = lineEnd;
+      }
       continue;
     }
 
-    // $ 인라인 수식
-    if (doc[i] === '$' && (i === 0 || doc[i - 1] !== '$') && (i + 1 < doc.length && doc[i + 1] !== '$')) {
+    // $ 인라인 수식 — $ 는 예외 없이 항상 수식 구분자로 취급 (통화 기호로 쓰지 않음).
+    // ($$ 는 위에서 이미 처리되므로 여기서는 단일 $ 만 남음)
+    if (doc[i] === '$' && doc[i - 1] !== '$' && doc[i + 1] !== '$') {
       const start = i;
       const innerStart = i + 1;
       let end = -1;
@@ -96,26 +107,35 @@ function buildDecorations(view: EditorView): DecorationSet {
         // (줄 넘김 허용 시, 타이핑 중 $ 짝이 잠깐 어긋나면 아래 줄의 $를 닫힘으로 오인해
         //  활성 행 이하가 통째로 수식으로 칠해져 색·글꼴이 매 타이핑마다 요동침)
         if (doc[j] === '\n') break;
-        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
+        if (doc[j] === '$' && doc[j - 1] !== '\\' && doc[j + 1] !== '$') {
           end = j;
           break;
         }
       }
 
-      if (end === -1) { i++; continue; }
-
       if (start > lastMathEnd) {
         decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
       }
 
-      decorations.push({ from: start, to: end + 1, deco: mathRegionStyle });
-      decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-      decorations.push({ from: end, to: end + 1, deco: delimiterStyle });
-
-      highlightMathContent(doc, innerStart, end, decorations);
-
-      lastMathEnd = end + 1;
-      i = end + 1;
+      if (end !== -1) {
+        // 닫는 $ 있음 → 정상 인라인 수식
+        decorations.push({ from: start, to: end + 1, deco: mathRegionStyle });
+        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
+        decorations.push({ from: end, to: end + 1, deco: delimiterStyle });
+        highlightMathContent(doc, innerStart, end, decorations);
+        lastMathEnd = end + 1;
+        i = end + 1;
+      } else {
+        // 닫는 $ 없음 → 열린 $ 로 보고 줄 끝까지 수식 영역으로 일관 처리.
+        // (타이핑 중이라도 여는 $ 직후부터 즉시 수식 색·글꼴 → 닫을 때 요동 없음)
+        let lineEnd = innerStart;
+        while (lineEnd < doc.length && doc[lineEnd] !== '\n') lineEnd++;
+        decorations.push({ from: start, to: lineEnd, deco: mathRegionStyle });
+        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
+        highlightMathContent(doc, innerStart, lineEnd, decorations);
+        lastMathEnd = lineEnd;
+        i = lineEnd;
+      }
       continue;
     }
 
