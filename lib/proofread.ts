@@ -474,6 +474,80 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
   return { fixed, count: matches.length };
 }
 
+/* ─── display 수식 구분자 통일: \[..\] → $$..$$ ─── */
+
+/**
+ * 텍스트 영역의 `\[ ... \]` display 수식을 `$$ ... $$` 로 통일.
+ *
+ * - `$..$` / `$$..$$` 내부는 건드리지 않음 (이미 수식이므로 그 안의 `\[`는 LaTeX 괄호)
+ * - 인라인 코드(`` ` ``)와 코드 펜스(``` ```)는 원문 보존
+ * - 여는 `\[`에 짝이 없으면 그대로 둔다
+ */
+export function normalizeDisplayMathDelimiters(text: string): { fixed: string; count: number } {
+  let out = '';
+  let count = 0;
+  let i = 0;
+
+  while (i < text.length) {
+    // 코드 펜스 ```...``` 통째로 보존
+    if (text.startsWith('```', i)) {
+      const close = text.indexOf('```', i + 3);
+      const end = close === -1 ? text.length : close + 3;
+      out += text.slice(i, end);
+      i = end;
+      continue;
+    }
+    // 인라인 코드 `...` 보존
+    if (text[i] === '`') {
+      const close = text.indexOf('`', i + 1);
+      if (close !== -1 && !text.slice(i + 1, close).includes('\n')) {
+        out += text.slice(i, close + 1);
+        i = close + 1;
+        continue;
+      }
+    }
+    // $$ 블록 보존
+    if (text[i] === '$' && text[i + 1] === '$') {
+      const close = text.indexOf('$$', i + 2);
+      if (close !== -1) {
+        out += text.slice(i, close + 2);
+        i = close + 2;
+        continue;
+      }
+    }
+    // $ 인라인 보존
+    if (text[i] === '$') {
+      let j = i + 1;
+      let found = -1;
+      while (j < text.length) {
+        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
+        if (text[j] === '\n' && text[j + 1] === '\n') break;
+        j++;
+      }
+      if (found !== -1) {
+        out += text.slice(i, found + 1);
+        i = found + 1;
+        continue;
+      }
+    }
+    // \[ ... \] → $$ ... $$
+    if (text[i] === '\\' && text[i + 1] === '[') {
+      const close = text.indexOf('\\]', i + 2);
+      if (close !== -1) {
+        out += '$$' + text.slice(i + 2, close) + '$$';
+        i = close + 2;
+        count++;
+        continue;
+      }
+    }
+
+    out += text[i];
+    i++;
+  }
+
+  return { fixed: out, count };
+}
+
 /* ─── 자동 수정: josa-space + latex-brace + latex-comma 결정적 규칙 일괄 적용 ─── */
 
 /**
@@ -485,6 +559,14 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
  */
 export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
   let count = 0;
+
+  // Step 0: display 수식 구분자 통일 (\[..\] → $$..$$)
+  // 이후 단계의 수식 영역 인식($ 기반)이 새 $$ 블록에도 동일하게 작용하도록 가장 먼저 처리.
+  {
+    const r = normalizeDisplayMathDelimiters(text);
+    text = r.fixed;
+    count += r.count;
+  }
 
   // Step 0a: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
   // (이후 단계의 수식 내 규칙이 새 영역에도 작용)
