@@ -76,8 +76,8 @@ const sidebarStyle: React.CSSProperties = {
   display: 'flex', flexDirection: 'column',
 };
 const logoStyle: React.CSSProperties = {
-  fontSize: 19, fontWeight: 500, color: 'var(--text-primary, #222)',
-  letterSpacing: -0.5, fontFamily: 'var(--font-logo)', marginBottom: 18,
+  fontSize: 19, fontWeight: 600, color: 'var(--mathory-red, #D97757)',
+  letterSpacing: '-0.03em', fontFamily: 'var(--font-logo)', marginBottom: 18,
 };
 const catLabelStyle: React.CSSProperties = {
   fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.3,

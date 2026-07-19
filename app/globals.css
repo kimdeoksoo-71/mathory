@@ -56,6 +56,10 @@
   --text-faint: #B8AFA4;
   --text-placeholder: #C8C1B6;
 
+  /* Brand — 로고 전용 레드 (로고 handoff 스펙) */
+  --mathory-red: #D97757;
+  --mathory-red-dark: #BC5F3F;
+
   /* Accent — Phase 43: 클레이 → 테라코타 */
   --accent-primary: #c96442;
   --accent-hover: #b1502f;
