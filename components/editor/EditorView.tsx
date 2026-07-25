@@ -30,7 +30,7 @@ import { sha256 } from '../../lib/version/hash';
 import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import SaveStatus from './SaveStatus';
 import VersionDrawer from '../version/VersionDrawer';
-import type { Participant, VersionContent, VersionTrigger } from '../../types/version';
+import type { Participant, VersionContent, VersionTrigger, ProblemVersion } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -2437,22 +2437,41 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleResizeLeave = () => setResizeHover(false);
   const resizeActive = resizeHover || resizeDragging;
 
-  // Phase 55 계층1: 복구 배너 [복구] — 드래프트를 작업본에 적용(dirty로 두어 다음 저장 시 스냅샷화)
-  const applyRecoveredDraft = (content: VersionContent) => {
-    const { tabs: dTabs, blocksByTab, title, answer } = versionContentToLocal(content);
+  // Phase 55: 버전 콘텐츠를 작업본에 적용 (드래프트 복구·복원 공용). block_key 유지 → diff 연속성.
+  const applyVersionContent = (content: VersionContent) => {
+    const { tabs: vTabs, blocksByTab, title, answer } = versionContentToLocal(content);
     const map: Record<string, LocalBlock[]> = {};
-    for (const t of dTabs) {
+    for (const t of vTabs) {
       map[t.id] = (blocksByTab[t.id] || []).map((b) => ({
-        ...b, id: `draft-${b.block_key}`, collapsed: false, title: b.title || '',
+        ...b, id: `v-${b.block_key}`, collapsed: false, title: b.title || '',
       })) as LocalBlock[];
     }
-    setTabs(dTabs);
+    setTabs(vTabs);
     setAllBlocks(map);
     setEditTitle(title);
     setEditAnswer(answer);
-    setActiveTab(dTabs[0]?.id || 'question');
-    setRecoverableDraft(null);
+    setActiveTab(vTabs[0]?.id || 'question');
     setDirty(true);
+  };
+
+  // 계층1 복구 배너 [복구]
+  const applyRecoveredDraft = (content: VersionContent) => {
+    applyVersionContent(content);
+    setRecoverableDraft(null);
+  };
+
+  // Phase 55 Stage 5: 비파괴 복원. 직전 보존 → 대상 적용(in-memory) → 복원 스냅샷.
+  const handleRestore = async (target: ProblemVersion, targetContent: VersionContent) => {
+    if (!problem || !user) return;
+    const actor: Participant = { uid: user.uid, display_name: user.displayName || user.email || '사용자' };
+    await snapshotCurrent('manual_save');                 // 1) 복원 직전 보존(무변경이면 dedup)
+    applyVersionContent(targetContent);                   // 2) 대상 적용(라이브 쓰기는 이후 저장이 수행)
+    const snap = await createSnapshot(problem.id, targetContent, 'restore', actor, { restoredFrom: target.id }); // 3) 복원 스냅샷
+    if (snap.status === 'error') console.error('[Phase55] 복원 스냅샷 실패:', snap.error);
+    setLastSavedAt(Date.now());
+    setVersionDrawerOpen(false);
+    setStatus(`v${target.seq}(으)로 복원됨 — 저장하면 반영됩니다`);
+    setTimeout(() => setStatus(''), 3000);
   };
 
   return (
@@ -2491,8 +2510,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       )}
 
-      {/* Phase 55 Stage 4: 버전 기록 드로어 (position:fixed) */}
-      <VersionDrawer problemId={problemId} open={versionDrawerOpen} onClose={() => setVersionDrawerOpen(false)} />
+      {/* Phase 55 Stage 4·5: 버전 기록 드로어 (position:fixed) */}
+      <VersionDrawer
+        problemId={problemId}
+        open={versionDrawerOpen}
+        onClose={() => setVersionDrawerOpen(false)}
+        getCurrentContent={() => {
+          try {
+            return collectCurrentContent({
+              tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
+              tabLoadErrors: tabLoadErrorsRef.current,
+            });
+          } catch { return null; }
+        }}
+        onRestore={handleRestore}
+      />
 
       {/* ═══ Row 1: 메타 정보 ═══
           높이 57px — 사이드바 헤더(padding 14×2 + 버튼 28 + border 1) + 토론 패널 헤더와 동일 */}
