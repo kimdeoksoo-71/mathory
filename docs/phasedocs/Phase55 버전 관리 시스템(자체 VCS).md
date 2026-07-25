@@ -62,6 +62,8 @@
 
 **F8. 기타 확정.** `computeContentHash`(`lib/copyright.ts:15`)는 필드셋이 달라(**order·type·raw_text·title·imageWidth만, svg/ggb/step_label 미포함** — 재검증 완료) 본 Phase 해시와 별개 — **통합 금지**, 원본인증은 계속 기존 함수 사용. `nanoid ^5.1.11` 설치됨, `diff` 미설치(`npm i diff` 필요), `hooks/` 기존재(`useAuth.ts` 등). 탭 순서 변경 UI는 현재 없음(추가 `2068`·삭제 `2092`·이름변경 `2116`) → canonicalize의 key 정렬은 현재 무해. *(각주: 장차 탭 reorder 도입 시 순서 변경이 스냅샷을 만들지 않음 — 그때 재검토.)*
 
+**F10. payload 규칙은 버전 doc이 아니라 문항 authorUid로 검사해야 한다 (Stage 2 런타임 발견).** `createSnapshot`은 `versions/{id}`와 `versions/{id}/payload/data`를 **한 트랜잭션에서 동시 생성**하는데, payload create 규칙이 부모 `versions/{id}`를 `get()`하면 규칙 엔진이 **같은 트랜잭션의 미커밋 버전 doc을 보지 못해** create가 거부되고 스냅샷 전체가 롤백된다(프로덕션에서 versions 미생성으로 발현). → payload 규칙의 소유 검사를 부모 **문항** authorUid로 변경(§5-(2)). 에뮬레이터 재현 테스트 `test:rules` #56 추가. *(교훈: read/update만 시드 검사하면 트랜잭션 create 경로를 놓친다.)*
+
 **F9. `step_label`은 현행 저장 경로에서 유지되지 않는다 (v4 신규).** `handleSave`의 saveData에 `step_label`이 **없다**(재검증: `EditorView.tsx` saveData 0건). `step_label`은 `duplicateProblem`의 복사(`lib/firestore.ts:519`)와 일부 legacy seed 경로(`app/problems/new`, `app/problems/[id]/edit`)에만 잔존하고, 현행 에디터는 유지하지 않는다. → **persisted form 기준으로 이미 드롭되는 필드**이므로 버전 모델(`VersionBlock`·canonBlock·직렬화)에서도 **제외**한다. 정말 보존하려면 `handleSave`부터 `step_label` 저장을 추가해야 하며(스코프 확대) 별도 과제로 남긴다.
 
 ---
@@ -321,9 +323,10 @@ catch 블록에서 `tabBlocks[tab.id] = []`에 더해 `tabLoadErrors[tab.id] = e
         allow delete: if request.auth != null && resource.data.author_uid == request.auth.uid;
 
         match /payload/{doc} {
+          // ⚠️ 소유 검사는 부모 "문항" authorUid로 한다(F10). 버전 메타는 payload와 같은
+          //    트랜잭션에서 생성되는데 규칙 get()은 미커밋 쓰기를 못 봐 create가 거부된다.
           allow read, create, delete: if request.auth != null
-            && get(/databases/$(database)/documents/problems/$(problemId)/versions/$(versionId))
-                 .data.author_uid == request.auth.uid;
+            && get(/databases/$(database)/documents/problems/$(problemId)).data.authorUid == request.auth.uid;
           allow update: if false;    // 본문 불변
         }
       }

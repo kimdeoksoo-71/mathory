@@ -44,7 +44,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, setDoc, getDoc, deleteDoc, updateDoc,
-  collection, getDocs, query, where, orderBy,
+  collection, getDocs, query, where, orderBy, runTransaction,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'mathory-rules-test';
@@ -429,4 +429,25 @@ test('54. payload/data 제3자 read 거부', async () => {
 test('55. payload/data update 거부 (본문 불변)', async () => {
   await assertFails(updateDoc(
     doc(as(OWNER), 'problems/pub/versions/v1/payload/data'), { content_hash: 'x' }));
+});
+// createSnapshot 재현: version + payload를 한 트랜잭션에서 동시 생성.
+// payload create 규칙이 부모 version doc을 get()하면, 같은 트랜잭션의 미커밋 version이
+// 안 보여 거부됨 → 전체 롤백. payload 소유검사는 문항 authorUid로 해야 통과.
+test('56. 오너가 version+payload 트랜잭션 동시 생성 허용 (createSnapshot 재현)', async () => {
+  const db = as(OWNER);
+  await assertSucceeds(runTransaction(db, async (tx) => {
+    const vRef = doc(db, 'problems/pub/versions/vtx');
+    const pRef = doc(db, 'problems/pub/versions/vtx/payload/data');
+    tx.set(vRef, {
+      author_uid: OWNER, seq: 9, problem_id: 'pub', trigger: 'manual_save',
+      name: null, pinned: false, content_hash: 'htx', tab_hashes: {},
+      parent_id: null, restored_from: null, changed_tabs: [], byte_size: 5,
+    });
+    tx.set(pRef, { content: { meta: { title: 't', answer: '' }, tabs: [] }, content_hash: 'htx' });
+  }));
+});
+test('57. payload/data 제3자 create 거부 (문항 소유 검사)', async () => {
+  await assertFails(setDoc(
+    doc(as(STRANGER), 'problems/pub/versions/vtx2/payload/data'),
+    { content: { meta: { title: 'x', answer: '' }, tabs: [] }, content_hash: 'h2' }));
 });

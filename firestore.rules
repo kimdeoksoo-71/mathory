@@ -153,11 +153,14 @@ service cloud.firestore {
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pinned']);
         allow delete: if isSignedIn() && resource.data.author_uid == request.auth.uid;
 
-        // 본문(무거움): 부모 버전 메타의 author_uid로 검사, 본문 자체는 불변
+        // 본문(무거움): 소유 검사는 부모 "문항" authorUid로 한다.
+        //   버전 메타(versions/{versionId})는 createSnapshot이 payload와 같은 트랜잭션에서
+        //   생성하는데, 규칙 get()은 같은 트랜잭션의 미커밋 쓰기를 보지 못한다 →
+        //   버전 doc을 참조하면 create가 거부돼 스냅샷 전체가 롤백된다. 문항은 항상 존재.
         match /payload/{doc} {
           allow read, create, delete: if isSignedIn()
-            && get(/databases/$(database)/documents/problems/$(problemId)/versions/$(versionId)).data.author_uid == request.auth.uid;
-          allow update: if false;
+            && get(/databases/$(database)/documents/problems/$(problemId)).data.authorUid == request.auth.uid;
+          allow update: if false;    // 본문 불변
         }
       }
 
