@@ -1263,3 +1263,34 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 - E 라우팅: 오너·live→ProblemView(편집), 스냅샷→SnapshotView, 그 외→PublicProblemView 임베드. 공개 뷰는 사이드바 자동 접기 제외(전체 사이드바 유지). /bazaar 랜딩·익명은 `onOpenPost` 미전달 → 기존 새 탭 앵커
 - 후속 과제: **U8 모바일 소형 화면 적응**(C·D는 데스크톱·태블릿 기준 — 232px 사이드바), 동적 OG 이미지(satori·한글 폰트), 카카오 리치 공유, `/p`·`/shared` 직접 접근(로그인) 시 인앱 리다이렉트(현재 미구현 — 직접 접근은 MiniShell)
 - 덕수 완료 필요: `git push`(→ Vercel 자동 배포)
+
+## Phase 54: Case 하위 케이스(sub-case) 들여쓰기 렌더링 ✅
+
+수학 풀이의 `Case`/하위 케이스 구조를 마커로 변환해 자동 들여쓰기·불릿 정리 렌더링. 스니펫 메뉴에 구조 템플릿 버튼 추가. 상세: `docs/phaseSketch/Phase54 Case 하위케이스 들여쓰기 렌더링 v3.md`
+
+| 영역 | 변경 |
+|------|------|
+| 파이프라인 | 하위 케이스 경계 정규화 + 마커 변환 함수 신설(D7·D8). 공용 `preprocess`와 `EditorPreview` 인라인 전처리에 동일 로직 반영(미리보기·인쇄 일관) |
+| CSS | 하위 케이스 불릿 숨김(화면 `app/globals.css` + 인쇄 `PrintStyles.css`) |
+| 스니펫 | `MathSnippetMenu`에 구조 템플릿 버튼(Case/하위 케이스) — 원문 삽입(`$` 래핑 없음) |
+| 맞춤법 | display 수식 구분자 `\[..\]` → `$$..$$` 통일(자동 수정) |
+
+- 불변 원칙: `raw_text` 저장 경로 오염 금지 — 저장 체인(`EditorView.handleSave`)에 정형화 함수 신규 추가 금지(렌더 단계에서만 변환)
+
+## Phase 55: 문항 버전 관리 시스템 (자체 VCS) ✅
+
+문항 단위로 편집 이력을 스냅샷으로 남기고 비교·복원하는 앱 자체 버전관리. 외부 GitHub 비의존(그건 별도 후속 Phase). 상세: `docs/phasedocs/Phase55 버전 관리 시스템(자체 VCS).md`
+
+| 단계 | 변경 |
+|------|------|
+| 0 | 블록 영속 키 `Block.block_key`(nanoid) — doc id는 저장마다 재발급되므로(delete-all→re-add) diff·복원 키로 사용 불가. `lib/blocks/normalize.ts`(`toPersistedBlock`)로 저장 정형화와 스냅샷 해시를 단일 소스화 |
+| 1 | 보안 규칙: `versions`/`payload` 매치 신설, 와일드카드에서 versions 제외(공개 문항 버전 메타 노출 차단). `test:rules` 케이스 확장 |
+| 2 | 스냅샷 생성 `createSnapshot`(정규화→SHA-256 해시 dedup→메타/본문 2-write→라이브 포인터 갱신). 제목·정답은 `content_hash`에만 포함(D1). `manual_save` 트리거 |
+| 3 | 계층1 자동저장: localStorage 드래프트 + `SaveStatus` 상태표시 + 크래시 복구 배너([복구]/[버림]). Firestore 상시 저장은 안 함(D2) |
+| 4 | 우측 `VersionDrawer` 타임라인(메타만·페이지네이션) + 본문 지연 로드. `editor_exit`(뒤로가기) 트리거(D5) |
+| 5 | `block_key` 매칭 diff(LCS 이동 감지: 이동/추가/삭제/수정) + 워드 diff + 메타 diff. 비파괴 복원(직전 보존→적용→restore 스냅샷) |
+| 6 | 보존(pruning): 문항당 하드 상한 50, 오래된 `editor_exit`부터 정리(manual_save/named/restore/pinned 보호). `deleteProblem`에 versions+payload cascade |
+
+- 런타임 발견 규칙 버그(에뮬레이터 재현 후 수정): **F10** payload 트랜잭션 create가 부모 version doc `get()`에 막힘(같은 트랜잭션 미커밋 불가시), **F11** versions LIST가 `resource.data` 참조로 거부(규칙은 필터 아님) → 둘 다 소유 검사를 부모 **문항** authorUid(`verOwner()`)로 통일해 해결
+- 후속 과제: 탭 단위 복원(현재 전체 복원만), 오프라인 persistence(Firestore 전역 초기화 변경 위험으로 보류), 탭 reorder diff, **GitHub 연동(Phase 56+ 별도)**
+- 덕수 완료: 규칙 배포(`firebase deploy --only firestore:rules`)·`git push` 완료
