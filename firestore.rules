@@ -142,25 +142,26 @@ service cloud.firestore {
       // ===== problems/{id}/versions/{versionId} (Phase 55 자체 VCS) =====
       // author_uid 비정규화 → 목록 조회 시 get() 없이 소유 검사(F2). 본문은 payload/data로 분리(불변).
       match /versions/{versionId} {
-        allow read:   if isSignedIn() && resource.data.author_uid == request.auth.uid;
-        allow create: if isSignedIn()
-          && request.resource.data.author_uid == request.auth.uid
-          // 위조 방지: 비정규화 값이 실제 부모 소유자와 일치해야 함 (create 1회만 get)
-          && request.resource.data.author_uid
-             == get(/databases/$(database)/documents/problems/$(problemId)).data.authorUid;
-        // 사후 수정은 name·pinned만 허용 (불변성 강제)
-        allow update: if isSignedIn() && resource.data.author_uid == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pinned']);
-        allow delete: if isSignedIn() && resource.data.author_uid == request.auth.uid;
-
-        // 본문(무거움): 소유 검사는 부모 "문항" authorUid로 한다.
-        //   버전 메타(versions/{versionId})는 createSnapshot이 payload와 같은 트랜잭션에서
-        //   생성하는데, 규칙 get()은 같은 트랜잭션의 미커밋 쓰기를 보지 못한다 →
-        //   버전 doc을 참조하면 create가 거부돼 스냅샷 전체가 롤백된다. 문항은 항상 존재.
-        match /payload/{doc} {
-          allow read, create, delete: if isSignedIn()
+        // ⚠️ 소유 검사는 부모 "문항" authorUid로 한다(F11). resource.data.author_uid를 쓰면
+        //   where 절 없는 목록(LIST) 쿼리가 규칙상 거부된다(규칙은 필터가 아님 →
+        //   "권한 없는 문서를 반환할 수 있는 쿼리"로 판정). 문항 검사는 단건 read·LIST·
+        //   payload 트랜잭션 create(F10)를 모두 통과시킨다.
+        function verOwner() {
+          return isSignedIn()
             && get(/databases/$(database)/documents/problems/$(problemId)).data.authorUid == request.auth.uid;
-          allow update: if false;    // 본문 불변
+        }
+        allow read:   if verOwner();
+        allow create: if verOwner()
+          && request.resource.data.author_uid == request.auth.uid;   // 데이터 정합(오너 == 작성자)
+        // 사후 수정은 name·pinned만 허용 (불변성 강제)
+        allow update: if verOwner()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pinned']);
+        allow delete: if verOwner();
+
+        // 본문(무거움): 부모 문항 소유로 검사(같은 트랜잭션의 미커밋 version doc은 못 봄 — F10). 본문 불변.
+        match /payload/{doc} {
+          allow read, create, delete: if verOwner();
+          allow update: if false;
         }
       }
 

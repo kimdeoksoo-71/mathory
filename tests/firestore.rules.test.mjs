@@ -44,7 +44,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, setDoc, getDoc, deleteDoc, updateDoc,
-  collection, getDocs, query, where, orderBy, runTransaction,
+  collection, getDocs, query, where, orderBy, limit, runTransaction,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'mathory-rules-test';
@@ -450,4 +450,17 @@ test('57. payload/data 제3자 create 거부 (문항 소유 검사)', async () =
   await assertFails(setDoc(
     doc(as(STRANGER), 'problems/pub/versions/vtx2/payload/data'),
     { content: { meta: { title: 'x', answer: '' }, tabs: [] }, content_hash: 'h2' }));
+});
+// 드로어 타임라인 = LIST 쿼리. read 규칙이 resource.data를 참조하면 where 절 없는 LIST는 거부된다.
+test('58. 오너 versions LIST 허용 (드로어 타임라인)', async () => {
+  await assertSucceeds(getDocs(query(
+    collection(as(OWNER), 'problems/pub/versions'), orderBy('seq', 'desc'), limit(30))));
+});
+test('59. 제3자 versions LIST 거부', async () => {
+  await assertFails(getDocs(query(
+    collection(as(STRANGER), 'problems/pub/versions'), orderBy('seq', 'desc'))));
+});
+test('60. 비로그인 versions LIST 거부', async () => {
+  await assertFails(getDocs(query(
+    collection(anon(), 'problems/pub/versions'), orderBy('seq', 'desc'))));
 });
