@@ -21,7 +21,8 @@ import FolderPathBar from '../editor/FolderPathBar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
-import { normalizeDisplayMathSpacing } from '../../lib/preprocess';
+import { nanoid } from 'nanoid';
+import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -1076,7 +1077,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setOrigTabs(loadedTabs);
 
         const toLocal = (blocks: Block[]): LocalBlock[] =>
-          blocks.map((b) => ({ ...b, type: normalizeBlockType(b.type), collapsed: false, title: b.title || '' }));
+          blocks.map((b) => ({ ...b, block_key: b.block_key || nanoid(), type: normalizeBlockType(b.type), collapsed: false, title: b.title || '' }));
 
         const blocksMap: Record<string, LocalBlock[]> = {};
         const origIds: Record<string, string[]> = {};
@@ -1519,6 +1520,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleAddBlock = useCallback((type: Block['type'] = 'text') => {
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
+      block_key: nanoid(),
       order: 0,
       type,
       raw_text: BLOCK_PRESETS[type] ?? '',
@@ -1579,6 +1581,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
+      block_key: nanoid(),                 // 분할로 파생된 블록은 새 키 (원본은 키 유지) — Phase55 F9
       order: activeBlock.order + 1,
       type: 'text',
       raw_text: after,
@@ -1644,6 +1647,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const pid = problemId || `temp-${Date.now()}`;
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
+      block_key: nanoid(),
       order: 0,
       type: 'text',
       raw_text: '',
@@ -2070,6 +2074,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ...prev,
       [newId]: [{
         id: `new-${Date.now()}`,
+        block_key: nanoid(),
         order: 0,
         type: 'text',
         raw_text: '',
@@ -2164,38 +2169,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           }
         }
 
-        // 새로 저장 (빈줄 trim 적용)
+        // 저장 형태 정형화 — 스냅샷 해시와 단일 소스 (lib/blocks/normalize.ts, Phase55 F4).
+        // block_key 포함 외 기존 저장 결과와 필드 단위 동일.
         for (let i = 0; i < blocks.length; i++) {
-          const b = blocks[i];
-          // $$ ... $$ 독립수식 앞·뒤 빈 줄을 정확히 1개로 정규화 → 위아래 빈 줄 제거
-          const trimmed = normalizeDisplayMathSpacing(b.raw_text)
-            .replace(/^\s*\n/, '')   // 첫 비어있지 않은 행 위의 빈 행 제거
-            .replace(/\n\s*$/, '');  // 마지막 비어있지 않은 행 아래의 빈 행 제거
-          const saveData: Record<string, any> = {
-            order: i, type: b.type, raw_text: trimmed,
-            title: b.title || '',
-          };
-          if (b.type === 'image' && b.imageWidth) {
-            saveData.imageWidth = b.imageWidth;
-          }
-          if (b.type === 'image' && b.imageTreatment) {
-            saveData.imageTreatment = b.imageTreatment;
-          }
-          if (b.type === 'image' && b.imageGray === false) {
-            saveData.imageGray = false;
-          }
-          if (b.type === 'svg' && b.svg_initial_view) {
-            saveData.svg_initial_view = b.svg_initial_view;
-          }
-          if (b.type === 'svg' && b.svg_height) {
-            saveData.svg_height = b.svg_height;
-          }
-          if (b.type === 'ggb' && b.ggb_initial_coords) {
-            saveData.ggb_initial_coords = b.ggb_initial_coords;
-          }
-          if (b.type === 'ggb' && b.ggb_height) {
-            saveData.ggb_height = b.ggb_height;
-          }
+          const saveData = toPersistedBlock(blocks[i], i);
           await saveTabBlock(problem.id, tab.id, saveData as any);
         }
       }
@@ -2229,6 +2206,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const toLocal = (blocks: Block[]): LocalBlock[] =>
           blocks.map((b, i) => ({
             ...b,
+            block_key: b.block_key || nanoid(),
             type: normalizeBlockType(b.type),
             collapsed: (allBlocks[activeTab] || [])
               .find((lb) => lb.order === i)?.collapsed ?? false,

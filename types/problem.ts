@@ -145,6 +145,8 @@ export interface GgbInitialCoords {
 
 export interface Block {
   id: string;
+  /** Phase 55: 블록의 영속 정체성(nanoid). doc id는 저장마다 재발급되므로 버전 diff·복원 매칭 키로 사용. */
+  block_key?: string;
   order: number;
   type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
   raw_text: string;
