@@ -23,9 +23,13 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
-import { collectCurrentContent, VersionLoadError } from '../../lib/version/adapter';
+import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
-import type { Participant } from '../../types/version';
+import { canonicalize } from '../../lib/version/canonicalize';
+import { sha256 } from '../../lib/version/hash';
+import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
+import SaveStatus from './SaveStatus';
+import type { Participant, VersionContent } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -955,6 +959,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [dirty, setDirty] = useState(false);
   // Phase 55(F7): 로드 실패 탭 — 스냅샷 전 가드용 (collectCurrentContent가 참조)
   const tabLoadErrorsRef = useRef<Record<string, string>>({});
+  // Phase 55 계층1: 자동저장 상태
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState(false);
+  const [recoverableDraft, setRecoverableDraft] = useState<VersionContent | null>(null);
   // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
   // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
   const [panelWidth, setPanelWidth] = useState(420);
@@ -1070,9 +1078,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const data = await getProblemWithBlocks(problemId);
       if (data) {
         setProblem(data);
-        // Phase 55: dedup 캐시 초기화 + 로드 실패 탭 보관(F7)
+        // Phase 55: dedup 캐시 초기화 + 로드 실패 탭 보관(F7) + 계층1 상태
         if (data.last_version_hash) setCachedLastHash(problemId, data.last_version_hash);
         tabLoadErrorsRef.current = data.tabLoadErrors || {};
+        setLastSavedAt(data.updated_at ? data.updated_at.getTime() : null);
         setEditTitle(data.title);
         setEditSource(data.source || data.exam_type || '');
         setEditCategory(data.category || '');
@@ -1096,6 +1105,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
         setAllBlocks(blocksMap);
         setOrigBlockIds(origIds);
+
+        // Phase 55 계층1: 크래시 복구 감지 — localStorage 드래프트가 서버본과 다르면 배너
+        try {
+          const draft = readDraft(problemId);
+          if (draft) {
+            const loaded = collectCurrentContent({
+              tabs: loadedTabs, blocksByTab: blocksMap,
+              title: data.title, answer: data.answer || '',
+              tabLoadErrors: data.tabLoadErrors,
+            });
+            const [dh, lh] = await Promise.all([
+              sha256(canonicalize(draft.content)),
+              sha256(canonicalize(loaded)),
+            ]);
+            if (dh !== lh) setRecoverableDraft(draft.content);   // 미저장 변경 존재
+            else clearDraft(problemId);                          // 서버본과 동일 → 정리
+          }
+        } catch {
+          /* 로드 실패 탭 등 → 복구 감지 스킵 */
+        }
 
         // 첫 블록 활성화
         const firstTabBlocks = blocksMap[loadedTabs[0].id] || [];
@@ -2239,6 +2268,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       skipDirtyRef.current = true;
       setDirty(false);
 
+      // Phase 55 계층1: 저장 성공 → 상태 갱신 + 드래프트 정리 (서버본과 동기화됨)
+      setSaveError(false);
+      setLastSavedAt(Date.now());
+      setRecoverableDraft(null);
+      clearDraft(problem.id);
+
       // Phase 55: 명시 저장(manual_save) 시 스냅샷 생성. 블록 커밋 완료 후, 방금 저장한
       // in-memory 상태로 수집(저장본과 동일 content_hash). 실패는 비치명(블록은 이미 저장됨).
       if (!silent && user) {
@@ -2271,6 +2306,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       }
     } catch (error) {
       setStatus(`에러: ${error}`);
+      setSaveError(true);   // Phase 55 계층1: 저장 실패 표시
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -2300,6 +2336,35 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       handleSaveRef.current(true);
     };
   }, []);
+
+  // Phase 55 계층1: localStorage 드래프트 기록(디바운스 500ms). Firestore 상시 저장 없음(D2).
+  useEffect(() => {
+    if (!problemId || !dirty) return;
+    const h = setTimeout(() => {
+      try {
+        writeDraft(problemId, collectCurrentContent({
+          tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
+          tabLoadErrors: tabLoadErrorsRef.current,
+        }));
+      } catch { /* 로드 실패 탭 등 → 드래프트 스킵 */ }
+    }, 500);
+    return () => clearTimeout(h);
+  }, [problemId, dirty, allBlocks, tabs, editTitle, editAnswer]);
+
+  // Phase 55 계층1: 창 닫힘 best-effort flush(sync) — 마지막 타이핑까지 보존.
+  useEffect(() => {
+    const handler = () => {
+      if (!problemId || !dirty) return;
+      try {
+        writeDraft(problemId, collectCurrentContent({
+          tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
+          tabLoadErrors: tabLoadErrorsRef.current,
+        }));
+      } catch { /* skip */ }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [problemId, dirty, allBlocks, tabs, editTitle, editAnswer]);
 
   /* ─── 로딩 / 에러 ─── */
   if (loading) {
@@ -2373,6 +2438,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleResizeLeave = () => setResizeHover(false);
   const resizeActive = resizeHover || resizeDragging;
 
+  // Phase 55 계층1: 복구 배너 [복구] — 드래프트를 작업본에 적용(dirty로 두어 다음 저장 시 스냅샷화)
+  const applyRecoveredDraft = (content: VersionContent) => {
+    const { tabs: dTabs, blocksByTab, title, answer } = versionContentToLocal(content);
+    const map: Record<string, LocalBlock[]> = {};
+    for (const t of dTabs) {
+      map[t.id] = (blocksByTab[t.id] || []).map((b) => ({
+        ...b, id: `draft-${b.block_key}`, collapsed: false, title: b.title || '',
+      })) as LocalBlock[];
+    }
+    setTabs(dTabs);
+    setAllBlocks(map);
+    setEditTitle(title);
+    setEditAnswer(answer);
+    setActiveTab(dTabs[0]?.id || 'question');
+    setRecoverableDraft(null);
+    setDirty(true);
+  };
+
   return (
     <div style={{
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -2389,6 +2472,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           border-radius: 3px;
         }
       `}</style>
+
+      {/* Phase 55 계층1: 크래시 복구 배너 */}
+      {recoverableDraft && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px',
+          background: 'var(--bg-warn, #fff8e1)', borderBottom: '1px solid var(--border-light)',
+          fontSize: 13, color: 'var(--text-primary)', flexShrink: 0,
+        }}>
+          <span>복구되지 않은 변경이 있습니다.</span>
+          <button onClick={() => applyRecoveredDraft(recoverableDraft)} style={{
+            padding: '3px 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+            background: '#e53935', color: '#fff', fontSize: 12,
+          }}>복구</button>
+          <button onClick={() => { clearDraft(problemId); setRecoverableDraft(null); }} style={{
+            padding: '3px 10px', border: '1px solid var(--border-light)', borderRadius: 5,
+            cursor: 'pointer', background: 'transparent', color: 'var(--text-muted)', fontSize: 12,
+          }}>버림</button>
+        </div>
+      )}
 
       {/* ═══ Row 1: 메타 정보 ═══
           높이 57px — 사이드바 헤더(padding 14×2 + 버튼 28 + border 1) + 토론 패널 헤더와 동일 */}
@@ -2425,6 +2527,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             color: status.includes('에러') || status.includes('오류') ? 'var(--accent-danger)' : 'var(--accent-success)',
           }}>{status}</span>
         )}
+
+        {/* Phase 55 계층1: 저장 상태 표시 */}
+        <SaveStatus
+          status={saving ? 'saving' : saveError ? 'error' : dirty ? 'unsaved' : 'saved'}
+          lastSavedAt={lastSavedAt}
+        />
 
         {/* 저장 버튼 — 아이콘만. dirty면 빨강, 저장 완료면 회색. */}
         <button

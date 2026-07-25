@@ -1,5 +1,5 @@
 import type { Block, TabMeta } from '../../types/problem';
-import type { VersionContent, VersionTab } from '../../types/version';
+import type { VersionContent, VersionTab, VersionBlock } from '../../types/version';
 import { toPersistedBlock } from '../blocks/normalize';
 
 /**
@@ -38,4 +38,22 @@ export function collectCurrentContent(args: {
     meta: { title: args.title, answer: args.answer || '' },
     tabs,
   };
+}
+
+/**
+ * 버전 콘텐츠 → 에디터 적용용 조각 (드래프트 복구·Stage 5 복원 공용).
+ * 블록은 order 정렬. 호출부가 LocalBlock으로 감싼다(collapsed·id 부여).
+ */
+export function versionContentToLocal(content: VersionContent): {
+  tabs: TabMeta[];
+  blocksByTab: Record<string, VersionBlock[]>;
+  title: string;
+  answer: string;
+} {
+  const tabs: TabMeta[] = content.tabs.map((t) => ({ id: t.key, label: t.title }));
+  const blocksByTab: Record<string, VersionBlock[]> = {};
+  for (const t of content.tabs) {
+    blocksByTab[t.key] = [...t.blocks].sort((a, b) => a.order - b.order);
+  }
+  return { tabs, blocksByTab, title: content.meta.title, answer: content.meta.answer };
 }
