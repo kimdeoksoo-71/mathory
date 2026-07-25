@@ -6,6 +6,7 @@ import type {
 } from '../../types/version';
 import { canonicalize, diffTabKeys } from './canonicalize';
 import { sha256, hashPerTab } from './hash';
+import { pruneProblemVersions, VERSION_CAP } from './prune';
 
 /**
  * Phase 55 — 스냅샷 생성.
@@ -97,6 +98,10 @@ export async function createSnapshot(
     // 트랜잭션 재시도 가능 → 캐시 갱신은 성공 후 한 번만.
     if (result.status === 'created' || result.status === 'named_existing') {
       setCachedLastHash(problemId, contentHash);
+    }
+    // Stage 6: 인라인 보존(fire-and-forget). seq가 상한 넘을 때만 읽기 비용 발생.
+    if (result.status === 'created' && result.version.seq > VERSION_CAP) {
+      pruneProblemVersions(problemId).catch((e) => console.warn('[Phase55] prune 실패:', e));
     }
     return result;
   } catch (error) {

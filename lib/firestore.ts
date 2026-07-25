@@ -15,6 +15,7 @@ import {
   onSnapshot,
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { deleteAllVersions } from './version/prune';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../types/problem';
 
 // ===== 특수 폴더 상수 =====
@@ -109,6 +110,7 @@ export async function deleteProblem(problemId: string): Promise<void> {
     snap.docs.forEach((d) => deletes.push(deleteDoc(d.ref)));
   }
   await Promise.all(deletes);
+  await deleteAllVersions(problemId);   // Phase 55: versions + payload cascade 정리
   await deleteDoc(doc(db, 'problems', problemId));
 }
 
