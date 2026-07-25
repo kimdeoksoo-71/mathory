@@ -29,7 +29,8 @@ import { canonicalize } from '../../lib/version/canonicalize';
 import { sha256 } from '../../lib/version/hash';
 import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import SaveStatus from './SaveStatus';
-import type { Participant, VersionContent } from '../../types/version';
+import VersionDrawer from '../version/VersionDrawer';
+import type { Participant, VersionContent, VersionTrigger } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -963,6 +964,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [recoverableDraft, setRecoverableDraft] = useState<VersionContent | null>(null);
+  const [versionDrawerOpen, setVersionDrawerOpen] = useState(false);  // Stage 4
   // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
   // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
   const [panelWidth, setPanelWidth] = useState(420);
@@ -2163,6 +2165,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   };
 
   /* ═══ 저장 ═══ */
+  // Phase 55: 현재 작업본으로 스냅샷 생성 (manual_save·editor_exit 공용). dedup으로 무변경은 no-op.
+  const snapshotCurrent = useCallback(async (trigger: VersionTrigger) => {
+    if (!problem || !user) return;
+    try {
+      const content = collectCurrentContent({
+        tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
+        tabLoadErrors: tabLoadErrorsRef.current,
+      });
+      const actor: Participant = {
+        uid: user.uid, display_name: user.displayName || user.email || '사용자',
+      };
+      const snap = await createSnapshot(problem.id, content, trigger, actor);
+      if (snap.status === 'error') console.error('[Phase55] 스냅샷 실패:', snap.error);
+    } catch (e) {
+      if (e instanceof VersionLoadError) console.warn('[Phase55] 스냅샷 생략(탭 로드 실패):', e.failedTabs);
+      else console.error('[Phase55] 스냅샷 예외:', e);
+    }
+  }, [problem, user, tabs, allBlocks, editTitle, editAnswer]);
+
   const savingRef = useRef(false);
   const handleSave = useCallback(async (silent = false) => {
     if (!problem) return;
@@ -2274,31 +2295,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       setRecoverableDraft(null);
       clearDraft(problem.id);
 
-      // Phase 55: 명시 저장(manual_save) 시 스냅샷 생성. 블록 커밋 완료 후, 방금 저장한
-      // in-memory 상태로 수집(저장본과 동일 content_hash). 실패는 비치명(블록은 이미 저장됨).
-      if (!silent && user) {
-        try {
-          const content = collectCurrentContent({
-            tabs,
-            blocksByTab: allBlocks,
-            title: editTitle,
-            answer: editAnswer,
-            tabLoadErrors: tabLoadErrorsRef.current,
-          });
-          const actor: Participant = {
-            uid: user.uid,
-            display_name: user.displayName || user.email || '사용자',
-          };
-          const snap = await createSnapshot(problem.id, content, 'manual_save', actor);
-          if (snap.status === 'error') console.error('[Phase55] 스냅샷 생성 실패:', snap.error);
-        } catch (e) {
-          if (e instanceof VersionLoadError) {
-            console.warn('[Phase55] 스냅샷 생략(탭 로드 실패):', e.failedTabs);
-          } else {
-            console.error('[Phase55] 스냅샷 예외:', e);
-          }
-        }
-      }
+      // Phase 55: 명시 저장 = manual_save 스냅샷 (블록 커밋 완료 후). 실패는 비치명(블록은 이미 저장됨).
+      if (!silent) await snapshotCurrent('manual_save');
 
       if (!silent) {
         setStatus('저장 완료');
@@ -2311,7 +2309,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       savingRef.current = false;
       setSaving(false);
     }
-  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user]);
+  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user, snapshotCurrent]);
 
   /* ─── 자동저장: 탭 전환 시 ─── */
   const switchTab = useCallback((nextTabId: string) => {
@@ -2325,8 +2323,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleBackWithSave = useCallback(async () => {
     skipUnmountSaveRef.current = true; // 명시적 저장 후 언마운트 중복 저장 방지
     await handleSave(true);
+    await snapshotCurrent('editor_exit'); // Phase 55 D5: 제어된 이탈 스냅샷(dedup으로 무변경은 no-op)
     onBack();
-  }, [handleSave, onBack]);
+  }, [handleSave, onBack, snapshotCurrent]);
 
   const handleSaveRef = useRef(handleSave);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
@@ -2492,6 +2491,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       )}
 
+      {/* Phase 55 Stage 4: 버전 기록 드로어 (position:fixed) */}
+      <VersionDrawer problemId={problemId} open={versionDrawerOpen} onClose={() => setVersionDrawerOpen(false)} />
+
       {/* ═══ Row 1: 메타 정보 ═══
           높이 57px — 사이드바 헤더(padding 14×2 + 버튼 28 + border 1) + 토론 패널 헤더와 동일 */}
       <div style={{
@@ -2533,6 +2535,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           status={saving ? 'saving' : saveError ? 'error' : dirty ? 'unsaved' : 'saved'}
           lastSavedAt={lastSavedAt}
         />
+
+        {/* Phase 55 Stage 4: 버전 기록 열기 */}
+        <button
+          onClick={() => setVersionDrawerOpen(true)}
+          title="버전 기록"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
+            color: 'var(--text-faint)', fontSize: 15,
+          }}
+        >🕘</button>
 
         {/* 저장 버튼 — 아이콘만. dirty면 빨강, 저장 완료면 회색. */}
         <button
