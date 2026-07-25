@@ -30,6 +30,10 @@
  *   42) 오너 commentStream 백필 update 허용  43) 비오너 거부
  *   [Phase 52 D1: 공개 Bazaar 피드 비로그인 열람]
  *   44) 비로그인 bazaar_posts 단건 read 허용  45) 비로그인 피드 LIST 허용
+ *   [Phase 55: 버전 스냅샷 규칙 (자체 VCS)]
+ *   46) 공개 문항 versions 제3자 read 거부(F2)  47) 비로그인 read 거부(핵심)  48) 오너 read 허용
+ *   49) 오너 create 허용  50) 비오너 create 거부(부모소유 불일치)  51) name·pinned update 허용
+ *   52) 그 외 필드 update 거부(불변성)  53) payload 오너 read 허용  54) payload 제3자 read 거부  55) payload update 거부
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -157,6 +161,18 @@ before(async () => {
     await setDoc(doc(db, 'admins/adminUid'), {});                 // 빈 문서로 충분
     await setDoc(doc(db, 'bazaar_reports/seedReport'), {
       reporterUid: STRANGER, postId: 'seedLive', createdAt: new Date(),
+    });
+
+    // ── Phase 55 시드: 버전 스냅샷 (자체 VCS) ──
+    // 공개 문항(pub, owner=OWNER)에 버전 1개 + payload. F2(공개 노출) 검증 대상.
+    await setDoc(doc(db, 'problems/pub/versions/v1'), {
+      author_uid: OWNER, seq: 1, problem_id: 'pub',
+      trigger: 'manual_save', name: null, pinned: false,
+      content_hash: 'h1', tab_hashes: { question: 'th1' },
+      parent_id: null, restored_from: null, changed_tabs: ['question'], byte_size: 10,
+    });
+    await setDoc(doc(db, 'problems/pub/versions/v1/payload/data'), {
+      content: { meta: { title: 'T', answer: '' }, tabs: [] }, content_hash: 'h1',
     });
   });
 });
@@ -369,4 +385,48 @@ test('45. 비로그인 bazaar_posts 피드 LIST 허용 (D1)', async () => {
   await assertSucceeds(getDocs(query(
     collection(anon(), 'bazaar_posts'), orderBy('createdAt', 'desc'),
   )));
+});
+
+// ══ Phase 55: 버전 스냅샷 규칙 (자체 VCS) ══
+const versionDoc = (over = {}) => ({
+  author_uid: OWNER, seq: 2, problem_id: 'pub',
+  trigger: 'manual_save', name: null, pinned: false,
+  content_hash: 'h2', tab_hashes: { question: 'th2' },
+  parent_id: 'v1', restored_from: null, changed_tabs: ['question'], byte_size: 10,
+  ...over,
+});
+
+test('46. 공개 문항 versions 제3자 read 거부 (F2)', async () => {
+  await assertFails(getDoc(doc(as(STRANGER), 'problems/pub/versions/v1')));
+});
+test('47. 공개 문항 versions 비로그인 read 거부 (F2 핵심)', async () => {
+  await assertFails(getDoc(doc(anon(), 'problems/pub/versions/v1')));
+});
+test('48. 오너 versions read 허용', async () => {
+  await assertSucceeds(getDoc(doc(as(OWNER), 'problems/pub/versions/v1')));
+});
+test('49. 오너 versions create 허용 (author_uid 본인·부모소유 일치)', async () => {
+  await assertSucceeds(setDoc(doc(as(OWNER), 'problems/pub/versions/v49'), versionDoc()));
+});
+test('50. 비오너 versions create 거부 (부모 소유자 불일치)', async () => {
+  await assertFails(setDoc(
+    doc(as(STRANGER), 'problems/pub/versions/v50'), versionDoc({ author_uid: STRANGER })));
+});
+test('51. 오너 name·pinned만 update 허용', async () => {
+  await assertSucceeds(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1'), { name: '중요본', pinned: true }));
+});
+test('52. name·pinned 외 필드 update 거부 (불변성 강제)', async () => {
+  await assertFails(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1'), { content_hash: 'tampered' }));
+});
+test('53. payload/data 오너 read 허용', async () => {
+  await assertSucceeds(getDoc(doc(as(OWNER), 'problems/pub/versions/v1/payload/data')));
+});
+test('54. payload/data 제3자 read 거부', async () => {
+  await assertFails(getDoc(doc(as(STRANGER), 'problems/pub/versions/v1/payload/data')));
+});
+test('55. payload/data update 거부 (본문 불변)', async () => {
+  await assertFails(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1/payload/data'), { content_hash: 'x' }));
 });

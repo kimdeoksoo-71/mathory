@@ -123,16 +123,42 @@ service cloud.firestore {
         function isCommentsCol() {
           return subcollection == 'tab_comments';
         }
+        // Phase 55: versions는 아래 별도 match에서 처리 → 와일드카드에서 제외 (F2 노출 차단)
+        function isVersionsCol() {
+          return subcollection == 'versions';
+        }
 
         // 탭 블록(xxx_blocks): 멤버·공개 모두 해당 탭이 공개일 때만 읽기
-        // tab_comments는 별도 매치에서 처리하므로 여기선 항상 false
-        allow read: if !isCommentsCol() && (
+        // tab_comments·versions는 별도 매치에서 처리하므로 여기선 항상 false
+        allow read: if !isCommentsCol() && !isVersionsCol() && (
           parentOwner()
           || (parentIsPublic() && (!isBlocksSubcol() || tabAllowedForPublic()))
           || (parentIsMember() && (!isBlocksSubcol() || tabAllowedForMember()))
         );
-        // 쓰기는 오너만 (tab_comments 제외)
-        allow write: if !isCommentsCol() && parentOwner();
+        // 쓰기는 오너만 (tab_comments·versions 제외)
+        allow write: if !isCommentsCol() && !isVersionsCol() && parentOwner();
+      }
+
+      // ===== problems/{id}/versions/{versionId} (Phase 55 자체 VCS) =====
+      // author_uid 비정규화 → 목록 조회 시 get() 없이 소유 검사(F2). 본문은 payload/data로 분리(불변).
+      match /versions/{versionId} {
+        allow read:   if isSignedIn() && resource.data.author_uid == request.auth.uid;
+        allow create: if isSignedIn()
+          && request.resource.data.author_uid == request.auth.uid
+          // 위조 방지: 비정규화 값이 실제 부모 소유자와 일치해야 함 (create 1회만 get)
+          && request.resource.data.author_uid
+             == get(/databases/$(database)/documents/problems/$(problemId)).data.authorUid;
+        // 사후 수정은 name·pinned만 허용 (불변성 강제)
+        allow update: if isSignedIn() && resource.data.author_uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pinned']);
+        allow delete: if isSignedIn() && resource.data.author_uid == request.auth.uid;
+
+        // 본문(무거움): 부모 버전 메타의 author_uid로 검사, 본문 자체는 불변
+        match /payload/{doc} {
+          allow read, create, delete: if isSignedIn()
+            && get(/databases/$(database)/documents/problems/$(problemId)/versions/$(versionId)).data.author_uid == request.auth.uid;
+          allow update: if false;
+        }
       }
 
       // ===== problems/{id}/tab_comments/{commentId} (Stage 3) =====
