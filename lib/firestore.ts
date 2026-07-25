@@ -199,6 +199,9 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
 
   // 각 탭의 블록 로드 — 권한 거부(예: 멤버에게 숨겨진 탭)는 빈 배열로 처리하고 계속 진행
   const tabBlocks: Record<string, Block[]> = {};
+  // Phase 55(F7): 로드 실패 탭을 밖으로 노출 → "정상적으로 빈 탭" vs "로드 실패" 구분.
+  //   catch가 모든 에러를 빈 배열로 삼키므로 여기서 기록하지 않으면 adapter가 구분 불가.
+  const tabLoadErrors: Record<string, string> = {};
   for (const tab of tabs) {
     const subcol = tabSubcollection(tab.id);
     try {
@@ -210,6 +213,7 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
       // permission-denied는 정상 (해당 탭이 멤버에게 비공개) — 그 외 에러도 일단 비우고 계속
       console.warn(`[getProblemWithBlocks] ${tab.id} 로드 스킵:`, err?.code || err?.message);
       tabBlocks[tab.id] = [];
+      tabLoadErrors[tab.id] = err?.code || err?.message || 'unknown';
     }
   }
 
@@ -219,6 +223,7 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
     question_blocks: tabBlocks['question'] || [],
     solution_blocks: tabBlocks['solution'] || [],
     tabBlocks,
+    ...(Object.keys(tabLoadErrors).length ? { tabLoadErrors } : {}),
   };
 }
 

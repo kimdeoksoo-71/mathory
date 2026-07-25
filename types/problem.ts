@@ -31,6 +31,12 @@ export interface Problem {
   commentSessionId?: string;                   // 댓글 세션 id 포인터(비정규화). 공개 뷰어 isCommentStream 필터용
   // Phase 52(N1): 공개 댓글 작성 opt-in. 미설정 = false. commentsWritable(멤버용)과 분리.
   publicCommentsEnabled?: boolean;             // true = 로그인 누구나 공개 댓글 작성 허용
+  // Phase 55: 자체 버전관리(VCS). 비정규화 포인터 — createSnapshot이 갱신.
+  version_seq?: number;                        // 마지막 부여 순번 (미설정 = 0)
+  last_version_id?: string | null;             // 직전 스냅샷 id
+  last_version_hash?: string | null;           // 직전 스냅샷 전체 해시 (dedup 캐시 초기화용)
+  last_version_tab_hashes?: Record<string, string>; // 탭별 해시 (changed_tabs 계산용)
+  last_editor_uid?: string;                    // 마지막 편집자 (협업 대비)
 }
 
 export type MemberRole = 'viewer' | 'commenter';
@@ -237,4 +243,6 @@ export interface ProblemWithBlocks extends Problem {
   solution_blocks: Block[];
   /** 모든 탭의 블록 (탭 ID → 블록 배열) */
   tabBlocks: Record<string, Block[]>;
+  /** Phase 55(F7): 로드 실패한 탭 (tabId → error). 성공 탭은 미포함. 스냅샷 로드 가드용. */
+  tabLoadErrors?: Record<string, string>;
 }

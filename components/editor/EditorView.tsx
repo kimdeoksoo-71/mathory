@@ -23,6 +23,9 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
+import { collectCurrentContent, VersionLoadError } from '../../lib/version/adapter';
+import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
+import type { Participant } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -950,6 +953,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  // Phase 55(F7): 로드 실패 탭 — 스냅샷 전 가드용 (collectCurrentContent가 참조)
+  const tabLoadErrorsRef = useRef<Record<string, string>>({});
   // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
   // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
   const [panelWidth, setPanelWidth] = useState(420);
@@ -1065,6 +1070,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const data = await getProblemWithBlocks(problemId);
       if (data) {
         setProblem(data);
+        // Phase 55: dedup 캐시 초기화 + 로드 실패 탭 보관(F7)
+        if (data.last_version_hash) setCachedLastHash(problemId, data.last_version_hash);
+        tabLoadErrorsRef.current = data.tabLoadErrors || {};
         setEditTitle(data.title);
         setEditSource(data.source || data.exam_type || '');
         setEditCategory(data.category || '');
@@ -2199,6 +2207,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
 
         setProblem(refreshed);
+        tabLoadErrorsRef.current = refreshed.tabLoadErrors || {};   // Phase 55(F7)
         const loadedTabs = refreshed.tabs || DEFAULT_TABS;
         setTabs(loadedTabs);
         setOrigTabs(loadedTabs);
@@ -2230,6 +2239,32 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       skipDirtyRef.current = true;
       setDirty(false);
 
+      // Phase 55: 명시 저장(manual_save) 시 스냅샷 생성. 블록 커밋 완료 후, 방금 저장한
+      // in-memory 상태로 수집(저장본과 동일 content_hash). 실패는 비치명(블록은 이미 저장됨).
+      if (!silent && user) {
+        try {
+          const content = collectCurrentContent({
+            tabs,
+            blocksByTab: allBlocks,
+            title: editTitle,
+            answer: editAnswer,
+            tabLoadErrors: tabLoadErrorsRef.current,
+          });
+          const actor: Participant = {
+            uid: user.uid,
+            display_name: user.displayName || user.email || '사용자',
+          };
+          const snap = await createSnapshot(problem.id, content, 'manual_save', actor);
+          if (snap.status === 'error') console.error('[Phase55] 스냅샷 생성 실패:', snap.error);
+        } catch (e) {
+          if (e instanceof VersionLoadError) {
+            console.warn('[Phase55] 스냅샷 생략(탭 로드 실패):', e.failedTabs);
+          } else {
+            console.error('[Phase55] 스냅샷 예외:', e);
+          }
+        }
+      }
+
       if (!silent) {
         setStatus('저장 완료');
         setTimeout(() => setStatus(''), 2000);
@@ -2240,7 +2275,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       savingRef.current = false;
       setSaving(false);
     }
-  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId]);
+  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user]);
 
   /* ─── 자동저장: 탭 전환 시 ─── */
   const switchTab = useCallback((nextTabId: string) => {
