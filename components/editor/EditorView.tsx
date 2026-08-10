@@ -2053,6 +2053,28 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId]);
 
+  /* ─── 불변식 감시(트립와이어): [data-noscroll] 컨테이너는 세로로 스크롤되면 안 된다 ───
+     이들은 overflow:hidden 이라 사용자가 되돌릴 수 없다. 즉시 0으로 복원하고,
+     개발 중엔 경고를 남긴다. 정상 상태에서는 scroll 이벤트가 한 번도 발생하지 않으므로
+     비용 0. 경고가 뜬다면 어떤 요소가 세로 overflow를 다시 만든 것이니 그 원인을 제거할 것.
+     (Phase 56 — 과거 편집 패널의 paddingBottom:100vh 가 그 원인이었다) */
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-noscroll]'));
+    const onScroll = (e: Event) => {
+      const el = e.currentTarget as HTMLElement;
+      if (el.scrollTop === 0) return;
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Phase56] noscroll 컨테이너가 세로 스크롤됨:', el.dataset.noscroll, {
+          scrollTop: el.scrollTop,
+          vOver: el.scrollHeight - el.clientHeight,
+        });
+      }
+      el.scrollTop = 0;
+    };
+    els.forEach((el) => el.addEventListener('scroll', onScroll));
+    return () => els.forEach((el) => el.removeEventListener('scroll', onScroll));
+  }, []);
+
   /* ─── 탭 전환 시 activeBlockId 갱신 + 전체접기/선택 초기화 ─── */
   useEffect(() => {
     const blocks = allBlocks[activeTab] || [];
@@ -2861,7 +2883,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       }}>
 
         {/* ─── U자 컨텐츠 프레임: 클레이 + 3면 경계(상·좌·우) + 상단 14px 라운드, 하단 열림 ─── */}
-        <div className="content-frame" style={{
+        <div className="content-frame" data-noscroll="content-frame" style={{
           flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
           background: 'var(--bg-content)',
           borderTop: '0.5px solid var(--border-content)',
@@ -2871,7 +2893,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }}>
 
         {/* ─── Left: Editor ─── */}
-        <div style={{
+        <div data-noscroll="left-column" style={{
           flex: 1, minWidth: 420,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
         }}>
@@ -2883,7 +2905,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             blockIds={currentBlocks.map((b) => b.id)}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', paddingBottom: '100vh', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
             <div style={{ maxWidth: '35em', margin: '0 auto' }}>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
@@ -2939,16 +2961,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               </SortableContext>
             </DndContext>
             </div>
+            {/* 문서 끝 여백 — 패널 자신에 paddingBottom:100vh 를 주면 border-box 규칙상
+                박스 최소높이가 100vh로 고정돼 overflow:hidden 부모(좌측 칼럼)에 복구 불가한
+                스크롤 틈이 생기고, CodeMirror scrollRectIntoView가 매 키입력마다 이를
+                밀어붙여 상단이 잘린다. 반드시 스페이서로 둘 것. (Phase 56) */}
+            <div aria-hidden style={{ height: '100vh', flexShrink: 0 }} />
           </div>
         </div>
 
         {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ─── */}
-        <div style={{
+        <div data-noscroll="preview-column" style={{
           width: `calc(35em + 64px)`, flexShrink: 0,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 100vh 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
             <div style={activeTab === 'question' ? {
               background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
@@ -3029,6 +3056,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               );
             })}
             </div>
+            {/* 문서 끝 여백 — 편집창과 동일 사유. 조건부 style 객체 안에 paddingBottom을
+                넣으면 padding shorthand가 뒤에서 덮어써 무효가 되므로 스페이서로 둘 것.
+                (Phase 56) */}
+            <div aria-hidden style={{ height: '100vh', flexShrink: 0 }} />
           </div>
         </div>
         </div>
