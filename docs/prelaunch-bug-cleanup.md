@@ -87,6 +87,12 @@ CDP `Input.imeSetComposition`으로는 재현되지 않는다(puppeteer로 8가�
 `EditorPreview`(ReactMarkdown + KaTeX)를 다시 렌더한다. memo 없음. 조합 지연·프레임
 드롭의 원인이고, 1번 같은 타이밍 버그의 발생 확률을 높인다.
 
+> **Phase 56 R8 교차 참조 (같은 뿌리)** — `handleCursorActivity`가 매 키입력마다
+> `buildMathIndex`(문서 전체 O(n) 스캔)를 돌리고, Phase 56에서 추가된 typewriter
+> 스크롤이 여기에 `getCursorCoords`(강제 레이아웃 읽기)를 더한다. typewriter 쪽은
+> rAF 안에서 실행하고 하단 임계 밖이면 즉시 반환하도록 이미 제한했으나,
+> `buildMathIndex` 메모이제이션은 이 항목과 함께 처리해야 한다.
+
 ## 5. `/api/copyright/register` 무인증
 
 Phase 29 시점의 미결 사항. 현재 C2(무인증). 공개 전 C1으로 업그레이드 필요.

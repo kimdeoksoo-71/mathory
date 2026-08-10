@@ -98,7 +98,7 @@
 | 항목 | 상태 | 완료일 | 비고 |
 |------|------|--------|------|
 | 미리보기 클릭 → 편집창 이동 | ✅ | 2026-03-14 | 수식 클릭 시 $...$ 전체 선택, 행번호 기반 2단계 검색 |
-| 편집창 → 미리보기 연동 | ✅ | 2026-03-14 | 커서 행번호 → sourceLineMap → 해당 단락/수식에 빨간 보더 하이라이트 |
+| 편집창 → 미리보기 연동 | ✅ | 2026-03-14 | 커서 행번호 → sourceLineMap → 해당 단락/수식에 빨간 보더 하이라이트 · **→ Phase 56에서 수식 클릭 세로 중앙 정렬 통일·cross-block 강조 수정** |
 | 코드 접힘(fold) 기능 제거 | ✅ | 2026-03-14 | .cm-foldGutter display:none |
 | 블록 분할 즉시 반영 | ✅ | 2026-03-14 | setContent() 메서드 추가, 분할 후 원본 블록 CodeMirror 즉시 갱신 |
 
@@ -1294,6 +1294,28 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 - 런타임 발견 규칙 버그(에뮬레이터 재현 후 수정): **F10** payload 트랜잭션 create가 부모 version doc `get()`에 막힘(같은 트랜잭션 미커밋 불가시), **F11** versions LIST가 `resource.data` 참조로 거부(규칙은 필터 아님) → 둘 다 소유 검사를 부모 **문항** authorUid(`verOwner()`)로 통일해 해결
 - 후속 과제: 탭 단위 복원(현재 전체 복원만), 오프라인 persistence(Firestore 전역 초기화 변경 위험으로 보류), 탭 reorder diff, **GitHub 연동(Phase 56+ 별도)**
 - 덕수 완료: 규칙 배포(`firebase deploy --only firestore:rules`)·`git push` 완료
+
+---
+
+## Phase 56: 편집창·미리보기 수식 세로 중앙 정렬 통일 + 상단 밀림 근본 대책 ✅
+> 목표: ① 편집창 상단 줄이 밀려 복구 불가해지던 고질 버그 근절 ② 수식 클릭 시 양쪽 패널 정렬 정책 통일 ③ 타자 시 세로 위치 자동 조정
+
+| 항목 | 상태 | 완료일 | 비고 |
+|------|------|--------|------|
+| 버그1: 상단 밀림 근본 수정 (D1‴·D2‴) | ✅ | 2026-08-10 | 패딩 → 스페이서 이관 + `data-noscroll` 트립와이어 |
+| 스크롤 헬퍼 추출·타입 통일 (D12·D13·D14) | ✅ | 2026-08-10 | `lib/editorScroll.ts`, `scrollToPos` 제거, 경합 취소 |
+| 버그2-2: 다른 블록 수식 강조 누락 (D3'·D4·D11·D16) | ✅ | 2026-08-10 | `clearSelection`이 `activeMathId`를 덮어쓰던 인과 차단 |
+| 버그2-1: 수식 클릭 정렬 통일 (D5‴·D6·D7) | ✅ | 2026-08-10 | 세 경로 모두 양쪽 패널 수식 중앙 정렬 |
+| 찾기/바꾸기 스크롤 통합 (D15) | ✅ | 2026-08-10 | 4번째 독립 정책 제거, 불변식 편입 |
+| typewriter 스크롤 (D8‴) | ✅ | 2026-08-10 | 히스테리시스 + `hasFocus`/`isComposing` 가드 |
+
+**핵심 교훈 — 버그1의 진짜 원인**: 편집 패널의 `paddingBottom:'100vh'`가 `box-sizing:border-box` 규칙상 박스 최소 높이를 `8px + 100vh`로 고정 → flex가 배정한 높이를 초과 → 부모인 좌측 칼럼(`overflow:hidden`)에 상시 세로 overflow 발생 → CodeMirror `scrollRectIntoView`가 매 키입력마다 이를 밀어붙임. 밀림 폭 = `paddingTop + 패널 위쪽 크롬 높이`. **"CM이 `overflow:hidden` 조상을 스크롤한다"는 것은 메커니즘의 절반일 뿐이고, 정작 고쳐야 할 것은 "왜 그 조상에 세로 overflow가 생겼는가"였다.**
+
+부수 교훈: 조건부 `style` 객체에 longhand를 병합할 때 shorthand(`padding`)가 뒤에 오면 조용히 덮어쓴다 → 스프레드 순서를 신뢰하지 말고 스페이서처럼 충돌 불가능한 구조를 택할 것.
+
+**검증 워크플로우 기록**: v1(web Claude 초안) → v2(CLI Claude, 실코드 전수 대조 + Playwright 격리 하니스로 D0 실측) → v3(web Claude 교차 검토) → v4(CLI Claude 확정). **세 라운드 모두에서 새 결함이 나왔다** — v1은 원인 오진, v2는 `scrollToPos` 오인·D8' 가드 누락, v3는 shorthand 순서 무효화·찾기/바꾸기 경로 누락·stale mathId. 이 규모의 변경에는 교차 검토가 필요하다는 근거로 남긴다. 계획서 v1~v4: `docs/phaseSketch/`, 확정본: `docs/phasedocs/Phase56 … v4.md`
+
+> Phase 15(에디터 기능 안정화)의 "미리보기 클릭 → 편집창 이동" 연동을 Phase 56에서 세로 정렬 정책까지 통일했다.
 
 ---
 
