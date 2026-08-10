@@ -24,12 +24,24 @@ import {
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
 
+/** 커서 활동 정보 (Phase 56 D12 — MarkdownEditor / SortableEditorBlock / EditorView 3곳 공유).
+ *  blockId 는 MarkdownEditor 자신은 모르므로 상위 래퍼가 주입한다. */
+export interface CursorActivityInfo {
+  line: number;
+  offset: number;
+  /** 이 트랜잭션이 문서를 바꿨는가 (선택만 바뀐 경우와 구분) */
+  docChanged: boolean;
+  /** 마우스 클릭으로 인한 선택인가 (화살표 키 이동과 구분) */
+  pointerSelect: boolean;
+  blockId: string;
+}
+
 interface MarkdownEditorProps {
   initialValue?: string;
   onChange?: (value: string) => void;
   autoHeight?: boolean;
   onSnippetShortcut?: (index: number) => void;
-  onCursorActivity?: (info: { line: number; offset: number; docChanged: boolean }) => void;
+  onCursorActivity?: (info: Omit<CursorActivityInfo, 'blockId'>) => void;
 }
 
 export interface MarkdownEditorHandle {
@@ -51,8 +63,11 @@ export interface MarkdownEditorHandle {
   highlightMath: (from: number, to: number) => void;
   /** 수식 클릭 하이라이트 해제 */
   clearMathHighlight: () => void;
-  /** 특정 위치로 스크롤 (검색 결과 이동용) */
-  scrollToPos: (pos: number) => void;
+  /** 이 에디터가 실제로 포커스를 갖고 있는가.
+   *  프로그램적 dispatch(clearSelection 등)가 유발한 cursorActivity를 걸러내는 데 쓴다. */
+  hasFocus: () => boolean;
+  /** 한글 IME 조합 중인가. 조합 중 스크롤/데코레이션 변동은 조합을 깨뜨린다. */
+  isComposing: () => boolean;
 }
 
 // ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
@@ -388,12 +403,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (!view) return;
         view.dispatch({ effects: setMathHighlightEffect.of(null) });
       },
-      scrollToPos(pos: number) {
-        const view = viewRef.current;
-        if (!view) return;
-        view.dispatch({
-          effects: EditorView.scrollIntoView(pos, { y: 'center' }),
-        });
+      hasFocus() {
+        return viewRef.current?.hasFocus ?? false;
+      },
+      isComposing() {
+        return viewRef.current?.composing ?? false;
       },
     }));
 
@@ -673,7 +687,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               if (cursorCallbackRef.current) {
                 const head = update.state.selection.main.head;
                 const line = update.state.doc.lineAt(head);
-                cursorCallbackRef.current({ line: line.number, offset: head, docChanged: update.docChanged });
+                // 마우스 클릭 선택만 수식 중앙 정렬을 유발한다 (화살표 키 이동은 제외)
+                const pointerSelect = update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
+                cursorCallbackRef.current({
+                  line: line.number, offset: head, docChanged: update.docChanged, pointerSelect,
+                });
               }
             }
           }),
