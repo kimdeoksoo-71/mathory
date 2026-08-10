@@ -1792,6 +1792,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     // 상단바 클릭: 블록 상단을 양쪽 패널 상단 ~80px 아래로
     skipNextBlockScrollRef.current = true;
     setActiveBlockId(blockId);
+    setActiveMathId(-1);   // D16: handleBlockFocus를 거치지 않는 경로 — stale 강조 제거
     setSelectedBlockIds(new Set());
     scrollEditorToBlockTop(blockId);
     scrollPreviewToBlockTop(blockId);
@@ -1910,26 +1911,39 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleCursorActivity = useCallback((info: CursorActivityInfo) => {
     const ref = editorRefs.current[info.blockId];
     if (!ref) return;
+    /* D3': 선택만 바꾸는 "비포커스" dispatch는 무시한다.
+       블록 전환 effect가 이전 블록에 거는 clearSelection()이 selectionSet를 발생시켜
+       activeMathId를 -1로 덮어써 cross-block 수식 강조가 즉시 풀리던 것이 버그2-2의 원인.
+       문서를 바꾼 프로그램적 변경(교정 자동수정·블록 분할 등)은 통과시켜야 하므로
+       docChanged는 예외로 둔다. */
+    if (!ref.hasFocus() && !info.docChanged) return;
     const content = ref.getContent();
     const ranges = buildMathIndex(content);
     const mathId = findMathIdAtCursor(ranges, info.offset);
-    setActiveMathId(mathId);
-    // Phase 25 Step 1: 활성 블록일 때만 수식 안/밖 갱신
+    /* D11: mousedown 시점엔 activeBlockId가 아직 이전 블록이므로, 여기서 무조건
+       setActiveMathId 하면 이전 블록 미리보기가 한 프레임 엉뚱한 수식을 칠한다.
+       cross-block 설정은 handleBlockFocus(D4)가 책임진다. */
     if (info.blockId === activeBlockId) {
+      setActiveMathId(mathId);
       setCursorInMath(isInsideMath(content, info.offset));
     }
   }, [activeBlockId]);
 
   /* ─── 블록 포커스 진입 (콘텐츠 클릭): 커서 라인 / 블록을 양쪽 패널 세로 중앙으로 ─── */
   const handleBlockFocus = useCallback((blockId: string) => {
+    const ref = editorRefs.current[blockId];
     if (blockId !== activeBlockId) {
       skipNextBlockScrollRef.current = true;
       setActiveBlockId(blockId);
+      /* D4: cross-block 수식 강조는 여기서 명시적으로 설정한다.
+         click은 mouseup 이후이므로 커서는 이미 클릭 위치로 이동해 있다. */
+      setActiveMathId(ref
+        ? findMathIdAtCursor(buildMathIndex(ref.getContent()), ref.getCursorPosition())
+        : -1);
       scrollEditorToCursorCenter(blockId);
       scrollPreviewToBlockCenter(blockId);
     }
     // Phase 25 Step 1: 포커스 진입 시 즉시 수식 안/밖 갱신
-    const ref = editorRefs.current[blockId];
     if (ref) {
       setCursorInMath(isInsideMath(ref.getContent(), ref.getCursorPosition()));
     }
@@ -1942,6 +1956,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       prev.map((b) => (b.id === blockId ? { ...b, collapsed: false } : b))
     );
     setActiveBlockId(blockId);
+    setActiveMathId(mathId);   // D4: 전달받은 mathId를 명시 설정 (D3' 게이트 우회 보정)
 
     // 다른 모든 블록의 선택/하이라이트 해제
     for (const [id, ref] of Object.entries(editorRefs.current)) {
@@ -1956,10 +1971,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       if (mathId < 0 || mathId >= ranges.length) return;
 
       const range = ranges[mathId];
+      // D4: focus()를 setSelection보다 먼저 — D3' 게이트(hasFocus)를 통과시켜
+      //     이 dispatch가 유발하는 cursorActivity가 정상 처리되게 한다
+      ref.focus();
       // 파란 텍스트 선택 대신: 커서만 두고 행 회색 + 수식 노랑 하이라이트
       ref.setSelection(range.from, range.from);
       ref.highlightMath(range.from, range.to);
-      ref.focus();
 
       // 편집 패널에서 선택된 수식을 세로 중앙으로 스크롤
       // — 단, 활성 블록 상단이 가려지지 않도록 computeBlockAwareScrollTop 로 클램프
@@ -2035,6 +2052,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (blocks.length > 0 && !blocks.find((b) => b.id === activeBlockId)) {
       setActiveBlockId(blocks[0].id);
     }
+    setActiveMathId(-1);   // D16: 탭 전환도 handleBlockFocus를 거치지 않는 경로
     setCollapseMode(false);
     setSelectedBlockIds(new Set());
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
