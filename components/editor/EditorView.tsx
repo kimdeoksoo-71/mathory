@@ -1787,6 +1787,51 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 50);
   }, []);
 
+  /* ─── 편집창: 클릭한 수식을 세로 중앙으로 (D5‴ — 미리보기와 대칭)
+        일반 자동 스크롤과 달리 computeMathCenterScrollTop 을 쓴다.
+        사유: 양쪽 패널이 "같은 수식을 같은 높이"에 두는 것이 목적이므로,
+        블록이 패널보다 클 때는 상단 클램프를 포기해야 대칭이 성립한다. ─── */
+  const scrollEditorToMathCenter = useCallback((blockId: string) => {
+    setTimeout(() => {
+      const ref = editorRefs.current[blockId];
+      const container = editorPanelRef.current;
+      if (!ref || !container) return;
+      const coords = ref.getCursorCoords();
+      const blockEl = container.querySelector(`[data-editor-block-id="${blockId}"]`) as HTMLElement | null;
+      if (!coords || !blockEl) return;
+      const target = computeMathCenterScrollTop(
+        container.getBoundingClientRect(), container.scrollTop,
+        blockEl.getBoundingClientRect(), coords.top,
+      );
+      fastScrollTo(container, target, BLOCK_SCROLL_MS);
+    }, 50);
+  }, []);
+
+  /* ─── 미리보기: 클릭한 수식을 세로 중앙으로 (D5‴ — 편집창과 동일 규칙) ─── */
+  const scrollPreviewToMathCenter = useCallback((blockId: string, mathId: number) => {
+    setTimeout(() => {
+      requestAnimationFrame(() => {
+        const container = previewRef.current;
+        if (!container) return;
+        const blockPreview = container.querySelector(`[data-block-id="${blockId}"]`) as HTMLElement | null;
+        if (!blockPreview) return;
+        const mathEl = blockPreview.querySelector(`.katex[data-math-id="${mathId}"]`) as HTMLElement | null;
+        if (!mathEl && process.env.NODE_ENV !== 'production') {
+          // 폴백이 상시 발동하면 기능이 조용히 죽으므로 개발 중엔 알린다 (v2 R9)
+          console.warn('[Phase56] 미리보기에서 수식 요소를 찾지 못해 블록 중앙으로 폴백:', { blockId, mathId });
+        }
+        const targetEl = mathEl ?? blockPreview;
+        const targetRect = targetEl.getBoundingClientRect();
+        const target = computeMathCenterScrollTop(
+          container.getBoundingClientRect(), container.scrollTop,
+          blockPreview.getBoundingClientRect(),
+          targetRect.top + targetRect.height / 2,   // 수식의 세로 중심을 기준점으로
+        );
+        fastScrollTo(container, target, BLOCK_SCROLL_MS);
+      });
+    }, 50);
+  }, []);
+
   /* ─── 상단바 클릭: 단일 선택(활성화) / Ctrl+클릭: 다중선택 토글 ─── */
   const handleSelectBlockBar = useCallback((blockId: string) => {
     // 상단바 클릭: 블록 상단을 양쪽 패널 상단 ~80px 아래로
@@ -1926,8 +1971,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (info.blockId === activeBlockId) {
       setActiveMathId(mathId);
       setCursorInMath(isInsideMath(content, info.offset));
+      /* D5‴·D7: 같은 블록 안에서 "마우스로" 수식을 클릭한 경우에만 양쪽 중앙 정렬.
+         화살표 키 이동으로는 발동하지 않는다(pointerSelect). */
+      if (info.pointerSelect && mathId >= 0) {
+        scrollEditorToMathCenter(info.blockId);
+        scrollPreviewToMathCenter(info.blockId, mathId);
+      }
     }
-  }, [activeBlockId]);
+  }, [activeBlockId, scrollEditorToMathCenter, scrollPreviewToMathCenter]);
 
   /* ─── 블록 포커스 진입 (콘텐츠 클릭): 커서 라인 / 블록을 양쪽 패널 세로 중앙으로 ─── */
   const handleBlockFocus = useCallback((blockId: string) => {
@@ -1937,17 +1988,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       setActiveBlockId(blockId);
       /* D4: cross-block 수식 강조는 여기서 명시적으로 설정한다.
          click은 mouseup 이후이므로 커서는 이미 클릭 위치로 이동해 있다. */
-      setActiveMathId(ref
+      const mathId = ref
         ? findMathIdAtCursor(buildMathIndex(ref.getContent()), ref.getCursorPosition())
-        : -1);
-      scrollEditorToCursorCenter(blockId);
-      scrollPreviewToBlockCenter(blockId);
+        : -1;
+      setActiveMathId(mathId);
+      if (mathId >= 0) {
+        // D5‴: 다른 블록의 수식을 클릭한 경우도 양쪽 수식 중앙 정렬
+        scrollEditorToMathCenter(blockId);
+        scrollPreviewToMathCenter(blockId, mathId);
+      } else {
+        // D6: 비수식 클릭은 기존 동작 유지 (커서 중앙 + 블록 중앙)
+        scrollEditorToCursorCenter(blockId);
+        scrollPreviewToBlockCenter(blockId);
+      }
     }
     // Phase 25 Step 1: 포커스 진입 시 즉시 수식 안/밖 갱신
     if (ref) {
       setCursorInMath(isInsideMath(ref.getContent(), ref.getCursorPosition()));
     }
-  }, [activeBlockId, scrollEditorToCursorCenter, scrollPreviewToBlockCenter]);
+  }, [activeBlockId, scrollEditorToCursorCenter, scrollPreviewToBlockCenter,
+      scrollEditorToMathCenter, scrollPreviewToMathCenter]);
 
   /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
@@ -1978,19 +2038,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ref.setSelection(range.from, range.from);
       ref.highlightMath(range.from, range.to);
 
-      // 편집 패널에서 선택된 수식을 세로 중앙으로 스크롤
-      // — 단, 활성 블록 상단이 가려지지 않도록 computeBlockAwareScrollTop 로 클램프
-      requestAnimationFrame(() => {
-        const coords = ref.getCursorCoords();
-        const container = editorPanelRef.current;
-        const blockEl = container?.querySelector(`[data-editor-block-id="${blockId}"]`) as HTMLElement | null;
-        if (coords && container && blockEl) {
-          const target = computeBlockAwareScrollTop(container, blockEl, coords.top);
-          fastScrollTo(container, target);
-        }
-      });
+      // D5‴: 양쪽 패널 모두 수식 중앙으로 (기존에는 편집창만 스크롤했다)
+      scrollEditorToMathCenter(blockId);
+      scrollPreviewToMathCenter(blockId, mathId);
     }, 100);
-  }, [setCurrentBlocks]);
+  }, [setCurrentBlocks, scrollEditorToMathCenter, scrollPreviewToMathCenter]);
 
   /* ─── 블록 활성화 시 기본 자동 스크롤 (탭 전환·초기 진입 등) ─── */
   // 핸들러(handleBlockFocus / handleSelectBlockBar)가 직접 스크롤을 처리한 경우엔 skip
