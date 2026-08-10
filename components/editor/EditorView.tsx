@@ -190,6 +190,10 @@ function buildMathIndex(content: string): MathRange[] {
   return ranges;
 }
 
+/* typewriter 스크롤 임계값 (Phase 56 D8‴) — 발화선 ≠ 착지선이어야 재발화가 없다 */
+const TYPING_TRIGGER_MARGIN = 80;   // 패널 하단 80px 안으로 들어오면 발화
+const TYPING_LANDING_RATIO = 0.45;  // 패널 높이의 45% 지점에 착지
+
 function findMathIdAtCursor(ranges: MathRange[], cursor: number): number {
   for (let idx = 0; idx < ranges.length; idx++) {
     if (cursor >= ranges[idx].from && cursor <= ranges[idx].to) return idx;
@@ -1832,6 +1836,28 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, 50);
   }, []);
 
+  /* ─── typewriter 스크롤 (D8‴): 타자 중 커서가 패널 하단에 닿으면 위쪽으로 재정렬 ───
+        발화선(하단 80px)과 착지선(패널 높이의 45%)을 다르게 둔다(히스테리시스).
+        같게 두면 재정렬 결과가 곧 발화 조건이 되어 매 키입력마다 재발화한다.
+        computeBlockAwareScrollTop 을 쓰지 않는 이유: 블록이 패널보다 길면
+        caretVisibleMin 이 이겨 커서가 하단 60px에 눌어붙어 중앙 정렬이 되지 않는다.
+        타자 중에는 블록 상단 가시성이 요구사항이 아니므로 순수 비율 정렬이 맞다. ─── */
+  const maybeRecenterOnBottomTyping = useCallback((blockId: string) => {
+    requestAnimationFrame(() => {   // CM 자체의 최소 가시화 스크롤이 반영된 뒤 측정
+      const ref = editorRefs.current[blockId];
+      const container = editorPanelRef.current;
+      if (!ref || !container) return;
+      if (!ref.hasFocus()) return;      // 사용자 타이핑에만 적용 (프로그램적 문서 변경 제외)
+      if (ref.isComposing()) return;    // 한글 IME 조합 중 스크롤은 조합을 깨뜨린다 (dad2588)
+      const coords = ref.getCursorCoords();
+      if (!coords) return;
+      const rect = container.getBoundingClientRect();
+      if (coords.top < rect.bottom - TYPING_TRIGGER_MARGIN) return;
+      const cursorRel = coords.top - rect.top + container.scrollTop;
+      fastScrollTo(container, cursorRel - rect.height * TYPING_LANDING_RATIO, 260);
+    });
+  }, []);
+
   /* ─── 상단바 클릭: 단일 선택(활성화) / Ctrl+클릭: 다중선택 토글 ─── */
   const handleSelectBlockBar = useCallback((blockId: string) => {
     // 상단바 클릭: 블록 상단을 양쪽 패널 상단 ~80px 아래로
@@ -1978,7 +2004,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         scrollPreviewToMathCenter(info.blockId, mathId);
       }
     }
-  }, [activeBlockId, scrollEditorToMathCenter, scrollPreviewToMathCenter]);
+    // D8‴: 타자로 커서가 하단에 닿으면 세로 위치 자동 조정
+    if (info.docChanged) maybeRecenterOnBottomTyping(info.blockId);
+  }, [activeBlockId, scrollEditorToMathCenter, scrollPreviewToMathCenter,
+      maybeRecenterOnBottomTyping]);
 
   /* ─── 블록 포커스 진입 (콘텐츠 클릭): 커서 라인 / 블록을 양쪽 패널 세로 중앙으로 ─── */
   const handleBlockFocus = useCallback((blockId: string) => {
