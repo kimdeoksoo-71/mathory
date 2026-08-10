@@ -9,6 +9,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MarkdownEditorHandle } from './MarkdownEditor';
+import { fastScrollTo, computeBlockAwareScrollTop } from '../../lib/editorScroll';
 
 interface Match {
   blockId: string;
@@ -21,6 +22,10 @@ interface FindReplacePanelProps {
   onClose: () => void;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
   blockIds: string[];
+  /** 편집 패널(스크롤 컨테이너). 전역 querySelector 대신 주입받는다 (Phase 56 D15) */
+  editorPanelRef: React.RefObject<HTMLDivElement>;
+  /** 매치로 이동할 때 활성 블록·수식 강조를 동기화한다 (Phase 56 D15) */
+  onNavigate?: (blockId: string, offset: number) => void;
 }
 
 function isWholeWord(text: string, pos: number, len: number): boolean {
@@ -31,7 +36,7 @@ function isWholeWord(text: string, pos: number, len: number): boolean {
 }
 
 export default function FindReplacePanel({
-  open, onClose, editorRefs, blockIds,
+  open, onClose, editorRefs, blockIds, editorPanelRef, onNavigate,
 }: FindReplacePanelProps) {
   // 렌더링용 state (UI 표시)
   const [query, setQuery] = useState('');
@@ -147,17 +152,22 @@ export default function FindReplacePanel({
     if (!handle) return;
     applyHighlights(allMatches, idx);
     try { handle.setSelection(match.from, match.to); } catch {}
+    // D15: 활성 블록·수식 강조 동기화. 검색 입력창이 포커스를 갖고 있어
+    //      setSelection이 유발하는 cursorActivity는 D3' 게이트에 막히므로 명시 통지.
+    onNavigate?.(match.blockId, match.from);
 
     requestAnimationFrame(() => {
       const coords = handle.getCursorCoords();
-      const scroller = document.querySelector('.scaled-editor') as HTMLElement | null;
-      if (!scroller) return;
-      const scrollRect = scroller.getBoundingClientRect();
-      if (coords) {
-        const cursorRelTop = coords.top - scrollRect.top + scroller.scrollTop;
-        const center = cursorRelTop - scrollRect.height / 2;
-        scroller.scrollTo({ top: Math.max(0, center), behavior: 'smooth' });
-      }
+      const container = editorPanelRef.current;   // D15: 전역 querySelector 제거
+      if (!coords || !container) return;
+      const blockEl = container.querySelector(
+        `[data-editor-block-id="${match.blockId}"]`) as HTMLElement | null;
+      if (!blockEl) return;
+      /* D15: 생짜 중앙 정렬 + 네이티브 smooth 대신 공용 경로를 쓴다.
+         ① computeBlockAwareScrollTop 로 블록 상단 가시성 불변식을 지키고
+         ② fastScrollTo 로 다른 스크롤과의 경합이 세대 카운터에 취소되게 한다.
+            (네이티브 behavior:'smooth'는 취소 장치가 없어 다른 애니메이션과 싸웠다) */
+      fastScrollTo(container, computeBlockAwareScrollTop(container, blockEl, coords.top));
     });
   }
 

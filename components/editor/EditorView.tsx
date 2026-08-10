@@ -2009,6 +2009,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [activeBlockId, scrollEditorToCursorCenter, scrollPreviewToBlockCenter,
       scrollEditorToMathCenter, scrollPreviewToMathCenter]);
 
+  /* ─── 찾기/바꾸기 매치 이동 → 활성 블록·수식 강조 동기화 (D15) ───
+        검색 입력창이 포커스를 갖고 있어 setSelection이 유발하는 cursorActivity는
+        D3' 게이트에 막힌다. FindReplacePanel이 이미 blockId·offset을 알고 있으므로
+        여기서 직접 반영해 미리보기 강조가 매치를 따라오게 한다. ─── */
+  const handleSearchNavigate = useCallback((blockId: string, offset: number) => {
+    skipNextBlockScrollRef.current = true;   // 스크롤은 FindReplacePanel이 직접 처리
+    setActiveBlockId(blockId);
+    const ref = editorRefs.current[blockId];
+    setActiveMathId(ref
+      ? findMathIdAtCursor(buildMathIndex(ref.getContent()), offset)
+      : -1);
+  }, []);
+
   /* ─── 미리보기 수식 클릭 → 편집창 선택 ─── */
   const handlePreviewMathClick = useCallback((blockId: string, mathId: number) => {
     // 블록 펼침 + 활성화
@@ -2927,6 +2940,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onClose={() => setSearchOpen(false)}
             editorRefs={editorRefs}
             blockIds={currentBlocks.map((b) => b.id)}
+            editorPanelRef={editorPanelRef}
+            onNavigate={handleSearchNavigate}
           />
 
           <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
