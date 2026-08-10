@@ -6,7 +6,7 @@ import { keymap } from '@codemirror/view';
 import { EditorState, Prec } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
-import { linter, lintGutter } from '@codemirror/lint';
+import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 // search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import {
@@ -249,11 +249,25 @@ function latexCompletionSource(context: CompletionContext) {
 }
 
 // ── LaTeX 린터 (동기) ──────────────────────────────────
+// 뷰별 직전 진단 캐시 — 한글 IME 조합 중 진단 갱신을 건너뛸 때 사용.
+const lastDiagnostics = new WeakMap<EditorView, Diagnostic[]>();
+
 const latexLinter = linter((view) => {
-  const doc = view.state.doc.toString();
-  return lintLaTeX(doc);
+  // 한글 IME 조합 중에는 진단을 갱신하지 않음.
+  // 조합 텍스트 위에 물결 밑줄 데코레이션이 붙거나 사라지면 조합이 깨져
+  // 끝글자가 중복 입력된다 (lib/latex-highlight.ts의 composing 가드와 같은 이유).
+  // 직전 진단을 그대로 반환 → 데코레이션 무변경 → DOM 재렌더 없음.
+  // 조합 중 자소 삭제로 문서가 짧아졌을 수 있으므로 문서 길이로 clamp.
+  if (view.composing) {
+    const len = view.state.doc.length;
+    return (lastDiagnostics.get(view) || []).filter((d) => d.to <= len);
+  }
+  const result = lintLaTeX(view.state.doc.toString());
+  lastDiagnostics.set(view, result);
+  return result;
 }, {
-  delay: 500,
+  // 한글 한 음절 조합이 delay를 넘기면 조합 중 진단이 발화하므로 넉넉하게.
+  delay: 1200,
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(

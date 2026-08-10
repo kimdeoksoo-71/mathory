@@ -1615,8 +1615,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const before = content.slice(0, cursor);
     const after = content.slice(cursor);
 
-    // 원본 블록의 CodeMirror 내용을 즉시 갱신 (before만 남김)
-    ref.setContent(before);
+    // 원본 블록의 CodeMirror 내용을 즉시 갱신 (before만 남김).
+    // 커서가 끝이면 내용이 그대로이므로 불필요한 문서 전체 교체를 건너뛴다.
+    if (before !== content) ref.setContent(before);
 
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
