@@ -1294,3 +1294,11 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 - 런타임 발견 규칙 버그(에뮬레이터 재현 후 수정): **F10** payload 트랜잭션 create가 부모 version doc `get()`에 막힘(같은 트랜잭션 미커밋 불가시), **F11** versions LIST가 `resource.data` 참조로 거부(규칙은 필터 아님) → 둘 다 소유 검사를 부모 **문항** authorUid(`verOwner()`)로 통일해 해결
 - 후속 과제: 탭 단위 복원(현재 전체 복원만), 오프라인 persistence(Firestore 전역 초기화 변경 위험으로 보류), 탭 reorder diff, **GitHub 연동(Phase 56+ 별도)**
 - 덕수 완료: 규칙 배포(`firebase deploy --only firestore:rules`)·`git push` 완료
+
+---
+
+## 공개 전 버그 청소 리스트
+
+공개 직전에 몰아서 처리할 버그 목록: `docs/prelaunch-bug-cleanup.md`
+(1번 한글 IME 조합 중 ⌘B 끝글자 중복, 2번 저장 왕복 중 타이핑 유실, 3번 저장 후 CodeMirror remount,
+4번 키입력마다 전체 리렌더, 5번 `/api/copyright/register` 무인증)
