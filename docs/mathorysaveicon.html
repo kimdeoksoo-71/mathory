@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mathory 저장 아이콘 재설계</title>
+<style>
+  :root{
+    --bg:#ffffff; --bg-functional:#fafafa; --border-light:#e6e6e6;
+    --text-primary:#1a1a1a; --text-secondary:#555; --text-muted:#777; --text-faint:#9a9a9a;
+    --accent-danger:#e53935; --card:#fff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#17181a; --bg-functional:#1e2023; --border-light:#33363b;
+      --text-primary:#ececec; --text-secondary:#bdbdbd; --text-muted:#98999c; --text-faint:#75777c;
+      --accent-danger:#ff6b66; --card:#212327; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text-primary);
+    font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    font-size:14px;line-height:1.65;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:940px;margin:0 auto;padding:48px 28px 80px}
+  h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin:0 0 6px}
+  .sub{color:var(--text-muted);font-size:13.5px;margin:0 0 40px}
+  h2{font-size:15px;font-weight:700;letter-spacing:-.01em;margin:44px 0 14px;
+    padding-bottom:8px;border-bottom:1px solid var(--border-light)}
+  p{margin:0 0 12px;color:var(--text-secondary)}
+  code{font-family:ui-monospace,Menlo,Monaco,monospace;font-size:12.5px;
+    background:var(--bg-functional);border:1px solid var(--border-light);
+    border-radius:4px;padding:1px 5px;color:var(--text-primary)}
+
+  /* ── 툴바 재현 ── */
+  .bar{display:flex;align-items:center;gap:8px;padding:0 16px;min-height:57px;
+    border:1px solid var(--border-light);border-radius:10px;
+    background:var(--bg-functional);margin:0 0 10px}
+  .bar .title{flex:1;font-size:15px;font-weight:600;color:var(--text-primary)}
+  .bar button{border:none;background:none;padding:4px;border-radius:4px;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-faint)}
+  .bar .back{color:var(--text-muted)}
+  .bar .dirty{color:var(--accent-danger)}
+  .fs{display:flex;align-items:center;gap:4px;margin-left:4px;
+    border-left:1px solid var(--border-light);padding-left:8px}
+  .fs .num{font-size:13.5px;font-weight:500;color:var(--text-secondary);min-width:22px;text-align:right}
+  .fs .col{display:flex;flex-direction:column}
+  .fs .col button{padding:0;width:14px;height:11px;color:var(--text-muted)}
+  .barlabel{font-size:12px;color:var(--text-muted);margin:0 0 6px;font-weight:600;letter-spacing:.02em}
+
+  /* ── 카드 ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin:16px 0}
+  .card{border:1px solid var(--border-light);border-radius:10px;background:var(--card);
+    padding:18px 16px;text-align:center}
+  .card.pick{border-color:var(--accent-danger);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent-danger) 12%,transparent)}
+  .card h3{margin:0 0 2px;font-size:13.5px;font-weight:700}
+  .card .tag{font-size:11px;color:var(--text-muted);margin:0 0 16px;display:block}
+  .card .tag.rec{color:var(--accent-danger);font-weight:700}
+  .sizes{display:flex;align-items:flex-end;justify-content:center;gap:20px;margin-bottom:14px;min-height:78px}
+  .sizes .s{display:flex;flex-direction:column;align-items:center;gap:7px;color:var(--text-faint)}
+  .sizes .s span{font-size:10px;color:var(--text-muted);font-variant-numeric:tabular-nums}
+  .sizes .s.red{color:var(--accent-danger)}
+  .note{font-size:11.5px;color:var(--text-muted);line-height:1.55;text-align:left;
+    border-top:1px solid var(--border-light);padding-top:11px;margin:0}
+
+  /* ── 표 ── */
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin:14px 0}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--border-light)}
+  th{font-weight:700;color:var(--text-muted);font-size:11.5px;letter-spacing:.03em;text-transform:uppercase}
+  td.num{font-variant-numeric:tabular-nums;text-align:right}
+  tr.hl td{background:color-mix(in srgb,var(--accent-danger) 7%,transparent)}
+  .ok{color:#2e9e5b;font-weight:700}
+  .bad{color:var(--accent-danger);font-weight:700}
+
+  /* ── 확대 대조 ── */
+  .zoom{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;
+    background:var(--bg-functional);border:1px solid var(--border-light);
+    border-radius:10px;padding:24px;margin:16px 0}
+  .zoom .z{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .zoom .z .cap{font-size:11.5px;color:var(--text-muted);text-align:center;max-width:150px}
+  .zoom svg{color:var(--text-faint)}
+  .zoom .z.red svg{color:var(--accent-danger)}
+  .fam{display:flex;flex-wrap:wrap;gap:22px;align-items:center;
+    background:var(--bg-functional);border:1px solid var(--border-light);
+    border-radius:10px;padding:20px 24px;margin:14px 0;color:var(--text-faint)}
+  .fam .f{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .fam .f span{font-size:10.5px;color:var(--text-muted)}
+  ul{margin:0 0 14px;padding-left:20px;color:var(--text-secondary)}
+  li{margin-bottom:5px}
+  pre{background:var(--bg-functional);border:1px solid var(--border-light);border-radius:8px;
+    padding:16px;overflow-x:auto;font-family:ui-monospace,Menlo,Monaco,monospace;
+    font-size:12px;line-height:1.6;color:var(--text-primary);margin:12px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Mathory 저장 아이콘 재설계</h1>
+<p class="sub"><code>EditorView.tsx:2690–2706</code> 인라인 SVG · 정제된 플로피 방향 · dirty는 선만 빨강</p>
+
+<!-- ═══════════════ 1. 진단 ═══════════════ -->
+<h2>1. 지금 아이콘이 거칠어 보이는 이유</h2>
+<p>현재 저장 아이콘은 Mathory 아이콘 39개가 쓰는 규격에서 혼자 벗어나 있습니다. 확대해 보면 원인이 분명합니다.</p>
+
+<div class="zoom">
+  <div class="z">
+    <!-- 현재 기본 -->
+    <svg width="130" height="130" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+      stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z"/>
+      <rect x="18" y="6" width="22" height="16" rx="1" fill="none" stroke="currentColor"/>
+      <circle cx="34" cy="42" r="9" fill="currentColor" stroke="none"/>
+    </svg>
+    <div class="cap"><b>현재 · 기본</b><br>viewBox 64 / stroke 3.5</div>
+  </div>
+  <div class="z red">
+    <!-- 현재 dirty -->
+    <svg width="130" height="130" viewBox="0 0 64 64" fill="none" stroke="currentColor"
+      stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" fill="currentColor"/>
+      <rect x="18" y="6" width="22" height="16" rx="1" fill="#fff" stroke="none"/>
+      <circle cx="34" cy="42" r="9" fill="#fff" stroke="none"/>
+    </svg>
+    <div class="cap"><b>현재 · dirty</b><br>바디 전체 빨강 채움</div>
+  </div>
+  <div style="flex:1;min-width:260px">
+    <ul style="font-size:13px">
+      <li><b>모서리에 라운드가 전혀 없음</b> — 다른 39개 아이콘은 전부 <code>rx=2~3</code> + <code>linejoin=round</code>. 이 아이콘만 직각·날카로운 45° 챔퍼라 각져 보입니다.</li>
+      <li><b>선이 이웃보다 얇음</b> — 18px에서 유효 0.98px. 바로 옆 <code>IconRecent</code>(1.28px)·<code>IconChevronLeft</code>(1.33px)보다 가늘어 픽셀 그리드에 안 맞고 흐려집니다.</li>
+      <li><b>라벨이 상단 모서리에 붙어 있음</b> — <code>rect y=6</code>이 바디 윗변 <code>y=6</code>과 겹쳐 선이 이중으로 그려집니다. 지저분해 보이는 직접적 원인.</li>
+      <li><b>허브 원이 과대</b> — <code>r=9</code>는 아이콘 폭의 28%. 꽉 찬 점 하나가 시선을 다 가져갑니다.</li>
+      <li><b>dirty가 면 채움</b> — 주변이 전부 선 아이콘인데 혼자 덩어리로 떠서 튑니다.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ═══════════════ 2. 후보 ═══════════════ -->
+<h2>2. 새 아이콘 후보 (모두 viewBox 24 / stroke 1.8 / round)</h2>
+<p>세 안 모두 플로피를 유지하되 라운드 처리하고, 실제 버튼 크기인 <b>18px</b>과 확대 뷰를 함께 놓았습니다.</p>
+
+<div class="grid">
+  <!-- A -->
+  <div class="card pick">
+    <h3>A. 셔터 + 라벨</h3>
+    <span class="tag rec">★ 권장 · Lucide 표준형</span>
+    <div class="sizes">
+      <div class="s"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg><span>18</span></div>
+      <div class="s red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg><span>dirty</span></div>
+      <div class="s"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg><span>72</span></div>
+    </div>
+    <p class="note">상단 셔터 + 하단 라벨. VS Code·Figma·Linear·Obsidian이 쓰는 가장 표준적인 형태라 설명 없이 읽힙니다. <code>Icons.tsx</code>에 이미 있는 <code>IconSave</code>와 같은 계열이라 코드도 자연스럽게 합쳐집니다.</p>
+  </div>
+
+  <!-- B -->
+  <div class="card">
+    <h3>B. 셔터 + 허브</h3>
+    <span class="tag">현재 형태를 정제</span>
+    <div class="sizes">
+      <div class="s"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><circle cx="12" cy="16" r="3"/></svg><span>18</span></div>
+      <div class="s red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><circle cx="12" cy="16" r="3"/></svg><span>dirty</span></div>
+      <div class="s"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><circle cx="12" cy="16" r="3"/></svg><span>72</span></div>
+    </div>
+    <p class="note">지금 아이콘의 <b>셔터+허브</b> 구성을 그대로 계승하되, 허브를 채운 점(r=9/64)에서 열린 원(r=3/24)으로 줄였습니다. 변화폭이 가장 작아 이질감이 없지만, 18px에서 원 내부가 1.2px밖에 안 돼 뭉개질 여지가 있습니다.</p>
+  </div>
+
+  <!-- C -->
+  <div class="card">
+    <h3>C. 셔터 + 채운 라벨</h3>
+    <span class="tag">A의 고대비 변형</span>
+    <div class="sizes">
+      <div class="s"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21 Z" fill="currentColor"/></svg><span>18</span></div>
+      <div class="s red"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21 Z" fill="currentColor"/></svg><span>dirty</span></div>
+      <div class="s"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21 Z" fill="currentColor"/></svg><span>72</span></div>
+    </div>
+    <p class="note">라벨만 면으로 채워 작은 크기에서 형태가 더 또렷합니다. 다만 Mathory의 다른 아이콘은 <code>IconDots</code>·<code>IconChoices</code> 정도만 면을 쓰기 때문에, 통일성 기준으로는 A보다 반 걸음 벗어납니다.</p>
+  </div>
+</div>
+
+<!-- ═══════════════ 3. 실제 툴바 ═══════════════ -->
+<h2>3. 실제 Row 1 툴바에 얹어 보기 (100% 크기)</h2>
+<p>저장 버튼의 좌우 이웃은 <code>IconRecent</code>(17px)와 글꼴 꺾쇠입니다. 이 맥락에서 어긋남이 가장 잘 드러납니다.</p>
+
+<div class="barlabel">현재 — 저장할 내용 있음(dirty)</div>
+<div class="bar">
+  <button class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg></button>
+  <span class="title">2026 수능 미적분 30번</span>
+  <button><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/></svg></button>
+  <button class="dirty"><svg width="18" height="18" viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 6 L44 6 L58 20 L58 58 L10 58 Z" fill="currentColor"/><rect x="18" y="6" width="22" height="16" rx="1" fill="#fff" stroke="none"/><circle cx="34" cy="42" r="9" fill="#fff" stroke="none"/></svg></button>
+  <div class="fs"><span class="num">16</span><div class="col">
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5 L5 1 L9 5"/></svg></button>
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1 L5 5 L9 1"/></svg></button>
+  </div></div>
+</div>
+
+<div class="barlabel">A안 적용 — 저장할 내용 있음(dirty)</div>
+<div class="bar">
+  <button class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg></button>
+  <span class="title">2026 수능 미적분 30번</span>
+  <button><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/></svg></button>
+  <button class="dirty"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg></button>
+  <div class="fs"><span class="num">16</span><div class="col">
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5 L5 1 L9 5"/></svg></button>
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1 L5 5 L9 1"/></svg></button>
+  </div></div>
+</div>
+
+<div class="barlabel">A안 적용 — 저장 완료(기본 회색)</div>
+<div class="bar">
+  <button class="back"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15,18 9,12 15,6"/></svg></button>
+  <span class="title">2026 수능 미적분 30번</span>
+  <button><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/></svg></button>
+  <button><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg></button>
+  <div class="fs"><span class="num">16</span><div class="col">
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 5 L5 1 L9 5"/></svg></button>
+    <button><svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1 L5 5 L9 1"/></svg></button>
+  </div></div>
+</div>
+
+<!-- ═══════════════ 4. 아이콘 가족 ═══════════════ -->
+<h2>4. Mathory 아이콘 가족과 나란히</h2>
+<p>같은 규격(<code>viewBox 24</code> / <code>stroke 1.8</code>)이면 선 굵기·모서리 반경·여백이 자동으로 맞습니다.</p>
+<div class="fam">
+  <div class="f"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7c0-1.1.9-2 2-2h4l2 2h8c1.1 0 2 .9 2 2v8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V7z"/></svg><span>Folder</span></div>
+  <div class="f"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 15.5,14"/></svg><span>Recent</span></div>
+  <div class="f"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="16.5" y1="16.5" x2="21" y2="21"/></svg><span>Search</span></div>
+  <div class="f"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>DocLines</span></div>
+  <div class="f"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="3"/><line x1="9" y1="3" x2="9" y2="21"/></svg><span>Sidebar</span></div>
+  <div class="f" style="color:var(--accent-danger)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z"/><path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3"/><path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21"/></svg><span style="color:var(--accent-danger);font-weight:700">Save (신규)</span></div>
+</div>
+
+<!-- ═══════════════ 5. 수치 ═══════════════ -->
+<h2>5. 규격 대조</h2>
+<table>
+  <thead><tr><th>항목</th><th>현재 저장</th><th>이웃 IconRecent</th><th>A안 (신규)</th></tr></thead>
+  <tbody>
+    <tr><td>viewBox</td><td class="bad">0 0 64 64</td><td>0 0 24 24</td><td class="ok">0 0 24 24</td></tr>
+    <tr><td>strokeWidth</td><td>3.5</td><td>1.8</td><td class="ok">1.8</td></tr>
+    <tr class="hl"><td><b>18px에서 유효 선 굵기</b></td><td class="num bad">0.98 px</td><td class="num">1.28 px</td><td class="num ok">1.35 px</td></tr>
+    <tr><td>모서리 반경</td><td class="bad">0 (직각)</td><td>—</td><td class="ok">2</td></tr>
+    <tr><td>strokeLinejoin</td><td>round<span style="color:var(--text-muted)"> (직각이라 무효)</span></td><td>—</td><td class="ok">round</td></tr>
+    <tr><td>내부 요소 겹침</td><td class="bad">라벨이 윗변에 밀착</td><td>없음</td><td class="ok">없음 (여백 5)</td></tr>
+    <tr><td>dirty 표현</td><td class="bad">바디 면 채움</td><td>—</td><td class="ok">선 색만 변경</td></tr>
+  </tbody>
+</table>
+<p style="font-size:12.5px;color:var(--text-muted)">유효 선 굵기 = <code>strokeWidth × (렌더 px ÷ viewBox 단위)</code>. 현재 아이콘은 3.5 × 18/64 = 0.98px로 이웃보다 <b>가늘어</b> 흐릿하게 뭉개지고, 동시에 모서리가 직각이라 <b>각져</b> 보입니다 — "거칠다"는 인상은 이 둘이 겹친 결과입니다.</p>
+
+<!-- ═══════════════ 6. 코드 ═══════════════ -->
+<h2>6. 적용 코드</h2>
+<p><b>① <code>components/ui/Icons.tsx</code></b> — 기존 <code>IconSave</code>(미사용 상태)를 새 도형으로 교체합니다.</p>
+<pre>export function IconSave({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    &lt;svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden&gt;
+      {/* 바디 — 우상단 45° 노치, 전 모서리 r=2 */}
+      &lt;path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19
+               a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z" /&gt;
+      {/* 상단 셔터 */}
+      &lt;path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3" /&gt;
+      {/* 하단 라벨 */}
+      &lt;path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21" /&gt;
+    &lt;/svg&gt;
+  );
+}</pre>
+
+<p><b>② <code>components/editor/EditorView.tsx</code> 2690–2706</b> — 인라인 SVG 두 벌을 <code>IconSave</code> 한 줄로 대체합니다. dirty 여부는 이미 버튼의 <code>color</code>가 처리하므로(<code>currentColor</code> 상속) 분기가 사라집니다.</p>
+<pre>{saving ? &lt;IconLoader size={16} /&gt; : &lt;IconSave size={18} /&gt;}</pre>
+<p style="font-size:12.5px;color:var(--text-muted)">import 구문에 <code>IconSave</code> 추가가 필요합니다. 버튼의 <code>color: dirty ? '#e53935' : 'var(--text-faint)'</code>는 그대로 두면 됩니다 — 이것만으로 "선만 빨강" 동작이 완성됩니다. 하드코딩된 <code>#e53935</code>는 다크 모드 대비를 위해 <code>var(--accent-danger)</code>로 바꾸는 것을 함께 권합니다.</p>
+
+</div>
+</body>
+</html>

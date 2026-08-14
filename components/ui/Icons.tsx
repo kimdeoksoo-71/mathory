@@ -168,12 +168,16 @@ export function IconTrash({ size = 14, color = 'currentColor' }: IconProps) {
   );
 }
 
-export function IconSave({ size = 16, color = 'currentColor' }: IconProps) {
+export function IconSave({ size = 18, color = 'currentColor' }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
-      <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-      <polyline points="17,21 17,13 7,13 7,21" />
-      <polyline points="7,3 7,8 15,8" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {/* 바디 — 우상단 45° 노치, 절 모서리 r=2 필렛 */}
+      <path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z" />
+      {/* 상단 셔터 */}
+      <path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3" />
+      {/* 하단 라벨 */}
+      <path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21" />
     </svg>
   );
 }

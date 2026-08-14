@@ -1319,6 +1319,17 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 
 ---
 
+## UI 정리 (Phase 간 소규모)
+
+Phase 신설 대신 기록하는 규격 통일 작업.
+
+| 항목 | 완료일 | 비고 |
+|------|--------|------|
+| 버전 기록 버튼 아이콘을 사이드바 '최근 문항'과 통일 | 2026-08-14 | `IconRecent` 계열로 통일 (커밋 c921b71) |
+| 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)` |
+
+---
+
 ## 공개 전 버그 청소 리스트
 
 공개 직전에 몰아서 처리할 버그 목록: `docs/prelaunch-bug-cleanup.md`
