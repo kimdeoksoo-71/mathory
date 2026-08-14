@@ -47,7 +47,7 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconCheck,
+  IconCheck, IconRecent,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
@@ -2663,16 +2663,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           lastSavedAt={lastSavedAt}
         />
 
-        {/* Phase 55 Stage 4: 버전 기록 열기 */}
+        {/* Phase 55 Stage 4: 버전 기록 열기 (아이콘은 사이드바 '최근 문항'과 통일) */}
         <button
           onClick={() => setVersionDrawerOpen(true)}
           title="버전 기록"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
-            color: 'var(--text-faint)', fontSize: 15,
+            color: 'var(--text-faint)',
           }}
-        >🕘</button>
+        ><IconRecent size={17} /></button>
 
         {/* 저장 버튼 — 아이콘만. dirty면 빨강, 저장 완료면 회색. */}
         <button
