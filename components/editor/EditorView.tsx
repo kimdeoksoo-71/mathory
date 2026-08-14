@@ -1465,6 +1465,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [setCurrentBlocks, activeTab]);
 
   const handleBlockTypeChange = useCallback((blockId: string, type: Block['type']) => {
+    const _cur = currentBlocks.find((b) => b.id === blockId);
+    if (_cur && _cur.type !== type) pushUndo();   // C3: 실제 타입 변경일 때만
     setCurrentBlocks((prev) =>
       prev.map((b) => {
         if (b.id !== blockId) return b;
@@ -1521,7 +1523,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         return { ...b, type, raw_text };
       })
     );
-  }, [setCurrentBlocks]);
+  }, [setCurrentBlocks, currentBlocks, pushUndo]);
 
   const handleBlockTitleChange = useCallback((blockId: string, title: string) => {
     setCurrentBlocks((prev) =>
@@ -1530,6 +1532,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [setCurrentBlocks]);
 
   const handleDeleteBlock = useCallback((blockId: string) => {
+    if (currentBlocks.length <= 1) return;   // C3: 마지막 블록은 삭제 안 함(no-op)
+    pushUndo();
     setCurrentBlocks((prev) => {
       if (prev.length <= 1) return prev;
       const filtered = prev.filter((b) => b.id !== blockId);
@@ -1538,7 +1542,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       }
       return filtered;
     });
-  }, [setCurrentBlocks, activeBlockId]);
+  }, [setCurrentBlocks, activeBlockId, currentBlocks, pushUndo]);
 
   const handleAddBlock = useCallback((type: Block['type'] = 'text') => {
     pushUndo();   // Phase 55a: 구조 조작 직전 (no-op 없음)
@@ -1594,6 +1598,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const ref = editorRefs.current[activeBlockId];
     if (!ref) return;
 
+    pushUndo();   // C3: 모든 가드 통과 후 분할(mutate) 직전
+
     const cursor = ref.getCursorPosition();
     const content = ref.getContent();
 
@@ -1628,7 +1634,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setTimeout(() => {
       editorRefs.current[newBlock.id]?.focus();
     }, 50);
-  }, [activeBlockId, currentBlocks, setCurrentBlocks]);
+  }, [activeBlockId, currentBlocks, setCurrentBlocks, pushUndo]);
 
   /* ─── 미디어 업로드 (image | svg) ─── */
   const handleBlockMediaUpload = useCallback(async (file: File, kind: ImageMediaKind, blockId: string) => {
@@ -1636,6 +1642,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     try {
       if (kind === 'svg') {
         const url = await uploadSvg(file, pid);
+        pushUndo();   // C3: 업로드 성공 후, 블록 변경 직전
         setCurrentBlocks((prev) =>
           prev.map((b) => (b.id === blockId
             ? { ...b, type: 'svg', raw_text: url, svg_initial_view: null }
@@ -1643,6 +1650,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         );
       } else if (kind === 'ggb') {
         const url = await uploadGgb(file, pid);
+        pushUndo();
         setCurrentBlocks((prev) =>
           prev.map((b) => (b.id === blockId
             ? { ...b, type: 'ggb', raw_text: url, ggb_initial_coords: null }
@@ -1651,6 +1659,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       } else {
         const url = await uploadImage(file, pid);
         const markdownImage = `<img src="${url}" alt="${file.name}" width="400" />`;
+        pushUndo();
         setCurrentBlocks((prev) =>
           prev.map((b) => (b.id === blockId
             ? { ...b, type: 'image', raw_text: markdownImage }
@@ -1661,7 +1670,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       console.error('[MediaUpload] 에러:', err);
       throw err;
     }
-  }, [problemId, setCurrentBlocks]);
+  }, [problemId, setCurrentBlocks, pushUndo]);
 
   /* ─── AI 그래프 → 블록 저장 (Phase 42) ─── */
   // 토론창 GgbGraphView의 💾 저장 → 업로드 후 현재 활성 탭 블록 목록 맨 끝에 append.
@@ -1697,9 +1706,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       newBlock.type = 'image';
       newBlock.raw_text = `<img src="${url}" alt="AI 그래프" width="400" />`;
     }
+    pushUndo();   // C3: 업로드 성공 후, 블록 추가 직전
     setCurrentBlocks((prev) => [...prev, newBlock]);
     return tabs.find((t) => t.id === activeTab)?.label || activeTab;
-  }, [problemId, setCurrentBlocks, tabs, activeTab]);
+  }, [problemId, setCurrentBlocks, tabs, activeTab, pushUndo]);
 
   /* ─── SVG 초기뷰 저장 ─── */
   const handleSaveSvgInitialView = useCallback(
@@ -1912,6 +1922,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const activeId = String(active.id);
     const overId = String(over.id);
 
+    // C3: 실제 이동 여부 사전 판정(제자리·묶음 내부 드롭 no-op) → 이동일 때만 push
+    {
+      const isGroupMove = selectedBlockIds.size > 1 && selectedBlockIds.has(activeId);
+      const movingSet = new Set(isGroupMove
+        ? currentBlocks.filter((b) => selectedBlockIds.has(b.id)).map((b) => b.id)
+        : [activeId]);
+      const noMove = (isGroupMove && movingSet.has(overId)) || (!isGroupMove && activeId === overId);
+      if (!noMove) pushUndo();
+    }
+
     setCurrentBlocks((prev) => {
       // 다중선택 묶음 이동: 드래그한 블록이 선택집합에 포함되고 2개 이상일 때
       const isGroupMove = selectedBlockIds.size > 1 && selectedBlockIds.has(activeId);
@@ -1937,7 +1957,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       remaining.splice(insertAt, 0, ...movingBlocks);
       return remaining;
     });
-  }, [setCurrentBlocks, selectedBlockIds]);
+  }, [setCurrentBlocks, selectedBlockIds, currentBlocks, pushUndo]);
 
   /* ─── MathToolbar ─── */
   const handleInsert = (template: string, cursorOffset: number) => {
@@ -2210,6 +2230,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
+    pushUndo();   // C3: 탭 추가 (no-op 없음)
     // 다음 "풀이N" 번호 계산
     let maxSolNum = 1;
     for (const tab of tabs) {
@@ -2255,6 +2276,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const tabLabel = tabs[tabIdx].label;
     if (!confirm(`'${tabLabel}' 탭을 삭제하시겠습니까? 탭 안의 모든 블록이 삭제됩니다.`)) return;
 
+    pushUndo();   // C3: confirm 통과 후
     setTabs((prev) => prev.filter((t) => t.id !== tabId));
     setAllBlocks((prev) => {
       const next = { ...prev };
@@ -2279,8 +2301,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   const commitTabLabel = () => {
     if (editingTabId && editingTabLabel.trim()) {
+      const trimmed = editingTabLabel.trim();
+      const cur = tabs.find((t) => t.id === editingTabId);
+      if (cur && cur.label !== trimmed) pushUndo();   // C3: 실제 변경일 때만
       setTabs((prev) =>
-        prev.map((t) => (t.id === editingTabId ? { ...t, label: editingTabLabel.trim() } : t))
+        prev.map((t) => (t.id === editingTabId ? { ...t, label: trimmed } : t))
       );
     }
     setEditingTabId(null);
