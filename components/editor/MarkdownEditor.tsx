@@ -68,6 +68,8 @@ export interface MarkdownEditorHandle {
   hasFocus: () => boolean;
   /** 한글 IME 조합 중인가. 조합 중 스크롤/데코레이션 변동은 조합을 깨뜨린다. */
   isComposing: () => boolean;
+  /** 선택 영역이 비어 있는가(= 커서만 있음). 드래그로 범위를 잡은 상태와 구분한다. */
+  isSelectionEmpty: () => boolean;
 }
 
 // ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
@@ -293,6 +295,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     const chordPendingRef = useRef<boolean>(false);
     const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastMetaDownRef = useRef<number>(0); // Command 더블탭 감지용
+    /* 마우스 버튼이 눌려 있는 동안(=드래그 선택 진행 중)인가.
+       CM은 드래그 중 mousemove마다 userEvent 'select.pointer' 트랜잭션을 만들므로,
+       이것만으로 "클릭"을 판정하면 드래그 내내 정렬이 실시간 발화한다. (Phase 56 D17) */
+    const pointerDownRef = useRef<boolean>(false);
 
     // 최신 콜백을 ref로 유지 (CodeMirror 초기화 이후에도 최신값 참조)
     const snippetCallbackRef = useRef(onSnippetShortcut);
@@ -408,6 +414,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       isComposing() {
         return viewRef.current?.composing ?? false;
+      },
+      isSelectionEmpty() {
+        return viewRef.current?.state.selection.main.empty ?? true;
       },
     }));
 
@@ -687,8 +696,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               if (cursorCallbackRef.current) {
                 const head = update.state.selection.main.head;
                 const line = update.state.doc.lineAt(head);
-                // 마우스 클릭 선택만 수식 중앙 정렬을 유발한다 (화살표 키 이동은 제외)
-                const pointerSelect = update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
+                /* 마우스로 "클릭을 완료"했을 때만 수식 중앙 정렬을 유발한다.
+                   드래그 중(pointerDown)에는 false로 내리고, 실제 발화는 mouseup에서
+                   선택이 비어 있을 때 한 번만 한다 — 드래그로 범위를 잡는 동안 화면이
+                   실시간으로 움직이면 세밀한 선택이 불가능하다. (Phase 56 D17) */
+                const pointerSelect = !pointerDownRef.current
+                  && update.transactions.some((tr) => tr.isUserEvent('select.pointer'));
                 cursorCallbackRef.current({
                   line: line.number, offset: head, docChanged: update.docChanged, pointerSelect,
                 });
@@ -842,7 +855,37 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
       viewRef.current = view;
 
+      /* ── 드래그 선택 판별 (Phase 56 D17) ──────────────────────────
+         mousedown ~ mouseup 구간은 "드래그 진행 중"으로 보고 정렬을 억제하다가,
+         mouseup 시점에 선택이 비어 있으면(=단순 클릭) 그때 한 번만 통지한다.
+         mouseup은 에디터 밖에서 끝날 수 있으므로 document에 건다.
+         CM의 MouseSelection.up()은 선택이 바뀌지 않으면 트랜잭션을 만들지 않아
+         (dist/index.js:4679-4685) 마지막 트랜잭션에 기댈 수 없다. */
+      /* ⚠️ 캡처 단계로 등록해야 한다. 버블로 걸면 CM이 먼저 등록한 mousedown 핸들러가
+         앞서 실행되어, CM이 선택 트랜잭션을 만드는 시점에 pointerDown이 아직 false다
+         → 드래그 시작 순간의 정렬 1회가 그대로 새어나간다. (하니스로 확인) */
+      const onPointerDown = (e: Event) => {
+        if (!view.contentDOM.contains(e.target as Node)) return;
+        pointerDownRef.current = true;
+      };
+      const onPointerUp = () => {
+        if (!pointerDownRef.current) return;
+        pointerDownRef.current = false;
+        const v = viewRef.current;
+        if (!v || !v.hasFocus) return;
+        const sel = v.state.selection.main;
+        if (!sel.empty) return;              // 범위를 잡은 드래그 → 정렬하지 않음
+        const line = v.state.doc.lineAt(sel.head);
+        cursorCallbackRef.current?.({
+          line: line.number, offset: sel.head, docChanged: false, pointerSelect: true,
+        });
+      };
+      document.addEventListener('mousedown', onPointerDown, true);
+      document.addEventListener('mouseup', onPointerUp);
+
       return () => {
+        document.removeEventListener('mousedown', onPointerDown, true);
+        document.removeEventListener('mouseup', onPointerUp);
         view.destroy();
         if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
       };

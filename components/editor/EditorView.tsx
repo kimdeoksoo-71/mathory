@@ -1997,8 +1997,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (info.blockId === activeBlockId) {
       setActiveMathId(mathId);
       setCursorInMath(isInsideMath(content, info.offset));
-      /* D5‴·D7: 같은 블록 안에서 "마우스로" 수식을 클릭한 경우에만 양쪽 중앙 정렬.
-         화살표 키 이동으로는 발동하지 않는다(pointerSelect). */
+      /* D5‴·D7: 같은 블록 안에서 마우스로 수식을 "클릭 완료"했을 때만 양쪽 중앙 정렬.
+         화살표 키 이동으로도, 드래그로 범위를 잡는 중에도 발동하지 않는다
+         (pointerSelect는 mouseup + 빈 선택일 때만 true — D17). */
       if (info.pointerSelect && mathId >= 0) {
         scrollEditorToMathCenter(info.blockId);
         scrollPreviewToMathCenter(info.blockId, mathId);
@@ -2021,7 +2022,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         ? findMathIdAtCursor(buildMathIndex(ref.getContent()), ref.getCursorPosition())
         : -1;
       setActiveMathId(mathId);
-      if (mathId >= 0) {
+      /* D17: 드래그로 범위를 잡고 끝난 경우엔 스크롤하지 않는다.
+         click은 mouseup 뒤에 오므로 드래그 종료 시에도 여기 도달하는데,
+         방금 잡은 선택 영역이 화면에서 움직이면 오히려 방해가 된다. */
+      if (ref && !ref.isSelectionEmpty()) {
+        // 활성화·강조만 반영하고 뷰는 그대로 둔다
+      } else if (mathId >= 0) {
         // D5‴: 다른 블록의 수식을 클릭한 경우도 양쪽 수식 중앙 정렬
         scrollEditorToMathCenter(blockId);
         scrollPreviewToMathCenter(blockId, mathId);
