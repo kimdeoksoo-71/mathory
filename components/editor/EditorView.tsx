@@ -31,6 +31,8 @@ import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import { fastScrollTo, computeBlockAwareScrollTop, computeMathCenterScrollTop } from '../../lib/editorScroll';
 import SaveStatus from './SaveStatus';
 import VersionDrawer from '../version/VersionDrawer';
+import { useBlockHistory } from '../../hooks/useBlockHistory';
+import type { HistoryEntry } from '../../hooks/useBlockHistory';
 import type { Participant, VersionContent, VersionTrigger, ProblemVersion } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
@@ -47,7 +49,7 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconCheck, IconRecent, IconSave,
+  IconCheck, IconRecent, IconSave, IconUndo, IconRedo,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
@@ -1031,6 +1033,29 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   };
 
+  // ─── Phase 55a: 블록 구조 Undo/Redo 히스토리 ───
+  const applyGenRef = useRef(0);   // apply 세대 카운터 (early return 위에 둬야 hooks 순서 안정)
+  const captureHistory = (): HistoryEntry | null => {
+    try {
+      return {
+        content: collectCurrentContent({
+          tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
+          tabLoadErrors: tabLoadErrorsRef.current,
+        }),
+        activeTab,
+        activeBlockKey: (allBlocks[activeTab] || []).find((b) => b.id === activeBlockId)?.block_key ?? null,
+      };
+    } catch { return null; }   // C4: 로드 실패 탭 → push/undo 스킵
+  };
+  const {
+    pushUndo, undo: undoBlocks, redo: redoBlocks, reset: resetHistory, canUndo, canRedo,
+  } = useBlockHistory(
+    captureHistory,
+    (entry) => applyVersionContent(entry.content, {
+      activeTab: entry.activeTab, activeBlockKey: entry.activeBlockKey ?? undefined,
+    }),
+  );
+
   /* ─── 데이터 로드 ─── */
   useEffect(() => {
     const load = async () => {
@@ -1041,6 +1066,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         // Phase 55: dedup 캐시 초기화 + 로드 실패 탭 보관(F7) + 계층1 상태
         if (data.last_version_hash) setCachedLastHash(problemId, data.last_version_hash);
         tabLoadErrorsRef.current = data.tabLoadErrors || {};
+        resetHistory();   // Phase 55a(C9): 문항 전환 시 undo 히스토리 초기화
         setLastSavedAt(data.updated_at ? data.updated_at.getTime() : null);
         setEditTitle(data.title);
         setEditSource(data.source || data.exam_type || '');
@@ -1515,6 +1541,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [setCurrentBlocks, activeBlockId]);
 
   const handleAddBlock = useCallback((type: Block['type'] = 'text') => {
+    pushUndo();   // Phase 55a: 구조 조작 직전 (no-op 없음)
     const newBlock: LocalBlock = {
       id: `new-${Date.now()}`,
       block_key: nanoid(),
@@ -1536,7 +1563,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return updated;
     });
     setActiveBlockId(newBlock.id);
-  }, [activeBlockId, setCurrentBlocks]);
+  }, [activeBlockId, setCurrentBlocks, pushUndo]);
 
   /** 이미지 크기 변경 */
   const handleImageWidthChange = useCallback((blockId: string, width: number) => {
@@ -2533,19 +2560,31 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const resizeActive = resizeHover || resizeDragging;
 
   // Phase 55: 버전 콘텐츠를 작업본에 적용 (드래프트 복구·복원 공용). block_key 유지 → diff 연속성.
-  const applyVersionContent = (content: VersionContent) => {
+  // Phase 55a(C1+F1): 세대 id로 매 apply 전면 리마운트(비제어 CM 갱신) + activeBlockId 항상 재설정
+  const applyVersionContent = (
+    content: VersionContent,
+    ui?: { activeTab?: string; activeBlockKey?: string },
+  ) => {
+    const gen = ++applyGenRef.current;
     const { tabs: vTabs, blocksByTab, title, answer } = versionContentToLocal(content);
     const map: Record<string, LocalBlock[]> = {};
     for (const t of vTabs) {
       map[t.id] = (blocksByTab[t.id] || []).map((b) => ({
-        ...b, id: `v-${b.block_key}`, collapsed: false, title: b.title || '',
+        ...b, id: `v${gen}-${b.block_key}`, collapsed: false, title: b.title || '',
       })) as LocalBlock[];
     }
     setTabs(vTabs);
     setAllBlocks(map);
     setEditTitle(title);
     setEditAnswer(answer);
-    setActiveTab(vTabs[0]?.id || 'question');
+    const nextTab = ui?.activeTab && vTabs.some((t) => t.id === ui.activeTab)
+      ? ui.activeTab : (vTabs[0]?.id || 'question');
+    setActiveTab(nextTab);
+    // F1: 같은 탭 apply에선 [activeTab] 보정 effect가 안 돌아 stale id 잔류 → 항상 유효값으로
+    const found = ui?.activeBlockKey
+      ? (map[nextTab] || []).find((b) => b.block_key === ui.activeBlockKey)
+      : undefined;
+    setActiveBlockId(found?.id ?? map[nextTab]?.[0]?.id ?? null);
     setDirty(true);
   };
 
@@ -2761,6 +2800,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
       }}>
+        {/* Phase 55a: 블록 실행취소/재실행 (Row 2 맨 왼쪽) */}
+        <button onClick={undoBlocks} disabled={!canUndo} title="실행취소 (⌘Z)" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', border: 'none', padding: 4,
+          cursor: canUndo ? 'pointer' : 'default',
+          color: canUndo ? 'var(--text-secondary)' : 'var(--text-faint)',
+        }}><IconUndo size={17} /></button>
+        <button onClick={redoBlocks} disabled={!canRedo} title="다시실행 (⌘⇧Z)" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'transparent', border: 'none', padding: 4,
+          cursor: canRedo ? 'pointer' : 'default',
+          color: canRedo ? 'var(--text-secondary)' : 'var(--text-faint)',
+        }}><IconRedo size={17} /></button>
+        <div style={{ width: 1, height: 18, background: 'var(--border-light)', margin: '0 4px' }} />
+
         <UnifiedToolbar
           cursorInMath={cursorInMath}
           showToolbar={!!showToolbar}

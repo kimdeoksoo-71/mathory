@@ -85,6 +85,25 @@ export function IconRecent({ size = 18, color = 'currentColor' }: IconProps) {
   );
 }
 
+// Phase 55a: 굽은 화살표 실행취소/재실행
+export function IconUndo({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a4.5 4.5 0 1 1 0 9H9" />
+    </svg>
+  );
+}
+
+export function IconRedo({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 14l5-5-5-5" />
+      <path d="M20 9H9.5a4.5 4.5 0 1 0 0 9H15" />
+    </svg>
+  );
+}
+
 export function IconUser({ size = 18, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round">
@@ -178,6 +197,19 @@ export function IconSave({ size = 18, color = 'currentColor' }: IconProps) {
       <path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3" />
       {/* 하단 라벨 */}
       <path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21" />
+    </svg>
+  );
+}
+
+export function IconExit({ size = 18, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      {/* 상자 — 오른쪽이 열려 화살표가 빠져나감 */}
+      <path d="M13 4 H6 a2 2 0 0 0 -2 2 V18 a2 2 0 0 0 2 2 h7" />
+      {/* 오른쪽으로 나가는 화살표 */}
+      <path d="M10 12 H21" />
+      <path d="M17.5 8.5 L21 12 L17.5 15.5" />
     </svg>
   );
 }

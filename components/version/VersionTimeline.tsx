@@ -2,7 +2,9 @@
 
 import React from 'react';
 import type { ProblemVersion, VersionTrigger } from '../../types/version';
+import { IconSave, IconExit } from '../ui/Icons';
 
+// manual_save·editor_exit는 아이콘 시스템 규격 SVG로 렌더, 나머지는 이모지
 const TRIGGER_ICON: Record<VersionTrigger, string> = {
   manual_save: '💾',
   editor_exit: '🚪',
@@ -83,8 +85,13 @@ export default function VersionTimeline({
               <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>
                 v{v.seq}
               </span>
-              <span title={TRIGGER_LABEL[trigger]} style={{ fontSize: 12 }}>
-                {TRIGGER_ICON[trigger]}
+              <span title={TRIGGER_LABEL[trigger]} style={{
+                fontSize: 12, display: 'inline-flex', alignItems: 'center',
+                color: 'var(--text-secondary)',
+              }}>
+                {trigger === 'manual_save' ? <IconSave size={14} />
+                  : trigger === 'editor_exit' ? <IconExit size={14} />
+                  : TRIGGER_ICON[trigger]}
               </span>
               {v.name && (
                 <span style={{ fontSize: 12, color: 'var(--accent-primary, #e53935)', fontWeight: 600 }}>
