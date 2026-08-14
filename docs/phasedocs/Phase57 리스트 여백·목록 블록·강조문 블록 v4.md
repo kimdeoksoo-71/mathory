@@ -65,7 +65,8 @@ v3의 가드는 "직전 줄이 리스트 항목이면 `-`/`=` 줄 앞 빈 줄 �
 | D4 | '목록' 프리셋 | **불릿 3 + 빈 줄 + ① 3 (빈 항목)** — D11 선행 |
 | D5 | 여백 CSS 스코프 | **`.preview-content` / `.print-body` 한정** (전역 금지) |
 | D6 | 수식 내 \tag도 본문 글꼴 | **통일** — `.tag` 서브트리 전칭 |
-| D7 | 원문자 개선 | **O3 합성 원문자** (전역 1패스 + CSS) |
+| ~~D7~~ | ~~원문자 개선~~ | ~~O3 합성 원문자~~ → **철회**, D7′로 대체 (§6) |
+| **D7′** | 원문자 개선 (재결정 2026-08-14) | **O1 글꼴 교체** — `@font-face` + `unicode-range: U+2460-2473` → **AppleGothic**, 배율 1.00. 마크업 0 |
 | D8 | 인쇄 리스트 항목 간 3pt | **제거** |
 | D9 | 빈 블록 타입 전환 시 프리셋 | **적용** (`raw_text.trim()===''`일 때만) |
 | D10 | EmptyBlockChips 라벨 | 칩은 **`(가)(나)`** 축약 |
@@ -240,7 +241,7 @@ if (isSetextUnderline && prevLine.trim() !== '' && !(isLoneDash && prevIsListIte
 - CLAUDE.md의 "locale.ts ↔ EditorPreview.tsx 동기화" 계열 — **한쪽만 고치면 화면/인쇄가 갈린다.**
 - EditorPreview에서는 `protectFences`(68-81) 안쪽에서 실행되므로 코드펜스 오염 없음.
 
-**ordered 파트에 markdown `1.`이 아닌 ① 리터럴을 쓰는 근거**: marker-circled 내어쓰기 파이프라인 + P5 합성 원문자 혜택을 동시에 받는다. `ol` decimal은 P5 대상 밖이라 요구사항 5(조화)에서 이탈.
+**ordered 파트에 markdown `1.`이 아닌 ① 리터럴을 쓰는 근거**: marker-circled 내어쓰기 파이프라인 + P5 원문자 글꼴 혜택을 동시에 받는다. `ol` decimal은 P5 대상 밖이라 요구사항 5(조화)에서 이탈.
 
 ### 3.4 D9 — 빈 블록 타입 전환 시 프리셋 (M2)
 
@@ -360,58 +361,74 @@ BORDERED와 같은 자리에 `<div className="callout-block">`(테두리 없음)
 
 ---
 
-## 6. P5 — 원문자 합성 (O3)
+## 6. P5 — 원문자 글꼴 (D7′ · 재구현)
 
-### 6.1 원리
+> **v4 최초안(O3 합성 원문자)은 배포 후 철회했다.** 실패 경위와 교훈은 §6.5에 남긴다.
 
-①~⑮는 폰트 스택 글리프(고정 아님). 작은 이유는 글리프 구조("원+숫자"를 1em 박스에). O3 = 글리프를 버리고 **본문 글꼴 숫자 + CSS 원**으로 합성 → 요구사항 5("크기가 글자 크기에 일치") 정확 충족.
+### 6.1 문제
 
-### 6.2 변환 — 전역 1패스
+①~⑮는 유니코드 문자(U+2460~)이고, "원+숫자"를 한 글자 박스(1em)에 넣은 글리프다.
+기본 스택(Pretendard → SF Pro)의 원문자는 본문 숫자에 비해 눈에 띄게 작아 조화가 깨진다.
 
-```js
-// lib/locale.ts preprocessLocale 3단계 — convertCircledList 직후 (순서 고정)
-processed = convertCircledGlyphs(processed);
+**도달 가능한 한계**: 원까지 1em 안에 들어가야 하므로 **어떤 글꼴로도 원 안 숫자를 본문 숫자와
+같은 크기로 만들 수는 없다.** "가장 큰 원문자를 가진 글꼴"이 최선이다.
 
-/** ①~⑮ 글리프 → 합성 원문자. 행 시작분은 이미 marker-circled로 감싸여 있어
- *  자동으로 <span class="marker-circled"><span class="num-circle">1</span></span> 중첩이 된다.
- *  글리프가 숫자로 소모되므로 이중 변환이 원천적으로 불가능. */
-function convertCircledGlyphs(text: string): string {
-  return text.replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g,
-    (ch) => `<span class="num-circle">${ch.charCodeAt(0) - 0x245F}</span>`);
-}
-```
-
-- `protectMath` 보호 구간 안(3단계) → 수식 무오염. `insertMarkerLineBreaks`·`convertCircledList`보다 **뒤**여야 한다.
-- **EditorPreview.tsx(149 직후)에 동일 패스** — 2곳 동기화 규칙.
-- 커버: 행 시작 마커 + **행 중간 인용**("①과 ②에서") 전부. 편집창 CM·툴바 입력은 원문 `①` 유지.
-- **선택지 라벨은 별도**(React 텍스트 노드): ChoicesBlock.tsx:38 `<span>{label}</span>` · PrintableContent.tsx:130 `print-choice-label`을 num-circle 마크업으로 교체. 파싱(raw_text의 ① 리터럴 기준, ChoicesBlock:11-22 / PrintableContent:113-121)은 표시 단계와 무관 → 무영향.
-
-### 6.3 CSS (M4·M5·D12)
+### 6.2 구현 — 마크업 없음
 
 ```css
-.num-circle {
-  display: inline-block;              /* inline-flex 금지 — 선택지 baseline 정렬 편차(M5) */
-  box-sizing: border-box;
-  min-width: 1.35em; height: 1.35em;  /* D12: 두 자리는 가로 확장 */
-  line-height: 1.28em;                /* height − border×2 → 세로 중앙 */
-  padding: 0 0.12em; text-align: center;
-  border: 0.08em solid currentColor;
-  border-radius: 999px;               /* 1자리=원, 2자리=스타디움 */
-  font-size: 0.86em;                  /* ← 실측 튜닝 */
-  font-weight: var(--weight-regular); /* marker-circled의 600 차단 */
-  font-variant-numeric: tabular-nums;
-  vertical-align: -0.22em;            /* ← 실측 튜닝 */
+/* app/globals.css 상단 */
+@font-face {
+  font-family: 'MathoryCircled';
+  src: local('AppleGothic'),          /* 덕수 선택 (후보 8종 실측 비교 후) */
+       local('Apple SD Gothic Neo'),
+       local('Malgun Gothic'),
+       url('https://fonts.gstatic.com/s/notosanskr/v39/…108.woff2') format('woff2');
+  unicode-range: U+2460-2473;         /* ① ~ ⑳ */
+  font-display: swap;
 }
-/* 인쇄: 동일 선언 (.print-body .num-circle) — 10pt에서 테두리 ≈0.28mm */
+
+:root {
+  --font-ui:    'MathoryCircled', 'Pretendard Variable', …;
+  --font-print: 'MathoryCircled', 'Noto Serif KR', …;
+}
 ```
 
-검증 기준: 행간(1.8)을 밀어내지 않을 것 / 선택지 3·5등분 baseline / 인쇄 2단 / `marker-circled`의 내어쓰기 폭(min-width 2em) 무변경.
+- `unicode-range`가 이 구간만 가로채므로 스택 맨 앞에 둬도 **나머지 글자엔 전혀 영향이 없다.**
+- 전처리·컴포넌트 변경 **0**. 원문(raw_text)의 `①`이 그대로 남는다
+  → **MD 내보내기**(`downloadMarkdown`은 raw_text를 그대로 이어붙인다) · 편집창(CodeMirror) ·
+  툴바 특수문자 입력 · 선택지 라벨 · 인쇄가 **전부 자동으로 같은 모양**이 된다.
+- 폴백 설계: `local()`은 덕수 맥 전용이므로, 그 외 기기는 `url()`의 **Noto Sans KR 웹폰트**
+  (①~⑮ 전 구간 커버 확인, 이미 앱이 로드하는 폰트)로 떨어진다. gstatic URL은 버전 고정이라
+  언젠가 404가 날 수 있으나 그때는 스택의 다음 글꼴로 조용히 되돌아갈 뿐이다(= 현재 동작).
+- **배율 1.00** — `font-size` 보정 없음(덕수 결정).
 
-### 6.4 합류 효과
+### 6.3 방식 비교 (기록)
 
-P4 + O3 → 참조번호·원문자·선택지 라벨이 **본문 글꼴 하나로 통일**(요구사항 5 완결).
+| | 내용 | 판정 |
+|---|---|---|
+| **O1 (채택)** | `@font-face` + `unicode-range`로 코드포인트만 글꼴 교체 | 마크업 0 → 깨질 여지 없음. 등장 지점 전부 자동 커버 |
+| O2 | 글리프 유지 + `font-size` 보정 | 원까지 커진다. O1과 병행 가능(현재 배율 1.00이라 미적용) |
+| ~~O3~~ | 합성: 숫자를 span으로 감싸고 CSS로 원을 그림 | **철회** — §6.5 |
 
----
+### 6.4 남은 한계
+
+숫자 크기가 본문과 완전히 일치하지는 않는다(§6.1의 구조적 한계). 더 키우려면 O2(배율)를
+얹으면 되고, 그때는 행간(1.8) 침범 여부가 상한이 된다.
+
+### 6.5 O3 실패 기록 — 글자 주위에 상자를 두르지 말 것
+
+`①` → `<span class="num-circle">1</span>`(inline-block) + CSS 원. 배포 직후 **행 중간의 ②에서
+숫자가 원 밖으로 튀어나갔다.**
+
+- **원인**: `p:has(.marker-circled) { text-indent: -2em !important }`(globals.css:264-268).
+  `text-indent`는 **`inline-block` 안쪽 첫 줄에도 다시 적용**되므로 숫자만 2em 왼쪽으로 밀렸다.
+- **증상이 절반만 보인 이유**: 행 시작 마커는 `.marker-circled`가 `text-indent: 0`으로 막아둔
+  자리에 중첩돼 멀쩡했다. 즉 **기존 코드가 이미 같은 함정을 밟고 방어해 둔 흔적**이 있었는데
+  그것을 새 요소에 옮기지 않았다.
+- `vertical-align: -0.22em`은 "baseline이 내려가 보인다"는 또 다른 지적의 원인이었다.
+- **교훈**: 글자 주위에 상자를 두르는 방식(inline-block 래핑)은 `text-indent`를 비롯한
+  **상속 인라인 속성에 계속 노출**된다. 하나를 막아도 다음이 나온다.
+  글리프 모양을 바꿔야 한다면 **폰트를 갈아끼울 것.**
 
 ## 7. 엣지 케이스
 

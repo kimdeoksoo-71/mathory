@@ -144,21 +144,6 @@ function convertCircledList(text: string): string {
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 }
 
-/** ①~⑮ 글리프 → 합성 원문자 마크업 (Phase 57 P5).
- *
- *  유니코드 원문자는 "원+숫자"를 한 글자 박스에 넣은 글리프라 숫자가 본문 숫자보다 훨씬 작다.
- *  글리프를 버리고 본문 글꼴 숫자 + CSS 원으로 합성해 본문과 크기·굵기를 맞춘다.
- *
- *  ★ 반드시 convertCircledList 뒤에 호출할 것.
- *    그러면 행 시작 원문자는 <span class="marker-circled"><span class="num-circle">1</span></span>로
- *    자동 중첩되어 기존 내어쓰기 체계가 그대로 유지되고, 행 중간 인용("①과 ②에서")도 한 번에 덮인다.
- *    글리프가 숫자로 소모되므로 이중 변환이 원천적으로 불가능하다.
- *  ⚠ components/editor/EditorPreview.tsx의 동일 패스와 반드시 일치시킬 것. */
-function convertCircledGlyphs(text: string): string {
-  return text.replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g,
-    (ch) => `<span class="num-circle">${ch.charCodeAt(0) - 0x245F}</span>`);
-}
-
 /** \ref{n} → (n) (텍스트 영역, 참조 번호) */
 function convertRefReferences(text: string): string {
   return text.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
@@ -197,7 +182,6 @@ export function preprocessLocale(text: string, locale: Locale): string {
   processed = convertAlphaList(processed);
   processed = convertRomanList(processed);
   processed = convertCircledList(processed);
-  processed = convertCircledGlyphs(processed);   // ★ convertCircledList 직후 (순서 고정)
   processed = convertRefReferences(processed);
   processed = convertTextTags(processed);
   processed = convertFigureLabels(processed);
@@ -212,7 +196,6 @@ export {
   convertAlphaList,
   convertRomanList,
   convertCircledList,
-  convertCircledGlyphs,
   convertRefReferences,
   convertTextTags,
   convertFigureLabels,

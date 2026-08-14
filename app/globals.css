@@ -14,6 +14,25 @@
   font-display: swap;
 }
 
+/* 원문자 ①~⑳ 전용 글꼴 (Phase 57 P5) — unicode-range로 이 구간만 가로챈다.
+   유니코드 원문자는 "원+숫자"를 한 글자 박스에 넣은 글리프라 폰트마다 크기 차이가 크고,
+   기본 스택(Pretendard→SF)의 것은 본문 숫자에 비해 너무 작아 조화가 깨졌다.
+   ⚠ 합성(마크업)은 쓰지 않는다 — 원문(raw_text)의 ① 문자를 그대로 두므로
+     MD 내보내기·편집창·툴바·선택지·인쇄까지 자동으로 같은 모양이 되고, 깨질 여지가 없다.
+   - local('AppleGothic'): 덕수 확인·선택(2026-08-14). macOS 기본 탑재
+   - url(...): 그 외 기기용 폴백. Noto Sans KR의 U+2460 포함 subset (이미 앱이 쓰는 웹폰트).
+     gstatic URL은 버전 고정이라 언젠가 404가 날 수 있으나, 그때는 스택의 다음 글꼴로
+     조용히 되돌아갈 뿐이라 안전하다(= 현재 동작). */
+@font-face {
+  font-family: 'MathoryCircled';
+  src: local('AppleGothic'),
+       local('Apple SD Gothic Neo'),
+       local('Malgun Gothic'),
+       url('https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLHq8H4gdeG6cl5G3CHlodySd_ke-3HNnn9yQA.108.woff2') format('woff2');
+  unicode-range: U+2460-2473;   /* ① ~ ⑳ */
+  font-display: swap;
+}
+
 :root {
   /* Background */
   --bg-primary: #FAF9F7;
@@ -72,11 +91,12 @@
   --badge-bg: #E8E4DF;
 
   /* Fonts — Phase 43: Pretendard 기반 통일 */
-  --font-ui: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+  /* 'MathoryCircled'는 unicode-range로 ①~⑳만 가로채므로 맨 앞에 둬도 나머지 글자엔 영향이 없다 (Phase 57 P5) */
+  --font-ui: 'MathoryCircled', 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
   --font-logo: var(--font-ui);     /* 로고도 산스 통일 (명조 제거) */
   --font-content: var(--font-ui);  /* 화면 본문도 Pretendard (명조 → 산스) */
   --font-mono: 'D2Coding', 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
-  --font-print: 'Noto Serif KR', 'Noto Serif CJK KR', 'Georgia', serif;  /* 인쇄·PDF 전용 */
+  --font-print: 'MathoryCircled', 'Noto Serif KR', 'Noto Serif CJK KR', 'Georgia', serif;  /* 인쇄·PDF 전용 */
 
   /* Weights — 3단계만 (700 금지) */
   --weight-regular: 400;
@@ -394,26 +414,15 @@ p:has(.marker-circled) {
 /* 강조문 안 독립행 수식은 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 */
 .callout-block .katex-display { padding-left: 0; }
 
-/* ═══ Phase 57 P5 — 합성 원문자 (①~⑮) ═══
-   유니코드 원문자 글리프는 "원+숫자"를 한 글자 박스에 넣느라 숫자가 본문보다 훨씬 작다.
-   글리프를 버리고 본문 글꼴 숫자 + CSS 원으로 합성해 크기·굵기·조화를 맞춘다.
-   등장 지점: 행 시작 마커(.marker-circled 안에 중첩) · 행 중간 인용 · 선택지 라벨.
-   편집창(CodeMirror)은 원문 ①을 그대로 둔다(기존 locale 정책과 동일). */
-.num-circle {
-  display: inline-block;              /* inline-flex 금지 — flex 컨테이너에서 baseline 합성이 브라우저마다 다름 */
-  box-sizing: border-box;
-  min-width: 1.35em;                  /* 두 자리(⑩~⑮)는 가로로 늘어남 */
-  height: 1.35em;
-  line-height: 1.28em;                /* height − border×2 → 숫자 세로 중앙 */
-  padding: 0 0.12em;
-  text-align: center;
-  border: 0.08em solid currentColor;
-  border-radius: 999px;               /* 1자리=원, 2자리=스타디움 */
-  font-size: 0.86em;
-  font-weight: var(--weight-regular); /* .marker-circled의 600을 상속하지 않도록 */
-  font-variant-numeric: tabular-nums;
-  vertical-align: -0.22em;            /* baseline 보정 */
-}
+/* ═══ Phase 57 P5 — 원문자(①~⑳)
+   구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui/--font-print 스택 한 줄이 전부다.
+   전용 CSS 클래스가 없는 것이 이 방식의 요점 — 마크업을 만들지 않는다.
+
+   ⚠ 지난 시도(합성 원문자: 숫자를 inline-block span으로 감싸고 CSS로 원을 그림)는 실패했다.
+     p:has(.marker-circled)의 text-indent: -2em(아래 참조)이 inline-block 안쪽 첫 줄에도
+     다시 적용되어 숫자가 원 밖으로 튀어나갔다. .marker-circled가 text-indent: 0으로
+     막고 있는 자리에 중첩된 것만 멀쩡했고, 행 중간 인용은 전부 깨졌다.
+     → 글자 주위에 상자를 두르는 방식은 상속되는 인라인 속성에 계속 노출된다. 쓰지 말 것. */
 
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */

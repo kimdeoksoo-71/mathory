@@ -157,13 +157,6 @@ function preprocessLocale(text: string): string {
   t = t.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/gm,
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 
-  // 4-2. 남은 ①~⑮ 글리프 → 합성 원문자 (Phase 57 P5)
-  //      4-1 직후여야 한다: 행 시작분은 marker-circled 안에 중첩되고, 행 중간 인용도 함께 덮인다.
-  //      글리프가 숫자로 소모되므로 이중 변환 불가.
-  //      (lib/locale.ts convertCircledGlyphs와 정규식·오프셋 동일 — 두 곳 반드시 일치)
-  t = t.replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g,
-    (ch) => `<span class="num-circle">${ch.charCodeAt(0) - 0x245F}</span>`);
-
   // 5. Fig.N → [그림N]
   t = t.replace(/\bFig\.(\d+)/g, '[그림$1]');
 

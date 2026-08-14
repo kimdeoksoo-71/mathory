@@ -132,10 +132,7 @@ function PrintChoicesBlock({ content, locale }: { content: string; locale: Local
     <div className="print-choices-row" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {choices.map((c, i) => (
         <div key={i} className="print-choice-item">
-          {/* 합성 원문자(Phase 57 P5) — 화면 ChoicesBlock과 동일 구조 */}
-          <span className="print-choice-label">
-            <span className="num-circle">{c.label.charCodeAt(0) - 0x245F}</span>
-          </span>
+          <span className="print-choice-label">{c.label}</span>
           <span className="print-choice-content">
             <PrintBlockRenderer content={c.content} locale={locale} />
           </span>
