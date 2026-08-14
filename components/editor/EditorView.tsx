@@ -2624,6 +2624,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ? (map[nextTab] || []).find((b) => b.block_key === ui.activeBlockKey)
       : undefined;
     setActiveBlockId(found?.id ?? map[nextTab]?.[0]?.id ?? null);
+    setCollapseMode(false);            // Stage 4: 전체접기 상태 동기화(블록은 collapsed:false로 적용됨)
+    setSelectedBlockIds(new Set());    // 새 세대 id로 리마운트 → 이전 선택 무효
     setDirty(true);
   };
 
