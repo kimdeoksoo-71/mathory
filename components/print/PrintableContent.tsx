@@ -68,6 +68,11 @@ export default function PrintableContent({
                   <div className="print-bordered-block">
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
                   </div>
+                ) : block.type === 'callout' ? (
+                  /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+                  <div className="callout-block">
+                    <PrintBlockRenderer content={block.raw_text} locale={locale} />
+                  </div>
                 ) : (
                   <PrintBlockRenderer content={block.raw_text} locale={locale} />
                 )}
@@ -127,7 +132,10 @@ function PrintChoicesBlock({ content, locale }: { content: string; locale: Local
     <div className="print-choices-row" style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {choices.map((c, i) => (
         <div key={i} className="print-choice-item">
-          <span className="print-choice-label">{c.label}</span>
+          {/* 합성 원문자(Phase 57 P5) — 화면 ChoicesBlock과 동일 구조 */}
+          <span className="print-choice-label">
+            <span className="num-circle">{c.label.charCodeAt(0) - 0x245F}</span>
+          </span>
           <span className="print-choice-content">
             <PrintBlockRenderer content={c.content} locale={locale} />
           </span>

@@ -76,9 +76,12 @@ const GGB_BLOCK_HEIGHT = 350;
 const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
   heading: '제목',
-  gana: '(가) (나) (다)',
-  roman: 'ㄱ. ㄴ. ㄷ.',
-  box: '글상자',
+  list: '목록',
+  callout: '강조문',
+  // Phase 57: 명칭 재조정 — 테두리 상자를 두른다는 사실이 이름에 드러나도록
+  gana: '(가), (나) 상자',
+  roman: 'ㄱ, ㄴ 상자',
+  box: '빈 글상자',
   choices: '선택지',
   image: '그림',
   svg: 'SVG',
@@ -87,13 +90,17 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 
 /** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
 const BLOCK_TYPES: Block['type'][] = [
-  'text', 'heading', 'gana', 'roman', 'box', 'choices', 'image',
+  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box', 'choices', 'image',
 ];
 
 /** 블록 생성 시 기본 내용 */
 const BLOCK_PRESETS: Record<string, string> = {
   text: '',
   heading: '## ',
+  // Phase 57 '목록': unordered 3줄 + ordered(① 리터럴) 3줄. 필요 없는 줄은 지우고 쓴다.
+  // `- ` 빈 항목이 setext underline으로 오판되지 않도록 preventSetextHeadings에 D11 가드가 있음.
+  list: '- \n- \n- \n\n① \n② \n③ ',
+  callout: '',
   gana: '(a) \n(b) \n(c) ',
   roman: '(i) \n(ii) \n(iii) ',
   box: '',
@@ -105,12 +112,12 @@ const BLOCK_PRESETS: Record<string, string> = {
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
 const TEXT_BASED_TYPES: Set<string> = new Set([
-  'text', 'heading', 'gana', 'roman', 'box', 'choices',
+  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box', 'choices',
 ]);
 
 /** 블록 분할 허용 타입 (choices, image 제외) */
 const SPLITTABLE_TYPES: Set<string> = new Set([
-  'text', 'heading', 'gana', 'roman', 'box',
+  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box',
 ]);
 
 /** 레거시 타입 → text 정규화 (DB 마이그레이션용) */
@@ -222,7 +229,7 @@ function EmptyBlockChips({ onPick }: { onPick: (type: Block['type']) => void }) 
   const CHIPS: Array<{ type: Block['type']; label: string }> = [
     { type: 'heading', label: '제목' },
     { type: 'image', label: '그림' },
-    { type: 'gana', label: '(가)(나)(다)' },
+    { type: 'gana', label: '(가)(나)' },   // Phase 57 D10: 칩 폭 제약상 축약형 유지
   ];
   return (
     <div style={{ display: 'flex', gap: 3, marginLeft: 4, alignItems: 'center' }}>
@@ -1515,6 +1522,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               editorRefs.current[blockId]?.setContent(finalText);
             });
           }
+        } else if (type !== b.type && !raw_text.trim() && BLOCK_PRESETS[type]) {
+          // Phase 57 D9: 내용이 빈 블록을 다른 타입으로 바꾸면 그 타입의 프리셋을 넣어준다.
+          // (기존 1518 분기는 소스가 "비텍스트"일 때만 적용해서, 빈 텍스트 → 목록/(가) 전환 시
+          //  빈 블록이 나오는 불편이 있었다.) 내용이 빌 때만이라 데이터 손실 불가.
+          raw_text = BLOCK_PRESETS[type];
+          // 텍스트→텍스트 전환은 MarkdownEditor가 재마운트되지 않으므로 CM 뷰를 직접 갱신
+          // (heading 전환 1502-1517에서 검증된 패턴)
+          const finalText = raw_text;
+          queueMicrotask(() => {
+            editorRefs.current[blockId]?.setContent(finalText);
+          });
         } else if (type !== b.type && BLOCK_PRESETS[type] !== undefined && !TEXT_BASED_TYPES.has(b.type)) {
           // 이미지→텍스트 계열 전환 시 프리셋 적용
           raw_text = BLOCK_PRESETS[type];
@@ -3187,6 +3205,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       border: '0.7px solid var(--text-primary)',
                       borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
                     }}>
+                      <EditorPreview
+                        content={block.raw_text}
+                        borderless
+                        locale="ko"
+                        activeMathId={isActivePreview ? activeMathId : undefined}
+                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
+                      />
+                    </div>
+                  ) : block.type === 'callout' ? (
+                    /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+                    <div className="callout-block">
                       <EditorPreview
                         content={block.raw_text}
                         borderless

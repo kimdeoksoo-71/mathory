@@ -49,7 +49,14 @@ function preventSetextHeadings(text: string): string {
     const isSetextUnderline =
       /^\s{0,3}-+\s*$/.test(line) || /^\s{0,3}=+\s*$/.test(line);
 
-    if (isSetextUnderline && prevLine.trim() !== '') {
+    // Phase 57 D11: "대시 1개뿐인 줄"이 리스트 항목 바로 뒤에 오면 setext underline이 아니라
+    // 빈 리스트 항목이다('목록' 블록 프리셋의 `- ` 3줄). 빈 줄을 넣으면 loose list로 승격돼
+    // 항목 간격이 깨진다. 단일 대시 한정 → `---`·`=` 계열은 기존 동작 불변.
+    // ⚠ lib/preprocess.ts의 동일 함수와 반드시 일치시킬 것.
+    const isLoneDash = /^\s{0,3}-\s*$/.test(line);
+    const prevIsListItem = /^\s{0,3}([-*+]|\d{1,9}[.)])(\s|$)/.test(prevLine);
+
+    if (isSetextUnderline && prevLine.trim() !== '' && !(isLoneDash && prevIsListItem)) {
       result.push(''); // 빈 줄 삽입 → setext heading 방지
     }
 
@@ -145,8 +152,17 @@ function preprocessLocale(text: string): string {
   t = t.replace(/([^a-zA-Z0-9\n])\((iii|ii|iv|v|i)\)/g, (_, pre, r) => `${pre}${giyeok[r]}.`);
 
   // 4-1. ①②③ … 행 시작: marker span(내어쓰기용)
-  t = t.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])\s*/gm,
+  //      마커 뒤 공백은 [ \t]*로만 — \s*는 개행까지 삼켜서 내용 없는 원문자 줄들이 뭉친다
+  //      (lib/locale.ts convertCircledList와 동일)
+  t = t.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/gm,
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
+
+  // 4-2. 남은 ①~⑮ 글리프 → 합성 원문자 (Phase 57 P5)
+  //      4-1 직후여야 한다: 행 시작분은 marker-circled 안에 중첩되고, 행 중간 인용도 함께 덮인다.
+  //      글리프가 숫자로 소모되므로 이중 변환 불가.
+  //      (lib/locale.ts convertCircledGlyphs와 정규식·오프셋 동일 — 두 곳 반드시 일치)
+  t = t.replace(/[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/g,
+    (ch) => `<span class="num-circle">${ch.charCodeAt(0) - 0x245F}</span>`);
 
   // 5. Fig.N → [그림N]
   t = t.replace(/\bFig\.(\d+)/g, '[그림$1]');
@@ -438,9 +454,10 @@ export default function EditorPreview({
       fontSize: 'var(--content-font-size, 15px)', lineHeight: '1.8',
       fontFamily: 'var(--font-ui)',
     }}>
-      {/* 독립행 수식: 위는 기존 KaTeX 기본값(1em), 아래는 1.8배 */}
+      {/* 독립행 수식 상하 여백 — Phase 57 K1: 문단 간격(0.6em) + 각 0.5em = 1.1em 대칭.
+          (Phase 56까지는 1em/1.8em 비대칭) !important는 KaTeX 자체 .katex-display 마진을 이기기 위함 */}
       <style>{`
-        .preview-content .katex-display { margin-top: 1em !important; margin-bottom: 1.8em !important; }
+        .preview-content .katex-display { margin-top: 1.1em !important; margin-bottom: 1.1em !important; }
       `}</style>
       <div ref={contentRef} className="preview-content"
         onClick={handleContentClick}

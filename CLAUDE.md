@@ -61,8 +61,9 @@ EditorPreview (미리보기)와 PrintableContent (PDF)에서 동일한 변환:
 preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → preprocessMath
 ```
 
-- `\tag{n}`: 수식 내 → `\tag*{…… ㉠}`, 텍스트 행 끝 → `<span class="tag-marker">`
-- `\ref{n}`: 수식 내 → `\text{㉠}`, 텍스트 → ㉠ 직접 치환
+- `\tag{n}`: 수식 내 → `\tag*{(n)}` (**수학 모드**라 `.mopen/.mord/.mclose`로 렌더 — `.text`가 아니다), 텍스트 행 끝 → `<span class="tag-marker">(n)</span>`
+- `\ref{n}`: 수식 내 → `\text{(n)}`, 텍스트 → `(n)` 직접 치환
+- `①~⑮` → `<span class="num-circle">1</span>` 합성 원문자 (행 시작분은 `.marker-circled` 안에 중첩)
 - `(a)~(e)` → `(가)~(마)`, `(i)~(v)` → `ㄱ.~ㅁ.` (각 5개 제한, 중복 방지)
 - `Fig.N` → `[그림N]`, `Table N` → `[표N]`
 
@@ -86,7 +87,10 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
 - **column-fill: auto**: 왼쪽 단 먼저 채움 (balance가 기본값)
 - **setext heading 방지**: `-` 줄 앞에 빈 줄 삽입 (`preventSetextHeadings`)
-- **locale.ts와 EditorPreview.tsx 범위 동기화**: (a)~(e) = `[a-e]`, (i)~(v) 반드시 일치
+- **locale.ts와 EditorPreview.tsx 범위 동기화**: (a)~(e) = `[a-e]`, (i)~(v) 반드시 일치. `preventSetextHeadings`(preprocess.ts ↔ EditorPreview.tsx)도 사본 2개
+- **행 단위 전처리에서 `\s*` 금지, `[ \t]*`를 쓸 것**: `\s`는 개행을 포함해 다음 줄을 빨아들인다. `^①\s*`가 내용 없는 원문자 줄들을 한 문단으로 뭉치던 버그가 이것 (Phase 57)
+- **여백을 논하기 전에 기준선을 실측할 것**: 전역 리셋 `* { margin: 0 }`(globals.css:100-104) 때문에 화면 `<p>`의 문단 간격은 오랫동안 **0**이었다(인쇄만 `.print-body p` 6pt). "UA 기본 1em"을 가정하면 산식이 3배로 어긋난다 (Phase 57)
+- **본문 상하 여백 기준 (Phase 57 K1)**: 문단 간격(화면 `0.6em` / 인쇄 `6pt`) 위에 **상하 각 +0.5em** → 화면 `1.1em` / 인쇄 `11pt`. display 수식·ul/ol·① 원문자 밭·강조문(`.callout-block`)이 전부 이 값을 공유한다. 새 블록 타입을 추가하면 같은 값을 쓸 것
 
 ## 현재 PDF 규격
 
@@ -95,6 +99,17 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 - 본문: 2단, 단 간격 10mm, column-fill: auto
 - 부가 요소 없음 (구분선, 머리말, 꼬리말, 페이지 번호 미구현 — CSS 인쇄 한계)
 - iframe 방식 인쇄 (시스템 다이얼로그 직접 호출, 미리보기 창 없음)
+
+## 블록 타입
+
+`text · heading · list(목록) · callout(강조문) · gana · roman · box · choices · image · svg · ggb`
+(+ 레거시 `math_block`·`bullet` → text로 정규화)
+
+- 상수 6종은 전부 `EditorView.tsx` 상단(BLOCK_TYPE_LABELS · BLOCK_TYPES · BLOCK_PRESETS · TEXT_BASED_TYPES · SPLITTABLE_TYPES · BORDERED_TYPES)
+- **렌더 사이트 5곳** — 특수 타입 분기를 추가하려면 전부 손봐야 한다:
+  `EditorView`(미리보기) · `ProblemView` · `FolderView` · `ProblemTabContent`(공유) · `PrintableContent`(인쇄)
+  앞 4곳은 `<EditorPreview borderless>` 경유 → `.preview-content` CSS가 자동 적용. 인쇄만 자체 ReactMarkdown(`.print-body`)
+- 분기 순서는 5곳 모두 `image → svg → ggb → BORDERED → callout → choices → 기본 markdown`
 
 ## 현재 Phase: 21 완료
 

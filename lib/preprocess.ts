@@ -96,7 +96,15 @@ export function preventSetextHeadings(text: string): string {
     const isSetextUnderline =
       /^\s{0,3}-+\s*$/.test(line) || /^\s{0,3}=+\s*$/.test(line);
 
-    if (isSetextUnderline && prevLine.trim() !== '') {
+    // Phase 57 D11: "대시 1개뿐인 줄"이 리스트 항목 바로 뒤에 오면 그것은 setext underline이
+    // 아니라 빈 리스트 항목이다('목록' 블록 프리셋의 `- ` 3줄). 여기서 빈 줄을 넣으면
+    // loose list로 승격돼 항목 간격이 깨진다.
+    // 단일 대시로 한정 → `---`(thematic break)·`=` 계열은 기존 동작 100% 불변.
+    // ⚠ components/editor/EditorPreview.tsx의 동일 함수와 반드시 일치시킬 것.
+    const isLoneDash = /^\s{0,3}-\s*$/.test(line);
+    const prevIsListItem = /^\s{0,3}([-*+]|\d{1,9}[.)])(\s|$)/.test(prevLine);
+
+    if (isSetextUnderline && prevLine.trim() !== '' && !(isLoneDash && prevIsListItem)) {
       result.push('');
     }
 

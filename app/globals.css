@@ -268,12 +268,14 @@ p:has(.marker-circled) {
 }
 
 /* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */
+/* Phase 57 P4: \tag{N}은 "수식 바깥에서 쓰는 것"이 표준 → 참조번호도 본문 글꼴·크기를 따른다.
+   .tag-marker는 .katex 바깥이라 --katex-scale(1.15) 영향을 받지 않으므로 inherit로 충분. */
 .tag-marker {
   float: right;
   white-space: nowrap;
   margin-left: 2em;
-  font-family: KaTeX_Main, 'Times New Roman', serif;
-  font-size: 14px;   /* 수식 안 \tag 번호와 동일 절대값으로 통일 */
+  font-family: inherit;
+  font-size: inherit;
 }
 
 /* ═══ 독립행 수식 참조 번호(\tag) 마지막 행 정렬 ═══ */
@@ -282,25 +284,24 @@ p:has(.marker-circled) {
    bottom 값으로 번호 baseline을 마지막 행 baseline에 맞춤(행 수 무관). */
 .katex-display > .katex > .katex-html > .tag {
   top: auto;
-  bottom: 0.85em;
+  /* Phase 57 P4: 0.85em은 14px 기준 눈맞춤 값이었다. 번호가 본문 15px Pretendard로 바뀌면
+     em 기준과 폰트 baseline 메트릭이 함께 바뀌므로 재보정(0.85 × 14/15 ≈ 0.79에서 출발). */
+  bottom: 0.79em;
   line-height: 1;
 }
 .katex-display > .katex > .katex-html > .tag > .strut {
   display: none;
 }
-/* 참조 번호는 `.katex .text` override(Pretendard)에서 제외 →
-   KaTeX_Main(LaTeX 수식 글자체)로 렌더.
-   크기는 수식 밖 텍스트 행 번호(tag-marker, 본문 15px)와 동일하게 절대값 고정.
-   수식(.katex)이 본문×1.15라 em로 주면 더 커지므로 px로 못박음. */
-.katex-display > .katex > .katex-html > .tag .text {
-  font-family: KaTeX_Main, 'Times New Roman', serif !important;
-}
-/* font-size는 측정 요소(.mord)까지 직접 못박아 .katex 1.15배 스케일 상속을 차단.
-   .text만 지정하면 일부 뷰(problem-content-toned)에서 안 먹어 수식 크기로 커짐. */
+/* Phase 57 P4/D6 — 수식 안 \tag 번호도 수식 밖(tag-marker)과 같은 모양으로 통일.
+   ⚠ \tag{n}은 preprocessMath에서 \tag*{(n)}이 되어 "수학 모드"로 렌더된다
+     → 실제 노드는 .mopen/.mord/.mclose이고 .text는 생기지 않는다.
+       그래서 .text만 지정하는 방식으로는 아무것도 바뀌지 않는다 → 서브트리 전칭으로 잡는다.
+   ⚠ font-size는 절대값이어야 한다. 1em/inherit로 주면 .katex의 --katex-scale(1.15)을
+     다시 물어 번호가 본문보다 커진다. */
 .katex-display > .katex > .katex-html > .tag,
-.katex-display > .katex > .katex-html > .tag .text,
-.katex-display > .katex > .katex-html > .tag .mord {
-  font-size: 14px !important;
+.katex-display > .katex > .katex-html > .tag * {
+  font-family: var(--font-content) !important;
+  font-size: var(--content-font-size, 15px) !important;
 }
 
 /* ═══ 프리뷰 본문: 좌측 정렬 + 한글 어절 단위 줄바꿈 ═══ */
@@ -334,6 +335,84 @@ p:has(.marker-circled) {
 /* 선택지 가로 배열: 셀 내부 여백 최소화 */
 .choices-grid .preview-content p {
   margin: 0;
+}
+
+/* ═══ Phase 57 (K1) — 상하 여백 통일 ═══
+   기준: "문단 간격 위에 상하 각 +0.5em".
+   - 화면 문단 간격은 전역 리셋(* { margin:0 })으로 지금까지 0이었다 → 인쇄와 같은 0.6em을 신설.
+     (인쇄는 .print-body p { margin: 0 0 6pt } = 본문 10pt 기준 0.6em으로 이미 존재)
+   - 그 위에 +0.5em → 화면 1.1em / 인쇄 11pt. 두 값의 배율이 같아 화면·인쇄 체감이 일치한다.
+   - 같은 값을 display 수식(EditorPreview 인라인 <style>)·ul/ol·① 원문자 밭·강조문에 공통 적용.
+   ⚠ 스코프는 .preview-content 한정 — 전역 ul/ol(206·240)은 앱 UI가 쓰므로 건드리지 않는다(D5). */
+
+/* 문단 간격 — bottom-only (인접 문단 collapse로 정확히 0.6em).
+   특이도상 .choices-grid .preview-content p(0,2,1)와 ul li > p:first-child(0,1,3)를 침범하지 않는다. */
+.preview-content p {
+  margin-bottom: 0.6em;
+}
+
+/* 리스트 상하 여백 — display 수식과 동일 기준.
+   ⚠ shorthand 금지: 전역 ul(209)의 margin-left:1em을 조용히 지워버린다. */
+.preview-content ul,
+.preview-content ol {
+  margin-top: 1.1em;
+  margin-bottom: 1.1em;
+}
+/* 중첩 리스트는 현행(0.4em) 유지 — 특이도 (0,1,2) > (0,1,1) */
+.preview-content li ul,
+.preview-content li ol {
+  margin-top: 0.4em;
+  margin-bottom: 0.4em;
+}
+
+/* D1 — ① 원문자 리스트는 markdown ol이 아니라 <p> 나열이라 위 규칙이 닿지 않는다.
+   연속된 ① 문단을 "리스트 한 덩어리"로 취급: 밭 위/아래만 1.1em, 항목 사이는 행간만.
+   ⚠ longhand만 사용 — 기존 p:has(.marker-circled)(264-268)의 margin-left:1em !important와 충돌 방지. */
+.preview-content p:has(.marker-circled) {
+  margin-top: 1.1em;
+  margin-bottom: 0;
+}
+.preview-content p:has(.marker-circled) + p:has(.marker-circled) {
+  margin-top: 0;
+}
+.preview-content p:has(.marker-circled):not(:has(+ p .marker-circled)) {
+  margin-bottom: 1.1em;
+}
+
+/* ═══ Phase 57 P3 — 강조문(callout) 블록 ═══
+   테두리 없이 "왼쪽 끝이 display 수식과 같은 위치"라는 것만으로 도드라지게 한다.
+   수식 밖 텍스트 행에 \tag{n}을 달 수 있어, 수식 흐름 중 한 행만 참조번호를 매길 때 쓴다. */
+.callout-block {
+  margin: 1.1em 0;      /* K1 — display 수식과 동일 */
+  padding-left: 3em;    /* .katex-display(185-187)와 동일 값·동일 em 기준 */
+  padding-right: 0;     /* \tag float:right 기준선을 컨테이너 우단에 맞춤 */
+}
+/* 블록 안 여러 행은 행간만.
+   구조가 .callout-block > (EditorPreview) > .preview-content > p 이므로 callout이 바깥이다.
+   특이도 (0,2,1)로 .preview-content p(0,1,1)를 이긴다. */
+.callout-block .preview-content p { margin: 0; }
+/* 강조문 안 독립행 수식은 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 */
+.callout-block .katex-display { padding-left: 0; }
+
+/* ═══ Phase 57 P5 — 합성 원문자 (①~⑮) ═══
+   유니코드 원문자 글리프는 "원+숫자"를 한 글자 박스에 넣느라 숫자가 본문보다 훨씬 작다.
+   글리프를 버리고 본문 글꼴 숫자 + CSS 원으로 합성해 크기·굵기·조화를 맞춘다.
+   등장 지점: 행 시작 마커(.marker-circled 안에 중첩) · 행 중간 인용 · 선택지 라벨.
+   편집창(CodeMirror)은 원문 ①을 그대로 둔다(기존 locale 정책과 동일). */
+.num-circle {
+  display: inline-block;              /* inline-flex 금지 — flex 컨테이너에서 baseline 합성이 브라우저마다 다름 */
+  box-sizing: border-box;
+  min-width: 1.35em;                  /* 두 자리(⑩~⑮)는 가로로 늘어남 */
+  height: 1.35em;
+  line-height: 1.28em;                /* height − border×2 → 숫자 세로 중앙 */
+  padding: 0 0.12em;
+  text-align: center;
+  border: 0.08em solid currentColor;
+  border-radius: 999px;               /* 1자리=원, 2자리=스타디움 */
+  font-size: 0.86em;
+  font-weight: var(--weight-regular); /* .marker-circled의 600을 상속하지 않도록 */
+  font-variant-numeric: tabular-nums;
+  vertical-align: -0.22em;            /* baseline 보정 */
 }
 
 /* ═══ Heading Styles (Phase 14) ═══ */

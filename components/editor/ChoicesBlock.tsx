@@ -34,8 +34,12 @@ export default function ChoicesBlock({ rawText, locale = 'ko' }: ChoicesBlockPro
     }}>
       {choices.map(({ label, content }, i) => (
         <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '1em' }}>
-          {/* 원문자 라벨: 본문과 동일한 정상 크기 */}
-          <span style={{ flexShrink: 0, lineHeight: 1 }}>{label}</span>
+          {/* 원문자 라벨: 합성 원문자(Phase 57 P5) — 본문 글꼴 숫자 + CSS 원.
+              바깥 span은 flex item(블록화)이고 안쪽 .num-circle이 인라인이라
+              vertical-align 보정이 그대로 살아 baseline 정렬이 맞는다. */}
+          <span style={{ flexShrink: 0 }}>
+            <span className="num-circle">{label.charCodeAt(0) - 0x245F}</span>
+          </span>
           <div style={{ flex: 1 }}>
             <EditorPreview content={content} borderless locale={locale} />
           </div>

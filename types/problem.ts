@@ -154,7 +154,8 @@ export interface Block {
   /** Phase 55: 블록의 영속 정체성(nanoid). doc id는 저장마다 재발급되므로 버전 diff·복원 매칭 키로 사용. */
   block_key?: string;
   order: number;
-  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
+  /** Phase 57: 'list'(목록) · 'callout'(강조문) 추가 — 둘 다 텍스트 계열, additive라 마이그레이션 불필요 */
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'list' | 'callout' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
   raw_text: string;
   step_label?: string;
   title?: string;

@@ -285,6 +285,14 @@ export default function FolderView({
           </div>
         );
       }
+      if (block.type === 'callout') {
+        /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+        return (
+          <div key={block.id || `q-${i}`} className="callout-block">
+            <EditorPreview content={block.raw_text} borderless locale="ko" />
+          </div>
+        );
+      }
       if (block.type === 'choices') {
         return <div key={block.id || `c-${i}`}><ChoicesBlock rawText={block.raw_text} locale="ko" /></div>;
       }
