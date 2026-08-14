@@ -2204,9 +2204,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setSelectedBlockIds(new Set());
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 ──
+  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      // Phase 55a: 블록 구조 undo/redo. C5(e.code — Korean IME) + C6(포커스 가드).
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
+        const el = document.activeElement as HTMLElement | null;
+        const inTextEditing = !!el && (
+          el.closest('.cm-editor') !== null ||               // 블록 CM·토론창 에디터
+          el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || // 제목·정답·탭이름·찾기/바꾸기
+          el.isContentEditable
+        );
+        if (!inTextEditing) {                                // 텍스트 편집 중이면 CM/브라우저 undo에 위임(D4)
+          e.preventDefault();
+          e.shiftKey ? redoBlocks() : undoBlocks();
+        }
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setSearchOpen(true);
@@ -2226,7 +2240,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines]);
+  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks]);
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
