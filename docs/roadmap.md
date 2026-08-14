@@ -1297,6 +1297,26 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 
 ---
 
+## Phase 55a: 블록 Undo/Redo (실행취소·재실행) ✅
+
+Phase 55 자체 VCS의 직접 확장. 블록 구조 조작(추가·삭제·이동·분할·타입변경·탭조작·미디어)의 실행취소/재실행. 텍스트 편집은 기존대로 CodeMirror per-block undo가 담당. 상세: `docs/phasedocs/Phase55a 블록 Undo·Redo (실행취소·재실행).md`
+
+| 단계 | 변경 |
+|------|------|
+| 설계 | A안(구조 전용 세션 인메모리 스택). VCS 스냅샷이 아니라 `hooks/useBlockHistory.ts`(past/future). push=`collectCurrentContent`, undo/redo=`applyVersionContent`, 매칭 키=`block_key`. 규칙·서버 변경 0(순수 클라이언트) |
+| Stage 1 | `applyVersionContent` 개조 — 세대 id `v{gen}-${block_key}`로 매 apply 전면 리마운트(비제어 MarkdownEditor 갱신, C1) + activeBlockId 항상 재설정(같은 탭 apply에서 stale 방지, F1). Row 2 좌측 ↶↷ 버튼(`IconUndo`/`IconRedo`). 문항 전환 시 `reset`(C9) |
+| Stage 2 | 구조 핸들러 10곳에 "검증 통과 후 mutate 직전" push(C3). no-op(마지막 블록 삭제·제자리/묶음 내부 드롭·동일 타입·confirm 취소·동일 이름) 사전검사로 스킵. 텍스트 입력(`handleBlockChange`) 제외 |
+| Stage 3 | `Cmd/Ctrl+Z`=undo, `+Shift`=redo. `e.code==='KeyZ'`(C5, Korean IME 안전) + 포커스가 `.cm-editor`/input/textarea/contentEditable면 CM·브라우저 기본 undo에 위임(C6) |
+| Stage 4 | undo/redo 시 전체접기·선택 상태 동기화 |
+
+- 부수 성과: C1+F1 개조가 이미 배포된 Phase 55 restore/draft의 잠재 버그(저장 없이 연속 복원 시 화면 미갱신·활성 블록 오류)도 함께 해소
+- 검증 워크플로우: v1(CLI 초안)→v2(web 라이브 대조 `c921b71`)→v3(CLI 재검증+C9)→v4(web 최종 F1·F2)→확정. 착수 후 디버깅으로 **Cmd+B=블록 분할(추가 아님)** 혼선 규명
+- 수용된 한계(R1): 구조 undo=전체 스냅샷 되돌리기라 끼어든 타이핑도 되돌아감(redo로 회수)·리마운트로 CM 텍스트 히스토리 초기화·전체접기 풀림
+- 후속 과제(필요 시): 변경 블록만 리마운트(미변경 블록 CM 히스토리·접기 보존), 텍스트까지 통합하는 B안(에디터 코어 리팩터)
+- 덕수 완료 필요: `git push`
+
+---
+
 ## Phase 56: 편집창·미리보기 수식 세로 중앙 정렬 통일 + 상단 밀림 근본 대책 ✅
 > 목표: ① 편집창 상단 줄이 밀려 복구 불가해지던 고질 버그 근절 ② 수식 클릭 시 양쪽 패널 정렬 정책 통일 ③ 타자 시 세로 위치 자동 조정
 
