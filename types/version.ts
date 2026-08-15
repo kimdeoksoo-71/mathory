@@ -22,7 +22,9 @@ export interface VersionMeta {
 export interface VersionBlock {
   block_key: string;           // 매칭·복원 키. 해시 제외
   order: number;
-  type: Block['type'];         // 11종 — Block과 일치 유지
+  // 실 유입 11종. 레거시 math_block·bullet은 normalizeBlockType(EditorView)으로
+  // 로드·저장 양쪽에서 text로 정규화된 뒤 들어오므로 payload엔 남지 않는다.
+  type: Block['type'];
   raw_text: string;            // 저장될 형태
   title?: string;
   imageWidth?: number;
@@ -46,7 +48,16 @@ export interface VersionContent {
   tabs: VersionTab[];
 }
 
-// 버전 메타 — content_hash·seq·created_*·trigger·parent_id 불변. name·pinned만 사후 수정.
+/** Phase 55b — GitHub 내보내기 기록. 사후 수정 허용 필드(규칙 hasOnly에 포함). */
+export interface GithubExport {
+  repo: string;
+  path: string;          // versions/{seq:04d}.md
+  commit_sha: string;
+  exported_at: string;   // 서버 시각 ISO. md 파일에는 넣지 않는다(W1: 넣으면 skip 판정이 무효)
+}
+
+// 버전 메타 — content_hash·seq·created_*·trigger·parent_id 불변.
+// 사후 수정은 name·pinned·github_export만 (firestore.rules의 hasOnly와 일치 유지).
 export interface ProblemVersion {
   id: string;
   seq: number;
@@ -64,6 +75,7 @@ export interface ProblemVersion {
   restored_from: string | null;
   changed_tabs: string[];
   byte_size: number;
+  github_export?: GithubExport | null;   // Phase 55b
 }
 
 export interface VersionPayload {

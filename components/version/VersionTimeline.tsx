@@ -2,14 +2,14 @@
 
 import React from 'react';
 import type { ProblemVersion, VersionTrigger } from '../../types/version';
-import { IconSave, IconExit } from '../ui/Icons';
+import { IconSave, IconExit, IconTag, IconRestore, IconPin, IconExport } from '../ui/Icons';
 
-// manual_save·editor_exit는 아이콘 시스템 규격 SVG로 렌더, 나머지는 이모지
-const TRIGGER_ICON: Record<VersionTrigger, string> = {
-  manual_save: '💾',
-  editor_exit: '🚪',
-  named: '🏷️',
-  restore: '↩️',
+// Phase 55b: 트리거 4종 전부 아이콘 시스템 규격 SVG (이모지 잔존 0)
+const TRIGGER_ICON: Record<VersionTrigger, React.ComponentType<{ size?: number }>> = {
+  manual_save: IconSave,
+  editor_exit: IconExit,
+  named: IconTag,
+  restore: IconRestore,
 };
 const TRIGGER_LABEL: Record<VersionTrigger, string> = {
   manual_save: '저장',
@@ -69,6 +69,7 @@ export default function VersionTimeline({
       {versions.map((v) => {
         const selected = v.id === selectedId;
         const trigger = v.trigger || 'manual_save';
+        const TriggerIcon = TRIGGER_ICON[trigger] || IconSave;
         return (
           <button
             key={v.id}
@@ -89,16 +90,24 @@ export default function VersionTimeline({
                 fontSize: 12, display: 'inline-flex', alignItems: 'center',
                 color: 'var(--text-secondary)',
               }}>
-                {trigger === 'manual_save' ? <IconSave size={14} />
-                  : trigger === 'editor_exit' ? <IconExit size={14} />
-                  : TRIGGER_ICON[trigger]}
+                <TriggerIcon size={14} />
               </span>
               {v.name && (
                 <span style={{ fontSize: 12, color: 'var(--accent-primary, #e53935)', fontWeight: 600 }}>
                   {v.name}
                 </span>
               )}
-              {v.pinned && <span title="고정" style={{ fontSize: 11 }}>📌</span>}
+              {v.pinned && (
+                <span title="고정" style={{
+                  display: 'inline-flex', alignItems: 'center', color: 'var(--accent-primary, #e53935)',
+                }}><IconPin size={12} filled /></span>
+              )}
+              {/* Phase 55b: 내보냄 표시(표시 전용 — 조작은 선택 버전 툴바에서) */}
+              {v.github_export && (
+                <span title={`GitHub에 내보냄 (${v.github_export.path})`} style={{
+                  display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)',
+                }}><IconExport size={12} /></span>
+              )}
               <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
                 {relTime(toMs(v))}
               </span>

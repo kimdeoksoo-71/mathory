@@ -409,3 +409,63 @@ export function IconLoader({ size = 14, color = 'currentColor' }: IconProps) {
     </svg>
   );
 }
+
+/* ═══ Phase 55b — 버전 관리 아이콘 4종 ═══
+ *
+ * 규약: 아이콘의 상태 변형은 boolean prop + fill 스위치로 표현한다(IconPin의 filled 참조).
+ *
+ * ⚠️ IconExport(트레이 + 상향 화살표)와 IconDownload(트레이 + 하향 화살표)는 거울상이다.
+ *    현재 둘은 동시에 노출되지 않는다(IconDownload는 ContextMenu·CommentPanel,
+ *    IconExport는 버전 드로어). 한 화면에 함께 놓아야 할 일이 생기면 둘 중 하나를
+ *    반드시 다시 디자인할 것.
+ *
+ * ⚠️ 버전 복원에 IconUndo를 쓰지 말 것 — Phase 55a 블록 Undo 버튼이 점유 중이다.
+ *    복원은 IconRestore(시계 + 반시계 호)로 "시간을 되돌린다"는 의미를 따로 표현한다.
+ */
+
+/** 외부 저장소로 내보내기 (버전 → GitHub). IconDownload의 상향 대칭. */
+export function IconExport({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+      <polyline points="7,8 12,3 17,8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
+/** 이름 저장(named 버전). */
+export function IconTag({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+      <circle cx="7" cy="7" r="1.2" fill={color} stroke="none" />
+    </svg>
+  );
+}
+
+/** 버전 고정(pin). 켜짐은 채움, 꺼짐은 외곽선. */
+export function IconPin({ size = 14, color = 'currentColor', filled = false }:
+  IconProps & { filled?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? color : 'none'} stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M12 17v5" />
+      <path d="M9 10.76a2 2 0 01-1.11 1.79l-1.78.9A2 2 0 005 15.24V16a1 1 0 001 1h12a1 1 0 001-1v-.76a2 2 0 00-1.11-1.79l-1.78-.9A2 2 0 0115 10.76V6h1a2 2 0 000-4H8a2 2 0 000 4h1z" />
+    </svg>
+  );
+}
+
+/** 버전 복원(restore). IconUndo(편집 되돌리기)와 의미·도안 모두 별개. */
+export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <path d="M3 3v5h5" />
+      <path d="M12 7v5l3.5 2" />
+    </svg>
+  );
+}

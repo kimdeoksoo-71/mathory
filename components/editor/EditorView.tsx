@@ -33,7 +33,7 @@ import SaveStatus from './SaveStatus';
 import VersionDrawer from '../version/VersionDrawer';
 import { useBlockHistory } from '../../hooks/useBlockHistory';
 import type { HistoryEntry } from '../../hooks/useBlockHistory';
-import type { Participant, VersionContent, VersionTrigger, ProblemVersion } from '../../types/version';
+import type { Participant, VersionContent, VersionTrigger, ProblemVersion, SnapshotResult } from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -2345,8 +2345,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ═══ 저장 ═══ */
   // Phase 55: 현재 작업본으로 스냅샷 생성 (manual_save·editor_exit 공용). dedup으로 무변경은 no-op.
-  const snapshotCurrent = useCallback(async (trigger: VersionTrigger) => {
-    if (!problem || !user) return;
+  // Phase 55b: opts(name·pinned)를 받고 SnapshotResult를 반환한다. 기존 두 호출부는
+  //   반환을 무시하므로 하위호환. '이름 저장' UI가 4갈래(created/named_existing/unchanged/error)를 분기한다.
+  const snapshotCurrent = useCallback(async (
+    trigger: VersionTrigger,
+    opts?: { name?: string; pinned?: boolean },
+  ): Promise<SnapshotResult> => {
+    if (!problem || !user) return { status: 'error', error: new Error('문항·사용자 없음') };
     try {
       const content = collectCurrentContent({
         tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer,
@@ -2355,11 +2360,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const actor: Participant = {
         uid: user.uid, display_name: user.displayName || user.email || '사용자',
       };
-      const snap = await createSnapshot(problem.id, content, trigger, actor);
+      const snap = await createSnapshot(problem.id, content, trigger, actor, opts);
       if (snap.status === 'error') console.error('[Phase55] 스냅샷 실패:', snap.error);
+      return snap;
     } catch (e) {
       if (e instanceof VersionLoadError) console.warn('[Phase55] 스냅샷 생략(탭 로드 실패):', e.failedTabs);
       else console.error('[Phase55] 스냅샷 예외:', e);
+      return { status: 'error', error: e };
     }
   }, [problem, user, tabs, allBlocks, editTitle, editAnswer]);
 
@@ -2717,6 +2724,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           } catch { return null; }
         }}
         onRestore={handleRestore}
+        onNamedSave={(name) => snapshotCurrent('named', { name })}
       />
 
       {/* ═══ Row 1: 메타 정보 ═══

@@ -39,5 +39,13 @@ export function useVersionHistory(problemId: string) {
     }
   }, [problemId]);
 
-  return { versions, loading, hasMore, loadFirst, loadMore };
+  /**
+   * Phase 55b — 로컬 배열만 패치(name·pinned·github_export 변경 반영).
+   * loadFirst는 커서를 리셋해 loadMore로 펼친 페이지를 접어버리므로, 메타 변경엔 이쪽을 쓴다.
+   */
+  const patchVersion = useCallback((id: string, partial: Partial<ProblemVersion>) => {
+    setVersions((prev) => prev.map((v) => (v.id === id ? { ...v, ...partial } : v)));
+  }, []);
+
+  return { versions, loading, hasMore, loadFirst, loadMore, patchVersion };
 }
