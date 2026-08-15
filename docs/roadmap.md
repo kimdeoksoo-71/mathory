@@ -1292,7 +1292,7 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 | 6 | 보존(pruning): 문항당 하드 상한 50, 오래된 `editor_exit`부터 정리(manual_save/named/restore/pinned 보호). `deleteProblem`에 versions+payload cascade |
 
 - 런타임 발견 규칙 버그(에뮬레이터 재현 후 수정): **F10** payload 트랜잭션 create가 부모 version doc `get()`에 막힘(같은 트랜잭션 미커밋 불가시), **F11** versions LIST가 `resource.data` 참조로 거부(규칙은 필터 아님) → 둘 다 소유 검사를 부모 **문항** authorUid(`verOwner()`)로 통일해 해결
-- 후속 과제: 탭 단위 복원(현재 전체 복원만), 오프라인 persistence(Firestore 전역 초기화 변경 위험으로 보류), 탭 reorder diff, **GitHub 연동(Phase 56+ 별도)**
+- 후속 과제: 탭 단위 복원(현재 전체 복원만), 오프라인 persistence(Firestore 전역 초기화 변경 위험으로 보류), 탭 reorder diff, **GitHub 연동 → Phase 55b에서 완료**
 - 덕수 완료: 규칙 배포(`firebase deploy --only firestore:rules`)·`git push` 완료
 
 ---
@@ -1314,6 +1314,31 @@ Phase 55 자체 VCS의 직접 확장. 블록 구조 조작(추가·삭제·이�
 - 수용된 한계(R1): 구조 undo=전체 스냅샷 되돌리기라 끼어든 타이핑도 되돌아감(redo로 회수)·리마운트로 CM 텍스트 히스토리 초기화·전체접기 풀림
 - 후속 과제(필요 시): 변경 블록만 리마운트(미변경 블록 CM 히스토리·접기 보존), 텍스트까지 통합하는 B안(에디터 코어 리팩터)
 - 덕수 완료 필요: `git push`
+
+---
+
+## Phase 55b: GitHub 연동 (버전 관리 마무리) ✅
+
+이름을 붙인 버전을 **비공개 콘텐츠 레포**에 md + JSON으로 커밋하는 단방향 아카이브. 상세: `docs/phasedocs/Phase55b GitHub 연동.md`
+
+| 단계 | 변경 |
+|------|------|
+| 1a | 아이콘 4종 신설(`IconGithub`·`IconTag`·`IconPin`·`IconRestore`) — `VersionTimeline`의 트리거·배지 이모지를 전부 SVG로 교체(이모지 잔존 0). 내보내기는 **GitHub 공식 마크(Invertocat)**를 쓴다 — 이것만 stroke가 아니라 fill이라 주변과 질감이 다르지만, 목적지가 GitHub임을 한눈에 알리는 게 시각적 균질성보다 중요하다는 판단(덕수 2026-08-15) |
+| 1b | **`named` 저장·핀 UI** — 모델·배지·규칙은 Phase 55에 이미 있었으나 `trigger:'named'`/`opts.name`으로 부르는 곳이 레포 전체에 0곳이었다. `snapshotCurrent(trigger, opts?)` + `SnapshotResult` 반환, `meta.ts`(이름·핀·export 기록 헬퍼), `patchVersion` |
+| 2 | 규칙: versions update `hasOnly`에 `github_export` 추가. `test:rules` 61~63 (65/65) |
+| 3 | `lib/version/exportMd.ts` — 순수·결정적 변환기. 단위 테스트 13건(`npm run test:export`, 에뮬레이터 불필요) |
+| 4 | `POST /api/github/export` — Contents API로 md·json·index 커밋, 파일별 skip 판정 |
+| 5 | 선택 버전 툴바에 이름 변경·핀·내보내기 배선 |
+
+- **인증에 `firebase-admin`을 쓰지 않는다**: 클라가 릴레이한 ID 토큰으로 Firestore REST를 직접 호출하면 토큰이 없거나 위조·만료거나 남의 문항일 때 Firestore가 401/403을 준다. 즉 보안 규칙 `verOwner`가 인증을 대행하므로 **검증 코드 0줄·신규 의존성 0**. 무결성은 서버가 읽은 `content_hash`와 클라가 보낸 content의 해시 대조로 세운다
+- **게이트는 `name != null`이지 `trigger === 'named'`가 아니다**: 무변경 상태에서 이름을 저장하면 기존 버전(`manual_save`·`editor_exit`)에 `name`만 붙으므로(`named_existing`), trigger로 걸면 그 버전은 영영 못 내보낸다. **같은 뿌리로 `prune.ts`의 보호 조건에도 `!v.name`이 필요했다** — 없으면 이름 붙인 버전이 상한 초과 시 삭제된다
+- **md에 export 시각을 넣지 않는다**: 넣으면 파일이 매번 달라져 "동일 내용 skip"이 영구 무효가 되고 무변경 재내보내기마다 커밋이 쌓인다. 불변 시각(`created_at`)만 담고 내보낸 시각은 version doc에만 기록
+- 조작 버튼은 **선택 버전 툴바**에 둔다: 타임라인 항목이 `<button>`이라 그 안에 버튼을 넣으면 중첩 무효 HTML + 클릭 버블링으로 버전 선택이 함께 발동한다. 부수 효과로 내보낼 content가 `loadContent` 결과(payload 원본)임이 구조적으로 보장된다
+- 경로에 이름 slug를 넣지 않는다(`{seq:04d}`만) — `name`은 사후 변경 가능이라 slug를 쓰면 이름을 바꿀 때마다 구 파일이 유령으로 남는다
+- 검증 워크플로우: **8라운드**(v1 web → v2 CLI → v3 web → v4 CLI → v5 web → v6 CLI → v7 web → v8 CLI 착수본), 누적 결함 60건. 🔴 4건(export 게이트·prune 보호·content 출처·버튼 중첩)은 전부 3회 이상 교차 확인
+- 착수 후 실측 정정: firebase-tools 15.19+가 **JDK 21+** 요구(`test:rules` 실행 시 `JAVA_HOME=/opt/homebrew/opt/openjdk@21` 필요), `.env.local`의 PAT에 `github_pat_` 접두사 중복
+- 후속: 역방향 동기화·이미지 동봉·문항 삭제 시 레포 정리는 모두 비목표(아카이브 취지). 아이콘 잔여 부채는 `prelaunch-bug-cleanup.md` 7번
+- 덕수 완료: 콘텐츠 레포 생성·PAT 발급·env 등록(로컬+Vercel)·규칙 배포 / **`git push` 필요**
 
 ---
 
@@ -1381,4 +1406,6 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 
 공개 직전에 몰아서 처리할 버그 목록: `docs/prelaunch-bug-cleanup.md`
 (1번 한글 IME 조합 중 ⌘B 끝글자 중복, 2번 저장 왕복 중 타이핑 유실, 3번 저장 후 CodeMirror remount,
-4번 키입력마다 전체 리렌더, 5번 `/api/copyright/register` 무인증)
+4번 키입력마다 전체 리렌더, 5번 `/api/copyright/register` 무인증,
+6번 내보낸 md에서 heading 블록이 탭 제목과 같은 레벨 — 제목 블록 디자인 개편 때 처리,
+7번 아이콘 시스템 잔여 부채)

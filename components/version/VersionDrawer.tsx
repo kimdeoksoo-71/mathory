@@ -6,7 +6,7 @@ import { useVersionHistory } from '../../hooks/useVersionHistory';
 import { loadContent, resolveLivingParent } from '../../lib/version/read';
 import { diffContent } from '../../lib/version/diff';
 import { setVersionName, setVersionPinned, setVersionExport } from '../../lib/version/meta';
-import { IconTag, IconPin, IconRename, IconClose, IconExport } from '../ui/Icons';
+import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons';
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
@@ -374,7 +374,7 @@ export default function VersionDrawer({
                   }
                   aria-label="GitHub에 내보내기"
                   style={{ ...iconBtn(!!sel.github_export), opacity: canExport ? 1 : 0.4 }}
-                ><IconExport size={13} /></button>
+                ><IconGithub size={13} /></button>
 
                 <button onClick={() => setRestoreOpen(true)} style={{
                   marginLeft: 'auto', fontSize: 11, padding: '2px 10px', borderRadius: 5,

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { ProblemVersion, VersionTrigger } from '../../types/version';
-import { IconSave, IconExit, IconTag, IconRestore, IconPin, IconExport } from '../ui/Icons';
+import { IconSave, IconExit, IconTag, IconRestore, IconPin, IconGithub } from '../ui/Icons';
 
 // Phase 55b: 트리거 4종 전부 아이콘 시스템 규격 SVG (이모지 잔존 0)
 const TRIGGER_ICON: Record<VersionTrigger, React.ComponentType<{ size?: number }>> = {
@@ -106,7 +106,7 @@ export default function VersionTimeline({
               {v.github_export && (
                 <span title={`GitHub에 내보냄 (${v.github_export.path})`} style={{
                   display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)',
-                }}><IconExport size={12} /></span>
+                }}><IconGithub size={12} /></span>
               )}
               <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--text-muted)' }}>
                 {relTime(toMs(v))}

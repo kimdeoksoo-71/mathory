@@ -96,3 +96,24 @@ CDP `Input.imeSetComposition`으로는 재현되지 않는다(puppeteer로 8가�
 ## 5. `/api/copyright/register` 무인증
 
 Phase 29 시점의 미결 사항. 현재 C2(무인증). 공개 전 C1으로 업그레이드 필요.
+
+## 6. 내보낸 md에서 heading 블록이 탭 제목과 같은 레벨
+
+Phase 55b GitHub 내보내기 관찰. `heading` 블록의 `raw_text`가 `## `로 시작하는데
+탭 제목도 `## {tab.title}`이라, 아카이브 md에서 둘이 형제로 보여 탭 구분이 흐려진다.
+
+- 원인이 아니라 원칙의 결과다 — `exportMd`는 렌더 재현을 목표로 하지 않고 `raw_text`를
+  그대로 흘린다. 여기서 `##`→`###`로 강등하면 사용자 내용을 변형하게 된다
+- **제목 블록 디자인 개편 때 같이 처리**(덕수 결정 2026-08-15). 블록 자체의 헤딩 레벨
+  규격이 정해지면 export는 따라오기만 하면 된다
+
+## 7. 아이콘 시스템 잔여 부채 (Phase 55b I8·J4)
+
+- `components/ui/ContextMenu.tsx:7`에 `IconDownload`가 **로컬 중복 정의**돼 있다
+  (`Icons.tsx:329`와 별개 구현) → `Icons.tsx` 것으로 통일
+- `Icons.tsx`의 `strokeWidth`가 1.8(9곳)/2(25곳)로 혼재. Phase 55b 신규 4종은 인접
+  아이콘(`IconSave`·`IconExit`)에 맞춰 1.8로 넣었으나 전면 통일은 미착수
+- `components/viewer/SvgViewer.tsx:286`·`GgbViewer.tsx:407`의 📌 이모지("초기뷰 저장"
+  버튼 라벨) → `IconPin`으로 교체 가능
+- `IconGithub`은 공식 마크라 유일하게 stroke가 아니라 fill이다. 의도된 예외이므로
+  "굵기 통일" 작업에서 제외할 것. 마크를 변형하거나 GitHub 아닌 대상에 돌려쓰지 말 것
