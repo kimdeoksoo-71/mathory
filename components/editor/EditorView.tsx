@@ -33,7 +33,9 @@ import SaveStatus from './SaveStatus';
 import VersionDrawer from '../version/VersionDrawer';
 import { useBlockHistory } from '../../hooks/useBlockHistory';
 import type { HistoryEntry } from '../../hooks/useBlockHistory';
-import type { Participant, VersionContent, VersionTrigger, ProblemVersion, SnapshotResult } from '../../types/version';
+import type {
+  Participant, VersionContent, VersionTrigger, ProblemVersion, SnapshotResult, ExportOutcome,
+} from '../../types/version';
 import { validateOcrFile, toDataUrl, normalizeAndFix, OCR_ACCEPT, OCR_LANGUAGES } from '../../lib/ocr';
 import { uploadImage, uploadSvg, uploadGgb } from '../../lib/storage';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
@@ -2654,6 +2656,28 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setDirty(true);
   };
 
+  // Phase 55b: GitHub 내보내기. user(ID 토큰)를 아는 곳이 여기뿐이라 Drawer가 아니라
+  //   EditorView가 fetch를 맡고, Drawer는 결과로 doc 기록·배지 갱신만 한다.
+  //   content는 반드시 Drawer가 loadContent로 읽은 payload 원본이다 — 현재 편집 상태를
+  //   보내면 최신 버전 외 전부 서버 해시 대조에서 409로 막힌다.
+  const handleExport = async (versionId: string, content: VersionContent): Promise<ExportOutcome> => {
+    if (!problem || !user) return { ok: false, error: '로그인이 필요합니다' };
+    try {
+      const idToken = await user.getIdToken();
+      const res = await fetch('/api/github/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ problemId: problem.id, versionId, content }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return { ok: false, error: data?.error || '내보내기에 실패했습니다' };
+      return { ok: true, ...data };
+    } catch (e) {
+      console.error('[Phase55b] export 요청 실패:', e);
+      return { ok: false, error: '네트워크 오류로 내보내지 못했습니다' };
+    }
+  };
+
   // 계층1 복구 배너 [복구]
   const applyRecoveredDraft = (content: VersionContent) => {
     applyVersionContent(content);
@@ -2725,6 +2749,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }}
         onRestore={handleRestore}
         onNamedSave={(name) => snapshotCurrent('named', { name })}
+        onExport={handleExport}
       />
 
       {/* ═══ Row 1: 메타 정보 ═══

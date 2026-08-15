@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import type { ProblemVersion, VersionContent, SnapshotResult } from '../../types/version';
+import type { ProblemVersion, VersionContent, SnapshotResult, ExportOutcome } from '../../types/version';
 import { useVersionHistory } from '../../hooks/useVersionHistory';
 import { loadContent, resolveLivingParent } from '../../lib/version/read';
 import { diffContent } from '../../lib/version/diff';
-import { setVersionName, setVersionPinned } from '../../lib/version/meta';
-import { IconTag, IconPin, IconRename, IconClose } from '../ui/Icons';
+import { setVersionName, setVersionPinned, setVersionExport } from '../../lib/version/meta';
+import { IconTag, IconPin, IconRename, IconClose, IconExport } from '../ui/Icons';
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
@@ -28,6 +28,7 @@ export default function VersionDrawer({
   getCurrentContent,
   onRestore,
   onNamedSave,
+  onExport,
 }: {
   problemId: string;
   open: boolean;
@@ -35,6 +36,7 @@ export default function VersionDrawer({
   getCurrentContent: () => VersionContent | null;
   onRestore: (target: ProblemVersion, content: VersionContent) => Promise<void>;
   onNamedSave: (name: string) => Promise<SnapshotResult>;
+  onExport: (versionId: string, content: VersionContent) => Promise<ExportOutcome>;
 }) {
   const { versions, loading, hasMore, loadFirst, loadMore, patchVersion } = useVersionHistory(problemId);
   const [selected, setSelected] = useState<ProblemVersion | null>(null);
@@ -197,6 +199,41 @@ export default function VersionDrawer({
     }
   };
 
+  /* ═══ Phase 55b: GitHub 내보내기 ═══ */
+
+  // 게이트: 이름이 있어야 하고(서버도 같은 조건으로 막는다), payload 로드가 끝나 있어야 한다.
+  const canExport = !!sel?.name && !contentLoading && !!vContent;
+
+  const doExport = async () => {
+    if (!sel || !vContent) return;
+    setMetaBusy(true);
+    try {
+      // vContent는 loadContent가 읽은 payload 원본이다. 현재 편집 상태를 보내면 안 된다.
+      const out = await onExport(sel.id, vContent);
+      if (!out.ok) { flash(out.error || '내보내기에 실패했습니다', 'error'); return; }
+
+      if (out.skipped) {
+        flash('이미 최신 상태입니다 (커밋 없음)');
+      } else {
+        flash(`GitHub에 내보냈습니다 — ${out.path}`);
+      }
+
+      const ge = {
+        repo: out.repo || '',
+        path: out.path || '',
+        commit_sha: out.commitSha || '',
+        exported_at: out.exportedAt || new Date().toISOString(),
+      };
+      await setVersionExport(problemId, sel.id, ge);
+      patchVersion(sel.id, { github_export: ge });
+    } catch (e) {
+      console.error('[Phase55b] 내보내기 기록 실패:', e);
+      flash('GitHub 커밋은 됐지만 기록에 실패했습니다 — 다시 내보내면 정정됩니다', 'error');
+    } finally {
+      setMetaBusy(false);
+    }
+  };
+
   const iconBtn = (active?: boolean): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '1px solid var(--border-light)', borderRadius: 5, padding: '3px 6px',
@@ -325,6 +362,19 @@ export default function VersionDrawer({
                   aria-label={sel.pinned ? '고정 해제' : '이 버전 고정'}
                   style={iconBtn(sel.pinned)}
                 ><IconPin size={13} filled={!!sel.pinned} /></button>
+
+                <button
+                  onClick={doExport}
+                  disabled={metaBusy || !canExport}
+                  title={
+                    !sel.name ? '이름이 붙은 버전만 내보낼 수 있습니다'
+                      : contentLoading || !vContent ? '본문을 불러오는 중입니다'
+                      : sel.github_export ? '다시 내보내기 (변경 없으면 커밋 없음)'
+                      : 'GitHub에 내보내기'
+                  }
+                  aria-label="GitHub에 내보내기"
+                  style={{ ...iconBtn(!!sel.github_export), opacity: canExport ? 1 : 0.4 }}
+                ><IconExport size={13} /></button>
 
                 <button onClick={() => setRestoreOpen(true)} style={{
                   marginLeft: 'auto', fontSize: 11, padding: '2px 10px', borderRadius: 5,

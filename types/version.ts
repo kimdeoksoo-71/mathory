@@ -48,6 +48,22 @@ export interface VersionContent {
   tabs: VersionTab[];
 }
 
+/**
+ * Phase 55b — /api/github/export 응답을 클라에서 다루는 형태.
+ * 판별 유니온이 아니라 평평한 인터페이스인 이유: tsconfig가 strict:false라
+ * `if (!res.ok)` 식의 좁히기가 동작하지 않는다.
+ */
+export interface ExportOutcome {
+  ok: boolean;
+  error?: string;
+  commitUrl?: string | null;
+  commitSha?: string | null;
+  path?: string;
+  skipped?: boolean;
+  exportedAt?: string;
+  repo?: string;
+}
+
 /** Phase 55b — GitHub 내보내기 기록. 사후 수정 허용 필드(규칙 hasOnly에 포함). */
 export interface GithubExport {
   repo: string;
