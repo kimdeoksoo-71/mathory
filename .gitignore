@@ -16,3 +16,6 @@ firebase-debug.log
 # Windows
 Thumbs.db
 **/Thumbs.db
+
+# 단위 테스트 컴파일 산출물 (npm run test:export)
+.test-build/
