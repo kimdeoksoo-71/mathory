@@ -153,9 +153,12 @@ service cloud.firestore {
         allow read:   if verOwner();
         allow create: if verOwner()
           && request.resource.data.author_uid == request.auth.uid;   // 데이터 정합(오너 == 작성자)
-        // 사후 수정은 name·pinned만 허용 (불변성 강제)
+        // 사후 수정은 name·pinned·github_export만 허용 (불변성 강제)
+        //   github_export(Phase 55b): 서버 API가 GitHub 커밋에 성공한 뒤 클라가 남기는 기록.
+        //   affectedKeys()는 최상위 키만 보므로 중첩 map은 그대로 통과한다.
         allow update: if verOwner()
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'pinned']);
+          && request.resource.data.diff(resource.data)
+               .affectedKeys().hasOnly(['name', 'pinned', 'github_export']);
         allow delete: if verOwner();
 
         // 본문(무거움): 부모 문항 소유로 검사(같은 트랜잭션의 미커밋 version doc은 못 봄 — F10). 본문 불변.

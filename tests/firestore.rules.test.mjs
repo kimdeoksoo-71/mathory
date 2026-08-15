@@ -34,6 +34,10 @@
  *   46) 공개 문항 versions 제3자 read 거부(F2)  47) 비로그인 read 거부(핵심)  48) 오너 read 허용
  *   49) 오너 create 허용  50) 비오너 create 거부(부모소유 불일치)  51) name·pinned update 허용
  *   52) 그 외 필드 update 거부(불변성)  53) payload 오너 read 허용  54) payload 제3자 read 거부  55) payload update 거부
+ *   56) version+payload 트랜잭션 동시 생성(F10)  57) payload 제3자 create 거부
+ *   58) 오너 LIST 허용(F11)  59) 제3자 LIST 거부  60) 비로그인 LIST 거부
+ *   [Phase 55b: GitHub 내보내기 기록]
+ *   61) github_export 단독 update 허용  62) name 동반 update 허용  63) content_hash 동반 update 거부
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -463,4 +467,28 @@ test('59. 제3자 versions LIST 거부', async () => {
 test('60. 비로그인 versions LIST 거부', async () => {
   await assertFails(getDocs(query(
     collection(anon(), 'problems/pub/versions'), orderBy('seq', 'desc'))));
+});
+
+// ══ Phase 55b: GitHub 내보내기 기록 ══
+// 서버 API가 커밋에 성공한 뒤 클라가 남기는 사후 기록. 중첩 map이지만 affectedKeys()는
+// 최상위 키만 보므로 hasOnly(['name','pinned','github_export'])로 통과해야 한다.
+const ghExport = {
+  repo: 'kimdeoksoo-71/mathory-content',
+  path: 'problems/pub/versions/0002.md',
+  commit_sha: 'abc1234',
+  exported_at: '2026-08-15T12:00:00.000Z',
+};
+
+test('61. 오너 github_export 단독 update 허용', async () => {
+  await assertSucceeds(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1'), { github_export: ghExport }));
+});
+test('62. 오너 name + github_export 동반 update 허용', async () => {
+  await assertSucceeds(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1'), { name: '내보낸본', github_export: ghExport }));
+});
+test('63. github_export + content_hash 동반 update 거부 (불변성 유지)', async () => {
+  await assertFails(updateDoc(
+    doc(as(OWNER), 'problems/pub/versions/v1'),
+    { github_export: ghExport, content_hash: 'tampered' }));
 });
