@@ -243,9 +243,15 @@ textarea:focus-visible {
 .solution-tone.has-key strong,
 .solution-tone.has-key strong .katex { color: var(--text-primary); }
 
-/* D5 — 화면에서 key는 색으로만 구분한다. 굵기+색 이중 신호를 피한다.
-   (KaTeX는 자체 `font: normal` shorthand로 weight를 리셋하므로 수식엔 원래 볼드가 없다) */
-.solution-tone.has-key strong { font-weight: inherit; }
+/* D5(개정) — key는 색 + 굵기 두 신호로 구분한다.
+   당초 설계는 "색으로만"이었으나(굵기+색 이중 신호 회피), 실사용에서 dim↔full 간격이
+   1.97:1뿐이라 본문 크기에서 강조/비강조가 거의 구별되지 않았다(덕수 판정) → 굵기 복원.
+   - 600(semibold): 제목이 700이므로 한 단계 아래를 써서 제목 > key > 본문 위계를 지킨다.
+     --weight-* 토큰 범위 안이라 "700 금지" 규칙과도 충돌하지 않는다.
+   - ⚠ key 안 수식은 굵어지지 않는다. KaTeX가 `font: normal 1.21em …` shorthand로
+     font-weight를 normal로 리셋하기 때문이다(katex.min.css). 수식은 색만 진해진다.
+     인쇄(D6')와 같은 상황이며, 글리프 왜곡이 없는 편이 조판상 낫다. */
+.solution-tone.has-key strong { font-weight: var(--weight-semibold); }
 
 /* D9' — 제목은 has-key 여부·dim 값과 무관하게 현행 색에 고정한다.
    현재 제목은 EditorPreview 인라인 style에 color가 없어 secondary를 상속하고 있다.
