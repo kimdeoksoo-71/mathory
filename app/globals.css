@@ -41,7 +41,7 @@
        local('Malgun Gothic'),
        url('https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLHq8H4gdeG6cl5G3CHlodySd_ke-3HNnn9yQA.108.woff2') format('woff2');
   unicode-range: U+2460-2473;   /* ① ~ ⑳ */
-  size-adjust: 92%;             /* Phase 58 P5 — 출발값. 실측 튜닝 범위 85~96% */
+  size-adjust: 88%;             /* Phase 58 P5 — 92%는 본문 대비 아직 컸다(덕수) → 88% */
   font-display: swap;
 }
 
