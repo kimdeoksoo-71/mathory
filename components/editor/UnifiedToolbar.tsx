@@ -798,7 +798,13 @@ export default function UnifiedToolbar({
           title={keyToggleRejected ? '감쌀 수 없는 선택입니다 (문단·수식 경계 확인)' : '핵심문장 (**로 강조)'}
           onClick={onToggleKey}
         >
-          <span style={keyToggleRejected ? { animation: 'keyShake 0.35s' } : undefined}>
+          {/* ⚠ display:flex 필수 — 인라인 span이면 내부 svg가 baseline 정렬을 받아
+              다른 아이콘 11종보다 몇 px 아래로 내려앉는다. 흔들림 애니메이션 때문에
+              래퍼가 필요한 것뿐이므로 정렬은 button과 동일하게 맞춘다. */}
+          <span style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            ...(keyToggleRejected ? { animation: 'keyShake 0.35s' } : null),
+          }}>
             <KeySentenceIcon />
           </span>
         </IconButton>
