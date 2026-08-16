@@ -123,6 +123,14 @@
      "살짝 큼"은 유지). 소비처는 아래 .preview-content .katex 한 곳뿐. */
   --katex-scale: 1.08em;
 
+  /* key sentence 톤 시스템의 routine 색 (Phase 58 P2/D3).
+     처음에는 --text-secondary(현행 본문색)를 그대로 dim으로 썼으나(A안), 그러면 비key
+     텍스트가 무변화라 "풀이가 물러나는" 느낌이 나지 않았다(덕수 판정) → B안 승격.
+     명암비 실측: #F4EFE7 5.50:1 / #EDE6DA 5.08:1 / #FEFDFB 6.19:1 — 세 배경 전부
+     4.5:1 통과. dim↔full(--text-primary) 명도 간격은 1.97 → 2.27:1로 벌어진다.
+     ⚠ 구속 조건은 FolderView 카드 배경 #EDE6DA다. 더 흐리게 갈 때 여기부터 깨진다. */
+  --tone-dim: #675F52;
+
   /* Sizing */
   --sidebar-expanded: 260px;
   --sidebar-collapsed: 56px;
