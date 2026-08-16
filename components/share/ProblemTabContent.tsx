@@ -16,7 +16,7 @@ export default function ProblemTabContent({ blocks }: { blocks: Block[] }) {
   return (
     <div>
       {sorted.map((block, i) => {
-        const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
+        const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
 
         if (block.type === 'image') {
           const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';

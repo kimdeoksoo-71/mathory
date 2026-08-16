@@ -332,15 +332,25 @@ export default function EditorPreview({
           }
           return <pre {...props}>{children}</pre>;
         },
+        /* ═══ 제목 (Phase 58 P1/D1·D1') ═══
+           ⚠ 여기 인라인 style이 제목 스타일의 유일한 진실이다. globals.css의 heading 절은
+             규칙 없는 주석이고, 인라인 style은 !important 없는 모든 시트 규칙을 이긴다
+             → CSS로는 못 바꾼다. 크기·굵기를 손대려면 반드시 이 세 줄을 고칠 것.
+           - 1.5 / 1.3 / 1.15em → 1.18 / 1.08 / 1.0em. h2만 내리면 h3와 위계가 역전하므로
+             셋을 함께 조정한다.
+           - 언더라인(h2 border-bottom) 제거 — 제목은 크기·굵기로만 구분한다.
+           - weight 700은 globals.css --weight-* "3단계만(700 금지)"의 제목 한정 예외(D1'').
+           - marginTop/Bottom의 em은 "본문 em"이 아니라 "이 제목 자신의 font-size" 기준이다.
+             제목 위 여백은 [앞 블록 이월 마진] + [블록 래퍼 paddingTop] + [이 marginTop]의
+             3항 합이므로, 여기만 봐서는 체감 여백을 알 수 없다 (Phase 58 F1). */
         h1: ({ children, ...props }) => (
-          <h1 style={{ fontSize: '1.5em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h1>
+          <h1 style={{ fontSize: '1.18em', fontWeight: 700, marginTop: '1em', marginBottom: '0.6em', lineHeight: 1.4, letterSpacing: '-0.01em' }} {...props}>{children}</h1>
         ),
         h2: ({ children, ...props }) => (
-          <h2 style={{ fontSize: '1.3em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4,
-            paddingBottom: '0.3em', borderBottom: '1px solid #999' }} {...props}>{children}</h2>
+          <h2 style={{ fontSize: '1.08em', fontWeight: 700, marginTop: '1em', marginBottom: '0.6em', lineHeight: 1.4, letterSpacing: '-0.01em' }} {...props}>{children}</h2>
         ),
         h3: ({ children, ...props }) => (
-          <h3 style={{ fontSize: '1.15em', fontWeight: 600, marginTop: '1em', marginBottom: '0.5em', lineHeight: 1.4 }} {...props}>{children}</h3>
+          <h3 style={{ fontSize: '1em', fontWeight: 700, marginTop: '1em', marginBottom: '0.6em', lineHeight: 1.4, letterSpacing: '-0.01em' }} {...props}>{children}</h3>
         ),
         table: ({ children, ...props }) => (
           <table style={{

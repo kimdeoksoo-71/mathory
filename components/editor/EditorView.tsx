@@ -3194,7 +3194,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             {currentBlocks.map((block, i) => {
               const isActivePreview = block.id === activeBlockId;
               const isBordered = BORDERED_TYPES.has(block.type);
-              const headingTopPad = block.type === 'heading' && i !== 0 ? '1.5em' : undefined;
+              // Phase 58 D2: 1.5em → 0.5em. 체감 여백은 [앞 블록 이월 마진 0.6~1.1em] +
+              // [이 paddingTop] + [h2 marginTop 1.08em]의 3항 합이다 (5개 렌더 사이트 동일).
+              const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;
               return (
                 <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
                   {block.type === 'image' ? (

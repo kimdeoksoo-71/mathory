@@ -55,7 +55,11 @@ export default function PrintableContent({
           <div key={tab.label + tabIdx} className={tabIdx > 0 ? 'print-tab-section' : ''}>
             <div className="print-tab-label">{tab.label}</div>
             {tab.blocks.map((block, blockIdx) => (
-              <div key={block.id} className="print-block" style={block.type === 'heading' && blockIdx > 0 ? { paddingTop: '1.5em' } : undefined}>
+              /* Phase 58 D2 — 제목 위 여백. 인쇄는 화면과 산식이 달라 값도 다르다:
+                 [앞 문단 margin-bottom 6pt] + [이 paddingTop] + [.print-body h2 margin-top 8pt].
+                 1.5em(15pt)이면 합 29pt(=2.9em)로 목표 2.4em 초과 → 1em(10pt)이면 정확히 24pt.
+                 PrintStyles의 h1/h2/h3 자체는 손대지 않는다(D10''). */
+              <div key={block.id} className="print-block" style={block.type === 'heading' && blockIdx > 0 ? { paddingTop: '1em' } : undefined}>
                 {block.type === 'choices' ? (
                   <PrintChoicesBlock content={block.raw_text} locale={locale} />
                 ) : block.type === 'image' ? (

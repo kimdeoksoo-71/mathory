@@ -110,7 +110,8 @@
   --font-mono: 'D2Coding', 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
   --font-print: 'MathoryCircled', 'Noto Serif KR', 'Noto Serif CJK KR', 'Georgia', serif;  /* 인쇄·PDF 전용 */
 
-  /* Weights — 3단계만 (700 금지) */
+  /* Weights — 3단계만 (700 금지).
+     예외: 본문 heading(h1~h3)은 700을 쓴다 — Phase 58 D1''. EditorPreview 인라인 style. */
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
