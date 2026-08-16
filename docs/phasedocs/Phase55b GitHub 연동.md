@@ -270,7 +270,7 @@ export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
 **접근성**(I7): 아이콘만 있는 버튼에 `title` + `aria-label` 둘 다. `className` prop은 받지 않는다(K6 — 기존 39개와 일관)
 **부수 변경**: `VersionTimeline.tsx:7` 주석 갱신 + `TRIGGER_ICON`(`:8-13`) 이모지 맵 → 컴포넌트 맵(`:92-95` 삼항 단순화) + `:101` 📌 → `IconPin`
 **범위 밖**(I8·J4·K3): `ContextMenu.tsx:7` 로컬 중복 정의 · `strokeWidth` 전면 통일 · `components/viewer/SvgViewer.tsx:286`·`GgbViewer.tsx:407`의 📌 → `docs/prelaunch-bug-cleanup.md` 등록만
-**검증**: 라이트/다크에서 신규 4종이 `IconSave`·`IconExit`과 획 굵기·시각 무게 일치 · **12px 배지에서 IconExport ↔ IconExit 구별 명확**(J1의 목적) · IconRestore ↔ IconUndo 구별 명확(J2) · 핀 on/off 구분 · 타임라인 한 줄 아이콘 4개에 460px 무너짐 없음 · **이모지 잔존 0**
+**검증**: (⚠️ v6~v8이 "라이트/다크 양쪽"이라 적었으나 **이 프로젝트에 다크 모드는 없다** — `prefers-color-scheme`·`data-theme` 0건, 단일 라이트 팔레트. 라이트만 확인하면 된다) 신규 4종이 `IconSave`·`IconExit`과 획 굵기·시각 무게 일치 · **12px 배지에서 IconExport ↔ IconExit 구별 명확**(J1의 목적) · IconRestore ↔ IconUndo 구별 명확(J2) · 핀 on/off 구분 · 타임라인 한 줄 아이콘 4개에 460px 무너짐 없음 · **이모지 잔존 0**
 
 ---
 

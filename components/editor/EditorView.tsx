@@ -51,7 +51,7 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconCheck, IconRecent, IconSave, IconUndo, IconRedo,
+  IconRestore, IconSave, IconUndo, IconRedo,
 } from '../ui/Icons';
 import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
@@ -2794,7 +2794,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           lastSavedAt={lastSavedAt}
         />
 
-        {/* Phase 55 Stage 4: 버전 기록 열기 (아이콘은 사이드바 '최근 문항'과 통일) */}
+        {/* 버전 기록 열기 — 아이콘은 IconRestore
+            (Phase 55c: 사이드바 '최근 문항'과 같은 IconRecent였던 것을 교체. 이력 복원 의미) */}
         <button
           onClick={() => setVersionDrawerOpen(true)}
           title="버전 기록"
@@ -2803,9 +2804,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
             color: 'var(--text-faint)',
           }}
-        ><IconRecent size={17} /></button>
+        ><IconRestore size={17} /></button>
 
-        {/* 저장 버튼 — 아이콘만. dirty면 빨강, 저장 완료면 회색. */}
+        {/* 저장 버튼 — 아이콘만. dirty면 빨강·구름만, 저장 완료면 회색·구름+체크. */}
         <button
           onClick={() => handleSave()}
           disabled={saving}
@@ -2818,8 +2819,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             transition: 'color 0.2s',
           }}
         >
-          {/* dirty 여부는 버튼 style의 color가 currentColor로 전달 → 아이콘 분기 불필요 */}
-          {saving ? <IconLoader size={16} /> : <IconSave size={18} />}
+          {/* 색은 버튼 style의 color가 currentColor로 전달. 체크 유무만 checked prop으로 분기(Phase 55c) */}
+          {saving ? <IconLoader size={16} /> : <IconSave size={18} checked={!dirty} />}
         </button>
 
         {/* ─── 글꼴 크기 조절: 숫자 + 위/아래 꺾쇠 ─── */}

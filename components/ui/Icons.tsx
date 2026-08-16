@@ -187,16 +187,24 @@ export function IconTrash({ size = 14, color = 'currentColor' }: IconProps) {
   );
 }
 
-export function IconSave({ size = 18, color = 'currentColor' }: IconProps) {
+/**
+ * 저장 — 클라우드(Firestore 확정) + 체크(저장 완료).
+ * Phase 55c: 플로피디스크를 폐기했다. 이 앱의 저장은 실제로 Firestore 확정을 뜻하므로
+ * (SaveStatus 주석 참조) 도안을 동작에 맞췄다.
+ *
+ * checked=false면 구름만 → 미저장(dirty) 상태.
+ * ⚠️ IconCheck(단독 체크 — 복사 완료 등)와 용도가 다르다. 여기 체크는 "구름 안의 완료 표시"다.
+ */
+export function IconSave({ size = 18, color = 'currentColor', checked = true }:
+  IconProps & { checked?: boolean }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {/* 바디 — 우상단 45° 노치, 절 모서리 r=2 필렛 */}
-      <path d="M5 3 H15.17 a2 2 0 0 1 1.42 .59 l3.83 3.83 a2 2 0 0 1 .58 1.41 V19 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 V5 a2 2 0 0 1 2 -2 Z" />
-      {/* 상단 셔터 */}
-      <path d="M7.5 3 v4.5 a1 1 0 0 0 1 1 h4 a1 1 0 0 0 1 -1 V3" />
-      {/* 하단 라벨 */}
-      <path d="M17 21 v-6.5 a1 1 0 0 0 -1 -1 H8 a1 1 0 0 0 -1 1 V21" />
+      {/* 구름 (Feather cloud) */}
+      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
+      {/* 체크 = 저장 완료. 구름 왼쪽 로브(중심 9,12 · r8) 안쪽에 시각 중심 정렬.
+          좌표는 미리보기(48·18·14·12px) 검수로 확정 — 임의 조정 금지. */}
+      {checked && <path d="M5.6 11.8 8 14.2 12.4 9.8" />}
     </svg>
   );
 }
@@ -412,7 +420,8 @@ export function IconLoader({ size = 14, color = 'currentColor' }: IconProps) {
 
 /* ═══ Phase 55b — 버전 관리 아이콘 4종 ═══
  *
- * 규약: 아이콘의 상태 변형은 boolean prop + fill 스위치로 표현한다(IconPin의 filled 참조).
+ * 규약: 아이콘의 상태 변형은 boolean prop으로 표현한다. 스위치 방식은 도안에 맞춘다 —
+ *   fill 전환(IconPin.filled) 또는 요소 유무(IconSave.checked).
  *
  * ⚠️ 버전 복원에 IconUndo를 쓰지 말 것 — Phase 55a 블록 Undo 버튼이 점유 중이다.
  *    복원은 IconRestore(시계 + 반시계 호)로 "시간을 되돌린다"는 의미를 따로 표현한다.

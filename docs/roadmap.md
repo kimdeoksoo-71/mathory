@@ -1338,7 +1338,26 @@ Phase 55 자체 VCS의 직접 확장. 블록 구조 조작(추가·삭제·이�
 - 검증 워크플로우: **8라운드**(v1 web → v2 CLI → v3 web → v4 CLI → v5 web → v6 CLI → v7 web → v8 CLI 착수본), 누적 결함 60건. 🔴 4건(export 게이트·prune 보호·content 출처·버튼 중첩)은 전부 3회 이상 교차 확인
 - 착수 후 실측 정정: firebase-tools 15.19+가 **JDK 21+** 요구(`test:rules` 실행 시 `JAVA_HOME=/opt/homebrew/opt/openjdk@21` 필요), `.env.local`의 PAT에 `github_pat_` 접두사 중복
 - 후속: 역방향 동기화·이미지 동봉·문항 삭제 시 레포 정리는 모두 비목표(아카이브 취지). 아이콘 잔여 부채는 `prelaunch-bug-cleanup.md` 7번
-- 덕수 완료: 콘텐츠 레포 생성·PAT 발급·env 등록(로컬+Vercel)·규칙 배포 / **`git push` 필요**
+- 덕수 완료: 콘텐츠 레포 생성·PAT 발급·env 등록(로컬+Vercel)·규칙 배포·`git push`
+- **버전 기록 열기 버튼의 아이콘은 Phase 55c에서 `IconRecent` → `IconRestore`로 교체됨**
+
+---
+
+## Phase 55c: 아이콘 정비 — 저장·버전 기록 ✅
+
+순수 표시 변경(규칙·데이터·서버 무관). 상세: `docs/phaseSketch/Phase55c 아이콘 정비저장·버전 기록 v2 착수본.md`
+
+| 항목 | 변경 |
+|------|------|
+| 저장 | 플로피디스크 → **클라우드 + 체크**. 이 앱의 저장은 실제로 Firestore 확정을 뜻하므로(`SaveStatus` 주석) 도안을 동작에 맞췄다. 컴포넌트명 `IconSave`는 유지 — 이름이 도안이 아니라 의미를 가리킨다 |
+| 상태 표시 | `checked` boolean prop 신설. dirty=구름만 / 저장 완료=구름+체크. `IconPin.filled`에 이은 상태 변형 prop 두 번째 사례이나 **fill 전환이 아니라 요소 유무** → 규약 문구를 그렇게 확장 |
+| 버전 기록 버튼 | `IconRecent` → `IconRestore`. 사이드바 '최근 문항'과 **같은 글리프**였던 게 실제 문제였다(Phase 55 Stage 4의 "사이드바와 통일" 결정을 뒤집음) |
+
+- 저장 버튼은 세 채널(SaveStatus 텍스트·버튼 색·체크 유무)이 같은 사실을 말한다. 의도된 중복 — 창 폭이 좁아 SaveStatus가 밀리거나 시선이 버튼에만 갈 때 **아이콘 단독으로도 상태가 읽혀야** 한다
+- 체크 좌표는 구름 왼쪽 로브(중심 9,12·r8) 안쪽에 들어가도록 확정. 세 점의 중심 거리 3.41·2.42·4.05로 외곽선과 겹치지 않는다. **임의 조정 금지**
+- `IconRestore`가 두 곳에 쓰인다(상단바 17px 버튼 / 타임라인 14px restore 트리거). 맥락이 분리돼 수용 — 혼란이 확인되면 그때 트리거 쪽을 분화한다
+- 부수 정리: `IconCheck` 미사용 import 제거, `docs/saveicontask.md`(2026-08-14 확정안 A)에 폐기 표시
+- 검증 워크플로우: v1(web) → v2(CLI 실코드 — **좌표 전면 재실측**). v1은 기준 커밋이 `f311121`이라 Phase 55b 커밋 5개만큼 좌표가 밀려 있었고, 거짓이 되는 주석 2개·규약 문구·낡은 지시서 폐기 표시가 누락돼 있었다
 
 ---
 
@@ -1398,7 +1417,8 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 | 항목 | 완료일 | 비고 |
 |------|--------|------|
 | 버전 기록 버튼 아이콘을 사이드바 '최근 문항'과 통일 | 2026-08-14 | `IconRecent` 계열로 통일 (커밋 c921b71) |
-| 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)` |
+| 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)`. **⚠️ 이때의 도안(플로피/셔터+라벨)은 Phase 55c에서 클라우드+체크로 교체됨 — 규격만 유효하고 도안은 낡은 기록이다** |
+| 저장·버전 기록 아이콘 정비 | 2026-08-15 | **Phase 55c** — 저장을 플로피 → 클라우드+체크(`checked` prop), 버전 기록 버튼을 `IconRecent` → `IconRestore`. 상세는 아래 Phase 55c 절 |
 
 ---
 
