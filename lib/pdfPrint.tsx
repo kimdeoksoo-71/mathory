@@ -3,6 +3,9 @@ import PrintableContent, { PrintTab } from '../components/print/PrintableContent
 import '../components/print/PrintStyles.css';
 
 export interface PdfPrintTab {
+  /** 탭 id (question / solution / extra_N). Phase 58 P2 — 인쇄에서도 톤 스코프를
+   *  판정해야 하는데 label만으로는 문제/풀이를 구분할 수 없어 신설했다. */
+  id: string;
   label: string;
   blocks: Array<{
     id: string;

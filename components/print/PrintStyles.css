@@ -36,6 +36,19 @@
   color: #000;
 }
 
+/* ═══ Phase 58 D6 — 인쇄는 톤 시스템의 의도적 예외 ═══
+   화면에서는 색으로 key를 구분하지만(D5), 인쇄는 흑백이 기본이라 색 위계가 죽는다.
+   → 전체를 100% 톤으로 되돌리고 key만 굵은 글씨로 바꾼다.
+
+   ⚠ 이 복원 규칙이 반드시 필요하다. globals.css는 .print-root 서브트리에도 적용되고,
+     @media print의 `* { print-color-adjust: exact }`(위) 때문에 회색이 그대로 인쇄된다.
+   ⚠ 특이도: .print-body .solution-tone.has-key (0,3,0) > globals의 (0,2,0).
+   ⚠ key 안 수식은 굵어지지 않는다(D6') — KaTeX가 자체 `font: normal` shorthand로
+     weight를 리셋하기 때문이다. 텍스트 굵기만으로 문장 단위 식별은 충분하다고 판단했다. */
+.print-body .solution-tone.has-key,
+.print-body .solution-tone.has-key .katex { color: inherit; }
+.print-body .solution-tone.has-key strong { font-weight: 700; }
+
 .print-tab-section { break-before: column; }
 .print-tab-label {
   font-size: 12pt; font-weight: 600;

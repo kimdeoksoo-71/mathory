@@ -201,16 +201,65 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-/* 본문 톤다운 (Phase 43): 본문은 톤다운 웜그레이, 수식은 진하게 → 수식이 앞으로
-   "수식은 진하게, 본문은 흐리게" — 굵기 대신 명도 대비로 위계 형성 */
+/* ═══ 본문 톤 기준선 (Phase 43 도입 → Phase 58 D14로 분리) ═══
+   "수식은 진하게, 본문은 흐리게" — 굵기 대신 명도 대비로 위계를 만든다.
+
+   ⚠ Phase 58: 색만 .tone-baseline으로 떼어냈다. 공유뷰(ProblemTabContent)에도
+     같은 기준선을 줘야 하는데, .problem-content-toned를 통째로 붙이면
+     letter-spacing: -0.01em이 함께 들어가 이미 공개된 페이지의 줄바꿈이 바뀐다.
+     색만 필요한 곳은 .tone-baseline만 붙일 것.
+   ⚠ .katex에 명시 color가 걸려 있다 — 조상에 color를 줘도 수식엔 닿지 않는다.
+     수식 색을 바꾸려면 반드시 .katex를 직접 겨냥해 이 규칙을 특이도로 이겨야 한다. */
+.tone-baseline        { color: var(--text-secondary); }
+.tone-baseline .katex { color: var(--text-primary); }
+
+/* 타이포그래피(색 제외) — 앱 내부 열람/편집 화면 전용 */
 .problem-content-toned {
   font-family: var(--font-ui);
   font-weight: var(--weight-regular);
   line-height: 1.8;
   letter-spacing: -0.01em;
-  color: var(--text-secondary);
 }
-.problem-content-toned .katex { color: var(--text-primary); }
+
+/* ═══ Phase 58 P2 — key sentence 톤 시스템 ═══
+   풀이(question 외 탭)에서 routine을 한 단계 물리고 key만 앞으로 낸다.
+   key 마커는 인라인 `**` 하나뿐이다 — 강조문(callout)은 들여쓰기 전용이라
+   여기에 아무 규칙도 두지 않는다(D13). callout 내부는 조상의 톤을 그대로 상속한다.
+
+   dim/full은 신규 색을 만들지 않고 기존 토큰 2종을 재사용한다(D3-A):
+     dim  = --text-secondary  (현행 본문색 그대로 → 비key 텍스트는 픽셀 무변화)
+     full = --text-primary    (현행 수식색)
+   실제로 변하는 것은 ① 비key 수식이 본문 톤으로 내려앉고 ② key가 진해지는 것 둘뿐이다.
+   명암비(실측): secondary는 클레이 배경에서 6.35/5.86/7.15:1, primary는 12.51/11.54/14.08:1.
+   더 강한 후퇴가 필요하면 :root에 --tone-dim: #675F52 한 줄만 추가하면 된다(5.50/5.08/6.19:1). */
+
+/* 톤 낮추기는 has-key일 때만 발동한다 (D4 — 마커 없는 문항 보호) */
+.solution-tone.has-key        { color: var(--tone-dim, var(--text-secondary)); }
+/* ⚠ 이 줄이 없으면 수식은 전혀 흐려지지 않는다 — .tone-baseline .katex(0,2,0)를
+     특이도(0,3,0)로 이겨야 한다 (D3') */
+.solution-tone.has-key .katex { color: var(--tone-dim, var(--text-secondary)); }
+
+/* key 복귀 — 텍스트와 그 안의 수식까지 (0,3,1)로 위 규칙을 이긴다 */
+.solution-tone.has-key strong,
+.solution-tone.has-key strong .katex { color: var(--text-primary); }
+
+/* D5 — 화면에서 key는 색으로만 구분한다. 굵기+색 이중 신호를 피한다.
+   (KaTeX는 자체 `font: normal` shorthand로 weight를 리셋하므로 수식엔 원래 볼드가 없다) */
+.solution-tone.has-key strong { font-weight: inherit; }
+
+/* D9' — 제목은 has-key 여부·dim 값과 무관하게 현행 색에 고정한다.
+   현재 제목은 EditorPreview 인라인 style에 color가 없어 secondary를 상속하고 있다.
+   has-key일 때만 진해지면 문항마다 제목 색이 달라지고 "진한 것 = key"라는 신호도 흐려진다.
+   dim을 --tone-dim으로 승격해도 제목만 따라 흐려지지 않게 막는 가드이기도 하다. */
+.solution-tone.has-key h1,
+.solution-tone.has-key h2,
+.solution-tone.has-key h3 { color: var(--text-secondary); }
+/* 제목 안 수식도 현행(primary) 유지. 위 h1~h3 규칙(0,3,0)은 제목 자신을 칠할 뿐이고,
+   .katex는 .solution-tone.has-key .katex(0,3,0)가 직접 잡아 dim이 되어버린다.
+   (0,3,1)로 되돌린다 — "제목은 현행 그대로"를 글자와 수식 양쪽에서 지킨다. */
+.solution-tone.has-key h1 .katex,
+.solution-tone.has-key h2 .katex,
+.solution-tone.has-key h3 .katex { color: var(--text-primary); }
 
 /* Display math: 왼쪽 정렬 + 들여쓰기 */
 .katex-display,

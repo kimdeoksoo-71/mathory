@@ -75,10 +75,10 @@ export default function PublicViewerShell({
         ) : twoColumn ? (
           <>
             <ScrollColumn>
-              <ContentCard><ProblemTabContent blocks={tabBlocks[tabs[0].id] || []} /></ContentCard>
+              <ContentCard><ProblemTabContent blocks={tabBlocks[tabs[0].id] || []} tabId={tabs[0].id} /></ContentCard>
             </ScrollColumn>
             <ScrollColumn divider>
-              <ContentCard><ProblemTabContent blocks={tabBlocks[tabs[1].id] || []} /></ContentCard>
+              <ContentCard><ProblemTabContent blocks={tabBlocks[tabs[1].id] || []} tabId={tabs[1].id} /></ContentCard>
               <Slogan />
             </ScrollColumn>
           </>
@@ -93,7 +93,7 @@ export default function PublicViewerShell({
                 ))}
               </div>
             )}
-            <ContentCard><ProblemTabContent blocks={tabBlocks[activeTab] || []} /></ContentCard>
+            <ContentCard><ProblemTabContent blocks={tabBlocks[activeTab] || []} tabId={activeTab} /></ContentCard>
             <Slogan />
           </ScrollColumn>
         )}

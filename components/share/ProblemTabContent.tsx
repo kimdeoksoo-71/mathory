@@ -4,17 +4,25 @@ import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import { Block } from '../../types/problem';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
+import { toneClass } from '../../lib/keyTone';
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 /**
  * 공개 뷰어용 탭 본문 렌더러 (Phase 50 /shared, Phase 51 /p 공통).
  * EditorPreview borderless + ChoicesBlock + 이미지 treatment 패턴.
+ *
+ * Phase 58 P2 — tabId를 받는다. 톤 스코프 판정(question 탭만 제외)에 필요한데
+ * 이전에는 blocks만 받아 탭 정체를 몰랐다.
  */
-export default function ProblemTabContent({ blocks }: { blocks: Block[] }) {
+export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; tabId: string }) {
   const sorted = [...blocks].sort((a, b) => a.order - b.order);
   return (
-    <div>
+    /* Phase 58 D14 — 앱 열람뷰와 톤 기준선을 맞춘다.
+       ⚠ .problem-content-toned를 통째로 붙이면 letter-spacing: -0.01em이 함께 들어와
+         이미 공개된 페이지의 줄바꿈이 바뀐다. 색만 담은 .tone-baseline만 쓸 것.
+         (line-height 1.8·font-family는 EditorPreview root가 이미 주고 있다) */
+    <div className={`tone-baseline ${toneClass(tabId, sorted)}`.trim()}>
       {sorted.map((block, i) => {
         const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
 

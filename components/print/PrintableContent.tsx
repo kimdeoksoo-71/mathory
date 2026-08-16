@@ -11,6 +11,7 @@ import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
 import './PrintStyles.css';
 import { preprocess, Locale } from '../../lib/preprocess';
+import { toneClass } from '../../lib/keyTone';
 
 export interface PrintBlock {
   id: string;
@@ -26,6 +27,9 @@ export interface PrintBlock {
 }
 
 export interface PrintTab {
+  /** 탭 id (question / solution / extra_N) — Phase 58 P2 톤 스코프 판정용.
+   *  label은 사용자가 바꿀 수 있어 문제/풀이 구분에 쓸 수 없다. */
+  id: string;
   label: string;
   blocks: PrintBlock[];
 }
@@ -52,7 +56,14 @@ export default function PrintableContent({
     <div className="print-root">
       <div className="print-body">
         {tabs.map((tab, tabIdx) => (
-          <div key={tab.label + tabIdx} className={tabIdx > 0 ? 'print-tab-section' : ''}>
+          /* Phase 58 P2 — 톤 스코프 클래스. 인쇄는 색을 100%로 되돌리고 key만 굵게 하는
+             의도적 예외라(D6), 클래스는 붙이되 PrintStyles가 색을 복원한다.
+             .tone-baseline은 붙이지 않는다 — 인쇄 본문색은 #000으로 별도 체계다. */
+          <div
+            key={tab.label + tabIdx}
+            className={[tabIdx > 0 ? 'print-tab-section' : '', toneClass(tab.id, tab.blocks)]
+              .filter(Boolean).join(' ')}
+          >
             <div className="print-tab-label">{tab.label}</div>
             {tab.blocks.map((block, blockIdx) => (
               /* Phase 58 D2 — 제목 위 여백. 인쇄는 화면과 산식이 달라 값도 다르다:

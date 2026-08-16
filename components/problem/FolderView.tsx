@@ -554,7 +554,9 @@ export default function FolderView({
                   </div>
 
                   {/* 카드 본문 — 잘림 */}
-                  <div className="problem-content-scaled problem-content-toned" style={{
+                  {/* Phase 58 P2 — 카드는 question 블록만 렌더하므로 톤 스코프 밖이다(D9).
+                      색 기준선(.tone-baseline)만 유지하고 solution-tone은 붙이지 않는다. */}
+                  <div className="problem-content-scaled problem-content-toned tone-baseline" style={{
                     flex: 1, minHeight: 0, overflow: 'hidden', position: 'relative',
                   }}>
                     <style>{`.problem-content-scaled > div { font-size: ${contentFontSize}px !important; }`}</style>

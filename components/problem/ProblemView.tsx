@@ -15,6 +15,7 @@ import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
+import { toneClass } from '../../lib/keyTone';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
@@ -301,6 +302,7 @@ export default function ProblemView({
       const printTabs: PdfPrintTab[] = tabs
         .filter((t) => selectedTabIds.includes(t.id))
         .map((t) => ({
+          id: t.id,          // Phase 58 P2 — 인쇄 톤 스코프 판정용
           label: t.label,
           blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
             id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
@@ -739,7 +741,11 @@ export default function ProblemView({
                             marginLeft: -24,
                           } : {}),
                         }}>
-                          <div className="problem-content-scaled problem-content-toned" style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}>
+                          {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
+                          <div
+                            className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id, blocks)}`}
+                            style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
+                          >
                             {renderBlocks(blocks)}
                           </div>
                         </div>

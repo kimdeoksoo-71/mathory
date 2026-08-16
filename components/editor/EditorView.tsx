@@ -23,6 +23,7 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
+import { toneClass } from '../../lib/keyTone';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
 import { canonicalize } from '../../lib/version/canonicalize';
@@ -3187,8 +3188,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
-            <div style={activeTab === 'question' ? {
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned tone-baseline" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
+            {/* Phase 58 P2 — 톤 스코프. 미리보기는 활성 탭 하나만 렌더하므로 activeTab으로 판정한다 */}
+            <div className={toneClass(activeTab, currentBlocks)} style={activeTab === 'question' ? {
               background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
             {currentBlocks.map((block, i) => {
