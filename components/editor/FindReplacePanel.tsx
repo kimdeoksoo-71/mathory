@@ -297,9 +297,16 @@ export default function FindReplacePanel({
 
   return (
     <div style={{
-      padding: '8px 12px', borderBottom: '1px solid var(--border-light, #e0e0e0)',
-      background: 'var(--bg-card, #fff)', fontFamily: 'var(--font-ui)', fontSize: 13,
-      flexShrink: 0, display: 'flex', gap: 6, alignItems: 'flex-start',
+      // 팝업 형태 — 편집 컬럼 우상단에 floating
+      position: 'absolute', top: 8, right: 12, zIndex: 20,
+      width: 'min(560px, calc(100% - 24px))',
+      padding: '8px 12px',
+      background: 'var(--bg-card, #fff)',
+      border: '1px solid var(--border-primary, #d4d0ca)',
+      borderRadius: 8,
+      boxShadow: '0 6px 20px rgba(0,0,0,0.14)',
+      fontFamily: 'var(--font-ui)', fontSize: 13,
+      display: 'flex', gap: 6, alignItems: 'flex-start',
     }} onKeyDown={handleKeyDown}>
       <button onClick={() => setShowReplace(!showReplace)} title={showReplace ? '바꾸기 숨기기' : '바꾸기 표시'}
         style={{ border: 'none', background: 'none', cursor: 'pointer', padding: '4px 2px',

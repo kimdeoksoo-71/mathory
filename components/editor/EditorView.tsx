@@ -3064,6 +3064,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         <div data-noscroll="left-column" style={{
           flex: 1, minWidth: 420,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
+          // FindReplacePanel 팝업 기준 컨테이너
+          position: 'relative',
         }}>
           {/* ── 찾기/바꾸기 패널 ── */}
           <FindReplacePanel
