@@ -92,6 +92,15 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 - **행 단위 전처리에서 `\s*` 금지, `[ \t]*`를 쓸 것**: `\s`는 개행을 포함해 다음 줄을 빨아들인다. `^①\s*`가 내용 없는 원문자 줄들을 한 문단으로 뭉치던 버그가 이것 (Phase 57)
 - **여백을 논하기 전에 기준선을 실측할 것**: 전역 리셋 `* { margin: 0 }`(globals.css:100-104) 때문에 화면 `<p>`의 문단 간격은 오랫동안 **0**이었다(인쇄만 `.print-body p` 6pt). "UA 기본 1em"을 가정하면 산식이 3배로 어긋난다 (Phase 57)
 - **본문 상하 여백 기준 (Phase 57 K1)**: 문단 간격(화면 `0.6em` / 인쇄 `6pt`) 위에 **상하 각 +0.5em** → 화면 `1.1em` / 인쇄 `11pt`. display 수식·ul/ol·① 원문자 밭·강조문(`.callout-block`)이 전부 이 값을 공유한다. 새 블록 타입을 추가하면 같은 값을 쓸 것
+- **제목 위 여백은 3항 합이다 (Phase 58 F1)**: `[앞 블록에서 이월된 마진]` + `[블록 래퍼 paddingTop]` + `[h2 자신의 marginTop]`. 앞 블록 타입에 따라 이월분이 달라져(text 뒤 `0.6em` / display 수식·리스트·① 밭 뒤 `1.1em`) 체감 여백이 ±0.25em 흔들린다. **em 마진은 본문 em이 아니라 그 요소 자신의 font-size 기준**이라 h2의 `margin: 1em`은 `1.08em`이다. 세 항 중 하나만 보고 계산하면 어긋난다 — 반드시 DevTools로 실측할 것
+- **제목 스타일은 `EditorPreview.tsx` 인라인 style이 유일한 진실**: globals.css의 heading 절은 규칙 없는 주석이고, 인라인 style은 `!important` 없는 모든 시트 규칙을 이긴다 → **CSS로는 못 바꾼다.** h1/h2/h3는 한 벌이므로 하나만 고치면 위계가 역전한다 (Phase 58 D1')
+- **`--katex-scale`은 `em` 단위 포함 값**(현재 `1.08em`): 무단위로 바꾸면 `font-size`에 invalid라 declaration이 통째로 폐기되고 `.katex`가 katex.min.css의 `font: normal 1.21em`으로 되돌아가 **오히려 커진다**. 소비처는 `.preview-content .katex` 한 곳뿐 (Phase 58 P4)
+- **원문자(①~⑳) 크기 레버는 `@font-face`의 `size-adjust` 하나뿐**(현재 88%): 합성을 안 쓰므로 전용 CSS 클래스가 없다. `--font-print`도 같은 family를 공유해 화면·인쇄가 함께 줄어든다. Safari 17 미만은 디스크립터를 무시할 뿐이라 안전 (Phase 58 P5)
+- **명암비 계산은 `((c+0.055)/1.055)^2.4`** — `/1.055`를 빠뜨리면 판정이 뒤집힌다. 실배경은 흰색이 아니라 클레이 3종(`--bg-content #F4EFE7` / FolderView 카드 `--block-bg-active #EDE6DA` / 공유뷰 `--bg-card #FEFDFB`)이고, **구속 조건은 가장 어두운 `#EDE6DA`** 하나다 (Phase 58 D3)
+- **`.problem-content-toned .katex`가 수식에 명시 color를 준다**: 조상에 `color`를 줘도 수식엔 닿지 않는다. 수식 색을 바꾸려면 `.katex`를 직접 겨냥해 특이도로 이겨야 한다 (Phase 58 D3')
+- **key sentence 톤 시스템 (Phase 58 P2)**: key 마커는 인라인 `**` **하나뿐**이다. 강조문(callout)은 들여쓰기로 위치를 강조하는 레이아웃 블록이고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). `**`가 없는 풀이는 톤 낮추기 미발동(D4). 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
+- **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
+- **툴바 아이콘은 `UnifiedToolbar.tsx` 안의 인라인 SVG 컴포넌트 계열**: `SVG_PROPS`(viewBox 64, stroke 3.5) + `CORNER_BRACKETS` 공유, `stroke="currentColor"`. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다 (Phase 58 P3)
 
 ## 현재 PDF 규격
 
@@ -106,15 +115,21 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 `text · heading · list(목록) · callout(강조문) · gana · roman · box · choices · image · svg · ggb`
 (+ 레거시 `math_block`·`bullet` → text로 정규화)
 
+- **강조의 두 축은 독립이다 (Phase 58 D13)**: `callout`은 **들여쓰기(위치)** 강조, 인라인 `**`는 **톤(색·굵기)** 강조. 따로 써도 되고 같이 써도 된다. display 수식 `$$…$$`은 블록 문법이라 `**`로 감쌀 수 없으므로, 톤 강조가 필요하면 인라인으로 바꿔 `**$…$**`로 쓴다(인라인 수식에도 `\displaystyle`이 자동 주입되므로 조판은 그대로다). 들여쓰기까지 원하면 그 행을 callout에 둔다
+
 - 상수 6종은 전부 `EditorView.tsx` 상단(BLOCK_TYPE_LABELS · BLOCK_TYPES · BLOCK_PRESETS · TEXT_BASED_TYPES · SPLITTABLE_TYPES · BORDERED_TYPES)
 - **렌더 사이트 5곳** — 특수 타입 분기를 추가하려면 전부 손봐야 한다:
   `EditorView`(미리보기) · `ProblemView` · `FolderView` · `ProblemTabContent`(공유) · `PrintableContent`(인쇄)
   앞 4곳은 `<EditorPreview borderless>` 경유 → `.preview-content` CSS가 자동 적용. 인쇄만 자체 ReactMarkdown(`.print-body`)
 - 분기 순서는 5곳 모두 `image → svg → ggb → BORDERED → callout → choices → 기본 markdown`
 
-## 현재 Phase: 21 완료
+## 현재 Phase: 58 완료 (P1~P5)
+
+Phase 58 = 제목 블록 재조정 · key sentence 톤 시스템 · 수식/원문자 크기 완화.
+착수 문서: `docs/phasedocs/Phase58 제목 블록·key sentence 톤·수식 크기.md`
 
 다음 작업 후보:
+- **P6 긴 display 수식 접기** (Phase 58에서 분리) — 최상위 `\\` display 수식 전용. `aligned`·`gathered`·`array`는 `.mspace.newline`을 방출하지 않아 행 단위 접기가 불가능하다. 착수 전 전 문항에서 두 문법의 사용 비율부터 조사할 것
 - PDF 정밀 레이아웃 (Puppeteer 또는 jsPDF)
 - UI 디자인 (docs/ui-design-reference.md 참조)
 - Mathpix OCR API 통합
