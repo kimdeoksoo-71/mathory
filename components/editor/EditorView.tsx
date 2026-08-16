@@ -3076,7 +3076,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           />
 
           <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
-            <div style={{ maxWidth: '35em', margin: '0 auto' }}>
+            <div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
                 {currentBlocks.map((block, i) => {
