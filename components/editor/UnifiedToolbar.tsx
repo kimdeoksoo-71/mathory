@@ -181,6 +181,21 @@ function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/** 핵심문장 (Phase 58 P3) — 보통 행 2개 사이에 칠해진 강조 행 1개.
+ *  기능(주변은 물러나고 key 한 줄만 앞으로)을 그대로 그린 것이고, 계열의 idiom만 쓴다:
+ *  선은 currentColor stroke, 면은 fill="currentColor" stroke="none"(SnippetIcon 점 선례).
+ *  ProofreadIcon(4행 + 체크)과 혼동되지 않도록 3행 + 가운데를 면으로 처리했다. */
+function KeySentenceIcon() {
+  return (
+    <svg {...SVG_PROPS}>
+      {CORNER_BRACKETS}
+      <path d="M18 22 L46 22" />
+      <rect x="18" y="27.5" width="26" height="9" rx="2" fill="currentColor" stroke="none" />
+      <path d="M18 42 L38 42" />
+    </svg>
+  );
+}
+
 function AiMathGenIcon() {
   return (
     <svg {...SVG_PROPS}>
@@ -263,6 +278,10 @@ interface UnifiedToolbarProps {
   aiLoading: boolean;
   collapseMode: boolean;
   onToggleCollapseAll: () => void;
+  /** Phase 58 P3 — 선택 영역을 `**…**`로 감싸기/해제 */
+  onToggleKey: () => void;
+  /** 직전 토글이 규칙 위반으로 거부됐는가 (버튼 흔들림 피드백) */
+  keyToggleRejected: boolean;
 }
 
 const ICON_BTN_BASE: React.CSSProperties = {
@@ -733,6 +752,8 @@ export default function UnifiedToolbar({
   aiLoading,
   collapseMode,
   onToggleCollapseAll,
+  onToggleKey,
+  keyToggleRejected,
 }: UnifiedToolbarProps) {
   const [snippetMenuOpen, setSnippetMenuOpen] = useState(false);
   const snippetBtnRef = useRef<HTMLButtonElement>(null);
@@ -768,6 +789,21 @@ export default function UnifiedToolbar({
   );
 
   const rightItems: { key: string; node: React.ReactNode }[] = [
+    {
+      /* Phase 58 P3 — 핵심문장 토글. rightItems는 폭이 좁아지면 끝부터 hide되므로
+         맨 앞에 둬야 좁은 화면에서 살아남는다. */
+      key: 'keysent',
+      node: (
+        <IconButton
+          title={keyToggleRejected ? '감쌀 수 없는 선택입니다 (문단·수식 경계 확인)' : '핵심문장 (**로 강조)'}
+          onClick={onToggleKey}
+        >
+          <span style={keyToggleRejected ? { animation: 'keyShake 0.35s' } : undefined}>
+            <KeySentenceIcon />
+          </span>
+        </IconButton>
+      ),
+    },
     {
       key: 'snippet',
       node: (

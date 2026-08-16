@@ -24,6 +24,7 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
+import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
 import { canonicalize } from '../../lib/version/canonicalize';
@@ -142,76 +143,12 @@ const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
 
-/* ═══ 수식 인덱싱: 원본 content에서 모든 수식의 {from, to} 추출 (출현 순서) ═══ */
-interface MathRange { from: number; to: number; }
-
-function buildMathIndex(content: string): MathRange[] {
-  const ranges: MathRange[] = [];
-  let i = 0;
-  while (i < content.length) {
-    // $$ 블록 수식
-    if (content[i] === '$' && content[i + 1] === '$') {
-      const start = i;
-      const closeIdx = content.indexOf('$$', i + 2);
-      if (closeIdx !== -1) {
-        ranges.push({ from: start, to: closeIdx + 2 });
-        i = closeIdx + 2;
-        continue;
-      }
-    }
-    // $ 인라인 수식
-    if (content[i] === '$' && content[i + 1] !== '$') {
-      const start = i;
-      let j = i + 1;
-      let found = false;
-      while (j < content.length) {
-        if (content[j] === '$' && content[j - 1] !== '\\') {
-          ranges.push({ from: start, to: j + 1 });
-          i = j + 1;
-          found = true;
-          break;
-        }
-        if (content[j] === '\n' && j + 1 < content.length && content[j + 1] === '\n') break;
-        j++;
-      }
-      if (!found) i = start + 1;
-      continue;
-    }
-    // \[...\]
-    if (content[i] === '\\' && content[i + 1] === '[') {
-      const start = i;
-      const closeIdx = content.indexOf('\\]', i + 2);
-      if (closeIdx !== -1) {
-        ranges.push({ from: start, to: closeIdx + 2 });
-        i = closeIdx + 2;
-        continue;
-      }
-    }
-    // \(...\)
-    if (content[i] === '\\' && content[i + 1] === '(') {
-      const start = i;
-      const closeIdx = content.indexOf('\\)', i + 2);
-      if (closeIdx !== -1) {
-        ranges.push({ from: start, to: closeIdx + 2 });
-        i = closeIdx + 2;
-        continue;
-      }
-    }
-    i++;
-  }
-  return ranges;
-}
+/* 수식 인덱싱(buildMathIndex·findMathIdAtCursor)은 Phase 58에서 lib/mathIndex.ts로
+   옮겼다 — P3의 "핵심문장" 토글이 같은 수식 경계를 봐야 하기 때문이다. */
 
 /* typewriter 스크롤 임계값 (Phase 56 D8‴) — 발화선 ≠ 착지선이어야 재발화가 없다 */
 const TYPING_TRIGGER_MARGIN = 80;   // 패널 하단 80px 안으로 들어오면 발화
 const TYPING_LANDING_RATIO = 0.45;  // 패널 높이의 45% 지점에 착지
-
-function findMathIdAtCursor(ranges: MathRange[], cursor: number): number {
-  for (let idx = 0; idx < ranges.length; idx++) {
-    if (cursor >= ranges[idx].from && cursor <= ranges[idx].to) return idx;
-  }
-  return -1;
-}
 
 function getStoredFontSize(): number {
   if (typeof window === 'undefined') return FONT_SIZE_DEFAULT;
@@ -1764,6 +1701,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     );
   }, [setCurrentBlocks]);
 
+  /* ─── Phase 58 P3 — 핵심문장(`**…**`) 토글 ───
+     경계 규칙은 MarkdownEditor.toggleKeyWrap이 갖고 있다(공백 정돈·`\tag` 제외·
+     문단 제약·수식 경계 가드). 여기서는 활성 블록의 에디터로 넘기고,
+     거부되면 버튼을 흔들어 조용히 실패하지 않게 한다. */
+  const [keyToggleRejected, setKeyToggleRejected] = useState(false);
+  const handleToggleKey = useCallback(() => {
+    if (!activeBlockId) return;
+    const editor = editorRefs.current[activeBlockId];
+    if (!editor) return;
+    const result = editor.toggleKeyWrap();
+    if (result === 'rejected') {
+      setKeyToggleRejected(false);
+      // 다음 프레임에 다시 켜야 같은 거부가 연속될 때도 애니메이션이 재생된다
+      requestAnimationFrame(() => setKeyToggleRejected(true));
+      setTimeout(() => setKeyToggleRejected(false), 400);
+    }
+  }, [activeBlockId]);
+
   /* ─── 전체 접기 / 펼치기 토글 ─── */
   const handleToggleCollapseAll = useCallback(() => {
     setCollapseMode((on) => {
@@ -2934,6 +2889,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           aiLoading={aiLoadingBlockId !== null}
           collapseMode={collapseMode}
           onToggleCollapseAll={handleToggleCollapseAll}
+          onToggleKey={handleToggleKey}
+          keyToggleRejected={keyToggleRejected}
         />
         <input
           ref={ocrInputRef}

@@ -195,6 +195,13 @@ html, body {
   to { opacity: 1; transform: scale(1); }
 }
 
+/* 핵심문장 토글이 규칙 위반으로 거부됐을 때 (Phase 58 P3) — 조용히 실패하지 않도록 */
+@keyframes keyShake {
+  0%, 100% { transform: translateX(0); }
+  25%      { transform: translateX(-3px); }
+  75%      { transform: translateX(3px); }
+}
+
 @keyframes slideInLeft {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }

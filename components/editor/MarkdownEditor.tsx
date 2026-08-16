@@ -9,6 +9,7 @@ import { autocompletion, CompletionContext, Completion } from '@codemirror/autoc
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 // search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
+import { buildMathIndex, isInsideMathRange, crossesDisplayMath, containsDisplayMath } from '../../lib/mathIndex';
 import {
   SearchMatch,
   searchHighlightField,
@@ -70,7 +71,12 @@ export interface MarkdownEditorHandle {
   isComposing: () => boolean;
   /** 선택 영역이 비어 있는가(= 커서만 있음). 드래그로 범위를 잡은 상태와 구분한다. */
   isSelectionEmpty: () => boolean;
+  /** Phase 58 P3 — 선택 영역을 key sentence(`**…**`)로 감싸거나 해제한다.
+   *  반환값: 'wrapped' 감쌈 / 'unwrapped' 해제 / 'rejected' 규칙 위반으로 거부. */
+  toggleKeyWrap: () => KeyWrapResult;
 }
+
+export type KeyWrapResult = 'wrapped' | 'unwrapped' | 'rejected';
 
 // ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
 // 커서를 감싸는 가장 안쪽 괄호 또는 수식 기호의 닫는 위치+1 반환
@@ -417,6 +423,85 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       isSelectionEmpty() {
         return viewRef.current?.state.selection.main.empty ?? true;
+      },
+
+      /* ═══ Phase 58 P3 — 핵심문장(`**…**`) 토글 ═══
+         key 마커는 인라인 `**` 하나뿐이다(D13). 손으로 치면 경계 규칙을 어기기 쉬워
+         (앞뒤 공백·`\tag` 포함·수식 내부 절단) 여기서 정돈해 준다. */
+      toggleKeyWrap(): KeyWrapResult {
+        const view = viewRef.current;
+        if (!view) return 'rejected';
+
+        const doc = view.state.doc.toString();
+        const sel = view.state.selection.main;
+        if (sel.empty) return 'rejected';                     // ① 선택 없음
+
+        // ② 경계 정돈 — 양끝 공백 제외. `** text**`는 CommonMark 강조가 되지 않는다.
+        let from = sel.from;
+        let to = sel.to;
+        while (from < to && /\s/.test(doc[from])) from++;
+        while (to > from && /\s/.test(doc[to - 1])) to--;
+        if (from >= to) return 'rejected';
+
+        // 행 끝 `\tag{n}`은 선택에서 뺀다. 텍스트 행의 tag 변환 정규식이 행 끝 앵커
+        // (/\\tag\{(\d+)\}\s*$/gm)라, `… \tag{1}**`가 되면 매칭이 깨져 원문이 노출된다.
+        // key와 참조번호는 의미상으로도 분리가 옳다.
+        const tagAtEnd = doc.slice(from, to).match(/\s*\\tag\{\d+\}\s*$/);
+        if (tagAtEnd) {
+          to -= tagAtEnd[0].length;
+          while (to > from && /\s/.test(doc[to - 1])) to--;
+          if (from >= to) return 'rejected';
+        }
+
+        // ③ 문단 제약 — 정돈된 선택 안에 빈 줄이 있으면 거부(한 문단 내로 강제).
+        if (/\n[ \t]*\n/.test(doc.slice(from, to))) return 'rejected';
+
+        // ④ 수식 경계 가드 — 양끝이 수식 *내부*면 거부. `$…$`를 통째로 품는 것은 허용.
+        //    display 수식(`$$…$$`·`\[…\]`)에 걸치거나 통째로 품는 선택도 거부한다:
+        //    블록 문법은 `**`로 감쌀 수 없고, D8 관행(인라인 `$…$`로 바꿔 쓰기)으로 유도한다.
+        const ranges = buildMathIndex(doc);
+        if (isInsideMathRange(ranges, from) || isInsideMathRange(ranges, to)) return 'rejected';
+        if (crossesDisplayMath(doc, ranges, from, to)) return 'rejected';
+        if (containsDisplayMath(doc, ranges, from, to)) return 'rejected';
+
+        // ⑤ 토글 — 이미 `**…**`로 감싸져 있으면 벗긴다.
+        const inner = doc.slice(from, to);
+        const wrappedInside = inner.startsWith('**') && inner.endsWith('**') && inner.length > 4;
+        const wrappedOutside = doc.slice(Math.max(0, from - 2), from) === '**'
+          && doc.slice(to, to + 2) === '**';
+
+        // 단일 트랜잭션으로 dispatch → CM 히스토리·Phase 55a 블록 undo에 자연 편입.
+        if (wrappedOutside) {
+          view.dispatch({
+            changes: [
+              { from: from - 2, to: from, insert: '' },
+              { from: to, to: to + 2, insert: '' },
+            ],
+            selection: { anchor: from - 2, head: to - 2 },
+          });
+          view.focus();
+          return 'unwrapped';
+        }
+        if (wrappedInside) {
+          view.dispatch({
+            changes: [
+              { from, to: from + 2, insert: '' },
+              { from: to - 2, to, insert: '' },
+            ],
+            selection: { anchor: from, head: to - 4 },
+          });
+          view.focus();
+          return 'unwrapped';
+        }
+        view.dispatch({
+          changes: [
+            { from, to: from, insert: '**' },
+            { from: to, to, insert: '**' },
+          ],
+          selection: { anchor: from + 2, head: to + 2 },
+        });
+        view.focus();
+        return 'wrapped';
       },
     }));
 
