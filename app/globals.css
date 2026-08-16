@@ -22,7 +22,18 @@
    - local('AppleGothic'): 덕수 확인·선택(2026-08-14). macOS 기본 탑재
    - url(...): 그 외 기기용 폴백. Noto Sans KR의 U+2460 포함 subset (이미 앱이 쓰는 웹폰트).
      gstatic URL은 버전 고정이라 언젠가 404가 날 수 있으나, 그때는 스택의 다음 글꼴로
-     조용히 되돌아갈 뿐이라 안전하다(= 현재 동작). */
+     조용히 되돌아갈 뿐이라 안전하다(= 현재 동작).
+
+   Phase 58 P5/D11 — size-adjust로 크기를 낮춘다.
+   ⚠ 전용 CSS 클래스가 없으므로(마크업을 만들지 않는 것이 이 방식의 요점) 크기를 조절할
+     레버는 이 디스크립터 하나뿐이다. 글리프 아웃라인과 폰트 메트릭을 함께 스케일하므로
+     라인박스 기여분까지 같이 줄어 vertical-align 수동 보정이 필요 없다.
+   ⚠ --font-print도 같은 family를 쓰므로 화면·인쇄가 함께 줄어든다(D11' — 의도된 것).
+     분리하려면 같은 src를 다른 family 이름으로 한 번 더 선언해야 한다.
+   ⚠ 지원: Chrome 92+ / Firefox 92+ / Safari 17+. 미지원 브라우저는 이 줄을 무시할 뿐이라
+     현행 크기가 유지된다(깨지지 않는다).
+   ⚠ local() 폰트마다 원문자 글리프 크기가 달라 한 값이 기기별로 다르게 보인다.
+     macOS/AppleGothic 기준으로 맞추고 나머지는 감수한다. */
 @font-face {
   font-family: 'MathoryCircled';
   src: local('AppleGothic'),
@@ -30,6 +41,7 @@
        local('Malgun Gothic'),
        url('https://fonts.gstatic.com/s/notosanskr/v39/PbyxFmXiEBPT4ITbgNA5Cgms3VYcOA-vvnIzzuoyeLHq8H4gdeG6cl5G3CHlodySd_ke-3HNnn9yQA.108.woff2') format('woff2');
   unicode-range: U+2460-2473;   /* ① ~ ⑳ */
+  size-adjust: 92%;             /* Phase 58 P5 — 출발값. 실측 튜닝 범위 85~96% */
   font-display: swap;
 }
 
@@ -103,9 +115,12 @@
   --weight-medium: 500;
   --weight-semibold: 600;
 
-  /* 화면 수식 크기 — 본문 대비 배율. 반드시 em 단위(단위 없으면 무효 → 미적용).
-     KaTeX 기본 1.21em → 1.15em으로 살짝 축소 */
-  --katex-scale: 1.15em;
+  /* 화면 수식 크기 — 본문 대비 배율.
+     ⚠ 반드시 em 단위. 무단위 값(예: 1.08)은 font-size에 invalid라 declaration이 통째로
+       폐기되고, .katex가 katex.min.css의 `font: normal 1.21em`으로 되돌아가 오히려 커진다.
+     KaTeX 기본 1.21em → 1.15em(Phase 57) → 1.08em(Phase 58 P4/D10 — 본문과의 이질감 완화,
+     "살짝 큼"은 유지). 소비처는 아래 .preview-content .katex 한 곳뿐. */
+  --katex-scale: 1.08em;
 
   /* Sizing */
   --sidebar-expanded: 260px;
@@ -206,8 +221,9 @@ textarea:focus-visible {
   padding-left: 3em;
 }
 
-/* 화면 본문 수식 크기 — 본문 대비 115%(--katex-scale). KaTeX 기본 1.21em보다 살짝 작게.
-   인쇄(.print-body .katex 1em)와 에디터(cm-math-region)는 영향 없음 */
+/* 화면 본문 수식 크기 — 본문 대비 108%(--katex-scale, Phase 58 P4). KaTeX 기본 1.21em보다 작게.
+   인쇄(.print-body .katex 1em)와 에디터(cm-math-region)는 영향 없음.
+   ⚠ --katex-scale의 유일한 소비처다. 값을 바꾸려면 :root의 변수 정의만 고칠 것 */
 .preview-content .katex,
 .problem-content-toned .katex {
   font-size: var(--katex-scale);
@@ -289,7 +305,7 @@ p:has(.marker-circled) {
 
 /* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */
 /* Phase 57 P4: \tag{N}은 "수식 바깥에서 쓰는 것"이 표준 → 참조번호도 본문 글꼴·크기를 따른다.
-   .tag-marker는 .katex 바깥이라 --katex-scale(1.15) 영향을 받지 않으므로 inherit로 충분. */
+   .tag-marker는 .katex 바깥이라 --katex-scale(1.08) 영향을 받지 않으므로 inherit로 충분. */
 .tag-marker {
   float: right;
   white-space: nowrap;
@@ -316,7 +332,7 @@ p:has(.marker-circled) {
    ⚠ \tag{n}은 preprocessMath에서 \tag*{(n)}이 되어 "수학 모드"로 렌더된다
      → 실제 노드는 .mopen/.mord/.mclose이고 .text는 생기지 않는다.
        그래서 .text만 지정하는 방식으로는 아무것도 바뀌지 않는다 → 서브트리 전칭으로 잡는다.
-   ⚠ font-size는 절대값이어야 한다. 1em/inherit로 주면 .katex의 --katex-scale(1.15)을
+   ⚠ font-size는 절대값이어야 한다. 1em/inherit로 주면 .katex의 --katex-scale(1.08)을
      다시 물어 번호가 본문보다 커진다. */
 .katex-display > .katex > .katex-html > .tag,
 .katex-display > .katex > .katex-html > .tag * {
@@ -417,6 +433,9 @@ p:has(.marker-circled) {
 /* ═══ Phase 57 P5 — 원문자(①~⑳)
    구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui/--font-print 스택 한 줄이 전부다.
    전용 CSS 클래스가 없는 것이 이 방식의 요점 — 마크업을 만들지 않는다.
+   → 크기 조절도 여기가 아니라 @font-face의 size-adjust로 한다 (Phase 58 P5).
+     p:has(.marker-circled)의 2em 내어쓰기는 고정값이므로, 원문자를 많이 줄이면
+     마커와 본문 사이가 벌어진다 — 화면·인쇄(PrintStyles) 두 곳을 1:1로 볼 것.
 
    ⚠ 지난 시도(합성 원문자: 숫자를 inline-block span으로 감싸고 CSS로 원을 그림)는 실패했다.
      p:has(.marker-circled)의 text-indent: -2em(아래 참조)이 inline-block 안쪽 첫 줄에도
