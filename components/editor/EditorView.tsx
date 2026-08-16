@@ -2794,34 +2794,40 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           lastSavedAt={lastSavedAt}
         />
 
-        {/* 버전 기록 열기 — 아이콘은 IconRestore
-            (Phase 55c: 사이드바 '최근 문항'과 같은 IconRecent였던 것을 교체. 이력 복원 의미) */}
-        <button
-          onClick={() => setVersionDrawerOpen(true)}
-          title="버전 기록"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
-            color: 'var(--text-faint)',
-          }}
-        ><IconRestore size={17} /></button>
+        {/* 저장 · 버전 기록 묶음 (Phase 55c 후속)
+            한 쌍으로 묶은 이유: ① 둘의 간격만 좁히려면 행의 gap:8과 분리돼야 한다
+            (여기 gap 3 + 각 버튼 padding 4 = 글리프 사이 11px, 묶기 전 16px의 약 2/3)
+            ② flexWrap 시 둘이 갈라지지 않는다. 순서는 저장 → 버전 기록. */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+          {/* 저장 버튼 — 아이콘만. dirty면 빨강·구름만, 저장 완료면 회색·구름+체크. */}
+          <button
+            onClick={() => handleSave()}
+            disabled={saving}
+            title={saving ? '저장 중...' : dirty ? '변경사항 저장' : '저장됨'}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', padding: 4,
+              cursor: saving ? 'wait' : (dirty ? 'pointer' : 'default'),
+              color: dirty ? 'var(--accent-danger)' : 'var(--text-faint)',
+              transition: 'color 0.2s',
+            }}
+          >
+            {/* 색은 버튼 style의 color가 currentColor로 전달. 체크 유무만 checked prop으로 분기(Phase 55c) */}
+            {saving ? <IconLoader size={16} /> : <IconSave size={18} checked={!dirty} />}
+          </button>
 
-        {/* 저장 버튼 — 아이콘만. dirty면 빨강·구름만, 저장 완료면 회색·구름+체크. */}
-        <button
-          onClick={() => handleSave()}
-          disabled={saving}
-          title={saving ? '저장 중...' : dirty ? '변경사항 저장' : '저장됨'}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'transparent', border: 'none', padding: 4,
-            cursor: saving ? 'wait' : (dirty ? 'pointer' : 'default'),
-            color: dirty ? 'var(--accent-danger)' : 'var(--text-faint)',
-            transition: 'color 0.2s',
-          }}
-        >
-          {/* 색은 버튼 style의 color가 currentColor로 전달. 체크 유무만 checked prop으로 분기(Phase 55c) */}
-          {saving ? <IconLoader size={16} /> : <IconSave size={18} checked={!dirty} />}
-        </button>
+          {/* 버전 기록 열기 — 아이콘은 IconRestore
+              (Phase 55c: 사이드바 '최근 문항'과 같은 IconRecent였던 것을 교체. 이력 복원 의미) */}
+          <button
+            onClick={() => setVersionDrawerOpen(true)}
+            title="버전 기록"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: 'transparent', border: 'none', padding: 4, cursor: 'pointer',
+              color: 'var(--text-faint)',
+            }}
+          ><IconRestore size={17} /></button>
+        </div>
 
         {/* ─── 글꼴 크기 조절: 숫자 + 위/아래 꺾쇠 ─── */}
         <div style={{
