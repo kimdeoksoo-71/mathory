@@ -29,6 +29,8 @@ export default function OutlineToggle({ mode, onToggle, disabled }: Props) {
       on={outline}
       onToggle={onToggle}
       disabled={disabled}
+      /* 탭 라벨('문제'·'풀이')과 자형을 맞춘다 — 바로 그 아래·옆에 놓이는 글자다 */
+      labelStyle={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}
       title={disabled
         ? '제목·핵심문장·경우 블록이 없습니다'
         : outline

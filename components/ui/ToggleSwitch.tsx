@@ -11,7 +11,7 @@
  * 바깥 span에서 pointerdown을 막는다 (이 컴포넌트는 순수하게 둔다).
  */
 export default function ToggleSwitch({
-  label, on, onToggle, title, disabled,
+  label, on, onToggle, title, disabled, labelStyle,
 }: {
   label: string;
   on: boolean;
@@ -19,6 +19,9 @@ export default function ToggleSwitch({
   title?: string;
   /** 켤 수 없는 상태(대상이 없음 등). 자리는 지키되 조작을 막는다 */
   disabled?: boolean;
+  /** 라벨 타이포 덮어쓰기. 옆에 놓인 글자와 자형을 맞춰야 하는 자리에서 쓴다
+   *  (열람뷰의 '요약'은 탭 라벨 '문제·풀이'와 같은 12px/600/자간 0.5) */
+  labelStyle?: React.CSSProperties;
 }) {
   return (
     <button
@@ -38,10 +41,12 @@ export default function ToggleSwitch({
         fontSize: 11, color: on ? 'var(--text-primary)' : 'var(--text-muted)',
       }}
     >
-      <span>{label}</span>
+      <span style={labelStyle}>{label}</span>
       <span style={{
         position: 'relative', display: 'inline-block',
-        width: 26, height: 15, borderRadius: 8,
+        /* 22×13 — 본문 옆에 놓이는 작은 컨트롤이라 산뜻한 쪽이 낫다(덕수).
+           손잡이 9 + 상하 2씩 = 13. 켜짐 위치 11 = 22 − 9 − 2 */
+        width: 22, height: 13, borderRadius: 7,
         // ON은 배경과 조화되는 따뜻한 탄 톤.
         // OFF는 --bg-active(#E8E2D9)를 쓰다가 --text-placeholder로 낮췄다 — 활성 블록
         // 배경(#E8DFCE)과 명암비가 1.03:1이라 트랙이 사실상 보이지 않았다(→ 1.35:1).
@@ -50,8 +55,8 @@ export default function ToggleSwitch({
         flexShrink: 0,
       }}>
         <span style={{
-          position: 'absolute', top: 2, left: on ? 13 : 2,
-          width: 11, height: 11, borderRadius: '50%',
+          position: 'absolute', top: 2, left: on ? 11 : 2,
+          width: 9, height: 9, borderRadius: '50%',
           background: '#fff',
           transition: 'left 0.15s',
           boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
