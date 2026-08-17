@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Block, TabMeta } from '../../types/problem';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { useOutlineState } from '../../hooks/useOutlineState';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -43,6 +43,7 @@ export default function TabBody({
   tab, blocks, tabIdx, isOpen, copied, contentFontSize, onToggleTab, onCopy,
 }: Props) {
   const caseLabels = useMemo(() => buildCaseLabels(blocks), [blocks]);
+  const caseGaps = useMemo(() => buildCaseGapKeys(blocks), [blocks]);
   const outline = useOutlineState(blocks);
   const scoped = isToneScoped(tab.id);
   const isQuestion = tab.id === 'question';
@@ -55,8 +56,18 @@ export default function TabBody({
     width: 35 * contentFontSize, flexShrink: 0,
   };
 
-  /* ─── 블록 렌더 (EditorView 미리보기와 동일 규칙) ─── */
+  /* 경우 사이에 낀 블록은 rail이 관통하도록 .case-gap 한 겹을 두른다.
+     ⚠ 감싸도 형제 관계는 유지된다(래퍼가 그 자리의 형제가 된다) — rail 연결은
+       인접 셀렉터로 이뤄지므로 이 성질이 필수다. 마진은 래퍼를 통과해 collapse되어
+       간격도 변하지 않는다. */
   const renderBlock = (block: Block, i: number) => {
+    const node = renderBlockInner(block, i);
+    if (!caseGaps.has(blockKeyOf(block))) return node;
+    return <div key={block.id} className="case-gap">{node}</div>;
+  };
+
+  /* ─── 블록 렌더 (EditorView 미리보기와 동일 규칙) ─── */
+  const renderBlockInner = (block: Block, i: number) => {
     const isBordered = BORDERED_TYPES.has(block.type);
     const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
     if (block.type === 'image') {

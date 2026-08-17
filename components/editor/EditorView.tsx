@@ -24,7 +24,7 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
@@ -1094,6 +1094,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   /* Phase 59 — 경우 블록 자동 번호. 편집 중 실시간 재계산이 목적이므로
      currentBlocks 참조가 바뀔 때마다 다시 돈다(블록 수십 개 규모라 비용 무시 가능). */
   const caseLabels = useMemo(() => buildCaseLabels(currentBlocks), [currentBlocks]);
+  /* 경우 사이에 낀 블록 — rail이 관통해야 한다(이미지를 경우 안에 끼운 구성) */
+  const caseGaps = useMemo(() => buildCaseGapKeys(currentBlocks), [currentBlocks]);
   const setCurrentBlocks = useCallback((updater: LocalBlock[] | ((prev: LocalBlock[]) => LocalBlock[])) => {
     setAllBlocks((prev) => ({
       ...prev,
@@ -3172,9 +3174,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               // Phase 59 D15′ — case 클래스는 이 래퍼에 병기한다. 래퍼 안에 새 div를
               // 만들면 .case-block끼리 형제가 아니게 되어 rail 브리징이 통째로 죽는다.
               const caseLabel = isCaseBlock(block.type) ? (caseLabels.get(blockKeyOf(block)) ?? null) : null;
+              const caseCls = isCaseBlock(block.type)
+                ? caseClassName(block.type, !!caseLabel)
+                : (caseGaps.has(blockKeyOf(block)) ? 'case-gap' : undefined);
               return (
                 <div key={block.id} data-block-id={block.id}
-                  className={isCaseBlock(block.type) ? caseClassName(block.type, !!caseLabel) : undefined}
+                  className={caseCls}
                   style={{ paddingTop: headingTopPad }}>
                   {block.type === 'image' ? (
                     <div style={{ textAlign: 'center', margin: '1.2em 0' }}>

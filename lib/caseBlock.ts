@@ -104,6 +104,45 @@ export function injectCaseLabel(raw: string, label: string | null): string {
   return `<span class="case-label">${label}.</span> ${first}${rest}`;
 }
 
+/**
+ * 경우 사이에 낀 블록(이미지·설명 문단 등)의 키 집합 (Phase 59 D20/A).
+ *
+ * "런(run)" = 한 섹션 안에서 **첫 경우 블록부터 마지막 경우 블록까지**. 그 사이의
+ * 비-경우 블록은 rail이 관통해야 한다 — 경우 안에 이미지를 끼운 구성(D9′ 이어짓기)에서
+ * 선이 끊기면 구조가 무너져 보이기 때문이다. 제목(heading)은 번호와 마찬가지로 런도 끊는다.
+ *
+ * 렌더 사이트는 이 키에 해당하는 블록을 `.case-gap`으로 감싸기만 하면 된다.
+ * ⚠ 감쌀 때도 형제 관계가 유지되어야 한다 — rail 연결이 인접 셀렉터로 이뤄진다.
+ */
+export function buildCaseGapKeys(blocks: CaseBlockLike[]): Set<string> {
+  const gaps = new Set<string>();
+  let sectionStart = 0;
+
+  const flush = (end: number) => {
+    let first = -1;
+    let last = -1;
+    for (let i = sectionStart; i < end; i++) {
+      if (isCaseBlock(blocks[i].type)) {
+        if (first < 0) first = i;
+        last = i;
+      }
+    }
+    if (first < 0) return;
+    for (let i = first + 1; i < last; i++) {
+      if (!isCaseBlock(blocks[i].type)) gaps.add(blockKeyOf(blocks[i]));
+    }
+  };
+
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].type === 'heading') {
+      flush(i);
+      sectionStart = i + 1;
+    }
+  }
+  flush(blocks.length);
+  return gaps;
+}
+
 /** 렌더 사이트가 최상위 블록 요소에 붙일 className (D15′).
  *  ⚠ 편집창·인쇄는 블록마다 래퍼 div가 이미 있다. 그 안에 새 div를 만들면
  *    .case-block끼리 형제가 아니게 되어 rail 브리징이 통째로 죽는다 (v3 F1). */

@@ -157,29 +157,45 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
   --case-dot: #000;
 }
 .print-body .case-block.case-sub { padding-left: 4em; }
-.print-body .case-block::before {
+.print-body .case-gap { position: relative; }
+/* rail — 화면과 같은 원리(위쪽 브리지 + 마지막 dot에서 종단, 불투명).
+   브리지 14pt는 인쇄 간격(경우 11pt·테두리 블록 12pt)보다 크고,
+   최소 간격 11pt + 첫 dot 8.5pt보다 작아야 한다는 양쪽 제약에서 나온 값이다. */
+.print-body .case-block::before,
+.print-body .case-gap::before {
   content: ''; position: absolute;
   left: 0.7em; margin-left: -0.125mm; width: 0.25mm;
   top: 0.85em; bottom: 0;
-  background: #000; opacity: 0.55;
+  background: #8a8a8a;
 }
-.print-body .case-block:has(+ .case-block)::before { bottom: -11pt; }
-.print-body .case-block + .case-block::before      { top: 0; }
+.print-body :is(.case-block, .case-gap) + :is(.case-block, .case-gap)::before { top: -14pt; }
+.print-body .case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before {
+  bottom: auto; height: 0;
+}
+.print-body :is(.case-block, .case-gap) + .case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before {
+  bottom: auto; height: calc(14pt + 0.85em);
+}
 .print-body .case-block::after {
   content: ''; position: absolute;
   left: 0.7em; top: 0.85em;
   transform: translate(-50%, -50%);
-  width: 0.42em; height: 0.42em; border-radius: 50%;
+  width: 0.44em; height: 0.44em; border-radius: 50%;
   box-sizing: border-box;
   background: var(--case-dot);
 }
-.print-body .case-block.case-sub::after  { width: 0.34em; height: 0.34em; }
+.print-body .case-block.case-sub::after  { width: 0.26em; height: 0.26em; }
 .print-body .case-block.case-cont::after { content: none; }
 /* 제목행 고아 방지만 — break-inside는 걸지 않는다(경우는 길 수 있다. callout과 반대 판단) */
 .print-body .case-block p:has(> .case-label:first-child) { break-after: avoid; font-weight: 600; }
-/* ⚠ 필수 — 없으면 이중 들여쓰기가 된다. @media print가 .katex-display를 0으로 죽이고
-   .fleqn > .katex에 2em을 다시 주기 때문이다(위 24행). callout과 동일 처방. */
-.print-body .case-block .katex-display.fleqn > .katex { padding-left: 0 !important; }
+/* 경우 안 들여쓰기 — 화면과 같은 원칙(§C·D). display 수식은 @media print의 fleqn 2em을
+   그대로 받으므로 override를 두지 않는다. 리스트·① 밭만 같은 한 단으로 맞춘다. */
+/* ⚠ 자식 결합자 필수 — 중첩 리스트(li > ul)까지 밀면 안 된다.
+   인쇄는 .preview-content 래퍼가 없어 마크다운 산출물이 .case-block의 직속 자식이다. */
+.print-body .case-block > ul,
+.print-body .case-block > ol { margin-left: 2em; }
+/* ⚠ !important 필수 — globals.css의 p:has(.marker-circled){margin-left:1em !important}가
+   .print-root 서브트리에도 적용된다. 특이도로는 못 이긴다(실측으로 확인). */
+.print-body .case-block > p:has(.marker-circled) { margin-left: 2em !important; }
 
 /* ── bordered 블록 (gana, roman, box) ── */
 .print-bordered-block {

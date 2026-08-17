@@ -107,13 +107,17 @@ export default function OutlineSections({
       {sections.map((sec) => {
         const open = openSections.has(sec.key);
         const bodyId = `outline-sec-${sec.key}`;
+        // 경우 항목 사이에 낀 발췌는 rail이 관통해야 한다 — 전체 렌더의 .case-gap과 같은 규칙
+        const firstCase = sec.items.findIndex((i) => i.kind === 'case');
+        const lastCase = sec.items.map((i) => i.kind).lastIndexOf('case');
         const skeleton = (
           <>
-            {sec.items.map((item) => (
+            {sec.items.map((item, idx) => (
               item.kind === 'case'
                 ? <CaseItem key={item.itemKey} item={item} open={openCases.has(item.itemKey)} onToggle={onToggleCase} />
                 : (
-                  <div key={item.itemKey} className="outline-keys">
+                  <div key={item.itemKey}
+                    className={`outline-keys${idx > firstCase && idx < lastCase ? ' case-gap' : ''}`}>
                     <EditorPreview content={item.head} borderless locale="ko" />
                   </div>
                 )

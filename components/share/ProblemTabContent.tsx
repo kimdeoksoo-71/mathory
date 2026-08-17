@@ -6,7 +6,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import { Block } from '../../types/problem';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { useOutlineState } from '../../hooks/useOutlineState';
 import OutlineSections from '../problem/OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
@@ -28,11 +28,19 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
   // ⚠ useOutlineState가 blocks 참조로 memo하므로 정렬 결과를 매 렌더 새로 만들면 안 된다
   const sorted = useMemo(() => [...blocks].sort((a, b) => a.order - b.order), [blocks]);
   const caseLabels = useMemo(() => buildCaseLabels(sorted), [sorted]);
+  const caseGaps = useMemo(() => buildCaseGapKeys(sorted), [sorted]);
   const outline = useOutlineState(sorted);
   // 문제 탭은 스코프 밖 — 거기서 `**`는 key 마커가 아니다(Phase 58 D9)
   const scoped = isToneScoped(tabId);
 
+  /* 경우 사이에 낀 블록은 rail이 관통하도록 .case-gap 한 겹을 두른다(형제 관계 유지) */
   const renderBlock = (block: Block, i: number) => {
+    const node = renderBlockInner(block, i);
+    if (!caseGaps.has(blockKeyOf(block))) return node;
+    return <div key={block.id} className="case-gap">{node}</div>;
+  };
+
+  const renderBlockInner = (block: Block, i: number) => {
     const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
 
     if (block.type === 'image') {

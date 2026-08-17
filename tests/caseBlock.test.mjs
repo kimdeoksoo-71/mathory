@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildCaseLabels, injectCaseLabel, splitCaseTitle, letters, caseClassName } from '../.test-build/lib/caseBlock.js';
+import { buildCaseLabels, buildCaseGapKeys, injectCaseLabel, splitCaseTitle, letters, caseClassName } from '../.test-build/lib/caseBlock.js';
 import { buildOutline, extractKeySentences, hasOutlineContent } from '../.test-build/lib/solutionOutline.js';
 
 let seq = 0;
@@ -62,6 +62,45 @@ test('letters: base-26 (fromCharCode 단독의 { 버그 방지)', () => {
   assert.equal(letters(26), 'z');
   assert.equal(letters(27), 'aa');
   assert.equal(letters(28), 'ab');
+});
+
+/* ═══ rail 관통 구간 (gap) ═══ */
+
+test('경우 안에 낀 이미지는 gap이 된다 (rail 관통)', () => {
+  const blocks = [B('case', '가\n본문'), B('image', '<img src="x">'), B('case', '\n이어짐'), B('case', '나\n')];
+  const g = buildCaseGapKeys(blocks);
+  assert.equal(g.has(blocks[1].block_key), true);
+  assert.equal(g.size, 1);
+});
+
+test('첫 경우 앞·마지막 경우 뒤의 블록은 gap이 아니다 (rail은 첫 dot~마지막 dot)', () => {
+  const blocks = [B('text', '도입'), B('case', '가\n'), B('image', '<img>'), B('case', '나\n'), B('text', '마무리')];
+  const g = buildCaseGapKeys(blocks);
+  assert.deepEqual([...g], [blocks[2].block_key]);
+});
+
+test('제목 블록은 런을 끊는다 — 섹션마다 따로 계산', () => {
+  const blocks = [
+    B('case', '가\n'), B('image', '<img>'), B('case', '나\n'),   // 런 1
+    B('heading', '## 다른 접근'),
+    B('text', '설명'),                                            // 어느 런에도 속하지 않는다
+    B('case', '다\n'), B('text', '중간'), B('case', '라\n'),      // 런 2
+  ];
+  const g = buildCaseGapKeys(blocks);
+  assert.equal(g.has(blocks[1].block_key), true);
+  assert.equal(g.has(blocks[4].block_key), false);
+  assert.equal(g.has(blocks[6].block_key), true);
+  assert.equal(g.size, 2);
+});
+
+test('경우가 하나뿐이면 gap이 없다', () => {
+  const blocks = [B('case', '가\n'), B('image', '<img>'), B('text', '설명')];
+  assert.equal(buildCaseGapKeys(blocks).size, 0);
+});
+
+test('하위경우도 런의 구성원이다', () => {
+  const blocks = [B('case', '가\n'), B('image', '<img>'), B('subcase', '가-1\n')];
+  assert.equal(buildCaseGapKeys(blocks).has(blocks[1].block_key), true);
 });
 
 /* ═══ 제목행 분리·라벨 주입 ═══ */

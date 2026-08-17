@@ -140,6 +140,14 @@
        산식은 ((c+0.055)/1.055)^2.4 — /1.055를 빠뜨리면 판정이 뒤집힌다. */
   --case-dot: var(--mathory-red-dark);
 
+  /* 경우 블록의 세로 연결선.
+     ⚠ 반드시 불투명일 것. 레일은 블록마다 조각을 그려 이어 붙이는데, 반투명이면
+       겹친 구간만 알파가 누적돼 그 부분만 진해진다. 값은 기존 모습(본문색 28%를
+       클레이 위에 얹은 색)을 그대로 굳힌 것이다.
+     ⚠ 그래서 레일은 톤 시스템을 따라 흐려지지 않는다 — dot과 같이
+       "구조 신호는 톤 불변"으로 통일된다(Phase 59 B). */
+  --case-rail: #C9C4BA;
+
   /* Sizing */
   --sidebar-expanded: 260px;
   --sidebar-collapsed: 56px;
@@ -523,22 +531,41 @@ p:has(.marker-circled) {
   padding-right: 0;     /* \tag float:right 기준선을 컨테이너 우단에 맞춤 */
 }
 .case-block.case-sub { padding-left: 6em; }   /* 하위경우 — 텍스트만 한 단 더 */
+/* 경우 사이에 낀 블록(이미지 등) — rail만 관통시킨다. 들여쓰기는 주지 않는다
+   (이미지는 중앙 정렬이라 padding을 주면 그림이 오른쪽으로 밀린다) */
+.case-gap { position: relative; }
 
-/* rail — 기본은 자기 dot에서 자기 하단까지 */
-.case-block::before {
+/* ── rail ──
+   런은 "첫 dot에서 시작해 마지막 dot에서 끝나는 하나의 선"이다. 블록마다 조각을
+   그리고 조각끼리 위쪽으로 이어 붙인다.
+
+   ⚠ 브리지는 반드시 **위쪽**이어야 한다. 아래로 뻗으면 마지막 블록 앞의 간격
+     크기에 따라 선이 마지막 dot을 지나쳐 삐져나온다(종단을 정확히 만들 수 없다).
+   ⚠ 색은 불투명이어야 한다. 반투명이면 겹친 구간만 알파가 누적돼 진해진다 —
+     블록마다 마진이 달라(이미지 1.2em·SVG 0.8em·수식 1.1em…) 겹침을 피할 수 없다.
+   ⚠ 브리지 1.5em은 양쪽에서 물린 값이다: 실제 최대 간격(1.2em)보다는 커야 하고,
+     최소 간격(0.8em) + 첫 dot 위치(0.9em)보다는 작아야 한다 — 크면 런의 첫 dot
+     위로 선이 삐져나온다. 블록 마진을 바꾸면 이 값을 다시 볼 것. */
+.case-block::before,
+.case-gap::before {
   content: '';
   position: absolute;
   left: 1em; margin-left: -1px; width: 2px;
-  top: 0.9em;           /* .preview-content의 line-height 1.8의 절반 = 첫 행 중심 */
+  top: 0.9em;           /* 런 시작 = .preview-content line-height 1.8의 절반 = 첫 행 중심 */
   bottom: 0;
-  background: currentColor;
-  opacity: 0.28;
+  background: var(--case-rail);
 }
-/* 연속 구간 브리징 — 형제 마진 collapse(1.1em)를 건너뛴다.
-   ⚠ 이 두 줄이 매칭되려면 .case-block끼리 형제여야 한다. 편집창·인쇄는 블록마다
-     래퍼 div가 이미 있으므로 그 안에 새 div를 만들지 말고 래퍼에 클래스를 병기할 것 (D15′). */
-.case-block:has(+ .case-block)::before { bottom: -1.1em; }
-.case-block + .case-block::before      { top: 0; }
+/* 런이 이어지는 조각 — 위쪽 간격까지 덮는다.
+   ⚠ 매칭되려면 형제여야 한다. 편집창·인쇄는 블록마다 래퍼 div가 이미 있으므로
+     그 안에 새 div를 만들지 말고 래퍼에 클래스를 병기할 것 (D15′). */
+:is(.case-block, .case-gap) + :is(.case-block, .case-gap)::before { top: -1.5em; }
+/* 런의 종단 — 아래로 뻗지 않고 마지막 dot에서 끊는다 */
+.case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before {
+  bottom: auto; height: 0;                     /* 경우가 하나뿐인 런: 선 없이 dot만 */
+}
+:is(.case-block, .case-gap) + .case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before {
+  bottom: auto; height: calc(1.5em + 0.9em);   /* 위 브리지 + 자기 dot까지 */
+}
 
 /* dot — 열림/닫힘 상태 표시기 (D19). 펼침 = 채움 / 접힘 = 테두리만.
    ⚠ box-sizing 명시 필수: 전역 리셋 `*`는 가상요소에 닿지 않는다.
@@ -550,7 +577,7 @@ p:has(.marker-circled) {
   position: absolute;
   left: 1em; top: 0.9em;
   transform: translate(-50%, -50%);
-  width: 0.5em; height: 0.5em; border-radius: 50%;
+  width: 0.52em; height: 0.52em; border-radius: 50%;
   box-sizing: border-box;
   background: var(--case-dot);
 }
@@ -558,8 +585,13 @@ p:has(.marker-circled) {
   background: transparent;
   border: 0.1em solid var(--case-dot);
 }
-/* 하위경우는 크기로만 구분한다 — 반투명은 채움/테두리와 섞여 3상으로 읽힌다 */
-.case-block.case-sub::after  { width: 0.4em; height: 0.4em; }
+/* 하위경우는 크기로만 구분한다 — 반투명은 채움/테두리와 섞여 3상으로 읽힌다.
+   0.3em은 경우(0.52em)의 지름 58% = 면적 34%. 0.4em(면적 59%)일 때는
+   두 단계가 거의 같아 보였다.
+   ⚠ 링 두께를 함께 줄이지 않으면 접힘 상태의 구멍이 사라져 채움과 구별되지 않는다.
+     그래도 11px 글꼴에서는 구멍이 1.7px까지 내려간다 — 덕수 인지 후 승인(F). */
+.case-block.case-sub::after            { width: 0.3em; height: 0.3em; }
+.case-block.case-sub.case-closed::after { border-width: 0.075em; }
 /* 이어짓기(제목행 없는 case) — 번호도 dot도 없고 레일만 이어진다 */
 .case-block.case-cont::after { content: none; }
 
@@ -572,8 +604,17 @@ p:has(.marker-circled) {
 /* 제목행 텍스트는 500 — 600은 key(strong)의 신호라 겹치면 위계가 흐려진다.
    제목행 안에 **를 쓰면 그 부분만 600으로 올라가 구분이 살아난다. */
 .case-block p:has(> .case-label:first-child) { font-weight: var(--weight-medium); }
-/* 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 (callout 전례) */
-.case-block .katex-display { padding-left: 0; }
+
+/* ── 경우 안의 들여쓰기 (Phase 59 C·D) ──
+   경우 블록 안에서는 **최상위와 똑같은 규칙**이 그대로 산다: 본문 대비 display 수식이
+   한 단(3em) 더 들어간다. 그래서 .katex-display에 아무 override도 두지 않는다.
+   ⚠ 강조문(.callout-block)은 반대로 padding-left를 0으로 죽인다 — 그쪽은 한 줄짜리
+     강조 장치라 이중 들여쓰기가 군더더기지만, 경우는 본문을 담는 컨테이너라
+     내부 위계가 살아야 한다. 전례를 복사해 되돌리지 말 것.
+   리스트·① 밭도 같은 한 단을 받아 display 수식과 좌단이 맞는다(기본 1em은 너무 약하다). */
+.case-block .preview-content > ul,
+.case-block .preview-content > ol { margin-left: 3em; }
+.case-block .preview-content p:has(.marker-circled) { margin-left: 3em !important; }
 
 /* 톤 가드 — 케이스 제목행은 구조 신호다. has-key 여부와 무관하게 현행 색에 고정한다.
    근거와 형태는 아래 h1~h3 가드(D9′)와 1:1 대응이다.

@@ -13,7 +13,7 @@ import ListView, { ListMode } from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
-import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import SvgViewer from '../viewer/SvgViewer';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
@@ -244,7 +244,17 @@ export default function FolderView({
   const renderBlocks = (blocks: Block[]) => {
     // Phase 59 — 경우 자동 번호. 카드는 접기가 없으므로 항상 전체 렌더다.
     const caseLabels = buildCaseLabels(blocks);
+    const caseGaps = buildCaseGapKeys(blocks);
     return blocks.map((block, i) => {
+      const node = renderOne(block, i, caseLabels);
+      // 경우 사이에 낀 블록은 rail이 관통하도록 한 겹 두른다(형제 관계 유지)
+      if (!caseGaps.has(blockKeyOf(block))) return node;
+      return <div key={block.id || `gap-${i}`} className="case-gap">{node}</div>;
+    });
+  };
+
+  const renderOne = (block: Block, i: number, caseLabels: Map<string, string>) => {
+    {
       const isBordered = BORDERED_TYPES.has(block.type);
       const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
       if (block.type === 'image') {
@@ -313,7 +323,7 @@ export default function FolderView({
           <EditorPreview content={block.raw_text} borderless locale="ko" />
         </div>
       );
-    });
+    }
   };
 
   return (
