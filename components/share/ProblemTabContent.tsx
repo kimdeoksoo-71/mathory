@@ -110,7 +110,9 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
        ⚠ .problem-content-toned를 통째로 붙이면 letter-spacing: -0.01em이 함께 들어와
          이미 공개된 페이지의 줄바꿈이 바뀐다. 색만 담은 .tone-baseline만 쓸 것.
          (line-height 1.8·font-family는 EditorPreview root가 이미 주고 있다) */
-    <div className={`tone-baseline ${toneClass(tabId, sorted)}`.trim()}>
+    /* --case-dot-fill: 접힘 dot의 속을 이 카드의 배경색으로 채운다(기본값은 앱의 클레이) */
+    <div className={`tone-baseline ${toneClass(tabId, sorted)}`.trim()}
+      style={{ ['--case-dot-fill' as any]: 'var(--bg-card, #fff)' }}>
       {scoped && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
           <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} />
