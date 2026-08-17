@@ -697,6 +697,26 @@ function SortableEditorBlock({
 
   // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
   const showBar = isActive || collapseMode;
+  // 요약에 넣은 블록은 비활성일 때도 그 사실이 보여야 한다 → 스위치만 있는 얇은 바를 남긴다
+  const showSummaryOnlyBar = !showBar && block.showInSummary === true;
+
+  /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다 */
+  const summaryToggle = (
+    <span
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      style={{ display: 'inline-flex', marginRight: 2 }}
+    >
+      <ToggleSwitch
+        label="요약에 넣기"
+        on={block.showInSummary === true}
+        onToggle={() => onSummaryChange(block.id, block.showInSummary ? undefined : true)}
+        title={block.showInSummary
+          ? '요약 보기에서 뺍니다'
+          : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)'}
+      />
+    </span>
+  );
 
   // 접힌 상단바에 보여줄 첫 줄 미리보기 (## 등 마크다운 기호 제거)
   const previewText = useMemo(() => {
@@ -706,6 +726,17 @@ function SortableEditorBlock({
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} data-editor-block-id={block.id}>
+      {/* 비활성이지만 요약에 넣은 블록 — 상단바의 '요약에 넣기'만 남긴다.
+          배경·구분선은 두지 않는다(활성 헤더처럼 보이면 안 된다). */}
+      {showSummaryOnlyBar && (
+        <div style={{
+          display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+          padding: '2px 8px 0', position: 'relative', zIndex: 1,
+        }}>
+          {summaryToggle}
+        </div>
+      )}
+
       {/* ── Block Header — 활성 블록 또는 전체접기 모드일 때 표시 ── */}
       {showBar && (
       <div
@@ -785,23 +816,7 @@ function SortableEditorBlock({
 
             <div style={{ flex: 1 }} />
 
-            {/* Phase 59 — 요약 보기에 이 블록을 남긴다. 블록 종류와 무관하게 같은 자리·같은 모양.
-                댓글 패널의 '보이기'와 동일한 공용 스위치를 쓴다(사본 금지).
-                바깥 span이 pointerdown을 막는다 — 헤더는 dnd-kit 드래그 핸들 영역이다. */}
-            <span
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
-              style={{ display: 'inline-flex', marginRight: 2 }}
-            >
-              <ToggleSwitch
-                label="요약에 넣기"
-                on={block.showInSummary === true}
-                onToggle={() => onSummaryChange(block.id, block.showInSummary ? undefined : true)}
-                title={block.showInSummary
-                  ? '요약 보기에서 뺍니다'
-                  : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)'}
-              />
-            </span>
+            {summaryToggle}
 
             {canDelete && (
               <button

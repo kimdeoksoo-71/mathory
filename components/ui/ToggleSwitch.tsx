@@ -33,8 +33,10 @@ export default function ToggleSwitch({
       <span style={{
         position: 'relative', display: 'inline-block',
         width: 26, height: 15, borderRadius: 8,
-        // 배경(따뜻한 아이보리)과 조화되는 부드러운 탄 톤. OFF는 한 단계 옅은 클레이.
-        background: on ? 'var(--border-content-active, #B89B78)' : 'var(--bg-active, #E8E2D9)',
+        // ON은 배경과 조화되는 따뜻한 탄 톤.
+        // OFF는 --bg-active(#E8E2D9)를 쓰다가 --text-placeholder로 낮췄다 — 활성 블록
+        // 배경(#E8DFCE)과 명암비가 1.03:1이라 트랙이 사실상 보이지 않았다(→ 1.35:1).
+        background: on ? 'var(--border-content-active, #B89B78)' : 'var(--text-placeholder, #C8C1B6)',
         transition: 'background 0.15s',
         flexShrink: 0,
       }}>
