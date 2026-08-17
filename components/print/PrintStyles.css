@@ -142,6 +142,45 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body .callout-block p { margin: 0; }   /* .print-body p의 0 0 6pt 상쇄 */
 .print-body .callout-block .katex-display.fleqn > .katex { padding-left: 0 !important; }
 
+/* ── Phase 59: 경우(case) 블록 ──
+   ⚠ 세로 기준은 0.85em이다 — .print-body의 line-height가 1.7이라 첫 행 중심이
+     0.85em이다. 화면(.preview-content line-height 1.8 → 0.9em)과 값이 다르다.
+   ⚠ dot은 #000 채움. 인쇄는 톤 시스템조차 100%로 되돌리는(색 위계를 죽이는)
+     체계이고, 흑백 프린터에서 컬러 dot은 중간 회색으로 떨어져 본문보다 약해진다.
+     인쇄에는 접힘 상태가 없어 색이 전할 상태 정보도 없다.
+     컬러 인쇄를 원하면 아래 --case-dot 한 줄만 지우면 화면 색을 그대로 쓴다. */
+.print-body .case-block {
+  position: relative;
+  margin: 11pt 0;        /* K1 인쇄 — .callout-block과 동일 */
+  padding-left: 2em;     /* 인쇄 display 수식 fleqn 들여쓰기와 동일 */
+  padding-right: 0;
+  --case-dot: #000;
+}
+.print-body .case-block.case-sub { padding-left: 4em; }
+.print-body .case-block::before {
+  content: ''; position: absolute;
+  left: 0.7em; margin-left: -0.125mm; width: 0.25mm;
+  top: 0.85em; bottom: 0;
+  background: #000; opacity: 0.55;
+}
+.print-body .case-block:has(+ .case-block)::before { bottom: -11pt; }
+.print-body .case-block + .case-block::before      { top: 0; }
+.print-body .case-block::after {
+  content: ''; position: absolute;
+  left: 0.7em; top: 0.85em;
+  transform: translate(-50%, -50%);
+  width: 0.42em; height: 0.42em; border-radius: 50%;
+  box-sizing: border-box;
+  background: var(--case-dot);
+}
+.print-body .case-block.case-sub::after  { width: 0.34em; height: 0.34em; }
+.print-body .case-block.case-cont::after { content: none; }
+/* 제목행 고아 방지만 — break-inside는 걸지 않는다(경우는 길 수 있다. callout과 반대 판단) */
+.print-body .case-block p:has(> .case-label:first-child) { break-after: avoid; font-weight: 600; }
+/* ⚠ 필수 — 없으면 이중 들여쓰기가 된다. @media print가 .katex-display를 0으로 죽이고
+   .fleqn > .katex에 2em을 다시 주기 때문이다(위 24행). callout과 동일 처방. */
+.print-body .case-block .katex-display.fleqn > .katex { padding-left: 0 !important; }
+
 /* ── bordered 블록 (gana, roman, box) ── */
 .print-bordered-block {
   border: 0.3mm solid #000;

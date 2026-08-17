@@ -12,6 +12,7 @@ import 'katex/dist/katex.min.css';
 import './PrintStyles.css';
 import { preprocess, Locale } from '../../lib/preprocess';
 import { toneClass } from '../../lib/keyTone';
+import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 
 export interface PrintBlock {
   id: string;
@@ -55,7 +56,10 @@ export default function PrintableContent({
   return (
     <div className="print-root">
       <div className="print-body">
-        {tabs.map((tab, tabIdx) => (
+        {tabs.map((tab, tabIdx) => {
+          // Phase 59 — 경우 블록 자동 번호(탭 단위. heading에서 리셋되므로 탭을 넘겨선 안 된다)
+          const caseLabels = buildCaseLabels(tab.blocks);
+          return (
           /* Phase 58 P2 — 톤 스코프 클래스. 인쇄는 색을 100%로 되돌리고 key만 굵게 하는
              의도적 예외라(D6), 클래스는 붙이되 PrintStyles가 색을 복원한다.
              .tone-baseline은 붙이지 않는다 — 인쇄 본문색은 #000으로 별도 체계다. */
@@ -65,12 +69,18 @@ export default function PrintableContent({
               .filter(Boolean).join(' ')}
           >
             <div className="print-tab-label">{tab.label}</div>
-            {tab.blocks.map((block, blockIdx) => (
+            {tab.blocks.map((block, blockIdx) => {
+              // Phase 59 D15′ — case 클래스는 이 print-block 래퍼에 병기한다.
+              // 안쪽에 새 div를 만들면 .case-block끼리 형제가 아니게 되어 rail이 끊긴다.
+              const caseLabel = isCaseBlock(block.type) ? (caseLabels.get(blockKeyOf(block)) ?? null) : null;
+              return (
               /* Phase 58 D2 — 제목 위 여백. 인쇄는 화면과 산식이 달라 값도 다르다:
                  [앞 문단 margin-bottom 6pt] + [이 paddingTop] + [.print-body h2 margin-top 8pt].
                  1.5em(15pt)이면 합 29pt(=2.9em)로 목표 2.4em 초과 → 1em(10pt)이면 정확히 24pt.
                  PrintStyles의 h1/h2/h3 자체는 손대지 않는다(D10''). */
-              <div key={block.id} className="print-block" style={block.type === 'heading' && blockIdx > 0 ? { paddingTop: '1em' } : undefined}>
+              <div key={block.id}
+                className={`print-block${isCaseBlock(block.type) ? ' ' + caseClassName(block.type, !!caseLabel) : ''}`}
+                style={block.type === 'heading' && blockIdx > 0 ? { paddingTop: '1em' } : undefined}>
                 {block.type === 'choices' ? (
                   <PrintChoicesBlock content={block.raw_text} locale={locale} />
                 ) : block.type === 'image' ? (
@@ -83,6 +93,9 @@ export default function PrintableContent({
                   <div className="print-bordered-block">
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
                   </div>
+                ) : isCaseBlock(block.type) ? (
+                  /* Phase 59: 경우 — 래퍼가 이미 .case-block이므로 라벨만 주입한다 */
+                  <PrintBlockRenderer content={injectCaseLabel(block.raw_text, caseLabel)} locale={locale} />
                 ) : block.type === 'callout' ? (
                   /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
                   <div className="callout-block">
@@ -92,9 +105,11 @@ export default function PrintableContent({
                   <PrintBlockRenderer content={block.raw_text} locale={locale} />
                 )}
               </div>
-            ))}
+              );
+            })}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

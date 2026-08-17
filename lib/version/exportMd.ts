@@ -1,4 +1,5 @@
 import type { VersionContent } from '../../types/version';
+import { buildCaseLabels } from '../caseBlock';
 
 /**
  * Phase 55b — VersionContent → GitHub 아카이브 산출물(md · json).
@@ -63,12 +64,19 @@ export function toMarkdown(c: VersionContent, meta: ExportMeta): string {
   for (const tab of c.tabs) {
     const parts: string[] = [`## ${tab.title}`];
     const blocks = [...tab.blocks].sort((a, b) => a.order - b.order);
-    for (const b of blocks) {
-      const chunk: string[] = [`<!-- block: ${b.type} -->`];
+    // Phase 59 — 경우 블록의 번호는 렌더 시 산출되므로 raw_text에 없다.
+    // 아카이브에서 "C-2의 본문"을 찾을 수 있도록 타입 주석에만 라벨을 동봉한다.
+    // (순수 함수 유지: 같은 입력이면 같은 라벨이 나온다)
+    const caseLabels = buildCaseLabels(
+      blocks.map((b, i) => ({ id: `i${i}`, type: b.type, raw_text: b.raw_text })),
+    );
+    blocks.forEach((b, i) => {
+      const label = caseLabels.get(`i${i}`);
+      const chunk: string[] = [`<!-- block: ${b.type}${label ? ` ${label}` : ''} -->`];
       if (b.title) chunk.push(`### ${b.title}`);
       if (b.raw_text) chunk.push(b.raw_text);
       parts.push(chunk.join('\n'));
-    }
+    });
     sections.push(parts.join('\n\n'));
   }
 

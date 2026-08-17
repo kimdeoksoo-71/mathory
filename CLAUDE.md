@@ -58,8 +58,10 @@ Firestore:
 EditorPreview (미리보기)와 PrintableContent (PDF)에서 동일한 변환:
 
 ```
-preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → preprocessMath
+preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
+  → normalizeCaseBoundaries → convertSubcaseMarkers → preprocessMath
 ```
+(뒤 두 단계는 Phase 54 레거시 `**Case n.**` / `- **Case na.**` 표기 전용. `lib/preprocess.ts:196-197`)
 
 - `\tag{n}`: 수식 내 → `\tag*{(n)}` (**수학 모드**라 `.mopen/.mord/.mclose`로 렌더 — `.text`가 아니다), 텍스트 행 끝 → `<span class="tag-marker">(n)</span>`
 - `\ref{n}`: 수식 내 → `\text{(n)}`, 텍스트 → `(n)` 직접 치환
@@ -112,7 +114,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 
 ## 블록 타입
 
-`text · heading · list(목록) · callout(강조문) · gana · roman · box · choices · image · svg · ggb`
+`text · heading · list(목록) · callout(강조문) · case(경우) · subcase(하위 경우) · gana · roman · box · choices · image · svg · ggb`
 (+ 레거시 `math_block`·`bullet` → text로 정규화)
 
 - **강조의 두 축은 독립이다 (Phase 58 D13)**: `callout`은 **들여쓰기(위치)** 강조, 인라인 `**`는 **톤(색·굵기)** 강조. 따로 써도 되고 같이 써도 된다. display 수식 `$$…$$`은 블록 문법이라 `**`로 감쌀 수 없으므로, 톤 강조가 필요하면 인라인으로 바꿔 `**$…$**`로 쓴다(인라인 수식에도 `\displaystyle`이 자동 주입되므로 조판은 그대로다). 들여쓰기까지 원하면 그 행을 callout에 둔다
@@ -121,12 +123,24 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale → prepro
 - **렌더 사이트 5곳** — 특수 타입 분기를 추가하려면 전부 손봐야 한다:
   `EditorView`(미리보기) · `ProblemView` · `FolderView` · `ProblemTabContent`(공유) · `PrintableContent`(인쇄)
   앞 4곳은 `<EditorPreview borderless>` 경유 → `.preview-content` CSS가 자동 적용. 인쇄만 자체 ReactMarkdown(`.print-body`)
-- 분기 순서는 5곳 모두 `image → svg → ggb → BORDERED → callout → choices → 기본 markdown`
+- **분기 순서는 5곳이 서로 다르다 (Phase 59 F1 실측)** — 공통 앵커는 **callout 바로 앞** 하나뿐이다:
+  `EditorView`·`ProblemView`(→TabBody)·`FolderView` = `image → svg → ggb → BORDERED → case → callout → choices → 기본` /
+  **`ProblemTabContent`은 svg·ggb 분기가 없다**(공개 뷰어 미지원) / **`PrintableContent`는 choices가 맨 앞**이다
+- **블록마다 래퍼가 있는 사이트가 둘이다 (Phase 59 D15′)**: `EditorView`(`<div data-block-id>`)와 `PrintableContent`(`<div class="print-block">`).
+  형제 인접 셀렉터(`.case-block + .case-block`)를 쓰는 스타일은 **래퍼에 클래스를 병기**해야 한다 — 래퍼 안에 새 div를 만들면 형제 관계가 끊겨 조용히 죽는다
+- **블록을 두 `<EditorPreview>`로 쪼개지 말 것 (Phase 59 E7)**: `data-math-id`가 인스턴스별로 0부터 매겨져 편집창의 "미리보기 수식 클릭 → 편집 위치" 매핑이 깨진다. 블록 앞머리에 무언가 붙여야 하면 **마크다운 문자열에 `<span>`을 주입**할 것(`marker-gana`·`case-label` 방식)
+- **`.case-block`에 상하 padding 금지 (Phase 59 G7)**: 지금은 자식 `<p>` 마진이 블록 밖으로 빠져나와(부모-자식 collapse) 형제 간격이 정확히 K1(1.1em)이다. 상하 padding이 1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 rail 브리징(`bottom: -1.1em`)이 짧아진다
+- **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경에서 3.49:1). 로고 레드 `#D97757`은 2.52:1로 **미달**이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 58 완료 (P1~P5)
+## 현재 Phase: 59 구현 완료 (검증 대기)
 
-Phase 58 = 제목 블록 재조정 · key sentence 톤 시스템 · 수식/원문자 크기 완화.
-착수 문서: `docs/phasedocs/Phase58 제목 블록·key sentence 톤·수식 크기.md`
+Phase 59 = 풀이 **구조 보기(outline)** + **'경우(case)' 블록**.
+착수 문서: `docs/phasedocs/Phase59 구조 보기·경우 블록.md`
+
+- **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C-1.` · `C-2-a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
+- **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
+- **구조 보기**: 열람 2뷰(ProblemView·ProblemTabContent) 전용, 기본 full, 비영속. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
+- 로직 검증: `npm run test:case` (18개)
 
 다음 작업 후보:
 - **P6 긴 display 수식 접기** (Phase 58에서 분리) — 최상위 `\\` display 수식 전용. `aligned`·`gathered`·`array`는 `.mspace.newline`을 방출하지 않아 행 단위 접기가 불가능하다. 착수 전 전 문항에서 두 문법의 사용 비율부터 조사할 것

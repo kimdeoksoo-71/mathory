@@ -24,6 +24,7 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
+import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
@@ -82,6 +83,9 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   heading: '제목',
   list: '목록',
   callout: '강조문',
+  // Phase 59: 첫 줄이 제목행(조건), 둘째 줄부터 본문. 번호는 렌더 시 자동 부여
+  case: '경우',
+  subcase: '하위 경우',
   // Phase 57: 명칭 재조정 — 테두리 상자를 두른다는 사실이 이름에 드러나도록
   gana: '(가), (나) 상자',
   roman: 'ㄱ, ㄴ 상자',
@@ -94,7 +98,7 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 
 /** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
 const BLOCK_TYPES: Block['type'][] = [
-  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box', 'choices', 'image',
+  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box', 'choices', 'image',
 ];
 
 /** 블록 생성 시 기본 내용 */
@@ -105,6 +109,9 @@ const BLOCK_PRESETS: Record<string, string> = {
   // `- ` 빈 항목이 setext underline으로 오판되지 않도록 preventSetextHeadings에 D11 가드가 있음.
   list: '- \n- \n- \n\n① \n② \n③ ',
   callout: '',
+  // 경우 블록은 빈 프리셋 — 첫 줄에 조건을 쓰면 그 줄이 제목행이 된다(D9).
+  case: '',
+  subcase: '',
   gana: '(a) \n(b) \n(c) ',
   roman: '(i) \n(ii) \n(iii) ',
   box: '',
@@ -116,12 +123,13 @@ const BLOCK_PRESETS: Record<string, string> = {
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
 const TEXT_BASED_TYPES: Set<string> = new Set([
-  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box', 'choices',
+  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box', 'choices',
 ]);
 
-/** 블록 분할 허용 타입 (choices, image 제외) */
+/** 블록 분할 허용 타입 (choices, image 제외)
+ *  case 계열도 허용한다 — 분할로 생기는 뒤 블록은 항상 'text'라 번호가 늘지 않는다. */
 const SPLITTABLE_TYPES: Set<string> = new Set([
-  'text', 'heading', 'list', 'callout', 'gana', 'roman', 'box',
+  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box',
 ]);
 
 /** 레거시 타입 → text 정규화 (DB 마이그레이션용) */
@@ -1083,6 +1091,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 현재 탭의 블록 ─── */
   const currentBlocks = allBlocks[activeTab] || [];
+  /* Phase 59 — 경우 블록 자동 번호. 편집 중 실시간 재계산이 목적이므로
+     currentBlocks 참조가 바뀔 때마다 다시 돈다(블록 수십 개 규모라 비용 무시 가능). */
+  const caseLabels = useMemo(() => buildCaseLabels(currentBlocks), [currentBlocks]);
   const setCurrentBlocks = useCallback((updater: LocalBlock[] | ((prev: LocalBlock[]) => LocalBlock[])) => {
     setAllBlocks((prev) => ({
       ...prev,
@@ -3158,8 +3169,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               // Phase 58 D2: 1.5em → 0.5em. 체감 여백은 [앞 블록 이월 마진 0.6~1.1em] +
               // [이 paddingTop] + [h2 marginTop 1.08em]의 3항 합이다 (5개 렌더 사이트 동일).
               const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;
+              // Phase 59 D15′ — case 클래스는 이 래퍼에 병기한다. 래퍼 안에 새 div를
+              // 만들면 .case-block끼리 형제가 아니게 되어 rail 브리징이 통째로 죽는다.
+              const caseLabel = isCaseBlock(block.type) ? (caseLabels.get(blockKeyOf(block)) ?? null) : null;
               return (
-                <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
+                <div key={block.id} data-block-id={block.id}
+                  className={isCaseBlock(block.type) ? caseClassName(block.type, !!caseLabel) : undefined}
+                  style={{ paddingTop: headingTopPad }}>
                   {block.type === 'image' ? (
                     <div style={{ textAlign: 'center', margin: '1.2em 0' }}>
                       {block.raw_text ? (
@@ -3216,6 +3232,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                         onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
                     </div>
+                  ) : isCaseBlock(block.type) ? (
+                    /* Phase 59: 경우 — 래퍼(위)가 이미 .case-block이다. 여기서는 라벨만 주입한다.
+                       ⚠ 제목행과 본문을 두 EditorPreview로 쪼개면 data-math-id가 인스턴스별로
+                         0부터 다시 매겨져 "미리보기 수식 클릭 → 편집 위치" 매핑이 깨진다. */
+                    <EditorPreview
+                      content={injectCaseLabel(block.raw_text, caseLabel)}
+                      borderless
+                      locale="ko"
+                      activeMathId={isActivePreview ? activeMathId : undefined}
+                      onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
+                    />
                   ) : block.type === 'callout' ? (
                     /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
                     <div className="callout-block">

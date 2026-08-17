@@ -87,7 +87,7 @@
   --text-faint: #B8AFA4;
   --text-placeholder: #C8C1B6;
 
-  /* Brand — 로고 전용 레드 (로고 handoff 스펙) */
+  /* Brand — 로고 레드 (로고 handoff 스펙). 소비처: 로고 워드마크 3곳 + --case-dot */
   --mathory-red: #D97757;
   --mathory-red-dark: #BC5F3F;
 
@@ -130,6 +130,15 @@
      4.5:1 통과. dim↔full(--text-primary) 명도 간격은 1.97 → 2.27:1로 벌어진다.
      ⚠ 구속 조건은 FolderView 카드 배경 #EDE6DA다. 더 흐리게 갈 때 여기부터 깨진다. */
   --tone-dim: #675F52;
+
+  /* 경우(case) 블록의 dot 색 (Phase 59 D19).
+     로고 팔레트의 dark 짝을 쓴다. --mathory-red(#D97757)는 클레이 배경에서 2.73:1,
+     FolderView 카드(#EDE6DA)에서 2.52:1로 비텍스트 UI 최소 3:1에 미달한다.
+     dark는 3.79 / 3.49 / 4.26(공유 카드)으로 전부 통과한다.
+     ⚠ dot은 장식이 아니라 열림/닫힘 상태 표시기다 — 3:1 기준이 그대로 적용된다.
+     ⚠ 값을 바꿀 땐 명암비를 다시 재고, 구속 조건은 #EDE6DA임을 잊지 말 것.
+       산식은 ((c+0.055)/1.055)^2.4 — /1.055를 빠뜨리면 판정이 뒤집힌다. */
+  --case-dot: var(--mathory-red-dark);
 
   /* Sizing */
   --sidebar-expanded: 260px;
@@ -500,6 +509,123 @@ p:has(.marker-circled) {
 .callout-block .preview-content p { margin: 0; }
 /* 강조문 안 독립행 수식은 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 */
 .callout-block .katex-display { padding-left: 0; }
+
+/* ═══ Phase 59 — 경우(case) 블록 ═══
+   rail·dot은 1em을 중심선으로 공유한다. 하위경우는 박스가 아니라 텍스트만
+   들여쓰므로 레일 규칙 3개가 case·subcase에 그대로 적용된다 (D12′).
+   ⚠ .case-block에 상하 padding을 주지 말 것. 지금은 자식 <p>의 마진이 블록 밖으로
+     빠져나와(부모-자식 collapse) 형제 간격이 정확히 1.1em이지만, 상하 padding이
+     1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 아래 -1.1em 브리지가 짧아진다. */
+.case-block {
+  position: relative;
+  margin: 1.1em 0;      /* K1 — .callout-block과 동일 */
+  padding-left: 3em;    /* .katex-display·.callout-block과 동일 값·동일 em 기준 */
+  padding-right: 0;     /* \tag float:right 기준선을 컨테이너 우단에 맞춤 */
+}
+.case-block.case-sub { padding-left: 6em; }   /* 하위경우 — 텍스트만 한 단 더 */
+
+/* rail — 기본은 자기 dot에서 자기 하단까지 */
+.case-block::before {
+  content: '';
+  position: absolute;
+  left: 1em; margin-left: -1px; width: 2px;
+  top: 0.9em;           /* .preview-content의 line-height 1.8의 절반 = 첫 행 중심 */
+  bottom: 0;
+  background: currentColor;
+  opacity: 0.28;
+}
+/* 연속 구간 브리징 — 형제 마진 collapse(1.1em)를 건너뛴다.
+   ⚠ 이 두 줄이 매칭되려면 .case-block끼리 형제여야 한다. 편집창·인쇄는 블록마다
+     래퍼 div가 이미 있으므로 그 안에 새 div를 만들지 말고 래퍼에 클래스를 병기할 것 (D15′). */
+.case-block:has(+ .case-block)::before { bottom: -1.1em; }
+.case-block + .case-block::before      { top: 0; }
+
+/* dot — 열림/닫힘 상태 표시기 (D19). 펼침 = 채움 / 접힘 = 테두리만.
+   ⚠ box-sizing 명시 필수: 전역 리셋 `*`는 가상요소에 닿지 않는다.
+     두 상태의 외곽 치수를 같게 유지하려면 여기서 직접 선언해야 한다.
+   ⚠ 링 두께는 반드시 em. px로 두면 글꼴 11px에서 구멍이 사라져 채움/테두리
+     구분이 무너진다(하위경우가 특히 작다). */
+.case-block::after {
+  content: '';
+  position: absolute;
+  left: 1em; top: 0.9em;
+  transform: translate(-50%, -50%);
+  width: 0.5em; height: 0.5em; border-radius: 50%;
+  box-sizing: border-box;
+  background: var(--case-dot);
+}
+.case-block.case-closed::after {
+  background: transparent;
+  border: 0.1em solid var(--case-dot);
+}
+/* 하위경우는 크기로만 구분한다 — 반투명은 채움/테두리와 섞여 3상으로 읽힌다 */
+.case-block.case-sub::after  { width: 0.4em; height: 0.4em; }
+/* 이어짓기(제목행 없는 case) — 번호도 dot도 없고 레일만 이어진다 */
+.case-block.case-cont::after { content: none; }
+
+/* 라벨·제목행 */
+.case-label {
+  margin-right: 0.4em;
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+/* 제목행 텍스트는 500 — 600은 key(strong)의 신호라 겹치면 위계가 흐려진다.
+   제목행 안에 **를 쓰면 그 부분만 600으로 올라가 구분이 살아난다. */
+.case-block p:has(> .case-label:first-child) { font-weight: var(--weight-medium); }
+/* 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 (callout 전례) */
+.case-block .katex-display { padding-left: 0; }
+
+/* 톤 가드 — 케이스 제목행은 구조 신호다. has-key 여부와 무관하게 현행 색에 고정한다.
+   근거와 형태는 아래 h1~h3 가드(D9′)와 1:1 대응이다.
+   특이도: 색 규칙 (0,5,1) / 수식 규칙 (0,6,1) > .solution-tone.has-key .katex (0,3,0) */
+.solution-tone.has-key .case-label,
+.solution-tone.has-key .case-block p:has(> .case-label:first-child) { color: var(--text-secondary); }
+.solution-tone.has-key .case-block p:has(> .case-label:first-child) .katex { color: var(--text-primary); }
+
+/* ─── 구조 보기(outline) ───
+   발췌는 전부 <strong>이라 has-key 복귀 규칙이 자동으로 primary+600을 준다.
+   여기에는 레이아웃만 둔다 — dim 무효화 같은 규칙은 필요 없다. */
+.outline-keys { margin: 0.35em 0; }
+.outline-keys .preview-content p { margin-bottom: 0.35em; }
+.outline-keys .preview-content p:last-child { margin-bottom: 0; }
+
+/* 여닫이 줄. chevron + 내용 한 행. */
+.section-head,
+.case-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.section-head:hover,
+.case-head:hover { background: var(--bg-hover); }
+.section-head:focus-visible,
+.case-head:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
+/* 여닫을 것이 없는 줄(레거시 Case 라벨)은 평범한 텍스트로 둔다 */
+.case-head.is-static { cursor: default; }
+.case-head.is-static:hover { background: none; }
+.case-head.is-static .outline-chevron { visibility: hidden; }
+/* 제목 줄은 dot 정렬 제약이 없으므로 터치 여유를 준다.
+   ⚠ .case-head에는 상하 padding을 주지 말 것 — 첫 행이 내려가면 dot(top:0.9em)과 어긋난다. */
+.section-head { padding: 0.2em 0.4em; margin-left: -0.4em; }
+.section-head.is-preface {
+  font-size: 0.85em;
+  color: var(--text-faint);
+  font-family: var(--font-ui);
+  padding: 0.35em 0.4em;
+}
+/* chevron은 모바일(hover 없음) 대비 구조 보기에서 상시 표시한다 */
+.outline-chevron {
+  display: inline-flex;
+  align-items: center;
+  height: 1.8em;                /* 본문 첫 행 높이 — 글자와 수직 중심을 맞춘다 */
+  color: var(--text-faint);
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.section-head .outline-chevron { height: 2.2em; }   /* 제목은 글자가 커서 첫 행도 높다 */
 
 /* ═══ Phase 57 P5 — 원문자(①~⑳)
    구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui/--font-print 스택 한 줄이 전부다.

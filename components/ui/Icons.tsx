@@ -147,6 +147,27 @@ export function IconChevronDown({ size = 14, color = 'currentColor' }: IconProps
   );
 }
 
+/* Phase 59 — 구조 보기/전체 보기 토글용 이중 chevron.
+   lucide는 의존성에 없다. 기존 3종(IconChevron/Left/Down)과 같은 규격:
+   viewBox 24 · strokeWidth 2 · stroke=currentColor. */
+export function IconChevronsDown({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6,6 12,12 18,6" />
+      <polyline points="6,13 12,19 18,13" />
+    </svg>
+  );
+}
+
+export function IconChevronsUp({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6,11 12,5 18,11" />
+      <polyline points="6,18 12,12 18,18" />
+    </svg>
+  );
+}
+
 export function IconEdit({ size = 14, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">

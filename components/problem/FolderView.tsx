@@ -13,6 +13,7 @@ import ListView, { ListMode } from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
+import { blockKeyOf, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import SvgViewer from '../viewer/SvgViewer';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
@@ -241,6 +242,8 @@ export default function FolderView({
   };
 
   const renderBlocks = (blocks: Block[]) => {
+    // Phase 59 — 경우 자동 번호. 카드는 접기가 없으므로 항상 전체 렌더다.
+    const caseLabels = buildCaseLabels(blocks);
     return blocks.map((block, i) => {
       const isBordered = BORDERED_TYPES.has(block.type);
       const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
@@ -282,6 +285,15 @@ export default function FolderView({
         return (
           <div key={block.id || `b-${i}`} style={{ border: '0.7px solid var(--text-primary)', borderRadius: 0, padding: '12px 16px', margin: '1.2em 0' }}>
             <EditorPreview content={block.raw_text} borderless locale="ko" />
+          </div>
+        );
+      }
+      if (isCaseBlock(block.type)) {
+        /* Phase 59: 경우 — rail·dot·자동 번호. 카드에는 접기가 없다 */
+        const label = caseLabels.get(blockKeyOf(block)) ?? null;
+        return (
+          <div key={block.id || `case-${i}`} className={caseClassName(block.type, !!label)}>
+            <EditorPreview content={injectCaseLabel(block.raw_text, label)} borderless locale="ko" />
           </div>
         );
       }

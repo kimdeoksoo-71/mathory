@@ -1,21 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder, Block } from '../../types/problem';
+import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
-import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
-import EditorPreview from '../editor/EditorPreview';
-import ChoicesBlock from '../editor/ChoicesBlock';
-import SvgViewer from '../viewer/SvgViewer';
-import GgbViewer from '../viewer/GgbViewer';
+import TabBody from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
-import { toneClass } from '../../lib/keyTone';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
 import { getUserProfile } from '../../lib/users';
@@ -24,7 +19,7 @@ import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import { UserProfile, ProblemComment, DiscussionSession } from '../../types/problem';
 import {
-  IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconCheck, IconDownload, IconShare,
+  IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconDownload, IconShare,
   IconDocLines,
   IconChevron, IconChevronLeft,
 } from '../ui/Icons';
@@ -34,7 +29,6 @@ const FONT_SIZE_DEFAULT = 15;
 const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
-const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 interface ProblemViewProps {
   problemId: string;
@@ -321,90 +315,6 @@ export default function ProblemView({
     }
   };
 
-  /* ─── 블록 렌더 (EditorView 미리보기와 동일 규칙) ─── */
-  const renderBlocks = (blocks: Block[]) => {
-    return blocks.map((block, i) => {
-      const isBordered = BORDERED_TYPES.has(block.type);
-      const headingTopPad = block.type === 'heading' && i !== 0 ? '0.5em' : undefined;   // Phase 58 D2
-      if (block.type === 'image') {
-        const src = block.raw_text.match(/src="([^"]+)"/)?.[1] || '';
-        return (
-          <div key={block.id} style={{ textAlign: 'center', margin: '1.2em 0' }}>
-            {src ? (
-              <img src={src} alt="" style={{
-                width: block.imageWidth || 400, maxWidth: '90%', height: 'auto',
-                ...imageTreatmentStyle(block),
-              }} />
-            ) : (
-              <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>(이미지 없음)</span>
-            )}
-          </div>
-        );
-      }
-      if (block.type === 'svg') {
-        return (
-          <div key={block.id} style={{ margin: '0.8em 0' }}>
-            {block.raw_text ? (
-              <SvgViewer
-                url={block.raw_text}
-                initialView={block.svg_initial_view}
-                height={block.svg_height || 300}
-                enableFullscreen
-              />
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(SVG 없음)</div>
-            )}
-          </div>
-        );
-      }
-      if (block.type === 'ggb') {
-        return (
-          <div key={block.id} style={{ margin: '0.8em 0' }}>
-            {block.raw_text ? (
-              <GgbViewer
-                url={block.raw_text}
-                initialCoords={block.ggb_initial_coords}
-                height={block.ggb_height || 350}
-              />
-            ) : (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>(GeoGebra 없음)</div>
-            )}
-          </div>
-        );
-      }
-      if (isBordered) {
-        return (
-          <div key={block.id} style={{
-            border: '0.7px solid var(--text-primary)',
-            borderRadius: 0, padding: '12px 16px', margin: '1.2em 0',
-          }}>
-            <EditorPreview content={block.raw_text} borderless locale="ko" />
-          </div>
-        );
-      }
-      if (block.type === 'callout') {
-        /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
-        return (
-          <div key={block.id} className="callout-block">
-            <EditorPreview content={block.raw_text} borderless locale="ko" />
-          </div>
-        );
-      }
-      if (block.type === 'choices') {
-        return (
-          <div key={block.id}>
-            <ChoicesBlock rawText={block.raw_text} locale="ko" />
-          </div>
-        );
-      }
-      return (
-        <div key={block.id} data-block-id={block.id} style={{ paddingTop: headingTopPad }}>
-          <EditorPreview content={block.raw_text} borderless locale="ko" />
-        </div>
-      );
-    });
-  };
-
   if (loading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>로딩 중...</div>;
   }
@@ -689,70 +599,21 @@ export default function ProblemView({
           {(() => {
             return (
               <>
-                {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글 */}
-                {tabs.map((tab, tabIdx) => {
-                  const blocks = problem.tabBlocks[tab.id] || [];
-                  const isOpen = !!openTabs[tab.id];
-                  const isQuestion = tab.id === 'question';
-                  return (
-                    <div key={tab.id} style={{
-                      display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP,
-                      marginTop: tabIdx === 0 ? 24 : 0,
-                      marginBottom: isOpen ? '5em' : '1.5em',
-                    }}>
-                      <div style={{
-                        ...labelColStyle,
-                        display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4,
-                        paddingTop: isOpen ? 14 : 0,
-                      }}>
-                        <span
-                          onClick={() => toggleTab(tab.id)}
-                          style={{
-                            fontSize: 12, fontWeight: 600,
-                            color: isOpen ? 'var(--text-muted)' : 'var(--text-faint)',
-                            letterSpacing: 0.5,
-                            cursor: 'pointer', userSelect: 'none',
-                          }}
-                          title={isOpen ? '탭 접기' : '탭 펼치기'}
-                        >
-                          {tab.label}
-                        </span>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); handleCopyTabMarkdown(tab.id); }}
-                          title="Markdown 복사"
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            width: 22, height: 22, border: 'none', background: 'none',
-                            cursor: 'pointer', borderRadius: 4, padding: 0,
-                            color: copiedTab === tab.id ? 'var(--accent-success)' : 'var(--text-faint)',
-                            transition: 'color 0.2s',
-                          }}
-                        >
-                          {copiedTab === tab.id ? <IconCheck size={13} /> : <IconCopy size={13} />}
-                        </button>
-                      </div>
-                      {isOpen && (
-                        <div style={{
-                          ...mainColStyle,
-                          ...(isQuestion ? {
-                            background: 'var(--bg-content)',
-                            padding: '20px 24px',
-                            borderRadius: 8,
-                            marginLeft: -24,
-                          } : {}),
-                        }}>
-                          {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
-                          <div
-                            className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id, blocks)}`}
-                            style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
-                          >
-                            {renderBlocks(blocks)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글.
+                    Phase 59: 탭별 구조 보기 상태를 들어야 해서 TabBody로 분리했다. */}
+                {tabs.map((tab, tabIdx) => (
+                  <TabBody
+                    key={tab.id}
+                    tab={tab}
+                    blocks={problem.tabBlocks[tab.id] || []}
+                    tabIdx={tabIdx}
+                    isOpen={!!openTabs[tab.id]}
+                    copied={copiedTab === tab.id}
+                    contentFontSize={contentFontSize}
+                    onToggleTab={() => toggleTab(tab.id)}
+                    onCopy={() => handleCopyTabMarkdown(tab.id)}
+                  />
+                ))}
 
                 {/* 하단 여백 — width:0으로 fit-content 부모의 폭 계산에 영향 안 주도록 */}
                 <div style={{ height: '70vh', width: 0 }} />

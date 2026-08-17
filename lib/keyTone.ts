@@ -18,7 +18,16 @@
  * - lookbehind를 쓰지 않는다 — 구형 Safari 대비.
  * - 근사로 충분하다: 오탐의 최악 결과가 "톤 시스템이 켜짐"이라 파괴적이지 않다.
  */
-const KEY_STRONG_RE = /\*\*(?=\S)[\s\S]*?\S\*\*/;
+export const KEY_STRONG_RE = /\*\*(?=\S)[\s\S]*?\S\*\*/;
+
+/**
+ * Phase 59 — 구조 보기의 key 발췌용. 패턴은 위와 같고 `g`만 붙였다.
+ * ⚠ 판정용(`test`)과 추출용(`exec`)을 반드시 분리할 것. `g` 정규식은 lastIndex를
+ *   들고 다니므로 하나를 돌려 쓰면 test가 한 번 걸러 한 번 통과하는 식으로 오작동한다.
+ * ⚠ 소비처(lib/solutionOutline.ts)는 이 상수를 직접 exec하지 말고 source로
+ *   지역 인스턴스를 만들어 쓴다 — 모듈 전역 상태를 공유하지 않기 위해서다.
+ */
+export const KEY_STRONG_RE_GLOBAL = /\*\*(?=\S)[\s\S]*?\S\*\*/g;
 
 /**
  * 이 탭의 블록 배열에 key 마커가 하나라도 있는가.

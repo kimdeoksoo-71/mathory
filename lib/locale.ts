@@ -7,6 +7,8 @@
  * 원본 데이터는 절대 수정하지 않음 — 표시 단계에서만 변환
  */
 
+import { LEGACY_CASE_RE } from './caseBlock';
+
 // ===== 매핑 테이블 =====
 
 export const CIRCLED_CONSONANTS = [
@@ -88,7 +90,9 @@ export function normalizeCaseBoundaries(text: string): string {
   const out: string[] = [];
   for (const line of lines) {
     // 최상위 Case 라벨: 행 시작 `**Case 1.**` / `**Case 1a.**` (리스트 `- ` 없음)
-    const isTopCaseLabel = /^\*\*Case\s+\d+[a-z]?\.\*\*/.test(line);
+    // Phase 59: 같은 문법을 구조 보기(lib/solutionOutline.ts)도 스캔한다 →
+    //           패턴은 lib/caseBlock.ts의 상수 하나로 공유한다(사본 이격 방지).
+    const isTopCaseLabel = LEGACY_CASE_RE.test(line);
     const prev = out.length > 0 ? out[out.length - 1] : '';
     if (isTopCaseLabel && prev.trim() !== '') {
       out.push('');
@@ -102,7 +106,9 @@ export function normalizeCaseBoundaries(text: string): string {
  *  `- **Case 1a.** …` 형태의 최상위 리스트 항목만 매칭.
  *  상위 케이스(`**Case 1.**`, 리스트 밖)는 변환하지 않음.
  *  로케일 무관 → preprocessLocale 밖에서 무조건 호출됨 (D4).
- *  ⚠️ 렌더 파이프라인 전용 — raw_text 저장 경로 호출 금지 (D8) */
+ *  ⚠️ 렌더 파이프라인 전용 — raw_text 저장 경로 호출 금지 (D8)
+ *  ⚠️ Phase 59: 판정만 하는 곳(구조 보기)은 caseBlock.LEGACY_SUBCASE_RE를 쓴다.
+ *     여기만 캡처 그룹 + /gm이 필요해 별도 리터럴을 유지한다 — 문법은 동일하다. */
 export function convertSubcaseMarkers(text: string): string {
   return text.replace(
     /^(-\s+)\*\*(Case\s+\d+[a-z])\.\*\*/gm,
