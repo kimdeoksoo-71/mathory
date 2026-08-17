@@ -5,7 +5,7 @@ import type { Block } from '../types/problem';
 import { buildOutline, hasOutlineContent } from '../lib/solutionOutline';
 
 /* ═══════════════════════════════════════════════════════════════
-   Phase 59 — 구조 보기 상태 (D3)
+   Phase 59 — 요약 보기 상태 (D3)
 
    비영속이다. URL·localStorage에 남기지 않는다 — 열람 중 시야 조절용 뷰 상태이지
    문서의 속성이 아니다. 기본값은 full이라 기존 문항의 첫 화면은 변화 0 (D5).
@@ -59,7 +59,7 @@ export function useOutlineState(blocks: Block[]) {
   const toggleMode = useCallback(() => {
     setMode((m) => {
       if (m === 'full') {
-        // 구조 보기 진입은 "전부 닫힘"에서 시작한다 — 직전 세션의 여닫이가
+        // 요약 보기 진입은 "전부 닫힘"에서 시작한다 — 직전 세션의 여닫이가
         // 남아 있으면 "한눈에 보기"가 성립하지 않는다.
         setOpenSections(new Set());
         setOpenCases(new Set());

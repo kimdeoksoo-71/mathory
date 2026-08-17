@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Phase 59 — 구조 보기(outline) 모델
+   Phase 59 — 요약 보기(outline) 모델
 
    열람 2뷰(ProblemView · ProblemTabContent)만 쓴다. 편집창·FolderView·인쇄는
    항상 전체를 보여주므로 이 모듈을 부르지 않는다 (D4).

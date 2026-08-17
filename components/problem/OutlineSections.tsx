@@ -8,7 +8,7 @@ import EditorPreview from '../editor/EditorPreview';
 import { IconChevron } from '../ui/Icons';
 
 /* ═══════════════════════════════════════════════════════════════
-   Phase 59 — 구조 보기 스켈레톤 렌더 (열람 2뷰 공용)
+   Phase 59 — 요약 보기 스켈레톤 렌더 (열람 2뷰 공용)
 
    블록 렌더러는 사이트마다 다르므로(공개 뷰어에는 svg·ggb 분기가 없다 — D16)
    renderBlock을 렌더프롭으로 받는다. 여기서 공유하는 것은 "무엇을 접고 무엇을

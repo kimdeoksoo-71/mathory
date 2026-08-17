@@ -1,4 +1,4 @@
-# Phase 59 — Structure at a Glance: 풀이 구조 보기 · '경우(Case)' 블록 **v4 착수본**
+# Phase 59 — Structure at a Glance: 풀이 요약 보기 · '경우(Case)' 블록 **v4 착수본**
 
 작성일: 2026-08-17 · 기준 커밋 **`459cbcb`** (main = origin, 미푸시 0건)
 문서 계보: v1(web, 방향·Q1~Q4 확정) → v2(CLI, 실측 정정 24건) → v3(web, 레포 클론 재검증 · F1 발견 · D19 추가) → **v4(CLI, 최종 착수본)**
@@ -33,7 +33,7 @@ v3 §3-2는 "`--mathory-red`(#D97757)은 텍스트 기준 4.5:1엔 못 미치지
 | # | 성격 | 내용 |
 |---|---|---|
 | **G2** | 보강 | `--mathory-red*`는 지금까지 **로고 워드마크 전용**이었다(소비처 3곳: `AppShell.tsx:835`·`MiniShell.tsx:79`·`Sidebar.tsx:827` 전부 로고). globals.css:90의 "로고 전용 레드" 주석이 거짓이 되므로 **주석 1줄 갱신 필수** |
-| **G3** ★ | 정정 | **하위경우의 테두리 dot은 구별되지 않는다.** v3 값(0.34em 지름 + 1.5px 테두리)은 15px에서 구멍 2.1px, **11px에서 구멍 0.7px = 사실상 채움**. 테두리를 px로 두면 글꼴 확대·축소에 따라 상태 구분이 무너진다 → **링 두께 `0.1em`, 하위 dot 0.34em → `0.4em`**(구멍 0.2em) |
+| **G3** ★ | 정정 | **하위경우의 테두리 dot은 구별되지 않는다.** v3 값(0.34em 지름 + 1.5px 테두리)은 15px에서 구멍 2.1px, **11px에서 구멍 0.7px = 사실상 채움**. 테두리를 px로 두면 글꼴 확대·축소에 따라 상태 구분이 무너진다 → **링 두께를 em으로, 하위 dot 0.34em → `0.4em`**(구멍 0.2em) |
 | **G4** ★ | 정정 | **인쇄의 세로 기준은 0.9em이 아니라 `0.85em`이다.** `.print-body { line-height: 1.7 }`(PrintStyles.css:35) → 첫 행 중심 = 0.85em. 화면은 `.preview-content` 인라인 `line-height: 1.8`이라 0.9em이 맞다. v2·v3 모두 인쇄에 0.9em을 그대로 뒀다 |
 | **G5** ★ | 정정 | **인쇄 dot은 `#000` 채움을 기본**으로 한다. ① 인쇄는 톤 시스템조차 의도적으로 100% 복원하는 "색 위계를 죽이는" 체계다(Phase 58 D6, PrintStyles:39-50) ② 흑백 프린터에서 로고 레드는 중간 회색으로 떨어져 구조 신호가 본문(#000)보다 약해진다 ③ 인쇄에는 접힘 상태가 없어 색이 전달할 상태 정보 자체가 없다. `--case-dot` 토큰 1줄로 컬러 인쇄 전환 가능(§4.2) |
 | **G6** ★ | 정정 | **F5(라벨 열 1행)는 기본 2탭에서만 안전하다.** 탭 이름은 3번째 탭부터 사용자 편집이고 **길이 제한이 없다**(`commitTabLabel`, maxLength 없음). 톤 스코프가 `tabId !== 'question'`이라 **extra 탭에도 토글이 뜬다** → 긴 라벨이면 105px를 넘긴다. 라벨 열에 `flexWrap: 'wrap'`을 주어 **토글이 다음 행으로 자연 낙하**하게 한다(v1 원안 "라벨 바로 아래"와 합치) |
@@ -51,13 +51,13 @@ v3 §3-2는 "`--mathory-red`(#D97757)은 텍스트 기준 4.5:1엔 못 미치지
 |---|---|
 | D1 | 섹션 = `type === 'heading'` 블록 경계. 첫 제목 앞은 전문(前文) 섹션 |
 | D1′ | 텍스트 블록 안의 마크다운 `## `는 섹션 경계가 아니다(블록 타입만 본다) |
-| D2 | 구조 보기의 핵심문장은 `**…**` **발췌 렌더**(블록·문단 통째가 아니다) |
+| D2 | 요약 보기의 핵심문장은 `**…**` **발췌 렌더**(블록·문단 통째가 아니다) |
 | D2′ | 레거시 Phase 54 라벨은 **행 단위 스캔**으로 case/subcase 항목 승격. 자동 번호 미부여 |
 | D3 | 상태 `mode`+`openSections`+`openCases`, **비영속**. 키는 `block_key ?? id` |
 | D4 | 적용 = ProblemView + ProblemTabContent(공유·스냅샷·실시간 공통). 편집창·FolderView·인쇄 제외 |
 | D4′ | 탭 스코프 = `isToneScoped(tabId)` (문제 탭 제외) |
 | D5 | 기본 상태 **full** — 기존 문항 화면 변화 0 |
-| D6 | 명칭 **"구조 보기 / 전체 보기"**(편집창 '전체 접기'와 충돌 회피). ProblemView는 라벨 열, 공유뷰는 탭 콘텐츠 최상단 우측 |
+| D6 | 명칭 **"요약 보기 / 전체 보기"**(편집창 '전체 접기'와 충돌 회피). ProblemView는 라벨 열, 공유뷰는 탭 콘텐츠 최상단 우측 |
 | D7 | additive 타입 2종 `case`/`subcase`. depth 필드 없음. **규칙 0 · 마이그레이션 0 · 서버 0** |
 | D8 | 한글 라벨 '경우' / '하위 경우' — Phase 54 D4가 미룬 한글화 결정의 답 |
 | D9 | 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호는 raw_text에 넣지 않는다 |
@@ -75,7 +75,7 @@ v3 §3-2는 "`--mathory-red`(#D97757)은 텍스트 기준 4.5:1엔 못 미치지
 | D16 | 공유뷰·앱 뷰 **렌더러 통합 금지**(공유뷰엔 svg·ggb 분기가 없다) |
 | D17 | rail 종단 기본 = 런의 마지막 블록 하단까지. "마지막 dot에서 끊기"는 1규칙 교체 |
 | D18 | 자동 번호는 화면·인쇄 전용. `exportMd` 블록 주석에만 라벨 동봉 |
-| **D19** | dot = 상태 표시기. **펼침 = 채움 / 접힘(outline) = 테두리만.** 색은 **`--mathory-red-dark`**(G1), 링 두께 `0.1em`(G3), 인쇄는 `#000` 채움(G5) |
+| **D19** | dot = 상태 표시기. **펼침 = 채움 / 접힘(outline) = 테두리만.** 색은 **`--mathory-red-dark`**(G1), 링 두께 `--case-ring`(G3), 인쇄는 `#000` 채움(G5) |
 | Q5 | 레거시 `Case 1.` 표기 유지 + 렌더 무변화. 신규는 `C1.` |
 
 ---
@@ -257,7 +257,7 @@ const caseCls = (block, label, closed) => [
 .case-block::before {
   content: '';
   position: absolute;
-  left: 1em; margin-left: -1px; width: 2px;
+  left: 1em; margin-left: -0.5px; width: 1px;
   top: 0.9em;             /* .preview-content line-height 1.8의 절반 */
   bottom: 0;
   background: currentColor; opacity: 0.28;
@@ -302,7 +302,7 @@ const caseCls = (block, label, closed) => [
 .solution-tone.has-key .case-block p:has(> .case-label:first-child) { color: var(--text-secondary); }
 .solution-tone.has-key .case-block p:has(> .case-label:first-child) .katex { color: var(--text-primary); }
 
-/* 구조 보기 발췌 — 발췌는 전부 <strong>이라 has-key 복귀 규칙(258-259)이
+/* 요약 보기 발췌 — 발췌는 전부 <strong>이라 has-key 복귀 규칙(258-259)이
    자동으로 primary+600을 준다. 여기에는 레이아웃만 둔다. */
 .outline-keys { margin: 0.35em 0; }
 .outline-keys .preview-content p { margin-bottom: 0.35em; }
@@ -371,7 +371,7 @@ const caseCls = (block, label, closed) => [
 
 ---
 
-## 5. 구조 보기 UI
+## 5. 요약 보기 UI
 
 ### 5-1. 상태와 배치
 
@@ -388,7 +388,7 @@ ProblemView는 탭이 여러 개이므로 **탭 본문을 `components/problem/Ta
 - **공용 컴포넌트** `components/ui/OutlineToggle.tsx` (`mode` `onChange` `disabled` `compact`). 로직·토글만 공유하고 **렌더러는 통합하지 않는다**(D16).
 - **아이콘**: `components/ui/Icons.tsx`에 `IconChevronsDown`(`polyline 6,6 12,12 18,6` + `6,13 12,19 18,13`)·`IconChevronsUp` 신설. viewBox 24 · strokeWidth 2 · `stroke="currentColor"` — 기존 3종(`:126-148`)과 동일 규격. **lucide는 의존성에 없다.**
 - **ProblemView**: 라벨 열(`:703-733`)에 아이콘 버튼 추가 + 그 컨테이너에 **`flexWrap: 'wrap'`**. 기본 2탭('문제'·'풀이')은 1행에 들어가고(105px vs ≈76px), 사용자가 이름을 정한 extra 탭에서 길어지면 자동으로 2행이 된다(G6).
-- **공유뷰**: `ProblemTabContent` 최상단 우측 1행. 공개 페이지는 발견성이 중요하므로 **아이콘 + "구조 보기" 텍스트**. 2단 레이아웃(`twoColumn`)에는 탭 바가 없으므로 셸이 아니라 여기여야 한다(E16).
+- **공유뷰**: `ProblemTabContent` 최상단 우측 1행. 공개 페이지는 발견성이 중요하므로 **아이콘 + "요약 보기" 텍스트**. 2단 레이아웃(`twoColumn`)에는 탭 바가 없으므로 셸이 아니라 여기여야 한다(E16).
 - **게이트**: `isToneScoped(tabId)`가 false면 렌더 자체를 하지 않고(D4′), `hasOutlineContent()`가 false면 `disabled` + `title="제목·핵심문장·경우 블록이 없습니다"`(D14).
 
 ### 5-3. 여닫이·접근성
@@ -408,7 +408,7 @@ ProblemView는 탭이 여러 개이므로 **탭 본문을 `components/problem/Ta
 | 대상 | 처리 |
 |---|---|
 | 기존 `**Case 1.**` / `- **Case 1a.**` | **렌더 무변화.** `normalizeCaseBoundaries`·`convertSubcaseMarkers`·불릿 숨김 CSS 유지, 마이그레이션 없음 |
-| 구조 보기에서 | 행 단위 스캔으로 case/subcase 항목 승격(D2′) → 레거시 문항도 즉시 동작 |
+| 요약 보기에서 | 행 단위 스캔으로 case/subcase 항목 승격(D2′) → 레거시 문항도 즉시 동작 |
 | 자동 번호 | 레거시 항목엔 부여하지 않는다(라벨이 원문에 이미 있다) |
 | 정규식 | `locale.ts:91`·`:108`의 것을 `lib/caseBlock.ts` 상수로 추출해 **3곳 공유**(사본 이격 방지) |
 | 신규 저작 | `case`/`subcase` 블록 권장. 레거시 규약은 "지원하되 권장 안 함" |
@@ -433,7 +433,7 @@ ProblemView는 탭이 여러 개이므로 **탭 본문을 `components/problem/Ta
 | 한 경우에 이미지·선택지 필요 | 블록 단위의 한계 → `case`(제목행 有) → `image` → `case`(이어짓기)로 잇는다(D9′) |
 | Undo/Redo | additive라 기존 배선이 커버(Phase 57 A-14). outline 상태는 undo 대상 아님 |
 | 저장 후 재로드 | outline 비영속. 키는 `block_key ?? id` |
-| 공개 문항 ⌘P | 공개 뷰어엔 앱 인쇄 경로가 없어 화면 DOM이 그대로 인쇄된다 → 구조 보기 상태로 인쇄됨. **사양** |
+| 공개 문항 ⌘P | 공개 뷰어엔 앱 인쇄 경로가 없어 화면 DOM이 그대로 인쇄된다 → 요약 보기 상태로 인쇄됨. **사양** |
 | 공개 문항 ⌘F | 접힌 텍스트는 DOM에 없어 찾히지 않는다 → 기본값 full의 근거 |
 | FolderView 글꼴 슬라이더 | 래퍼 em ≠ 본문 15px 편차(G8) — Stage 2 실측만, 동작 변경 없음 |
 | 톤 dim | rail은 `currentColor`라 함께 흐려지고(의도), **dot은 동행하지 않는다**(구조 신호 불변) |
@@ -469,7 +469,7 @@ app/globals.css:503 이후                   .case-block 일체 + 톤 가드 + .
 components/print/PrintStyles.css:144 이후  인쇄 .case-block 일체
 ```
 
-**Firestore 규칙 0 · 서버 0 · 마이그레이션 0.** P3~P4(경우 블록)와 P1~P2(구조 보기)는 독립 배포 가능하지만 구조 보기가 경우 제목행을 항목으로 쓰므로 **경우 블록 먼저**가 자연 순서다.
+**Firestore 규칙 0 · 서버 0 · 마이그레이션 0.** P3~P4(경우 블록)와 P1~P2(요약 보기)는 독립 배포 가능하지만 요약 보기가 경우 제목행을 항목으로 쓰므로 **경우 블록 먼저**가 자연 순서다.
 
 ---
 
@@ -496,7 +496,7 @@ components/print/PrintStyles.css:144 이후  인쇄 .case-block 일체
 - callout과 나란히 둔 리듬 / 경우 안 수식·리스트·`\tag` / has-key에서 제목행·제목행 수식이 dim되지 않음(E17)
 - **하위 dot↔텍스트 간격(5em)** 판정 — 멀면 (a) 들여쓰기 6em→5em (b) dot을 4em으로 옮기고 tick 추가
 
-**Stage 3 · 구조 보기(ProblemView)** — 섹션 모델 + 토글 + 스켈레톤.
+**Stage 3 · 요약 보기(ProblemView)** — 섹션 모델 + 토글 + 스켈레톤.
 - 접기 → 제목·발췌·경우 제목행만 / 펼치기 → 픽셀 동일 / D14 게이트 / 전문 섹션
 - **F3 회귀**: `**Case 1.** … **Case 2.** … - **Case 2a.**`가 **한 블록에 든** 레거시 문항에서 세 항목이 모두 뜨는지
 - 문제 탭에 토글이 없는지(D4′) / 발췌가 primary+600인지
@@ -534,15 +534,15 @@ components/print/PrintStyles.css:144 이후  인쇄 .case-block 일체
 | C | 경우 안 리스트 | display 수식과 **같은 좌단**(한 단 = 3em / 인쇄 2em). ① 원문자 밭도 동일 |
 | D | 하위경우도 동일 원칙 | 본문 6em · 수식/리스트/① 9em (인쇄 4em · 6em) |
 | E | 개재 이미지 들여쓰기 | 하지 않는다 |
-| F | dot 크기 | 경우 `0.52em` / 하위 `0.3em` (지름비 58%, **면적비 34%**). 접힘 링은 `0.1em` / `0.075em` |
+| F | dot 크기 | 경우 `0.52em` / 하위 `0.3em` (지름비 58%, **면적비 34%**). 접힘 링은 `--case-ring: 0.07em` / 하위 `0.055em` |
 
 ### 11-1. rail 모델 (§6.2 대체)
 
 **런 = 첫 dot에서 시작해 마지막 dot에서 끝나는 하나의 선.** 블록마다 조각을 그리고 조각끼리 **위쪽으로** 이어 붙인다.
 
 ```css
-.case-block::before, .case-gap::before { left: 1em; margin-left: -1px; width: 2px;
-                                          top: 0.9em; bottom: 0; background: var(--case-rail); }
+.case-block::before, .case-gap::before { left: 1em; margin-left: -0.5px; width: 1px;
+                                          top: 0.9em; bottom: 0; background: var(--case-rail); }   /* width 1px 헤어라인 */
 :is(.case-block, .case-gap) + :is(.case-block, .case-gap)::before { top: -1.5em; }
 .case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before { bottom: auto; height: 0; }
 :is(.case-block, .case-gap) + .case-block:not(:has(+ .case-block)):not(:has(+ .case-gap))::before {
@@ -591,13 +591,13 @@ $$
 
 처럼 제목행 바로 다음 줄에 본문을 쓰면 마크다운이 **한 문단으로 묶어** `C1. a>1인 경우 x=1`처럼 붙어 나온다. 들여쓰기도 먹지 않는다(문단 안 인라인이 되므로). 제목행 규약(D9)이 "첫 줄은 제목"이라고 정한 이상 사용자가 빈 줄까지 신경 쓰게 할 수 없으므로 `injectCaseLabel`이 렌더 시점에 빈 줄을 넣는다. Phase 54의 `normalizeCaseBoundaries`가 Case 라벨 앞에 빈 줄을 넣는 것과 같은 처방이며, 수식의 개수·순서를 바꾸지 않아 편집창 `data-math-id` 매핑에 영향이 없다.
 
-**구조 보기 토글에 글자를 붙였다.** 아이콘만(22px, `--text-faint`) 두었더니 복사 버튼 옆에 묻혀 **덕수가 기능의 존재 자체를 찾지 못했다.** 라벨 열은 `flexWrap`이라 글자를 붙이면 '풀이' 아래 줄로 자연스럽게 내려간다. 공개 뷰어는 처음부터 글자를 달고 있었다.
+**요약 보기 토글에 글자를 붙였다.** 아이콘만(22px, `--text-faint`) 두었더니 복사 버튼 옆에 묻혀 **덕수가 기능의 존재 자체를 찾지 못했다.** 라벨 열은 `flexWrap`이라 글자를 붙이면 '풀이' 아래 줄로 자연스럽게 내려간다. 공개 뷰어는 처음부터 글자를 달고 있었다.
 
 > ⚠ 함께 확인된 기존 동작: **`$$x = 1$$`처럼 한 줄로 쓴 독립행 수식은 이 파이프라인에서 인라인으로 파싱된다**(경우 블록과 무관하게 최상위에서도 동일). `.katex-display`가 생기지 않으므로 들여쓰기·상하 여백 규칙이 전부 비껴간다. 독립행 수식은 `$$` / 내용 / `$$` 세 줄로 쓸 것.
 
-### 11-5. 구조 보기 실사용 후 조정 3건 (덕수, 2026-08-17)
+### 11-5. 요약 보기 실사용 후 조정 3건 (덕수, 2026-08-17)
 
-**접힘 dot의 속을 배경색으로 채운다.** 투명하게 두면 rail이 dot 한가운데를 관통해 지나가는 것이 그대로 보인다. `--case-dot-fill`을 두고 기본값은 앱의 클레이(`--bg-content`), 공개 뷰어는 `ProblemTabContent`가 `--bg-card`로 덮어쓴다. **접힘 상태는 구조 보기가 있는 두 곳에서만 생기므로 소비처도 이 둘뿐이다** — 편집창·카드·인쇄에는 `case-closed`가 아예 나오지 않는다.
+**접힘 dot의 속을 배경색으로 채운다.** 투명하게 두면 rail이 dot 한가운데를 관통해 지나가는 것이 그대로 보인다. `--case-dot-fill`을 두고 기본값은 앱의 클레이(`--bg-content`), 공개 뷰어는 `ProblemTabContent`가 `--bg-card`로 덮어쓴다. **접힘 상태는 요약 보기가 있는 두 곳에서만 생기므로 소비처도 이 둘뿐이다** — 편집창·카드·인쇄에는 `case-closed`가 아예 나오지 않는다.
 
 **chevron은 어느 쪽도 내용을 밀지 않는다.**
 
@@ -618,8 +618,8 @@ $$
 |---|---|---|
 | rail · dot · chevron(경우 줄 1.5em) | 1em | 구조선 |
 | 경우·하위경우 제목행, 개재 글상자 | 3em | 경우 본문 기준 |
-| 경우 안 display 수식·리스트·① 밭, 개재 강조문·목록, 구조 보기 발췌 | 6em | 본문보다 한 단 더 |
-| 제목 블록(구조 보기) | 1em | rail과 같은 선 |
+| 경우 안 display 수식·리스트·① 밭, 개재 강조문·목록, 요약 보기 발췌 | 6em | 본문보다 한 단 더 |
+| 제목 블록(요약 보기) | 1em | rail과 같은 선 |
 | 개재 이미지·SVG·GGB | 0em | 중앙 정렬·전폭이라 들여쓰면 밀린다 |
 
 **개재 블록(`.case-gap-body`)이 왜 필요한가**: 경우 사이에 강조문·목록·글상자를 두면 그 블록은 0em에서 시작하므로 **목록 불릿과 글상자 테두리가 rail(1em) 위에 겹쳐 지나간다.** 경우 본문과 같은 좌측 기준을 주면 겹침이 사라지고, "경우 안에 넣어 쓴 목록"과 "경우 사이에 둔 목록"이 같은 자리에 선다.
@@ -629,6 +629,20 @@ $$
 **⚠ chevron 회전을 인라인 style로 주지 말 것.** 경우 줄 chevron은 `translateY(-50%)`로 dot과 세로를 맞추는데, 인라인 `transform: rotate()`가 그것을 통째로 덮어써 chevron만 반 칸 내려앉는다. 회전은 `aria-expanded`를 보고 CSS가 건다.
 
 실측: 접힘·펼침 chevron 세로 오차 0.0px / 발췌 3em·6em / 개재 강조문 6em·목록 불릿 6em·글상자 3em·이미지 0em / rail 연속.
+
+### 11-7. 선 굵기 정리 (덕수, 2026-08-17)
+
+구조선이 본문을 누르지 않도록 전부 헤어라인으로 낮췄다.
+
+| | 이전 | 지금 |
+|---|---|---|
+| rail (화면) | 2px | **1px** (`margin-left: -0.5px`로 1em 중심 유지) |
+| rail (인쇄) | 0.25mm | **0.15mm** (`hr` 0.1mm ~ 탭 밑줄 0.15mm 계열) |
+| 접힘 dot 링 | 0.1em / 하위 0.075em | **`--case-ring: 0.07em`** / 하위 **0.055em** |
+
+링을 얇게 하면 속(배경색)이 넓어져 채움↔테두리 구별이 **오히려 좋아진다** — 11px에서도 링으로 읽힌다(Retina 2x 실측 스크린샷).
+
+또한 토글 버튼 문구를 방향형으로 바꿨다: **'요약 보기로' / '전체 보기로'** — 버튼은 현재 상태가 아니라 누르면 가는 곳을 말한다.
 
 **확인 완료(덕수, 2026-08-17)**: ① 하위경우 접힘 dot 구멍 — Retina 2x 실측 스크린샷으로 11·13·15px 모두 링이 구별됨(F값 유지) ② 하위경우 display 수식 9em — 문제 없음 ③ 흑백 인쇄 rail·dot 농도 — 적절.
 
@@ -672,4 +686,4 @@ def cr(a,b):
 
 ## 부록 C. 후속 후보
 
-레거시 `Case` 텍스트 → 블록 자동 변환 도구 · 펼침 애니메이션 · 편집창 미리보기 구조 보기 · FolderView 적용 · 구조 보기 상태 URL 공유 · callout B안(`>> `)과 경우 제목행 문법 통합 · Phase 58 P6 긴 display 수식 접기.
+레거시 `Case` 텍스트 → 블록 자동 변환 도구 · 펼침 애니메이션 · 편집창 미리보기 요약 보기 · FolderView 적용 · 요약 보기 상태 URL 공유 · callout B안(`>> `)과 경우 제목행 문법 통합 · Phase 58 P6 긴 display 수식 접기.

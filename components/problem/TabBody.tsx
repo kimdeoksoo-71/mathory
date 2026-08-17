@@ -17,7 +17,7 @@ import { IconCheck, IconCopy } from '../ui/Icons';
 /* ═══════════════════════════════════════════════════════════════
    Phase 59 — ProblemView의 탭 한 행 ([탭 라벨 | 탭 본문]).
 
-   ProblemView에서 분리한 이유: 구조 보기 상태를 **탭마다** 따로 들어야 하는데
+   ProblemView에서 분리한 이유: 요약 보기 상태를 **탭마다** 따로 들어야 하는데
    ProblemView는 이미 1,000행이 넘고 인라인 style·IIFE가 촘촘하다. 상태를 탭
    컴포넌트가 들면 Record<tabId, state> 같은 배선이 통째로 사라진다.
 
@@ -164,7 +164,7 @@ export default function TabBody({
       marginTop: tabIdx === 0 ? 24 : 0,
       marginBottom: isOpen ? '5em' : '1.5em',
     }}>
-      {/* 라벨 열 — 라벨 · 복사 · 구조 보기.
+      {/* 라벨 열 — 라벨 · 복사 · 요약 보기.
           ⚠ flexWrap 필수: 탭 이름은 3번째 탭부터 사용자가 자유롭게 짓고 길이 제한이
             없다. 폭(7em)을 넘으면 토글이 다음 행으로 내려가야 레이아웃이 버틴다. */}
       <div style={{

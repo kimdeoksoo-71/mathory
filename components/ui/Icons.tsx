@@ -147,7 +147,7 @@ export function IconChevronDown({ size = 14, color = 'currentColor' }: IconProps
   );
 }
 
-/* Phase 59 — 구조 보기/전체 보기 토글용 이중 chevron.
+/* Phase 59 — 요약 보기/전체 보기 토글용 이중 chevron.
    lucide는 의존성에 없다. 기존 3종(IconChevron/Left/Down)과 같은 규격:
    viewBox 24 · strokeWidth 2 · stroke=currentColor. */
 export function IconChevronsDown({ size = 14, color = 'currentColor' }: IconProps) {

@@ -169,7 +169,7 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body .case-block::before,
 .print-body .case-gap::before {
   content: ''; position: absolute;
-  left: 0.7em; margin-left: -0.125mm; width: 0.25mm;
+  left: 0.7em; margin-left: -0.075mm; width: 0.15mm;
   top: 0.85em; bottom: 0;
   background: #8a8a8a;
 }

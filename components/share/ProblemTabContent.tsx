@@ -20,7 +20,7 @@ const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
  * Phase 58 P2 — tabId를 받는다. 톤 스코프 판정(question 탭만 제외)에 필요한데
  * 이전에는 blocks만 받아 탭 정체를 몰랐다.
  *
- * Phase 59 — 구조 보기 토글을 여기에 둔다(D6). 셸이 아니라 이 컴포넌트인 이유:
+ * Phase 59 — 요약 보기 토글을 여기에 둔다(D6). 셸이 아니라 이 컴포넌트인 이유:
  * 넓은 화면 + 탭 2개면 PublicViewerShell이 탭 바 없이 좌·우 2단으로 가르므로
  * "탭 바 옆"이라는 자리가 존재하지 않는다. 탭 콘텐츠 자신이 유일한 공통 자리다.
  */

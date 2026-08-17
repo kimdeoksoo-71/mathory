@@ -600,7 +600,7 @@ export default function ProblemView({
             return (
               <>
                 {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글.
-                    Phase 59: 탭별 구조 보기 상태를 들어야 해서 TabBody로 분리했다. */}
+                    Phase 59: 탭별 요약 보기 상태를 들어야 해서 TabBody로 분리했다. */}
                 {tabs.map((tab, tabIdx) => (
                   <TabBody
                     key={tab.id}

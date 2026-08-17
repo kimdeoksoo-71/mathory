@@ -3,10 +3,10 @@
 import { IconChevronsUp, IconChevronsDown } from './Icons';
 import type { OutlineMode } from '../../hooks/useOutlineState';
 
-/* Phase 59 — 구조 보기 / 전체 보기 토글 (D6)
+/* Phase 59 — 요약 보기 / 전체 보기 토글 (D6)
 
    ⚠ 명칭 주의: 편집창의 "전체 접기/펼치기"(Phase 45 collapseMode)는 완전히
-     다른 기능이다. 열람 화면의 이 토글은 "구조 보기 / 전체 보기"로만 부른다.
+     다른 기능이다. 열람 화면의 이 토글은 "요약 보기 / 전체 보기"로만 부른다.
 
    앱 열람뷰(라벨 열)와 공개 뷰어(탭 콘텐츠 상단)가 함께 쓴다. 공유하는 것은
    이 버튼과 outline 로직뿐이고 블록 렌더러는 통합하지 않는다 (D16). */
@@ -22,10 +22,11 @@ interface Props {
 
 export default function OutlineToggle({ mode, onToggle, disabled, compact }: Props) {
   const outline = mode === 'outline';
-  const label = outline ? '전체 보기' : '구조 보기';
+  // 버튼은 "지금 상태"가 아니라 "누르면 가는 곳"을 말한다 → 조사 '로'를 붙여 방향을 분명히
+  const label = outline ? '전체 보기로' : '요약 보기로';
   const title = disabled
     ? '제목·핵심문장·경우 블록이 없습니다'
-    : outline ? '전체 보기 — 풀이 전체를 펼칩니다' : '구조 보기 — 제목·핵심문장·경우만 남깁니다';
+    : outline ? '전체 보기로 — 풀이 전체를 펼칩니다' : '요약 보기로 — 제목·핵심문장·경우만 남깁니다';
 
   return (
     <button

@@ -21,7 +21,7 @@
 export const KEY_STRONG_RE = /\*\*(?=\S)[\s\S]*?\S\*\*/;
 
 /**
- * Phase 59 — 구조 보기의 key 발췌용. 패턴은 위와 같고 `g`만 붙였다.
+ * Phase 59 — 요약 보기의 key 발췌용. 패턴은 위와 같고 `g`만 붙였다.
  * ⚠ 판정용(`test`)과 추출용(`exec`)을 반드시 분리할 것. `g` 정규식은 lastIndex를
  *   들고 다니므로 하나를 돌려 쓰면 test가 한 번 걸러 한 번 통과하는 식으로 오작동한다.
  * ⚠ 소비처(lib/solutionOutline.ts)는 이 상수를 직접 exec하지 말고 source로

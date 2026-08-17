@@ -138,12 +138,12 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 현재 Phase: 59 구현 완료 (검증 대기)
 
-Phase 59 = 풀이 **구조 보기(outline)** + **'경우(case)' 블록**.
-착수 문서: `docs/phasedocs/Phase59 구조 보기·경우 블록.md`
+Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
+착수 문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md`
 
 - **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C1.` · `C2a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
 - **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
-- **구조 보기**: 열람 2뷰(ProblemView·ProblemTabContent) 전용, 기본 full, 비영속. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
+- **요약 보기**: 열람 2뷰(ProblemView·ProblemTabContent) 전용, 기본 full, 비영속. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
 - 로직 검증: `npm run test:case` (18개)
 
 다음 작업 후보:

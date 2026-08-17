@@ -150,9 +150,13 @@
 
   /* 접힘 dot의 속을 채울 색 = 그 자리의 배경색. 투명하게 두면 rail이 dot을 관통한다.
      ⚠ 배경이 다른 곳에서는 그 컨테이너가 이 변수를 덮어써야 한다.
-       접힘 상태는 구조 보기가 있는 두 곳에서만 생기므로 소비처도 둘뿐이다:
+       접힘 상태는 요약 보기가 있는 두 곳에서만 생기므로 소비처도 둘뿐이다:
        앱 열람뷰(클레이 = 기본값) · 공개 뷰어 카드(ProblemTabContent가 --bg-card로 재정의). */
   --case-dot-fill: var(--bg-content);
+
+  /* 접힘 dot 테두리 두께. 얇게 유지할 것 — 굵으면 점이 둔탁해지고 속(배경색)이 사라져
+     펼침(채움)과 구별이 안 된다. 하위경우는 지름이 작으므로 따로 더 얇게 준다. */
+  --case-ring: 0.07em;
 
   /* Sizing */
   --sidebar-expanded: 260px;
@@ -563,7 +567,7 @@ p:has(.marker-circled) {
 .case-gap::before {
   content: '';
   position: absolute;
-  left: 1em; margin-left: -1px; width: 2px;
+  left: 1em; margin-left: -0.5px; width: 1px;   /* 헤어라인 — 굵으면 구조선이 본문을 누른다 */
   top: 0.9em;           /* 런 시작 = .preview-content line-height 1.8의 절반 = 첫 행 중심 */
   bottom: 0;
   background: var(--case-rail);
@@ -598,7 +602,7 @@ p:has(.marker-circled) {
    dot 한가운데를 관통해 지나가는 것이 보인다. */
 .case-block.case-closed::after {
   background: var(--case-dot-fill);
-  border: 0.1em solid var(--case-dot);
+  border: var(--case-ring) solid var(--case-dot);
 }
 /* 하위경우는 크기로만 구분한다 — 반투명은 채움/테두리와 섞여 3상으로 읽힌다.
    0.3em은 경우(0.52em)의 지름 58% = 면적 34%. 0.4em(면적 59%)일 때는
@@ -606,7 +610,7 @@ p:has(.marker-circled) {
    ⚠ 링 두께를 함께 줄이지 않으면 접힘 상태의 구멍이 사라져 채움과 구별되지 않는다.
      그래도 11px 글꼴에서는 구멍이 1.7px까지 내려간다 — 덕수 인지 후 승인(F). */
 .case-block.case-sub::after            { width: 0.3em; height: 0.3em; }
-.case-block.case-sub.case-closed::after { border-width: 0.075em; }
+.case-block.case-sub.case-closed::after { border-width: 0.055em; }
 /* 이어짓기(제목행 없는 case) — 번호도 dot도 없고 레일만 이어진다 */
 .case-block.case-cont::after { content: none; }
 
@@ -638,10 +642,10 @@ p:has(.marker-circled) {
 .solution-tone.has-key .case-block p:has(> .case-label:first-child) { color: var(--text-secondary); }
 .solution-tone.has-key .case-block p:has(> .case-label:first-child) .katex { color: var(--text-primary); }
 
-/* ─── 구조 보기(outline) ───
+/* ─── 요약 보기(outline) ───
    발췌는 전부 <strong>이라 has-key 복귀 규칙이 자동으로 primary+600을 준다.
    여기에는 레이아웃만 둔다 — dim 무효화 같은 규칙은 필요 없다. */
-/* 구조 보기의 발췌는 제목보다 한 단 들어간다 — 제목(1em)과 위계를 구별하고
+/* 요약 보기의 발췌는 제목보다 한 단 들어간다 — 제목(1em)과 위계를 구별하고
    경우 제목행(3em)과 좌단을 맞춘다. 경우 안 발췌는 3em(경우) + 3em = 6em이 되어
    "경우 안 내용은 한 단 더"라는 본문 규칙과 그대로 맞는다. */
 /* ⚠ margin이 아니라 padding으로 들여쓸 것. 경우 사이에 낀 발췌는 .case-gap을 함께
@@ -702,7 +706,7 @@ p:has(.marker-circled) {
   font-family: var(--font-ui);
   padding: 0.35em 0.4em;
 }
-/* chevron은 모바일(hover 없음) 대비 구조 보기에서 상시 표시한다 */
+/* chevron은 모바일(hover 없음) 대비 요약 보기에서 상시 표시한다 */
 .outline-chevron {
   display: inline-flex;
   align-items: center;
