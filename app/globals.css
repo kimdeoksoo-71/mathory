@@ -537,9 +537,16 @@ p:has(.marker-circled) {
   padding-right: 0;     /* \tag float:right 기준선을 컨테이너 우단에 맞춤 */
 }
 .case-block.case-sub { padding-left: 6em; }   /* 하위경우 — 텍스트만 한 단 더 */
-/* 경우 사이에 낀 블록(이미지 등) — rail만 관통시킨다. 들여쓰기는 주지 않는다
-   (이미지는 중앙 정렬이라 padding을 주면 그림이 오른쪽으로 밀린다) */
+/* 경우 사이에 낀 블록 — rail을 관통시킨다.
+   이미지·SVG·GGB는 여기까지만(중앙 정렬·전폭이라 padding을 주면 그림이 밀린다).
+   나머지(강조문·목록·글상자·텍스트)는 경우 본문과 같은 좌측 기준을 받는다 —
+   0에서 시작하면 목록 불릿·글상자 테두리가 rail(1em) 위에 겹쳐 지나간다. */
 .case-gap { position: relative; }
+.case-gap-body { padding-left: 3em; padding-right: 0; }
+/* 경우 안과 같은 규칙 — 그래야 "경우에 넣어 쓴 목록"과 "경우 사이에 둔 목록"이 같은 자리에 선다 */
+.case-gap-body .preview-content > ul,
+.case-gap-body .preview-content > ol { margin-left: 3em; }
+.case-gap-body .preview-content p:has(.marker-circled) { margin-left: 3em !important; }
 
 /* ── rail ──
    런은 "첫 dot에서 시작해 마지막 dot에서 끝나는 하나의 선"이다. 블록마다 조각을
@@ -634,7 +641,13 @@ p:has(.marker-circled) {
 /* ─── 구조 보기(outline) ───
    발췌는 전부 <strong>이라 has-key 복귀 규칙이 자동으로 primary+600을 준다.
    여기에는 레이아웃만 둔다 — dim 무효화 같은 규칙은 필요 없다. */
-.outline-keys { margin: 0.35em 0; }
+/* 구조 보기의 발췌는 제목보다 한 단 들어간다 — 제목(1em)과 위계를 구별하고
+   경우 제목행(3em)과 좌단을 맞춘다. 경우 안 발췌는 3em(경우) + 3em = 6em이 되어
+   "경우 안 내용은 한 단 더"라는 본문 규칙과 그대로 맞는다. */
+/* ⚠ margin이 아니라 padding으로 들여쓸 것. 경우 사이에 낀 발췌는 .case-gap을 함께
+   달고 rail을 그리는데, margin을 주면 박스가 통째로 밀려 rail이 1em이 아니라
+   4em에 그려진다(그 구간만 레일이 끊기고 엉뚱한 자리에 세로선이 하나 더 생긴다). */
+.outline-keys { margin: 0.35em 0; padding-left: 3em; }
 .outline-keys .preview-content p { margin-bottom: 0.35em; }
 .outline-keys .preview-content p:last-child { margin-bottom: 0; }
 
@@ -668,6 +681,9 @@ p:has(.marker-circled) {
   top: 0.9em;                 /* dot과 같은 세로선 */
   transform: translateY(-50%);
 }
+/* 펼침 표시 회전. ⚠ 인라인 style로 주면 위 translateY를 덮어써 chevron이 내려앉는다 */
+.section-head[aria-expanded="true"] .outline-chevron { transform: rotate(90deg); }
+.case-head[aria-expanded="true"] .outline-chevron { transform: translateY(-50%) rotate(90deg); }
 .section-head:hover,
 .case-head:hover { background: var(--bg-hover); }
 .section-head:focus-visible,

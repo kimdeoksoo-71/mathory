@@ -24,7 +24,7 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
@@ -3176,7 +3176,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               const caseLabel = isCaseBlock(block.type) ? (caseLabels.get(blockKeyOf(block)) ?? null) : null;
               const caseCls = isCaseBlock(block.type)
                 ? caseClassName(block.type, !!caseLabel)
-                : (caseGaps.has(blockKeyOf(block)) ? 'case-gap' : undefined);
+                : (caseGaps.has(blockKeyOf(block)) ? caseGapClassName(block.type) : undefined);
               return (
                 <div key={block.id} data-block-id={block.id}
                   className={caseCls}

@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { Block, TabMeta } from '../../types/problem';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { useOutlineState } from '../../hooks/useOutlineState';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -63,7 +63,7 @@ export default function TabBody({
   const renderBlock = (block: Block, i: number) => {
     const node = renderBlockInner(block, i);
     if (!caseGaps.has(blockKeyOf(block))) return node;
-    return <div key={block.id} className="case-gap">{node}</div>;
+    return <div key={block.id} className={caseGapClassName(block.type)}>{node}</div>;
   };
 
   /* ─── 블록 렌더 (EditorView 미리보기와 동일 규칙) ─── */

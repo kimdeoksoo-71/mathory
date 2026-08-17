@@ -12,7 +12,7 @@ import 'katex/dist/katex.min.css';
 import './PrintStyles.css';
 import { preprocess, Locale } from '../../lib/preprocess';
 import { toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 
 export interface PrintBlock {
   id: string;
@@ -76,7 +76,7 @@ export default function PrintableContent({
               const caseLabel = isCaseBlock(block.type) ? (caseLabels.get(blockKeyOf(block)) ?? null) : null;
               const caseCls = isCaseBlock(block.type)
                 ? ' ' + caseClassName(block.type, !!caseLabel)
-                : (caseGaps.has(blockKeyOf(block)) ? ' case-gap' : '');
+                : (caseGaps.has(blockKeyOf(block)) ? ' ' + caseGapClassName(block.type) : '');
               return (
               /* Phase 58 D2 — 제목 위 여백. 인쇄는 화면과 산식이 달라 값도 다르다:
                  [앞 문단 margin-bottom 6pt] + [이 paddingTop] + [.print-body h2 margin-top 8pt].

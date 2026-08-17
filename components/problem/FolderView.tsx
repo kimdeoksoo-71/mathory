@@ -13,7 +13,7 @@ import ListView, { ListMode } from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import SvgViewer from '../viewer/SvgViewer';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
@@ -249,7 +249,7 @@ export default function FolderView({
       const node = renderOne(block, i, caseLabels);
       // 경우 사이에 낀 블록은 rail이 관통하도록 한 겹 두른다(형제 관계 유지)
       if (!caseGaps.has(blockKeyOf(block))) return node;
-      return <div key={block.id || `gap-${i}`} className="case-gap">{node}</div>;
+      return <div key={block.id || `gap-${i}`} className={caseGapClassName(block.type)}>{node}</div>;
     });
   };
 

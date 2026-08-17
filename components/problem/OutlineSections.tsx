@@ -55,7 +55,10 @@ function Toggler({
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
       }}
     >
-      <span className="outline-chevron" aria-hidden style={{ transform: open ? 'rotate(90deg)' : 'none' }}>
+      {/* ⚠ 회전을 인라인 style로 주지 말 것 — 경우 줄의 chevron은 CSS에서
+          translateY(-50%)로 dot과 세로를 맞추는데 인라인 transform이 그것을 덮어써
+          chevron만 반 칸 내려앉는다. 회전은 aria-expanded를 보고 CSS가 건다. */}
+      <span className="outline-chevron" aria-hidden>
         <IconChevron size={12} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>

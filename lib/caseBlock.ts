@@ -151,6 +151,18 @@ export function buildCaseGapKeys(blocks: CaseBlockLike[]): Set<string> {
   return gaps;
 }
 
+/** 개재 블록 중 좌측 여백을 주면 안 되는 타입 — 중앙 정렬(이미지)이거나 전폭 뷰어다. */
+const GAP_MEDIA_TYPES = new Set(['image', 'svg', 'ggb']);
+
+/**
+ * 경우 사이에 낀 블록에 붙일 className.
+ * 텍스트 계열은 경우 본문과 같은 좌측 기준(`case-gap-body`)을 받는다 — 안 그러면
+ * 목록 불릿·글상자 테두리가 rail(1em) 위에 겹쳐 지나간다.
+ */
+export function caseGapClassName(type: string): string {
+  return GAP_MEDIA_TYPES.has(type) ? 'case-gap' : 'case-gap case-gap-body';
+}
+
 /** 렌더 사이트가 최상위 블록 요소에 붙일 className (D15′).
  *  ⚠ 편집창·인쇄는 블록마다 래퍼 div가 이미 있다. 그 안에 새 div를 만들면
  *    .case-block끼리 형제가 아니게 되어 rail 브리징이 통째로 죽는다 (v3 F1). */

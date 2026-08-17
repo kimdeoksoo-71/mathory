@@ -6,7 +6,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import { Block } from '../../types/problem';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { useOutlineState } from '../../hooks/useOutlineState';
 import OutlineSections from '../problem/OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
@@ -37,7 +37,7 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
   const renderBlock = (block: Block, i: number) => {
     const node = renderBlockInner(block, i);
     if (!caseGaps.has(blockKeyOf(block))) return node;
-    return <div key={block.id} className="case-gap">{node}</div>;
+    return <div key={block.id} className={caseGapClassName(block.type)}>{node}</div>;
   };
 
   const renderBlockInner = (block: Block, i: number) => {

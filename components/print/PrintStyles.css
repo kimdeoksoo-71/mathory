@@ -158,6 +158,11 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 }
 .print-body .case-block.case-sub { padding-left: 4em; }
 .print-body .case-gap { position: relative; }
+/* 개재 블록의 좌측 기준 — 화면과 같은 원칙(미디어 제외) */
+.print-body .case-gap-body { padding-left: 2em; padding-right: 0; }
+.print-body .case-gap-body > ul,
+.print-body .case-gap-body > ol { margin-left: 2em; }
+.print-body .case-gap-body > p:has(.marker-circled) { margin-left: 2em !important; }
 /* rail — 화면과 같은 원리(위쪽 브리지 + 마지막 dot에서 종단, 불투명).
    브리지 14pt는 인쇄 간격(경우 11pt·테두리 블록 12pt)보다 크고,
    최소 간격 11pt + 첫 dot 8.5pt보다 작아야 한다는 양쪽 제약에서 나온 값이다. */
