@@ -1,6 +1,6 @@
 'use client';
 
-import { IconChevronsUp, IconChevronsDown } from './Icons';
+import ToggleSwitch from './ToggleSwitch';
 import type { OutlineMode } from '../../hooks/useOutlineState';
 
 /* Phase 59 — 요약 보기 / 전체 보기 토글 (D6)
@@ -9,59 +9,31 @@ import type { OutlineMode } from '../../hooks/useOutlineState';
      다른 기능이다. 열람 화면의 이 토글은 "요약 보기 / 전체 보기"로만 부른다.
 
    앱 열람뷰(라벨 열)와 공개 뷰어(탭 콘텐츠 상단)가 함께 쓴다. 공유하는 것은
-   이 버튼과 outline 로직뿐이고 블록 렌더러는 통합하지 않는다 (D16). */
+   이 버튼과 outline 로직뿐이고 블록 렌더러는 통합하지 않는다 (D16).
+
+   모양은 블록 상단바의 '요약에 넣기'·댓글 패널의 '보이기'와 같은 공용 스위치다
+   — 앱 안에서 켜고 끄는 것은 전부 같은 형태로 보여야 한다. */
 
 interface Props {
   mode: OutlineMode;
   onToggle: () => void;
   /** 보여줄 스켈레톤이 없을 때 (D14) */
   disabled?: boolean;
-  /** true = 아이콘만 (앱 라벨 열). false = 아이콘 + 텍스트 (공개 뷰어) */
-  compact?: boolean;
 }
 
-export default function OutlineToggle({ mode, onToggle, disabled, compact }: Props) {
+export default function OutlineToggle({ mode, onToggle, disabled }: Props) {
   const outline = mode === 'outline';
-  // 버튼은 "지금 상태"가 아니라 "누르면 가는 곳"을 말한다 → 조사 '로'를 붙여 방향을 분명히
-  const label = outline ? '전체 보기로' : '요약 보기로';
-  const title = disabled
-    ? '제목·핵심문장·경우 블록이 없습니다'
-    : outline ? '전체 보기로 — 풀이 전체를 펼칩니다' : '요약 보기로 — 제목·핵심문장·경우만 남깁니다';
-
   return (
-    <button
-      type="button"
-      onClick={onToggle}
+    <ToggleSwitch
+      label="요약"
+      on={outline}
+      onToggle={onToggle}
       disabled={disabled}
-      title={title}
-      aria-pressed={outline}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: compact ? 0 : 5,
-        border: 'none', background: outline && !disabled ? 'var(--accent-soft)' : 'none',
-        cursor: disabled ? 'not-allowed' : 'pointer',
-        padding: compact ? 0 : '3px 7px',
-        width: compact ? 22 : undefined, height: compact ? 22 : undefined,
-        justifyContent: 'center',
-        borderRadius: 6,
-        fontSize: 12, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
-        marginLeft: compact ? 0 : -7,   /* 라벨 글자와 좌단 정렬 (패딩 상쇄) */
-        color: disabled
-          ? 'var(--text-placeholder)'
-          : outline ? 'var(--accent-primary)' : 'var(--text-faint)',
-        transition: 'color 0.15s, background 0.15s',
-        flexShrink: 0,
-      }}
-      onMouseEnter={(e) => {
-        if (disabled) return;
-        (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
-      }}
-      onMouseLeave={(e) => {
-        if (disabled) return;
-        (e.currentTarget as HTMLElement).style.color = outline ? 'var(--accent-primary)' : 'var(--text-faint)';
-      }}
-    >
-      {outline ? <IconChevronsDown size={13} /> : <IconChevronsUp size={13} />}
-      {!compact && <span>{label}</span>}
-    </button>
+      title={disabled
+        ? '제목·핵심문장·경우 블록이 없습니다'
+        : outline
+          ? '켜짐 — 제목·핵심문장·경우만 보입니다. 끄면 전체가 펼쳐집니다'
+          : '꺼짐 — 풀이 전체가 보입니다. 켜면 요약만 남습니다'}
+    />
   );
 }

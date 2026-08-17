@@ -11,20 +11,29 @@
  * 바깥 span에서 pointerdown을 막는다 (이 컴포넌트는 순수하게 둔다).
  */
 export default function ToggleSwitch({
-  label, on, onToggle, title,
+  label, on, onToggle, title, disabled,
 }: {
   label: string;
   on: boolean;
   onToggle: () => void;
   title?: string;
+  /** 켤 수 없는 상태(대상이 없음 등). 자리는 지키되 조작을 막는다 */
+  disabled?: boolean;
 }) {
   return (
     <button
-      onClick={onToggle}
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={disabled ? undefined : onToggle}
+      disabled={disabled}
       title={title}
       style={{
+        opacity: disabled ? 0.45 : 1,
         display: 'inline-flex', alignItems: 'center', gap: 5,
-        border: 'none', background: 'transparent', cursor: 'pointer',
+        border: 'none', background: 'transparent',
+        cursor: disabled ? 'not-allowed' : 'pointer',
         padding: '2px 2px', fontFamily: 'var(--font-ui)',
         fontSize: 11, color: on ? 'var(--text-primary)' : 'var(--text-muted)',
       }}
