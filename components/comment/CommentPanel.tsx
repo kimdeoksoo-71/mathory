@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import ToggleSwitch from '../ui/ToggleSwitch';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import {
   ProblemComment, TabMeta, UserProfile, DiscussionSession, AIModelConfig, Block,
@@ -936,49 +937,6 @@ export default function CommentPanel({
         </div>
       )}
     </div>
-  );
-}
-
-/* ═══════════════════════════════════════════════════════ */
-/* ToggleSwitch — 라벨 고정 + iOS형 on/off 스위치               */
-/* ═══════════════════════════════════════════════════════ */
-function ToggleSwitch({
-  label, on, onToggle, title,
-}: {
-  label: string;
-  on: boolean;
-  onToggle: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      onClick={onToggle}
-      title={title}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        border: 'none', background: 'transparent', cursor: 'pointer',
-        padding: '2px 2px', fontFamily: 'var(--font-ui)',
-        fontSize: 11, color: on ? 'var(--text-primary)' : 'var(--text-muted)',
-      }}
-    >
-      <span>{label}</span>
-      <span style={{
-        position: 'relative', display: 'inline-block',
-        width: 26, height: 15, borderRadius: 8,
-        // 배경(따뜻한 아이보리)과 조화되는 부드러운 탄 톤. OFF는 한 단계 옅은 클레이.
-        background: on ? 'var(--border-content-active, #B89B78)' : 'var(--bg-active, #E8E2D9)',
-        transition: 'background 0.15s',
-        flexShrink: 0,
-      }}>
-        <span style={{
-          position: 'absolute', top: 2, left: on ? 13 : 2,
-          width: 11, height: 11, borderRadius: '50%',
-          background: '#fff',
-          transition: 'left 0.15s',
-          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
-        }} />
-      </span>
-    </button>
   );
 }
 

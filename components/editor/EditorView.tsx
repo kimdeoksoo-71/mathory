@@ -33,6 +33,7 @@ import { sha256 } from '../../lib/version/hash';
 import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import { fastScrollTo, computeBlockAwareScrollTop, computeMathCenterScrollTop } from '../../lib/editorScroll';
 import SaveStatus from './SaveStatus';
+import ToggleSwitch from '../ui/ToggleSwitch';
 import VersionDrawer from '../version/VersionDrawer';
 import { useBlockHistory } from '../../hooks/useBlockHistory';
 import type { HistoryEntry } from '../../hooks/useBlockHistory';
@@ -785,30 +786,22 @@ function SortableEditorBlock({
             <div style={{ flex: 1 }} />
 
             {/* Phase 59 — 요약 보기에 이 블록을 남긴다. 블록 종류와 무관하게 같은 자리·같은 모양.
-                (그림도 여기를 쓴다 — 옵션 패널에 따로 두면 위치가 블록마다 달라진다) */}
-            <button
-              onClick={(e) => { e.stopPropagation(); onSummaryChange(block.id, block.showInSummary ? undefined : true); }}
+                댓글 패널의 '보이기'와 동일한 공용 스위치를 쓴다(사본 금지).
+                바깥 span이 pointerdown을 막는다 — 헤더는 dnd-kit 드래그 핸들 영역이다. */}
+            <span
               onPointerDown={(e) => e.stopPropagation()}
-              title={block.showInSummary
-                ? '요약 보기에서 뺍니다'
-                : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)'}
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 4,
-                border: 'none', background: 'none', cursor: 'pointer',
-                padding: '1px 6px', marginRight: 2, borderRadius: 4,
-                fontSize: 11, fontFamily: 'var(--font-ui)',
-                color: block.showInSummary ? 'var(--accent-primary)' : 'var(--text-faint)',
-              }}
+              onClick={(e) => e.stopPropagation()}
+              style={{ display: 'inline-flex', marginRight: 2 }}
             >
-              <span style={{
-                width: 9, height: 9, borderRadius: '50%', boxSizing: 'border-box',
-                border: `1.5px solid ${block.showInSummary ? 'var(--accent-primary)' : 'var(--text-faint)'}`,
-                background: block.showInSummary
-                  ? 'radial-gradient(circle, var(--accent-primary) 0 45%, transparent 46%)'
-                  : 'none',
-              }} />
-              요약에 넣기
-            </button>
+              <ToggleSwitch
+                label="요약에 넣기"
+                on={block.showInSummary === true}
+                onToggle={() => onSummaryChange(block.id, block.showInSummary ? undefined : true)}
+                title={block.showInSummary
+                  ? '요약 보기에서 뺍니다'
+                  : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)'}
+              />
+            </span>
 
             {canDelete && (
               <button
