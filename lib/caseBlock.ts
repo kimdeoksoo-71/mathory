@@ -96,12 +96,20 @@ export function buildCaseLabels(blocks: CaseBlockLike[]): Map<string, string> {
  * 쓰는 확립된 방식이고 rehypeRaw가 파싱한다. raw_text는 불변이다.
  */
 export function injectCaseLabel(raw: string, label: string | null): string {
-  if (!label) return raw;
   const nl = raw.indexOf('\n');
   const first = nl === -1 ? raw : raw.slice(0, nl);
-  if (!first.trim()) return raw;                // 이어짓기 — 주입하지 않는다
-  const rest = nl === -1 ? '' : raw.slice(nl);  // 앞의 개행 포함
-  return `<span class="case-label">${label}.</span> ${first}${rest}`;
+  if (!first.trim()) return raw;                    // 이어짓기 — 제목행이 없다
+  const rest = nl === -1 ? '' : raw.slice(nl + 1);
+  const head = label ? `<span class="case-label">${label}.</span> ${first}` : first;
+  if (!rest.trim()) return head;
+  // 제목행 뒤에 빈 줄을 보장한다.
+  // ⚠ 이게 없으면 둘째 줄의 `$$…$$`·리스트가 제목행 문단에 흡수돼 인라인으로 렌더된다
+  //   ("C-1. a>1인 경우 x=1"처럼 한 줄로 붙는다). 사용자가 빈 줄을 넣어야만 제대로
+  //   나오는 규약은 제목행 규약(D9)과 어긋나므로 렌더 시점에 정규화한다.
+  //   Phase 54의 normalizeCaseBoundaries가 Case 라벨 앞에 빈 줄을 넣는 것과 같은 처방이다.
+  // ⚠ 수식의 개수·순서는 바뀌지 않으므로 편집창의 data-math-id 매핑은 그대로다.
+  const sep = rest.startsWith('\n') ? '\n' : '\n\n';
+  return `${head}${sep}${rest}`;
 }
 
 /**

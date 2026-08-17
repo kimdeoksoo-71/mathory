@@ -38,11 +38,12 @@ export default function OutlineToggle({ mode, onToggle, disabled, compact }: Pro
         display: 'inline-flex', alignItems: 'center', gap: compact ? 0 : 5,
         border: 'none', background: outline && !disabled ? 'var(--accent-soft)' : 'none',
         cursor: disabled ? 'not-allowed' : 'pointer',
-        padding: compact ? 0 : '4px 8px',
+        padding: compact ? 0 : '3px 7px',
         width: compact ? 22 : undefined, height: compact ? 22 : undefined,
         justifyContent: 'center',
         borderRadius: 6,
-        fontSize: 12, fontFamily: 'var(--font-ui)',
+        fontSize: 12, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap',
+        marginLeft: compact ? 0 : -7,   /* 라벨 글자와 좌단 정렬 (패딩 상쇄) */
         color: disabled
           ? 'var(--text-placeholder)'
           : outline ? 'var(--accent-primary)' : 'var(--text-faint)',

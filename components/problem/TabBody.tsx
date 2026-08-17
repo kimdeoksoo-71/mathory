@@ -198,8 +198,10 @@ export default function TabBody({
         >
           {copied ? <IconCheck size={13} /> : <IconCopy size={13} />}
         </button>
+        {/* 아이콘만 두면 복사 버튼 옆에 묻혀 아무도 찾지 못한다(덕수 실사용 확인).
+            라벨 열은 flexWrap이라 글자를 붙이면 자연스럽게 라벨 아래 줄로 내려간다. */}
         {isOpen && scoped && (
-          <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} compact />
+          <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} />
         )}
       </div>
 

@@ -111,14 +111,19 @@ test('splitCaseTitle: 첫 줄이 제목, 공백뿐이면 이어짓기', () => {
   assert.deepEqual(splitCaseTitle('   \n본문'), { title: '', body: '본문' });
 });
 
-test('injectCaseLabel: 첫 줄 앞에만 span, 나머지는 원문 그대로', () => {
-  const raw = '$a>1$인 경우\n$$x=1$$\n끝';
+test('injectCaseLabel: 첫 줄 앞에 span + 제목행 뒤 빈 줄 보장', () => {
+  // 빈 줄이 없으면 $$…$$가 제목행 문단에 흡수돼 인라인으로 렌더된다 → 렌더 시 정규화
   assert.equal(
-    injectCaseLabel(raw, 'C-2'),
-    '<span class="case-label">C-2.</span> $a>1$인 경우\n$$x=1$$\n끝',
+    injectCaseLabel('$a>1$인 경우\n$$x=1$$\n끝', 'C-2'),
+    '<span class="case-label">C-2.</span> $a>1$인 경우\n\n$$x=1$$\n끝',
   );
-  assert.equal(injectCaseLabel(raw, null), raw);          // 라벨 없으면 무변환
-  assert.equal(injectCaseLabel('\n본문', 'C-1'), '\n본문'); // 이어짓기는 주입하지 않는다
+  // 이미 빈 줄이 있으면 그대로 (빈 줄이 두 개로 늘지 않는다)
+  assert.equal(
+    injectCaseLabel('제목\n\n본문', 'C-1'),
+    '<span class="case-label">C-1.</span> 제목\n\n본문',
+  );
+  assert.equal(injectCaseLabel('제목만', 'C-1'), '<span class="case-label">C-1.</span> 제목만');
+  assert.equal(injectCaseLabel('\n본문', 'C-1'), '\n본문');   // 이어짓기는 손대지 않는다
 });
 
 test('injectCaseLabel은 수식 개수를 바꾸지 않는다 (data-math-id 매핑 보존)', () => {
