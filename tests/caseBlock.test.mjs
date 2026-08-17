@@ -213,3 +213,16 @@ test('buildOutline: 이어짓기 블록은 발췌만 남긴다', () => {
   assert.deepEqual(sec.items.map((i) => i.kind), ['case', 'keys']);
   assert.equal(sec.items[1].head, '**핵심**');
 });
+
+test('buildOutline: 작성자가 고른 그림만 요약에 남는다', () => {
+  const marked = { ...B('image', '<img src="a">'), showInSummary: true };
+  const blocks = [B('heading', '## 접근'), B('image', '<img src="b">'), marked, B('text', '설명')];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['block']);      // 표시 안 한 그림은 빠진다
+  assert.equal(sec.items[0].block.raw_text, '<img src="a">');
+});
+
+test('buildOutline: 고른 그림만 있어도 요약 보기가 활성된다 (D14 게이트)', () => {
+  const blocks = [{ ...B('image', '<img src="a">'), showInSummary: true }];
+  assert.equal(hasOutlineContent(buildOutline(blocks)), true);
+});

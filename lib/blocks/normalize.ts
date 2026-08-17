@@ -19,6 +19,7 @@ export interface PersistedBlockData {
   imageWidth?: number;
   imageTreatment?: 'frame';
   imageGray?: false;
+  showInSummary?: boolean;
   svg_initial_view?: SvgInitialView | null;
   svg_height?: number;
   ggb_initial_coords?: GgbInitialCoords | null;
@@ -40,6 +41,8 @@ export function toPersistedBlock(b: Block, index: number): PersistedBlockData {
   if (b.type === 'image' && b.imageWidth) out.imageWidth = b.imageWidth;
   if (b.type === 'image' && b.imageTreatment) out.imageTreatment = b.imageTreatment;
   if (b.type === 'image' && b.imageGray === false) out.imageGray = false;
+  // Phase 59: 요약 보기 노출 플래그. true일 때만 기록해 문서를 깨끗하게 유지한다
+  if (b.showInSummary) out.showInSummary = true;
   if (b.type === 'svg' && b.svg_initial_view) out.svg_initial_view = b.svg_initial_view;
   if (b.type === 'svg' && b.svg_height) out.svg_height = b.svg_height;
   if (b.type === 'ggb' && b.ggb_initial_coords) out.ggb_initial_coords = b.ggb_initial_coords;

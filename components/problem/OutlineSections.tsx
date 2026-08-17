@@ -118,6 +118,11 @@ export default function OutlineSections({
             {sec.items.map((item, idx) => (
               item.kind === 'case'
                 ? <CaseItem key={item.itemKey} item={item} open={openCases.has(item.itemKey)} onToggle={onToggleCase} />
+                : item.kind === 'block'
+                /* 작성자가 고른 그림 — 사이트 renderBlock을 그대로 쓴다(자체 key 보유).
+                   ⚠ 여기서 div로 한 번 더 감싸면 .case-gap이 형제가 아니게 되어
+                     rail이 그림 앞뒤로 끊긴다. renderBlock 결과를 그대로 흘릴 것. */
+                ? renderBlock(item.block!, 0)
                 : (
                   <div key={item.itemKey}
                     className={`outline-keys${idx > firstCase && idx < lastCase ? ' case-gap' : ''}`}>

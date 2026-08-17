@@ -217,6 +217,7 @@ function MediaBlockContent({
   onImageWidthChange,
   onImageTreatmentChange,
   onImageGrayChange,
+  onImageSummaryChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
   onSaveGgbInitialView,
@@ -228,6 +229,7 @@ function MediaBlockContent({
   onImageWidthChange: (blockId: string, width: number) => void;
   onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
   onImageGrayChange: (blockId: string, gray: boolean | undefined) => void;
+  onImageSummaryChange: (blockId: string, show: boolean | undefined) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
   onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
@@ -242,6 +244,7 @@ function MediaBlockContent({
   const imgWidth = block.imageWidth || 400;
   const isFrame = block.imageTreatment === 'frame';
   const isColor = block.imageGray === false;
+  const inSummary = block.showInSummary === true;
 
   const openTypeModal = () => setShowTypeModal(true);
   const cancelTypeModal = () => setShowTypeModal(false);
@@ -435,6 +438,19 @@ function MediaBlockContent({
           >
             컬러 유지
           </button>
+          <button
+            onClick={() => onImageSummaryChange(block.id, inSummary ? undefined : true)}
+            onPointerDown={(e) => e.stopPropagation()}
+            title="요약 보기에도 이 그림을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)"
+            style={{
+              padding: '4px 12px', fontSize: 12,
+              background: inSummary ? 'var(--accent-primary)' : 'var(--bg-hover)',
+              color: inSummary ? '#fff' : 'var(--text-primary)',
+              border: '1px solid var(--border-light)', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            요약에 표시
+          </button>
         </div>
         <div style={{ marginTop: 6 }}>
           <button
@@ -621,6 +637,7 @@ function SortableEditorBlock({
   onImageWidthChange,
   onImageTreatmentChange,
   onImageGrayChange,
+  onImageSummaryChange,
   onSaveSvgInitialView,
   onSvgHeightChange,
   onSaveGgbInitialView,
@@ -653,6 +670,7 @@ function SortableEditorBlock({
   onImageWidthChange: (blockId: string, width: number) => void;
   onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
   onImageGrayChange: (blockId: string, gray: boolean | undefined) => void;
+  onImageSummaryChange: (blockId: string, show: boolean | undefined) => void;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
   onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
@@ -810,6 +828,7 @@ function SortableEditorBlock({
               onImageWidthChange={onImageWidthChange}
               onImageTreatmentChange={onImageTreatmentChange}
               onImageGrayChange={onImageGrayChange}
+              onImageSummaryChange={onImageSummaryChange}
               onSaveSvgInitialView={onSaveSvgInitialView}
               onSvgHeightChange={onSvgHeightChange}
               onSaveGgbInitialView={onSaveGgbInitialView}
@@ -1558,6 +1577,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleImageGrayChange = useCallback((blockId: string, gray: boolean | undefined) => {
     setCurrentBlocks((prev) =>
       prev.map((b) => (b.id === blockId ? { ...b, imageGray: gray } : b))
+    );
+  }, [setCurrentBlocks]);
+
+  /** Phase 59: 요약 보기 노출 토글 — undefined(숨김) ↔ true */
+  const handleImageSummaryChange = useCallback((blockId: string, show: boolean | undefined) => {
+    setCurrentBlocks((prev) =>
+      prev.map((b) => (b.id === blockId ? { ...b, showInSummary: show } : b))
     );
   }, [setCurrentBlocks]);
 
@@ -3118,6 +3144,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onImageWidthChange={handleImageWidthChange}
                     onImageTreatmentChange={handleImageTreatmentChange}
                     onImageGrayChange={handleImageGrayChange}
+                    onImageSummaryChange={handleImageSummaryChange}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
                     onSvgHeightChange={handleSvgHeightChange}
                     onSaveGgbInitialView={handleSaveGgbInitialView}

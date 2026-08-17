@@ -18,8 +18,9 @@ import {
 
 /** 스켈레톤 한 줄. */
 export interface OutlineItem {
-  /** 'case' = 경우 제목행(rail·dot 붙음) · 'keys' = key 발췌 묶음 */
-  kind: 'case' | 'keys';
+  /** 'case' = 경우 제목행(rail·dot 붙음) · 'keys' = key 발췌 묶음
+   *  'block' = 작성자가 요약에 남기기로 고른 블록(그림) — 사이트별 renderBlock에 그대로 넘긴다 */
+  kind: 'case' | 'keys' | 'block';
   /** 여닫이·React 키. 레거시 항목은 `${blockKey}:${행번호}` */
   itemKey: string;
   /** 하위경우 여부 (렌더 클래스 case-sub) */
@@ -32,6 +33,9 @@ export interface OutlineItem {
   body?: string;
   /** 접힌 경우 안에서 보여줄 본문 발췌. 없으면 제목행만 */
   keys?: string;
+  /** kind === 'block'일 때 원본 블록. 렌더는 사이트가 자기 분기로 처리한다
+   *  (앱은 imageTreatment·크기, 공개 뷰어는 자기 스타일 — D16 렌더러 분리 유지) */
+  block?: Block;
 }
 
 export interface OutlineSection {
@@ -101,6 +105,13 @@ export function buildOutline(blocks: Block[]): OutlineSection[] {
     }
     const sec: OutlineSection = cur ?? open(null, key);
     sec.blocks.push(b);
+
+    // 작성자가 고른 그림은 스켈레톤에도 남긴다 (요약의 유일한 예외).
+    // 경우 블록 자신은 이미 항목이 되므로 제외한다.
+    if (b.showInSummary && !isCaseBlock(b.type)) {
+      sec.items.push({ kind: 'block', itemKey: key, head: '', block: b });
+      continue;
+    }
 
     if (isCaseBlock(b.type)) {
       const label = labels.get(key) ?? null;

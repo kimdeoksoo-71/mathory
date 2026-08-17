@@ -166,6 +166,10 @@ export interface Block {
   imageTreatment?: 'frame';
   /** 이미지 블록 전용: 흑백 여부. 미설정/true = grayscale(기본), false = 컬러 유지 */
   imageGray?: boolean;
+  /** Phase 59: 요약 보기에도 남길 블록(작성자가 고른 그림). 미설정 = 요약에서 숨김.
+   *  요약 스켈레톤은 제목·핵심문장·경우 제목행만 남기는 것이 원칙이고, 이 플래그가
+   *  그 원칙의 유일한 예외다 — "내가 고른 그림만" 남는다. */
+  showInSummary?: boolean;
   /** SVG 블록 전용: 편집자가 저장한 초기 뷰 transform (없으면 fit-to-container) */
   svg_initial_view?: SvgInitialView | null;
   /** SVG 블록 전용: 표시 높이(px). 기본 300 */
