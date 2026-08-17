@@ -31,8 +31,12 @@ const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : use
 
 export type OutlineMode = 'full' | 'outline';
 
-export function useOutlineState(blocks: Block[]) {
-  const [mode, setMode] = useState<OutlineMode>('full');
+/**
+ * @param initialMode 첫 화면의 모드. 앱 열람뷰(ProblemView)는 'outline'로 열어
+ *   풀이의 뼈대를 먼저 보이고, 공개 뷰어는 'full'로 열어 방문자가 곧장 읽게 한다.
+ */
+export function useOutlineState(blocks: Block[], initialMode: OutlineMode = 'full') {
+  const [mode, setMode] = useState<OutlineMode>(initialMode);
   const [openSections, setOpenSections] = useState<Set<string>>(new Set());
   const [openCases, setOpenCases] = useState<Set<string>>(new Set());
 
@@ -89,5 +93,10 @@ export function useOutlineState(blocks: Block[]) {
     });
   }, [keepAnchor]);
 
-  return { mode, setMode, toggleMode, sections, available, openSections, openCases, toggleSection, toggleCase };
+  return {
+    // ⚠ 보여줄 뼈대가 없으면 요약 보기를 강제로 해제한다. 기본값이 'outline'인 화면에서
+    //   제목·핵심문장·경우가 하나도 없는 풀이를 열면 빈 화면이 되기 때문이다.
+    mode: available ? mode : 'full',
+    setMode, toggleMode, sections, available, openSections, openCases, toggleSection, toggleCase,
+  } as const;
 }

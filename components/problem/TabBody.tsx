@@ -44,7 +44,9 @@ export default function TabBody({
 }: Props) {
   const caseLabels = useMemo(() => buildCaseLabels(blocks), [blocks]);
   const caseGaps = useMemo(() => buildCaseGapKeys(blocks), [blocks]);
-  const outline = useOutlineState(blocks);
+  // 앱 열람뷰는 요약 보기로 연다 — 뼈대를 먼저 보고 필요한 곳만 펼치는 것이 기본 동선이다.
+  // (공개 뷰어는 'full' 기본 — 방문자는 곧장 읽는 것이 자연스럽다)
+  const outline = useOutlineState(blocks, 'outline');
   const scoped = isToneScoped(tab.id);
   const isQuestion = tab.id === 'question';
 
