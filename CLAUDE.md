@@ -136,17 +136,17 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **경우 블록 안은 최상위와 같은 들여쓰기 규칙 (Phase 59 §11-2)**: display 수식이 본문보다 한 단(3em/인쇄 2em) 더 들어간다 → `.katex-display`에 override를 두지 **않는다**. 반대로 `.callout-block`은 `padding-left: 0`으로 죽인다(한 줄 강조 장치라 이중 들여쓰기가 군더더기) — **전례를 복사해 되돌리지 말 것**. 리스트·① 밭은 기본 1em이 약해 같은 한 단으로 올리며, 인쇄 ① 규칙은 globals의 `!important`를 이기려면 `!important`가 필요하다
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경에서 3.49:1). 로고 레드 `#D97757`은 2.52:1로 **미달**이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 59 구현 완료 (검증 대기)
+## 현재 Phase: 59 완료
 
 Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
-착수 문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md`
+문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md` — **§0-0이 최종 사양**, §11이 실사용 개정 기록
 
 - **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C1.` · `C2a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
 - **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
 - **요약 보기에 그림 남기기 (Phase 59 §11-9)**: 요약은 제목·핵심문장·경우 제목행만 남기는 것이 원칙이고, `Block.showInSummary`가 **유일한 예외**다 — 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기" 스위치**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)로 켠다. 블록 종류를 가리지 않으므로 표를 담은 텍스트 블록·글상자도 같은 방식이다. 렌더는 사이트별 `renderBlock`을 그대로 재사용한다 — ⚠ 스켈레톤에서 그 결과를 div로 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그림 앞뒤로 끊긴다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·`**`·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
-- 로직 검증: `npm run test:case` (18개)
+- 로직 검증: `npm run test:case` (27개)
 
 다음 작업 후보:
 - **P6 긴 display 수식 접기** (Phase 58에서 분리) — 최상위 `\\` display 수식 전용. `aligned`·`gathered`·`array`는 `.mspace.newline`을 방출하지 않아 행 단위 접기가 불가능하다. 착수 전 전 문항에서 두 문법의 사용 비율부터 조사할 것

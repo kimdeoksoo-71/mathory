@@ -202,8 +202,12 @@ export default function TabBody({
         </button>
         {/* 아이콘만 두면 복사 버튼 옆에 묻혀 아무도 찾지 못한다(덕수 실사용 확인).
             라벨 열은 flexWrap이라 글자를 붙이면 자연스럽게 라벨 아래 줄로 내려간다. */}
+        {/* 항상 라벨 아래 줄에 놓는다 — flexBasis 100%가 flex 줄을 강제로 끊는다.
+            (폭에 따라 붙었다 떨어졌다 하면 탭마다 위치가 달라 보인다) */}
         {isOpen && scoped && (
-          <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} />
+          <span style={{ flexBasis: '100%', display: 'flex', marginLeft: -2 }}>
+            <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} />
+          </span>
         )}
       </div>
 
