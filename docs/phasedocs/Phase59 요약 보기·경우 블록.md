@@ -603,7 +603,7 @@ $$
 
 | | 가로 | 세로 |
 |---|---|---|
-| 제목 줄 | chevron이 `1em` 폭을 차지 → **제목 좌단이 정확히 1em = 경우 rail 선**에 선다 | `align-items: baseline` |
+| 제목 줄 | chevron을 흐름 밖으로(§11-11) → **제목 좌단 0em = 본문과 같은 선** | `align-items: baseline` |
 | 경우 줄 | chevron을 `.case-block` 기준 `left: 1.5em`으로 **절대배치**(dot 1em 바로 오른쪽) → 흐름에서 빠져 제목행은 3em 그대로 | `top: 0.9em; translateY(-50%)` — dot과 같은 세로선 |
 
 ⚠ 제목 줄의 세로 정렬에 고정 높이를 쓰면 안 된다. h1/h2/h3는 font-size도 `margin-top`도 서로 다르고 **EditorPreview 인라인 style이라 CSS로 만질 수 없다**(Phase 58 D1′). `baseline` 정렬에 맡기면 세 크기가 전부 자동으로 글자 줄에 붙는다 — 실측 오차 0.3px.
