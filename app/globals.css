@@ -648,6 +648,10 @@ p:has(.marker-circled) {
    달고 rail을 그리는데, margin을 주면 박스가 통째로 밀려 rail이 1em이 아니라
    4em에 그려진다(그 구간만 레일이 끊기고 엉뚱한 자리에 세로선이 하나 더 생긴다). */
 .outline-keys { margin: 0.35em 0; padding-left: 3em; }
+/* 경우와 경우 사이(런 안)의 발췌는 경우 안 발췌와 같은 자리에 선다 —
+   그 블록이 전체 보기에서 서는 자리(강조문·목록 6em)와도 일치한다.
+   런 밖(첫 경우 앞·마지막 경우 뒤)의 섹션 발췌는 3em 그대로. */
+.outline-keys.case-gap { padding-left: 6em; }
 .outline-keys .preview-content p { margin-bottom: 0.35em; }
 .outline-keys .preview-content p:last-child { margin-bottom: 0; }
 

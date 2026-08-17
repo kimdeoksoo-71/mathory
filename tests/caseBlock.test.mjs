@@ -15,7 +15,7 @@ const B = (type, raw_text) => ({ id: `b${seq++}`, block_key: `k${seq}`, type, ra
 
 /* ═══ 자동 번호 ═══ */
 
-test('경우 3개 + 하위 2개 → C-1 · C-2 · C-2-a · C-2-b · C-3', () => {
+test('경우 3개 + 하위 2개 → C1 · C2 · C2a · C2b · C3', () => {
   const blocks = [
     B('text', '준비'),
     B('case', '$a>1$인 경우\n본문'),
@@ -27,34 +27,34 @@ test('경우 3개 + 하위 2개 → C-1 · C-2 · C-2-a · C-2-b · C-3', () => 
   const m = buildCaseLabels(blocks);
   assert.deepEqual(
     blocks.filter((b) => b.type !== 'text').map((b) => m.get(b.block_key)),
-    ['C-1', 'C-2', 'C-2-a', 'C-2-b', 'C-3'],
+    ['C1', 'C2', 'C2a', 'C2b', 'C3'],
   );
 });
 
 test('제목 블록에서 번호가 리셋된다', () => {
   const blocks = [B('case', '가\n'), B('heading', '## 다른 접근'), B('case', '나\n')];
   const m = buildCaseLabels(blocks);
-  assert.equal(m.get(blocks[0].block_key), 'C-1');
-  assert.equal(m.get(blocks[2].block_key), 'C-1');
+  assert.equal(m.get(blocks[0].block_key), 'C1');
+  assert.equal(m.get(blocks[2].block_key), 'C1');
 });
 
 test('경우 사이에 일반 블록이 끼어도 번호는 이어진다', () => {
   const blocks = [B('case', '가\n'), B('text', '설명'), B('image', '<img src="x">'), B('case', '나\n')];
   const m = buildCaseLabels(blocks);
-  assert.equal(m.get(blocks[3].block_key), 'C-2');
+  assert.equal(m.get(blocks[3].block_key), 'C2');
 });
 
 test('이어짓기(첫 줄 빈 case)는 번호를 받지 않는다', () => {
   const blocks = [B('case', '가\n본문'), B('image', '<img src="x">'), B('case', '\n이어지는 본문'), B('case', '나\n')];
   const m = buildCaseLabels(blocks);
-  assert.equal(m.get(blocks[0].block_key), 'C-1');
+  assert.equal(m.get(blocks[0].block_key), 'C1');
   assert.equal(m.get(blocks[2].block_key), undefined);   // dot·번호 없음
-  assert.equal(m.get(blocks[3].block_key), 'C-2');       // 이어짓기가 번호를 소모하지 않는다
+  assert.equal(m.get(blocks[3].block_key), 'C2');       // 이어짓기가 번호를 소모하지 않는다
 });
 
-test('상위 case 없는 subcase는 C-1-a로 친다 (데이터 불변)', () => {
+test('상위 case 없는 subcase는 C1a로 친다 (데이터 불변)', () => {
   const blocks = [B('subcase', '단독\n')];
-  assert.equal(buildCaseLabels(blocks).get(blocks[0].block_key), 'C-1-a');
+  assert.equal(buildCaseLabels(blocks).get(blocks[0].block_key), 'C1a');
 });
 
 test('letters: base-26 (fromCharCode 단독의 { 버그 방지)', () => {
@@ -114,22 +114,22 @@ test('splitCaseTitle: 첫 줄이 제목, 공백뿐이면 이어짓기', () => {
 test('injectCaseLabel: 첫 줄 앞에 span + 제목행 뒤 빈 줄 보장', () => {
   // 빈 줄이 없으면 $$…$$가 제목행 문단에 흡수돼 인라인으로 렌더된다 → 렌더 시 정규화
   assert.equal(
-    injectCaseLabel('$a>1$인 경우\n$$x=1$$\n끝', 'C-2'),
-    '<span class="case-label">C-2.</span> $a>1$인 경우\n\n$$x=1$$\n끝',
+    injectCaseLabel('$a>1$인 경우\n$$x=1$$\n끝', 'C2'),
+    '<span class="case-label">C2.</span> $a>1$인 경우\n\n$$x=1$$\n끝',
   );
   // 이미 빈 줄이 있으면 그대로 (빈 줄이 두 개로 늘지 않는다)
   assert.equal(
-    injectCaseLabel('제목\n\n본문', 'C-1'),
-    '<span class="case-label">C-1.</span> 제목\n\n본문',
+    injectCaseLabel('제목\n\n본문', 'C1'),
+    '<span class="case-label">C1.</span> 제목\n\n본문',
   );
-  assert.equal(injectCaseLabel('제목만', 'C-1'), '<span class="case-label">C-1.</span> 제목만');
-  assert.equal(injectCaseLabel('\n본문', 'C-1'), '\n본문');   // 이어짓기는 손대지 않는다
+  assert.equal(injectCaseLabel('제목만', 'C1'), '<span class="case-label">C1.</span> 제목만');
+  assert.equal(injectCaseLabel('\n본문', 'C1'), '\n본문');   // 이어짓기는 손대지 않는다
 });
 
 test('injectCaseLabel은 수식 개수를 바꾸지 않는다 (data-math-id 매핑 보존)', () => {
   const raw = '$a>1$인 경우\n본문 $x$ 와 $y$';
   const count = (s) => (s.match(/\$/g) || []).length;
-  assert.equal(count(injectCaseLabel(raw, 'C-1')), count(raw));
+  assert.equal(count(injectCaseLabel(raw, 'C1')), count(raw));
 });
 
 test('caseClassName', () => {
@@ -178,7 +178,7 @@ test('buildOutline: 경우 항목은 제목행 + 본문 발췌, 제목행 자체
   const [sec] = buildOutline(blocks);
   const item = sec.items[0];
   assert.equal(item.kind, 'case');
-  assert.equal(item.head, '<span class="case-label">C-1.</span> **$a>1$인 경우**');
+  assert.equal(item.head, '<span class="case-label">C1.</span> **$a>1$인 경우**');
   assert.equal(item.keys, '**본문 핵심**');     // 제목행의 강조는 중복 표시하지 않는다
   assert.equal(item.body, '본문 **본문 핵심** 이어짐');
 });

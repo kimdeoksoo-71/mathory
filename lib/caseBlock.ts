@@ -77,14 +77,15 @@ export function buildCaseLabels(blocks: CaseBlockLike[]): Map<string, string> {
     if (!isCaseBlock(b.type)) continue;
     const { title } = splitCaseTitle(b.raw_text || '');
     if (!title) continue;                       // 이어짓기 — 번호 없음
+    // 표기는 대시 없이 붙여 쓴다(C1 · C1a) — 대시가 있으면 수식·부호와 섞여 읽기 나쁘다
     if (b.type === 'case') {
       n += 1;
       sub = 0;
-      out.set(blockKeyOf(b), `C-${n}`);
+      out.set(blockKeyOf(b), `C${n}`);
     } else {
       sub += 1;
-      // 상위 case 없이 등장한 subcase는 C-1-a로 친다 (데이터는 손대지 않는다)
-      out.set(blockKeyOf(b), `C-${n || 1}-${letters(sub)}`);
+      // 상위 case 없이 등장한 subcase는 C1a로 친다 (데이터는 손대지 않는다)
+      out.set(blockKeyOf(b), `C${n || 1}${letters(sub)}`);
     }
   }
   return out;

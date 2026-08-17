@@ -76,7 +76,7 @@ v3 §3-2는 "`--mathory-red`(#D97757)은 텍스트 기준 4.5:1엔 못 미치지
 | D17 | rail 종단 기본 = 런의 마지막 블록 하단까지. "마지막 dot에서 끊기"는 1규칙 교체 |
 | D18 | 자동 번호는 화면·인쇄 전용. `exportMd` 블록 주석에만 라벨 동봉 |
 | **D19** | dot = 상태 표시기. **펼침 = 채움 / 접힘(outline) = 테두리만.** 색은 **`--mathory-red-dark`**(G1), 링 두께 `0.1em`(G3), 인쇄는 `#000` 채움(G5) |
-| Q5 | 레거시 `Case 1.` 표기 유지 + 렌더 무변화. 신규는 `C-1.` |
+| Q5 | 레거시 `Case 1.` 표기 유지 + 렌더 무변화. 신규는 `C1.` |
 
 ---
 
@@ -88,7 +88,7 @@ v3 §3-2는 "`--mathory-red`(#D97757)은 텍스트 기준 4.5:1엔 못 미치지
 export type CaseKind = 'case' | 'subcase';
 export function isCaseBlock(type: string): boolean;
 
-/** blockKey(=block_key ?? id) → 'C-2' | 'C-2-a'. 이어짓기 블록은 항목 없음(=null 취급) */
+/** blockKey(=block_key ?? id) → 'C2' | 'C2a'. 이어짓기 블록은 항목 없음(=null 취급) */
 export function buildCaseLabels(
   blocks: { id: string; block_key?: string; type: string; raw_text: string }[],
 ): Map<string, string>;
@@ -108,9 +108,9 @@ export const LEGACY_SUBCASE_RE = /^-\s+\*\*Case\s+\d+[a-z]\.\*\*/;
 
 ```
 heading             → n = 0, sub = 0
-case,    제목행 有   → n++, sub = 0,  label `C-${n}`
+case,    제목행 有   → n++, sub = 0,  label `C${n}`
 case,    제목행 無   → label 없음 (이어짓기)
-subcase, 제목행 有   → sub++,        label `C-${n || 1}-${letters(sub)}`
+subcase, 제목행 有   → sub++,        label `C${n || 1}${letters(sub)}`
 subcase, 제목행 無   → label 없음
 그 외 블록           → 상태 불변 (경우 사이 설명 문단이 번호를 끊지 않는다)
 ```
@@ -126,7 +126,7 @@ function letters(n: number): string {          // 1→'a', 26→'z', 27→'aa'
 `injectCaseLabel` 출력:
 
 ```
-<span class="case-label">C-2.</span> $a>1$인 경우
+<span class="case-label">C2.</span> $a>1$인 경우
 본문 첫 줄…
 ```
 
@@ -138,7 +138,7 @@ function letters(n: number): string {          // 1→'a', 26→'z', 27→'aa'
 export interface OutlineItem {
   kind: 'case' | 'subcase' | 'keys';
   blockKey: string;
-  label?: string;      // 'C-2.' (레거시 항목은 없음)
+  label?: string;      // 'C2.' (레거시 항목은 없음)
   content: string;     // EditorPreview에 그대로 넘길 문자열(마커 포함)
 }
 export interface OutlineSection {
@@ -424,7 +424,7 @@ ProblemView는 탭이 여러 개이므로 **탭 본문을 `components/problem/Ta
 |---|---|
 | 제목·key·경우 전무 | D14 게이트로 토글 비활성 |
 | key 마커가 경우 제목행에 있음 | 제목행은 항상 표시 → 발췌는 본문만 |
-| 상위 case 없는 subcase | `C-1-a`로 렌더 + **편집창 미리보기에서만** 흐린 경고. 데이터 불변 |
+| 상위 case 없는 subcase | `C1a`로 렌더 + **편집창 미리보기에서만** 흐린 경고. 데이터 불변 |
 | 이어짓기가 런의 첫 블록 | dot 없이 rail만 → 편집창에서만 경고 |
 | 경우 사이에 일반 블록 | 번호 유지(D10), rail은 끊긴다 — **의도**(경우 밖 문단임을 알린다) |
 | 경우 안 display 수식·리스트·① 밭 | 기존 K1 규칙 그대로. 이중 들여쓰기 override만 확인 |
@@ -478,7 +478,7 @@ components/print/PrintStyles.css:144 이후  인쇄 .case-block 일체
 **Stage 0** — 착수 시 `git log -1`이 `459cbcb`에서 움직였으면 §8 좌표만 재확인.
 
 **Stage 1 · 경우 블록** — 타입·상수·5곳 분기·라벨 계산·주입.
-- 경우 3 + 하위 2 문항에서 `C-1`~`C-3`·`C-2-a`·`C-2-b`
+- 경우 3 + 하위 2 문항에서 `C1`~`C3`·`C2a`·`C2b`
 - 삽입·삭제·순서 변경 후 번호 재계산 / 이어짓기 억제 / 상위 없는 subcase 경고
 - 저장→재로드 / undo 복원 / ⌘B가 `case + text`를 만드는지
 - **E7 회귀**: 편집창 미리보기에서 제목행 수식과 본문 수식을 각각 클릭 → 각각 올바른 편집 위치
@@ -589,7 +589,7 @@ x = 1
 $$
 ```
 
-처럼 제목행 바로 다음 줄에 본문을 쓰면 마크다운이 **한 문단으로 묶어** `C-1. a>1인 경우 x=1`처럼 붙어 나온다. 들여쓰기도 먹지 않는다(문단 안 인라인이 되므로). 제목행 규약(D9)이 "첫 줄은 제목"이라고 정한 이상 사용자가 빈 줄까지 신경 쓰게 할 수 없으므로 `injectCaseLabel`이 렌더 시점에 빈 줄을 넣는다. Phase 54의 `normalizeCaseBoundaries`가 Case 라벨 앞에 빈 줄을 넣는 것과 같은 처방이며, 수식의 개수·순서를 바꾸지 않아 편집창 `data-math-id` 매핑에 영향이 없다.
+처럼 제목행 바로 다음 줄에 본문을 쓰면 마크다운이 **한 문단으로 묶어** `C1. a>1인 경우 x=1`처럼 붙어 나온다. 들여쓰기도 먹지 않는다(문단 안 인라인이 되므로). 제목행 규약(D9)이 "첫 줄은 제목"이라고 정한 이상 사용자가 빈 줄까지 신경 쓰게 할 수 없으므로 `injectCaseLabel`이 렌더 시점에 빈 줄을 넣는다. Phase 54의 `normalizeCaseBoundaries`가 Case 라벨 앞에 빈 줄을 넣는 것과 같은 처방이며, 수식의 개수·순서를 바꾸지 않아 편집창 `data-math-id` 매핑에 영향이 없다.
 
 **구조 보기 토글에 글자를 붙였다.** 아이콘만(22px, `--text-faint`) 두었더니 복사 버튼 옆에 묻혀 **덕수가 기능의 존재 자체를 찾지 못했다.** 라벨 열은 `flexWrap`이라 글자를 붙이면 '풀이' 아래 줄로 자연스럽게 내려간다. 공개 뷰어는 처음부터 글자를 달고 있었다.
 
