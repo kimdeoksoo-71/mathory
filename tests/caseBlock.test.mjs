@@ -226,3 +226,23 @@ test('buildOutline: 고른 그림만 있어도 요약 보기가 활성된다 (D1
   const blocks = [{ ...B('image', '<img src="a">'), showInSummary: true }];
   assert.equal(hasOutlineContent(buildOutline(blocks)), true);
 });
+
+test('buildOutline: "요약에 넣기"는 블록 종류를 가리지 않는다 (표를 담은 텍스트·글상자)', () => {
+  const table = '| 구간 | 부호 |\n|---|---|\n| $x<0$ | 음 |';
+  const blocks = [
+    B('text', '앞 문단 **핵심**'),
+    { ...B('text', table), showInSummary: true },
+    B('text', '| 안 보일 | 표 |\n|---|---|\n| a | b |'),
+    { ...B('box', '글상자 요약'), showInSummary: true },
+  ];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['keys', 'block', 'block']);
+  assert.equal(sec.items[1].block.raw_text, table);
+  assert.equal(sec.items[2].block.raw_text, '글상자 요약');
+});
+
+test('buildOutline: 넣기로 한 블록은 발췌를 따로 만들지 않는다 (통째로 이미 보인다)', () => {
+  const blocks = [{ ...B('text', '설명 **핵심이다** 뒤'), showInSummary: true }];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['block']);
+});
