@@ -95,8 +95,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **이 프로젝트에 다크 모드는 없다 (Phase 45a)**: `globals.css`에 `prefers-color-scheme`·`[data-theme]`·`.dark` 셀렉터가 **0건**이다. 계획서에 반복 등장하는 "다크 토큰도 함께 정의" 요구는 소비처 없는 허수다 — 새 색 토큰에 다크 정의를 붙이지 말 것
 - **활성 블록을 바꾸는 모든 경로는 `skipNextBlockScrollRef` 계약을 맺을 것 (Phase 45a)**: 플래그는 자동 스크롤 effect **맨 앞**에서 소비한다. `collapseMode` 가드 뒤에 두면 전체접기 중엔 소비되지 않고 남아 나중 전환 하나를 삼킨다. 반대로 **직접 스크롤을 호출하는 핸들러**(`handleSelectBlockBar`)는 effect의 게이트를 우회하므로 같은 조건을 자기 안에 다시 적어야 한다 — Phase 56이 이걸 빠뜨려 Phase 45의 접기 모드 가드가 무력화됐다
 - **click의 `stopPropagation`은 `dblclick`을 막지 않는다 (Phase 45a)**: 별개 이벤트 타입이다. 더블클릭 핸들러가 달린 컨테이너 안의 버튼·스위치에는 `onDoubleClick` 차단을 **따로** 달 것
-- **편집창 블록 인셋은 E형 (Phase 45a)**: 비활성 = 전폭·직각·상하 헤어라인(`--block-hairline`) / 활성·선택 = radius 8 + 1px `--block-border-active` + 그림자. **비활성의 좌우 1px은 `transparent`로 자리를 잡아 둔다** — 아예 빼면 활성 전환 순간 내용물이 1px 밀린다. 편집 패널이 좌우 패딩 0이라 **좌측 기준선 16px**(`.cm-content` 패딩)에 바·하단툴바·미디어 블록·교정 박스를 모두 맞춘다. 열람·공유·인쇄에는 적용하지 않는다
-- **U자 프레임(상·좌·우 0.5px + 상단 라운드 10)은 3곳 공유**: `EditorView:3116` · `ProblemView:584` · `FolderView:447`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸한다. Phase 45a는 프레임을 **건드리지 않고** 블록 좌우 선만 없애 이중 외곽을 풀었다
+- **편집창 블록 인셋은 E형 (Phase 45a)**: 비활성 = 전폭·직각·간격 0 / 활성·선택 = radius 8 + `--block-border-active`. 선은 전부 **0.5px**(레티나 1물리픽셀)이고 **그림자는 쓰지 않는다**. **블록 사이 구분선은 하나뿐** — 그래서 가로선은 **위쪽만** 그린다(아래까지 그리면 인접 두 블록이 각자 내어 2줄). 덕분에 첫 블록은 상단 선이 없고 마지막 블록 아래는 열린다. 직전이 활성 카드면 그 카드의 아래 테두리가 선을 담당하므로 생략(`hideTopLine` — **CSS 형제 선택자로는 불가**, `<div key>` 래퍼가 형제 관계를 끊는다). **비활성의 네 변 0.5px은 `transparent`로 자리를 잡아 둔다** — 아예 빼면 활성 전환 순간 내용물이 밀린다. 편집 패널이 좌우 패딩 0이라 **좌측 기준선 16px**(`.cm-content` 패딩)에 바·하단툴바·미디어 블록·교정 박스를 모두 맞춘다. 열람·공유·인쇄에는 적용하지 않는다
+- **U자 프레임(상·좌·우 0.5px, 상단 직각)은 3곳 공유**: `EditorView` · `ProblemView` · `FolderView`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸하므로 **셋을 항상 함께** 손댈 것. Phase 45a는 테두리 선은 **그대로 두고**(블록 좌우 선을 없애는 것만으로 이중 외곽이 풀린다) 상단 라운드 10만 3곳 동시에 직각으로 바꿨다
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
