@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>P5 · E형 최종 확정판 — E-b 전폭, 활성 블록도 전폭</title>
+<style>
+  :root{
+    --clay:#F4EFE7; --ivory:#FEFDFB; --blk:#F0EAE0; --blk-active:#E8DFCE;
+    --bb-hair:#DCD3C2; --bb-active:#AC9C7E;
+    --muted:#9C9585; --faint:#B8AFA4;
+    --shadow:0 4px 16px rgba(0,0,0,.14);
+    --ui:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Pretendard','Noto Sans KR',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:28px 24px 40px;background:#FBF9F5;font-family:var(--ui);color:#4a443a}
+  h1{font-size:17px;margin:0 0 4px}
+  .sub{font-size:12.5px;color:var(--muted);margin:0 0 20px;line-height:1.6}
+  .wrap{display:grid;grid-template-columns:1.35fr 1fr;gap:28px;max-width:1360px;align-items:start}
+  h2{font-size:13.5px;margin:0 0 4px}
+  .desc{font-size:11.5px;color:var(--muted);line-height:1.65;margin:4px 0 12px}
+  .desc b{color:#6b6353}
+
+  .stage{background:var(--ivory);border:1px solid #EAE5DC;border-radius:10px;padding:26px 22px 0;position:relative}
+  .frame{position:relative;height:410px;overflow:hidden;display:flex;background:var(--clay);border:none}
+
+  .edit-col{flex:1.15;position:relative;padding:8px 0;min-width:0}
+
+  /* 활성: 전폭 그대로 — 둥근 모서리 + 1px 다소 진한 테두리 + 그림자. 폭 축소 없음 */
+  .card-active{background:var(--blk-active);border:1px solid var(--bb-active);border-radius:8px;
+               box-shadow:var(--shadow);overflow:hidden;position:relative;z-index:2}
+  .bar{display:flex;align-items:center;gap:5px;padding:4px 14px;font-size:9.5px;color:var(--muted);
+       border-bottom:1px solid var(--bb-active)}
+  .grip{letter-spacing:-1px;color:var(--faint);font-size:10px}
+  .body{padding:8px 14px 10px}
+  .ln{height:6px;border-radius:3px;background:#D8D0C2;margin:6px 0}
+  .ln.w60{width:60%}.ln.w80{width:80%}.ln.w40{width:40%}.ln.w70{width:70%}
+  .ln.math{background:#CEC2AC;width:52%;height:8px;margin:8px auto}
+
+  /* 비활성: 전폭 · 직각 · 상하 헤어라인만 */
+  .flat{background:var(--blk);border-top:1px solid var(--bb-hair);border-bottom:1px solid var(--bb-hair)}
+  .flat + .flat{border-top:none}
+  .card-active + .flat{border-top:none}   /* 활성 카드 직후는 카드 하변이 경계를 겸함 */
+
+  .prev-col{flex:1;padding:16px 22px;min-width:0}
+  .prev-col .ln{background:#DDD5C6}
+  .prev-col .title{height:9px;width:45%;background:#CFC5B2;border-radius:3px;margin:2px 0 12px}
+
+  .note{position:absolute;z-index:6;font-size:9.5px;font-weight:700;
+        background:rgba(255,255,255,.94);padding:1px 6px;border-radius:4px;border:1px solid #cbc2b2;color:#6b6353}
+  .note.g{color:#3f6b3f;border-color:#BFD6BF}
+  .col-label{position:absolute;z-index:7;font-size:10.5px;font-weight:700;color:#7a7263;
+             background:var(--ivory);padding:1px 8px;border-radius:9px;border:1px solid #E2DBCE;top:8px}
+
+  /* ── 확대도 ── */
+  .zoom{background:var(--ivory);border:1px solid #EAE5DC;border-radius:10px;padding:22px;position:relative}
+  .zoom-frame{background:var(--clay);padding:14px 0;position:relative}
+  .zoom .card-active{font-size:13px}
+  .zoom .bar{font-size:12px;padding:7px 20px}
+  .zoom .body{padding:12px 20px 14px}
+  .zoom .ln{height:9px}
+  .zoom .flat .body{padding:12px 20px 14px}
+  .guide{position:absolute;z-index:8;border-left:1.5px dashed #C0392B;top:6px;bottom:6px;width:0;opacity:.75}
+  .glabel{position:absolute;z-index:9;font-size:9.5px;color:#C0392B;font-weight:700;
+          background:rgba(255,255,255,.93);padding:1px 5px;border-radius:4px;border:1px solid #E8B4AC}
+
+  .foot{font-size:11px;color:var(--faint);margin-top:24px;line-height:1.7;max-width:1120px}
+  .foot b{color:#8a8172}
+</style>
+</head>
+<body>
+
+<h1>P5 · E형 최종 확정판 — <b>E-b 전폭 + 활성 블록도 전폭(폭 축소 없음)</b></h1>
+<p class="sub">덕수 확인 반영: 이전 목업에서 활성 카드를 8px 들여 그린 것은 <b>가안이었고, 폐기</b>한다. 확정안은 <b>활성·비활성 모두 동일한 전폭</b> — 활성의 "떠오름"은 폭 변화가 아니라 <b>둥근 모서리 + 1px 테두리(#AC9C7E) + 그림자 + 진한 배경</b>만으로 만든다. 부수 효과: 활성 전환 시 폭 변화가 0이라 레이아웃 시프트 문제(이전 확인 포인트 ③)가 원천 소멸한다.</p>
+
+<div class="wrap">
+
+  <!-- 전체 레이아웃 -->
+  <div>
+    <h2>전체 레이아웃</h2>
+    <p class="desc">클레이 테두리 3면 제거 · 편집↔미리보기 무선(색 단차) · 비활성=전폭 직각 행 · <b>활성=같은 전폭</b>의 둥근 카드.</p>
+    <div class="stage">
+      <div class="col-label" style="left:26%">편집창</div>
+      <div class="col-label" style="left:69%">미리보기창</div>
+      <div class="frame">
+        <div class="edit-col">
+          <div class="card-active">
+            <div class="bar"><span class="grip">⣿</span> 텍스트</div>
+            <div class="body"><div class="ln w80"></div><div class="ln math"></div><div class="ln w60"></div></div>
+          </div>
+          <div class="flat"><div class="body"><div class="ln w80"></div><div class="ln w40"></div></div></div>
+          <div class="flat"><div class="body"><div class="ln w60"></div><div class="ln w80"></div><div class="ln w40"></div></div></div>
+        </div>
+        <div class="prev-col">
+          <div class="title"></div>
+          <div class="ln w80"></div><div class="ln w70"></div>
+          <div class="ln math"></div>
+          <div class="ln w80"></div><div class="ln w60"></div><div class="ln w40"></div>
+        </div>
+      </div>
+      <div class="note g" style="left:26px;top:118px">활성: 전폭 그대로 — 테두리·그림자·배경으로만 떠오름</div>
+      <div class="note g" style="left:26px;top:238px">비활성: 전폭 · 직각 · 상하선만</div>
+    </div>
+  </div>
+
+  <!-- 확대도 -->
+  <div>
+    <h2>확대 — 활성↔비활성 좌변 정렬 확인</h2>
+    <p class="desc">빨간 점선 = 같은 x좌표. 활성 카드의 좌·우 변이 비활성 행과 <b>동일선상</b>에 있고, 둥근 모서리만 안쪽으로 말려 들어간다(radius 8의 모서리 부분에서만 클레이가 살짝 비침).</p>
+    <div class="zoom">
+      <div class="zoom-frame">
+        <div class="card-active">
+          <div class="bar"><span class="grip">⣿</span> 텍스트</div>
+          <div class="body"><div class="ln w80"></div><div class="ln math"></div></div>
+        </div>
+        <div class="flat"><div class="body"><div class="ln w70"></div><div class="ln w40"></div></div></div>
+        <div class="guide" style="left:0"></div>
+        <div class="guide" style="right:0;border-left:none;border-right:1.5px dashed #C0392B"></div>
+      </div>
+      <div class="glabel" style="left:10px;top:6px">좌변 동일선</div>
+      <div class="glabel" style="right:10px;top:6px">우변 동일선</div>
+      <div class="glabel" style="left:10px;bottom:8px">모서리 radius 부분만 클레이가 살짝 비침</div>
+    </div>
+  </div>
+
+</div>
+
+<p class="foot">
+<b>확정 사양 요약 (v4 반영 예정)</b> — ⓐ 클레이 프레임 좌·우·상 테두리 제거(0px), 클레이↔아이보리 = 색 단차만, 모서리 논점 소멸. ⓑ 편집 패널 패딩 상·하 8px / 좌·우 0(전폭). ⓒ 비활성 블록: 전폭 · 직각 · 상하 헤어라인만 · <code>--block-bg</code>. ⓓ 활성 블록: <b>동일 전폭</b> · radius 8 · 1px <code>#AC9C7E</code>(시안값) 테두리 · <code>--block-bg-active</code> + 그림자. ⓔ 편집↔미리보기 구분선 없음(현행도 없음). ⓕ 3톤 명도 위계 유지. <b>잔여 확인</b>: 활성 카드 그림자의 좌우 클리핑(패널 overflow) · 다크 모드 선색 · 전체접기 모드의 선택 블록에 활성 카드 문법 적용(D6 연계) · § 표시 위치(거터 소멸 → 바 내부).
+</p>
+
+</body>
+</html>
