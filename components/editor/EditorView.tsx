@@ -702,15 +702,21 @@ function SortableEditorBlock({
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    border: emphasized
-      ? '0.5px solid var(--block-border-active)'
-      : '0.5px solid transparent',
-    /* ⚠ 활성 카드의 네 변은 반드시 같은 색일 것. 아래 변만 다른 색으로 낮췄더니
-       둥근 모서리에서 브라우저가 인접 두 변의 색을 대각선으로 전환시켜
-       하단 코너의 곡선이 흐려졌다(덕수 검수). 색 대비가 필요하면 네 변을 함께 옮긴다. */
-    ...(emphasized || hideTopLine ? null : {
-      borderTopColor: 'var(--block-hairline)',
-    }),
+    /* ⚠ 네 변을 항상 '전부' 적는다 — 조건부 스프레드로 longhand를 얹지 말 것.
+       `border` shorthand 위에 borderTopColor를 스프레드로 얹었더니, hideTopLine이
+       false→true로 바뀔 때 React가 그 longhand만 제거(= '')하고 shorthand는
+       변경이 없어 다시 쓰지 않았다. 결과: border-top-color가 빈 구멍으로 남아
+       초기값 currentColor(본문 검정 #2D2A23)로 떨어져 진한 선이 생겼다.
+       첫 렌더는 멀쩡하고 활성 블록을 옮긴 뒤부터 나타나 추적이 어려웠다.
+       (DevTools 실측 2026-08-18: 활성 카드 아래 블록 Top = rgb(45,42,35))
+     ⚠ 활성 카드의 네 변은 같은 색일 것 — 둥근 모서리에서 인접 두 변의 색이
+       다르면 브라우저가 곡선 구간을 대각선으로 전환시켜 코너가 흐려진다. */
+    borderTop: `0.5px solid ${emphasized
+      ? 'var(--block-border-active)'
+      : hideTopLine ? 'transparent' : 'var(--block-hairline)'}`,
+    borderRight: `0.5px solid ${emphasized ? 'var(--block-border-active)' : 'transparent'}`,
+    borderBottom: `0.5px solid ${emphasized ? 'var(--block-border-active)' : 'transparent'}`,
+    borderLeft: `0.5px solid ${emphasized ? 'var(--block-border-active)' : 'transparent'}`,
     borderRadius: emphasized ? 8 : 0,
     background: emphasized ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
