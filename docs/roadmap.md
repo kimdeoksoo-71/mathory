@@ -1208,6 +1208,7 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 
 - **교훈**: 활성 블록을 바꾸는 모든 경로는 자동 스크롤 effect와 `skipNextBlockScrollRef` 계약을 맺어야 한다. Phase 56이 `handleSelectBlockBar`에 직접 스크롤을 넣으면서 Phase 45의 접기 모드 가드를 우회한 것이 Stage 3의 회귀 사례
 - U자 프레임 3면은 **유지**한다(v5 Q7=B). `EditorView`·`ProblemView`·`FolderView` 3곳 공유라 한 곳만 걷으면 화면 간 문법이 갈리고, 이중 외곽은 블록 좌우 선 제거만으로 이미 해소된다
+- **후속(기타 개선 4)**: 전폭화로 좁아진 편집창↔미리보기 채널을 미리보기 칼럼 `marginLeft: 24`로 32px → 56px 확장. 편집 패널 패딩이나 미리보기 패딩으로 벌리면 각각 블록 비대칭·본문 측정폭 35em 훼손이 따른다
 - **검수 완료(덕수 4회차)**. 반영: 구분선 2개→1개 · 두께 0.5px · 그림자 제거 · 프레임 상단 직각 · 비활성 구분선 톤 상향(`#DCD3C2`→`#C2B7A2`, 1.24:1→1.66:1)
 - **최대 난관**: 활성 카드 아래에만 생기는 진한 선. `border` shorthand 위에 `borderTopColor`를 조건부 스프레드로 얹은 탓에, 조건이 바뀌어 longhand가 사라질 때 React가 그것만 지우고 shorthand는 다시 쓰지 않아 **`border-top-color`가 빈 구멍으로 남아 `currentColor`(본문 검정)로 떨어졌다**. 첫 렌더는 멀쩡하고 활성 블록을 옮긴 뒤부터 나타나 정적 분석으로는 끝내 안 보였고, DevTools `getComputedStyle` 스니펫으로 확정했다 → **네 변을 항상 전부 적을 것**
 
@@ -1225,7 +1226,7 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 | CommentPanel | `mode`('comments'\|'agent') 분기. 탭 필터 제거(문항 전체). 댓글 모드=세션바·LLM칩 숨김·AI 비활성. agent 컨텍스트=문제+풀이+extra 전탭(15,000자 상한). 패널 배경 토큰 분리 |
 | 진입 버튼 | ProblemView 제목행 [💬 댓글][🤖 agent](agent는 오너 전용), per-tab 💬 제거. EditorView 토론 버튼 → [댓글][agent] 2버튼 |
 | 보안 규칙 | 탭 가시성 검사 제거, read에 `commentsVisible()`. 멤버 댓글 create에 `commentsWritable()`+`isCommentSessionRef()`(agent 세션 차단). `'comment'` 세션 create 규칙, `'normal'`은 오너 전용. `resolved` 검사 유지 |
-| 오너 토글 | 댓글 모드 헤더에 보임/숨김·쓰기 허용/잠금 |
+| 오너 토글 | 댓글 모드 보임/숨김·쓰기 허용/잠금 (2026-08-18: 헤더 1행 → **2행**으로 분리, agent 세션 바와 같은 규격. 배경 차별화 폐기 — 두 패널 모두 아이보리) |
 
 - 알려진 한계: list 쿼리 제약상 멤버가 규칙 레벨에선 agent AI 메시지를 읽을 수 있음 → UI로 차단(공개 전 세션 단위 read 분리 재검토)
 
@@ -1304,7 +1305,7 @@ Phase 52 Bazaar를 앱 공통 문법으로 통일 + 별도 웹 공개 뷰어를 
 | 1 | 보안 규칙: `versions`/`payload` 매치 신설, 와일드카드에서 versions 제외(공개 문항 버전 메타 노출 차단). `test:rules` 케이스 확장 |
 | 2 | 스냅샷 생성 `createSnapshot`(정규화→SHA-256 해시 dedup→메타/본문 2-write→라이브 포인터 갱신). 제목·정답은 `content_hash`에만 포함(D1). `manual_save` 트리거 |
 | 3 | 계층1 자동저장: localStorage 드래프트 + `SaveStatus` 상태표시 + 크래시 복구 배너([복구]/[버림]). Firestore 상시 저장은 안 함(D2) |
-| 4 | 우측 `VersionDrawer` 타임라인(메타만·페이지네이션) + 본문 지연 로드. `editor_exit`(뒤로가기) 트리거(D5) |
+| 4 | 우측 `VersionDrawer` 타임라인(메타만·페이지네이션) + 본문 지연 로드. `editor_exit`(뒤로가기) 트리거(D5). *(2026-08-18: fixed 오버레이 → absolute 밀어내기, agent 패널 규약으로 통일)* |
 | 5 | `block_key` 매칭 diff(LCS 이동 감지: 이동/추가/삭제/수정) + 워드 diff + 메타 diff. 비파괴 복원(직전 보존→적용→restore 스냅샷) |
 | 6 | 보존(pruning): 문항당 하드 상한 50, 오래된 `editor_exit`부터 정리(manual_save/named/restore/pinned 보호). `deleteProblem`에 versions+payload cascade |
 
@@ -1477,7 +1478,7 @@ Phase 58이 만든 두 자산(제목 블록 위계, `**` key 마커)이 여기�
 | rail 모델 | **첫 dot ~ 마지막 dot 하나의 선.** 사이에 낀 블록(이미지 등)은 `.case-gap`으로 관통, 마지막 dot에서 종단. 조각을 **위쪽으로** 이어 붙이고 색은 불투명(겹침 누적 방지) |
 | 경우 안 들여쓰기 | 최상위와 같은 규칙 — display 수식·리스트·① 밭이 본문보다 한 단(3em/인쇄 2em) 더. 강조문과 정반대 처방이다 |
 | dot = 상태 | 펼침 = 채움 / 접힘 = 테두리만. 색은 `--case-dot`(로고 레드 dark) |
-| 요약에 넣기 | 블록 상단바의 스위치(`showInSummary`)로 고른 블록만 요약에 남는다(그림·표·글상자 무관) — 스켈레톤 원칙의 유일한 예외 |
+| 요약에 넣기 | 블록 상단바의 스위치(`showInSummary`)로 고른 블록만 요약에 남는다(그림·표·글상자 무관) — 스켈레톤 원칙의 유일한 예외. **제목 블록은 스위치 없음**(항상 들어간다, 2026-08-18) |
 | 토글 UI | 앱의 on/off를 공용 `ToggleSwitch` 하나로 통일(블록 '요약에 넣기' · 열람뷰 '요약' · 댓글 '보이기/쓰기 허용') |
 | 요약 보기 | 열람 2뷰 전용, 비영속. 기본값 앱 outline / 공개 full(뼈대 없으면 full 강제). 섹션·경우 개별 여닫이 + 스크롤 앵커링 |
 | 레거시 | Phase 54 `**Case n.**` 표기는 렌더 무변화. 요약 보기는 **행 단위 스캔**으로 항목 승격 |

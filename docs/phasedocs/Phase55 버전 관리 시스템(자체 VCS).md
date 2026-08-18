@@ -394,7 +394,12 @@ v2 §5.4의 1)직전 보존 → 2)대상 로드·작업본 교체 → 3)`restore
 
 **계층1 (v2 §4 확정, D2):** localStorage `mathory:draft:{problemId}` 즉시 기록 / Firestore 커밋은 명시 저장·제어된 이탈만 / 오프라인 persistence / `SaveStatus.tsx` 상태 머신("저장됨"=Firestore 확정) / 크래시 복구 배너([복구]/[버림]) / 기존 `dirty` state 재사용.
 
-**드로어 (v2 §5.1):** `VersionDrawer.tsx` 우측 슬라이드. 좌측 타임라인(순번·트리거 아이콘·이름·상대시각·작성자·변경 탭 칩·핀) + 우측 diff. 기본 비교쌍 = 선택 버전 ↔ parent. "현재 작업본과 비교" = `collectCurrentContent()` 즉석 해시.
+**드로어 (v2 §5.1):** `VersionDrawer.tsx` 우측 패널. 좌측 타임라인(순번·트리거 아이콘·이름·상대시각·작성자·변경 탭 칩·핀) + 우측 diff. 기본 비교쌍 = 선택 버전 ↔ parent. "현재 작업본과 비교" = `collectCurrentContent()` 즉석 해시.
+
+> **개정 (2026-08-18, 기타 개선 3)** — **agent 패널과 같은 규약으로 통일했다.**
+> - **덮지 않고 밀어낸다**: `position: fixed` 오버레이 → EditorView 루트 기준 `absolute`. 미는 쪽은 EditorView의 `rightPanelWidth`/`rightPanelOpen`이 담당하며, 댓글·agent 패널과 **같은 경로**를 탄다(Row1·Row2·Row3의 `paddingRight`). 폭은 `VERSION_DRAWER_WIDTH`(460)를 export해 미는 쪽과 공유한다. 둘 다 열리면 넓은 쪽 기준.
+> - **디자인**: 바탕 `--bg-panel-agent`, `borderLeft`·그림자·슬라이드 transform 제거. 1행 = 제목+닫기(높이 57), 2행 = 이름 저장(높이 41, `SessionTabBar`와 같은 규격).
+> - ⚠ **`zIndex` 1200 → 110**: `absolute`가 되면서 드로어가 **스태킹 컨텍스트를 만든다** → 그 안에서 열리는 `RestoreConfirm`(`fixed`·`zIndex 1400`)의 1400은 드로어 내부에서만 유효하다. 모달이 드로어 밖 요소를 덮으려면 **드로어 자신이** EditorView 안 최대치(리사이즈 핸들 100)보다 위에 있어야 한다. 복원 확인 모달이 무언가에 가리면 이 값을 먼저 의심할 것.
 
 **보존 (v2 §6, D4):** 보호 = `manual_save`·`named`·`restore`·`pinned`. prune 후보 = `editor_exit`만. **하드 상한 50개**, 초과 시 오래된 후보부터. `createSnapshot` 성공 직후 인라인 `pruneProblemVersions`. **cascade: 메타 삭제 시 `payload/data` 반드시 동반 삭제.** `deleteProblem`(`lib/firestore.ts:100`) 확장: versions 전체+payload 정리. pruned parent는 재링크 없이 `resolveLivingParent` 폴백.
 

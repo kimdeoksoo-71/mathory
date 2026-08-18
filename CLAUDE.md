@@ -156,8 +156,10 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 
 - **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C1.` · `C2a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
 - **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
-- **요약 보기에 그림 남기기 (Phase 59 §11-9)**: 요약은 제목·핵심문장·경우 제목행만 남기는 것이 원칙이고, `Block.showInSummary`가 **유일한 예외**다 — 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기" 스위치**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)로 켠다. 블록 종류를 가리지 않으므로 표를 담은 텍스트 블록·글상자도 같은 방식이다. 렌더는 사이트별 `renderBlock`을 그대로 재사용한다 — ⚠ 스켈레톤에서 그 결과를 div로 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그림 앞뒤로 끊긴다
+- **요약 보기에 그림 남기기 (Phase 59 §11-9)**: 요약은 제목·핵심문장·경우 제목행만 남기는 것이 원칙이고, `Block.showInSummary`가 **유일한 예외**다 — 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기" 스위치**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)로 켠다. 블록 종류를 가리지 않으므로 표를 담은 텍스트 블록·글상자도 같은 방식이다. **단 제목 블록에는 스위치를 두지 않는다** — `buildOutline`이 `heading`을 만나면 섹션을 열고 즉시 `continue`해(`lib/solutionOutline.ts:102-105`) `showInSummary` 검사에 아예 도달하지 않으므로, 스위치가 아무 일도 하지 않으면서 오해만 준다. 렌더는 사이트별 `renderBlock`을 그대로 재사용한다 — ⚠ 스켈레톤에서 그 결과를 div로 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그림 앞뒤로 끊긴다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
+- **우측 패널 3종은 한 규약이다 (2026-08-18)**: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
+- **`position: absolute`로 바꾸면 그 안의 `fixed` 모달이 갇힌다 (2026-08-18)**: 포지션+zIndex를 가진 요소는 **스태킹 컨텍스트**를 만든다 → `VersionDrawer`(absolute·110) 안의 `RestoreConfirm`(fixed·1400)에서 1400은 드로어 내부에서만 유효하다. 모달이 바깥을 덮으려면 **드로어 자신이** 그 화면의 최대 zIndex(EditorView는 리사이즈 핸들 100)보다 위여야 한다
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·`**`·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
 - 로직 검증: `npm run test:case` (27개)
 

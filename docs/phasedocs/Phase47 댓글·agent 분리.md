@@ -86,6 +86,8 @@ problems/{id}
 
 ### 3-3. 시각 차별화
 - `globals.css`에 토큰 추가(단일 소스): `--bg-panel-agent`(기존 패널 키 유지) / `--bg-panel-comment`(다른 키 — 더 중립/차분한 화면). 패널 루트에 모드별 배경만 다르게.
+
+> **개정 (2026-08-18, 기타 개선 2-1)** — **모드별 배경 차별화를 폐기했다.** 댓글 전용 틴트(`--bg-panel-comment` `#F6F3EE`)가 클레이 컨텐츠 영역과 구별이 흐려, 두 패널 모두 `--bg-panel-agent`(아이보리)를 쓴다. 기능 영역은 밝게 후퇴한다는 Phase 44 역할 구분이 모드 구분보다 우선한다. 토큰 정의는 남기되 소비처는 없다.
 - 정확한 색감은 Phase 44 디자인 시스템과 조화되게 디자인 단계에서 확정.
 
 ---
@@ -186,7 +188,9 @@ allow create: if request.resource.data.type == 'normal'
 ---
 
 ## 7. 오너 제어 UI
-댓글 패널 헤더(오너에게만) 토글 2개: "댓글 보이기"(`commentsVisible`) / "댓글 쓰기 허용"(`commentsWritable`).
+댓글 패널의 오너 전용 토글 2개: "댓글 보이기"(`commentsVisible`) / "댓글 쓰기 허용"(`commentsWritable`).
+
+> **개정 (2026-08-18, 기타 개선 2-2)** — **헤더 1행에서 2행으로 내렸다.** 1행은 제목+닫기만 두고, 토글은 agent 모드의 세션 바와 **같은 자리·같은 규격**의 2행에 놓는다(`minHeight 41` · `padding '0 12px'` · `gap 6` · `borderBottom --border-light` · `background --bg-primary`). ⚠ 이 컨테이너 값은 `SessionTabBar`·`VersionDrawer` 2행과 **함께** 유지할 것 — 갈리면 패널을 오갈 때 헤더 높이가 흔들린다. 2행은 오너에게만 보이므로 멤버 화면에서는 댓글 패널이 1행이다.
 
 ---
 
