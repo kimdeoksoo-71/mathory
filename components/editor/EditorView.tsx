@@ -725,12 +725,16 @@ function SortableEditorBlock({
   // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
   const showBar = isActive || collapseMode;
   // 요약에 넣은 블록은 비활성일 때도 그 사실이 보여야 한다 → 스위치만 있는 얇은 바를 남긴다
-  const showSummaryOnlyBar = !showBar && block.showInSummary === true;
+  const showSummaryOnlyBar = !showBar && !isHeading && block.showInSummary === true;
 
   /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다.
      Phase 45a D3-c: click의 stopPropagation은 dblclick을 막지 않는다(별개 이벤트 타입) →
-     바의 onDoubleClick(개별 펼침)이 걸리지 않도록 따로 차단한다. */
-  const summaryToggle = (
+     바의 onDoubleClick(개별 펼침)이 걸리지 않도록 따로 차단한다.
+     ⚠ 제목 블록에는 두지 않는다 — 제목은 요약의 '뼈대'라 항상 들어간다.
+       buildOutline이 heading을 만나면 섹션을 열고 즉시 continue하므로
+       showInSummary 검사에 아예 도달하지 않는다(lib/solutionOutline.ts:102-105).
+       즉 이 블록에서는 스위치가 아무 일도 하지 않아 오해만 준다. */
+  const summaryToggle = isHeading ? null : (
     <span
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}

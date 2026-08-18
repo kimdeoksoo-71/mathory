@@ -69,7 +69,7 @@
   --bg-bazaar:     #F2E3D5;   /* Bazaar 광장 영역 — 테라코타 워시(accent 저채도 틴트), 클레이와 웜톤 조화 (Phase 53) */
   /* Phase 47: 댓글/agent 패널 배경 차별화 */
   --bg-panel-agent:   var(--bg-functional);  /* agent 패널 = 기존 아이보리 키 유지 */
-  --bg-panel-comment: #F6F3EE;               /* 댓글 패널 = 한 톤 차분한 회보라빛 아이보리 */
+  --bg-panel-comment: #F6F3EE;               /* 댓글 패널 전용 틴트 — 클레이와 구별이 흐려 폐기(덕수). 현재 소비처 없음 */
   /* 블록 */
   --block-bg:        #F0EAE0;            /* 비활성 블록: 컨텐츠(#F4EFE7)와 활성(#EDE6DA) 사이 중간 톤 → 3단계 구별 */
   --block-bg-active: #E8DFCE;            /* 활성: 비활성보다 두 단계 진하게 (3단계 구분 강조) */

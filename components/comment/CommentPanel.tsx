@@ -703,7 +703,9 @@ export default function CommentPanel({
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
       width: width, maxWidth: '90vw',
-      background: isCommentsMode ? 'var(--bg-panel-comment)' : 'var(--bg-panel-agent)',
+      // 댓글·agent 모두 아이보리. 댓글 전용 틴트(--bg-panel-comment)는 클레이와 구별이
+      // 흐려 폐기했다(덕수) — 두 패널이 같은 '기능 영역' 키를 쓴다.
+      background: 'var(--bg-panel-agent)',
       display: 'flex', flexDirection: 'column',
       zIndex: 50,
       fontFamily: 'var(--font-ui)',
@@ -744,15 +746,6 @@ export default function CommentPanel({
           {isCommentsMode ? '댓글' : 'AI agent'}
         </div>
         <div style={{ flex: 1 }} />
-        {/* Phase 47: 오너 댓글 제어 토글 스위치 (댓글 모드, 멤버에게만 적용) */}
-        {isCommentsMode && isOwner && (
-          <>
-            <ToggleSwitch label="보이기" on={commentsVisibleFlag} onToggle={toggleCommentsVisible}
-              title="멤버에게 댓글 보이기/숨김 (오너는 항상 보임)" />
-            <ToggleSwitch label="쓰기 허용" on={commentsWritableFlag} onToggle={toggleCommentsWritable}
-              title="멤버 댓글 쓰기 허용/잠금 (오너는 항상 가능)" />
-          </>
-        )}
         {isAISession && sessionCostUsd > 0 && (
           <span
             title="이 세션의 AI 응답 누적 비용"
@@ -777,6 +770,27 @@ export default function CommentPanel({
           title="토론 사이드바 닫기"
         >×</button>
       </div>
+
+      {/* ═══ 오너 제어 바 (댓글 모드 전용) — agent 모드의 세션 바와 같은 자리·같은 규격 ═══
+            1행은 제목+닫기만 두고 토글은 2행으로 내린다(덕수). 컨테이너 값은
+            SessionTabBar와 동일하게 유지할 것 — 두 모드의 행 높이·선·바탕이 갈리면
+            패널을 오갈 때 헤더가 흔들린다. */}
+      {isCommentsMode && isOwner && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '0 12px',
+          minHeight: 41, boxSizing: 'border-box',
+          borderBottom: '1px solid var(--border-light, #eee)',
+          background: 'var(--bg-primary, #FAF9F7)',
+          overflowX: 'auto',
+          flexShrink: 0,
+        }}>
+          <ToggleSwitch label="보이기" on={commentsVisibleFlag} onToggle={toggleCommentsVisible}
+            title="멤버에게 댓글 보이기/숨김 (오너는 항상 보임)" />
+          <ToggleSwitch label="쓰기 허용" on={commentsWritableFlag} onToggle={toggleCommentsWritable}
+            title="멤버 댓글 쓰기 허용/잠금 (오너는 항상 가능)" />
+        </div>
+      )}
 
       {/* ═══ 세션 바 (agent 모드 전용) ═══ */}
       {!isCommentsMode && (
