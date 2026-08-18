@@ -705,10 +705,9 @@ function SortableEditorBlock({
     border: emphasized
       ? '0.5px solid var(--block-border-active)'
       : '0.5px solid transparent',
-    /* 활성 카드의 아래 변은 카드 윤곽이자 '블록 사이 구분선'을 겸한다.
-       윤곽 색(진한 --block-border-active)을 그대로 쓰면 바로 아래 블록의 윗선이
-       불필요하게 강조돼 보인다(덕수 검수) → 이 변만 일반 구분선 색으로 낮춘다. */
-    ...(emphasized ? { borderBottomColor: 'var(--block-hairline)' } : null),
+    /* ⚠ 활성 카드의 네 변은 반드시 같은 색일 것. 아래 변만 다른 색으로 낮췄더니
+       둥근 모서리에서 브라우저가 인접 두 변의 색을 대각선으로 전환시켜
+       하단 코너의 곡선이 흐려졌다(덕수 검수). 색 대비가 필요하면 네 변을 함께 옮긴다. */
     ...(emphasized || hideTopLine ? null : {
       borderTopColor: 'var(--block-hairline)',
     }),
@@ -797,10 +796,12 @@ function SortableEditorBlock({
           background: block.collapsed ? 'transparent' : 'var(--block-bg-active)',
           fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
-          /* 본문이 보일 때만 헤더↔에디터 구분선. 카드 '내부' 선이므로 윤곽보다 약해야 한다
-             — 카드 테두리 색·두께에 맞췄더니 두껍고 진했다(덕수 검수).
-             하단 툴바의 borderTop과 같은 값으로 되돌려 위아래 대칭을 유지한다. */
-          borderBottom: !block.collapsed ? '0.5px solid var(--border-primary)' : 'none',
+          /* 본문이 보일 때만 헤더↔에디터 구분선.
+             1px·--block-border-active는 두껍고 진했고(덕수 검수 1차),
+             0.5px·--border-primary는 활성 배경(#E8DFCE)에서 1.06:1이라 아예 안 보였다(2차).
+             두께만 절반으로 줄이고 색은 카드 선 계열을 유지한다 = 0.5px·2.03:1.
+             하단 툴바 borderTop도 같은 값으로 맞춰 블록 위아래를 대칭으로 둔다. */
+          borderBottom: !block.collapsed ? '0.5px solid var(--block-border-active)' : 'none',
           // 활성 카드일 때만 첫 둥근 모서리 유지 (비활성 플랫 행은 직각)
           borderTopLeftRadius: emphasized ? 7.5 : 0, borderTopRightRadius: emphasized ? 7.5 : 0,
         }}

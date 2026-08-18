@@ -143,7 +143,7 @@ export default function BlockBottomToolbar({
         display: 'flex', alignItems: 'center', gap: 4,
         padding: '4px 16px', background: 'var(--block-bg-active)',   // Phase 45a D6″-g: 본문선(16px) 정렬
         // 본문↔하단툴바 구분 상단선 (상단바의 하단선과 대칭). 0.5px 헤어라인
-        borderTop: '0.5px solid var(--border-primary)',
+        borderTop: '0.5px solid var(--block-border-active)',   // Phase 45a: 상단바 구분선과 대칭
         fontFamily: 'var(--font-ui)',
       }}
     >
