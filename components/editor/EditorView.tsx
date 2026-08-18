@@ -612,6 +612,7 @@ function SortableEditorBlock({
   editorRefs,
   collapseMode,
   selected,
+  hideTopLine,
   onFocus,
   onChange,
   onTypeChange,
@@ -644,6 +645,8 @@ function SortableEditorBlock({
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
   collapseMode: boolean;
   selected: boolean;
+  /* 위쪽 가로선을 그리지 않는다: 첫 블록이거나, 직전이 활성 카드라 그쪽 아래 테두리가 선을 담당할 때 */
+  hideTopLine: boolean;
   onFocus: () => void;
   onChange: (val: string) => void;
   onTypeChange: (type: Block['type']) => void;
@@ -681,26 +684,33 @@ function SortableEditorBlock({
      안쪽에서 푼다. 비활성 블록의 세로선을 지우면 화면에 남는 닫힌 윤곽은
      활성 카드뿐 — 활성=인테리어(둥근 진한 면), 비활성=공통영역(면+가로선).
      선택 블록은 활성과 같은 문법을 쓴다(전체접기 모드 재배치용 표시).
-     ⚠ 비활성의 좌우 1px은 transparent로 '자리를 잡아 둔다'. 테두리를 아예
-        빼면 활성 전환 순간 내용물이 1px 밀린다.                          */
+
+     ⚠ 구분선은 블록 사이에 **하나만** 둔다 (덕수 검수 2·2-1).
+       그래서 가로선은 **위쪽만** 그린다 — 아래쪽까지 그리면 인접한 두 블록이
+       각자 선을 내어 2줄이 된다. 위쪽만 그리면 자연스럽게
+         · 첫 블록은 상단 선이 없고(클레이 영역 경계에 밀착)
+         · 마지막 블록 아래는 열려 클레이로 이어진다.
+       직전이 활성 카드면 그 카드의 아래 테두리가 이미 선을 담당하므로
+       이 블록의 위쪽 선은 지운다 → hideTopLine.
+     ⚠ 비활성의 네 변 0.5px은 transparent로 '자리를 잡아 둔다'. 테두리를 아예
+        빼면 활성 전환 순간 내용물이 밀린다 (덕수 검수 1에서 확인된 불변식).
+     ⚠ 0.5px = 레티나 1물리픽셀. 1px은 2물리픽셀이라 부담스럽다(덕수 검수 3).
+     ⚠ 그림자는 쓰지 않는다(덕수 검수 2). 활성 신호는 배경·라운드·테두리 3중. */
   const emphasized = isActive || selected;
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    marginBottom: 6,
     border: emphasized
-      ? '1px solid var(--block-border-active)'
-      : '1px solid transparent',
-    ...(emphasized ? null : {
+      ? '0.5px solid var(--block-border-active)'
+      : '0.5px solid transparent',
+    ...(emphasized || hideTopLine ? null : {
       borderTopColor: 'var(--block-hairline)',
-      borderBottomColor: 'var(--block-hairline)',
     }),
     borderRadius: emphasized ? 8 : 0,
     background: emphasized ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
-    boxShadow: emphasized ? 'var(--block-shadow-active)' : 'none',
   };
 
   // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
@@ -786,7 +796,7 @@ function SortableEditorBlock({
           // 본문이 보일 때만 헤더↔에디터 구분선 (카드 테두리와 키를 맞춘다)
           borderBottom: !block.collapsed ? '1px solid var(--block-border-active)' : 'none',
           // 활성 카드일 때만 첫 둥근 모서리 유지 (비활성 플랫 행은 직각)
-          borderTopLeftRadius: emphasized ? 7 : 0, borderTopRightRadius: emphasized ? 7 : 0,
+          borderTopLeftRadius: emphasized ? 7.5 : 0, borderTopRightRadius: emphasized ? 7.5 : 0,
         }}
       >
         {/* 제목 블록 접힘 표시 (D7″-c: 거터가 사라져 돌출 문법 자체가 소멸 → 바 내부 인라인) */}
@@ -3190,7 +3200,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           borderTop: '0.5px solid var(--border-content)',
           borderLeft: '0.5px solid var(--border-content)',
           borderRight: '0.5px solid var(--border-content)',
-          borderTopLeftRadius: 10, borderTopRightRadius: 10,
+          // Phase 45a — 전폭 직각 블록이 상단에 밀착하므로 프레임도 직각(3곳 동일)
         }}>
 
         {/* ─── Left: Editor ─── */}
@@ -3210,12 +3220,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onNavigate={handleSearchNavigate}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 0', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', minHeight: 0 }}>
             <div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
-                {currentBlocks.map((block, i) => {
+                {currentBlocks.map((block, i, arr) => {
                   const proofData = proofreadResults[activeTab]?.[block.id];
+                  /* 블록 사이 구분선은 하나뿐이다 — 위쪽만 그리므로 첫 블록은 선이 없고,
+                     직전이 활성 카드면 그 카드의 아래 테두리가 이미 선을 담당한다.
+                     ⚠ CSS 형제 선택자(.flat + .flat)로는 못 한다 — 아래 <div key>가
+                       블록 루트끼리의 형제 관계를 끊는다(Phase 59 D15′와 같은 함정). */
+                  const prev = i > 0 ? arr[i - 1] : null;
+                  const hideTopLine = !prev
+                    || activeBlockId === prev.id || selectedBlockIds.has(prev.id);
                   return (
                   <div key={block.id}>
                   <SortableEditorBlock
@@ -3226,6 +3243,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     editorRefs={editorRefs}
                     collapseMode={collapseMode}
                     selected={selectedBlockIds.has(block.id)}
+                    hideTopLine={hideTopLine}
                     onFocus={() => handleBlockFocus(block.id)}
                     onChange={(val) => handleBlockChange(block.id, val)}
                     onTypeChange={(type) => handleBlockTypeChange(block.id, type)}

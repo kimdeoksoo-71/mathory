@@ -447,7 +447,7 @@ export default function FolderView({
         borderTop: '0.5px solid var(--border-content)',
         borderLeft: '0.5px solid var(--border-content)',
         borderRight: '0.5px solid var(--border-content)',
-        borderTopLeftRadius: 10, borderTopRightRadius: 10,
+        // Phase 45a — U자 프레임 상단 직각(EditorView·ProblemView·FolderView 3곳 동일)
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
 

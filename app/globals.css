@@ -73,11 +73,11 @@
   /* 블록 */
   --block-bg:        #F0EAE0;            /* 비활성 블록: 컨텐츠(#F4EFE7)와 활성(#EDE6DA) 사이 중간 톤 → 3단계 구별 */
   --block-bg-active: #E8DFCE;            /* 활성: 비활성보다 두 단계 진하게 (3단계 구분 강조) */
-  --block-shadow-active: 0 4px 16px rgba(0, 0, 0, 0.14); /* 활성 떠오름 그림자 (키 + 그림자 병행) */
+  --block-shadow-active: 0 4px 16px rgba(0, 0, 0, 0.14); /* 활성 떠오름 그림자 — Phase 45a에서 편집창은 사용 중지(덕수: 구분선이 2줄로 보임). 현재 소비처 없음 */
   /* Phase 45a E형 — 편집창 블록 인셋 전용. 활성 블록만 닫힌 윤곽(카드)을 갖고
      비활성은 전폭 플랫 행이 된다. 소비처는 EditorView 한 곳. */
-  --block-border-active: #AC9C7E;   /* 활성 카드 테두리 (활성 배경 대비 2.03:1 — 배경·라운드·그림자가 중복 신호라 G1 단독 기준 대상 아님) */
-  --block-hairline:      #DCD3C2;   /* 비활성 행 상·하 헤어라인 (--border-block #E0DCD6보다 9% 진하다) */
+  --block-border-active: #AC9C7E;   /* 활성 카드 테두리 0.5px (활성 배경 대비 2.03:1 — 배경·라운드가 중복 신호라 G1 단독 기준 대상 아님) */
+  --block-hairline:      #DCD3C2;   /* 비활성 행 구분선. 블록 '위쪽만' 그린다 — 아래까지 그리면 인접 블록끼리 2줄이 된다 */
   /* 경계선 위계 (주목도: content > block > subtle) */
   --border-content:        #D2C8B8;   /* U자 컨텐츠 구분선 (가장 뚜렷) */
   --border-content-active: #B89B78;   /* 구분선 hover 활성 */
