@@ -90,6 +90,11 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **`PrintStyles.css`는 화면에도 로드된다 (Phase 60)**: `EditorView.tsx:51`이 직접 import하고 AppShell이 EditorView를 정적 import한다 → **앱 전 페이지**. 따라서 **인쇄 전용 규칙에는 `.print-body` 접두가 필수**다(파일 118행 주석이 이미 못 박은 규약). 접두를 빠뜨리면 인쇄 값이 화면으로 새고, 동시에 이 파일을 안 부르는 곳만 규칙이 빠진다. 반대로 화면 규칙은 `globals.css`가 `.preview-content` 스코프로 소유한다 — 인쇄가 iframe이 아니라 같은 document라 **양방향 스코프**가 필요하다
 - **공개 뷰어는 두 CSS 환경에서 렌더된다 (Phase 60)**: 앱 셸 임베드(`AppShell` 783·791, BazaarView '앱에서 열기')와 독립 라우트(`/p/[problemId]`·`/shared/[shareId]`, 새 탭). 전이적 import closure 실측 — AppShell(123파일)은 PrintStyles에 도달하고 `/p`(36)·`/shared`(29)는 도달하지 않는다. **공개 페이지 스타일은 라우트 2개 + 임베드를 다 확인할 것**
 - **행이 분리되는 이유는 `insertMarkerLineBreaks`뿐이다**: 렌더 파이프라인에 `remark-breaks`가 **없다**(`EditorPreview` 300 · `PrintableContent` 126 = `[remarkMath, remarkGfm]`) → CommonMark soft break가 공백이 되어 연속 행이 한 문단으로 합쳐진다. 마커 계열을 추가하면 반드시 `MARKER_LINE_RE`(lib/locale.ts)에도 넣을 것
+- **이 프로젝트에 다크 모드는 없다 (Phase 45a)**: `globals.css`에 `prefers-color-scheme`·`[data-theme]`·`.dark` 셀렉터가 **0건**이다. 계획서에 반복 등장하는 "다크 토큰도 함께 정의" 요구는 소비처 없는 허수다 — 새 색 토큰에 다크 정의를 붙이지 말 것
+- **활성 블록을 바꾸는 모든 경로는 `skipNextBlockScrollRef` 계약을 맺을 것 (Phase 45a)**: 플래그는 자동 스크롤 effect **맨 앞**에서 소비한다. `collapseMode` 가드 뒤에 두면 전체접기 중엔 소비되지 않고 남아 나중 전환 하나를 삼킨다. 반대로 **직접 스크롤을 호출하는 핸들러**(`handleSelectBlockBar`)는 effect의 게이트를 우회하므로 같은 조건을 자기 안에 다시 적어야 한다 — Phase 56이 이걸 빠뜨려 Phase 45의 접기 모드 가드가 무력화됐다
+- **click의 `stopPropagation`은 `dblclick`을 막지 않는다 (Phase 45a)**: 별개 이벤트 타입이다. 더블클릭 핸들러가 달린 컨테이너 안의 버튼·스위치에는 `onDoubleClick` 차단을 **따로** 달 것
+- **편집창 블록 인셋은 E형 (Phase 45a)**: 비활성 = 전폭·직각·상하 헤어라인(`--block-hairline`) / 활성·선택 = radius 8 + 1px `--block-border-active` + 그림자. **비활성의 좌우 1px은 `transparent`로 자리를 잡아 둔다** — 아예 빼면 활성 전환 순간 내용물이 1px 밀린다. 편집 패널이 좌우 패딩 0이라 **좌측 기준선 16px**(`.cm-content` 패딩)에 바·하단툴바·미디어 블록·교정 박스를 모두 맞춘다. 열람·공유·인쇄에는 적용하지 않는다
+- **U자 프레임(상·좌·우 0.5px + 상단 라운드 10)은 3곳 공유**: `EditorView:3116` · `ProblemView:584` · `FolderView:447`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸한다. Phase 45a는 프레임을 **건드리지 않고** 블록 좌우 선만 없애 이중 외곽을 풀었다
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
@@ -142,7 +147,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **경우 블록 안은 최상위와 같은 들여쓰기 규칙 (Phase 59 §11-2)**: display 수식이 본문보다 한 단(3em/인쇄 2em) 더 들어간다 → `.katex-display`에 override를 두지 **않는다**. 반대로 `.callout-block`은 `padding-left: 0`으로 죽인다(한 줄 강조 장치라 이중 들여쓰기가 군더더기) — **전례를 복사해 되돌리지 말 것**. 리스트·① 밭은 기본 1em이 약해 같은 한 단으로 올리며, 인쇄 ① 규칙은 globals의 `!important`를 이기려면 `!important`가 필요하다
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경에서 3.49:1). 로고 레드 `#D97757`은 2.52:1로 **미달**이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 60 진행 중
+## 현재 Phase: 60 진행 중 · 45a 완료(검수 대기)
 
 Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md` — **§0-0이 최종 사양**, §11이 실사용 개정 기록

@@ -1195,6 +1195,21 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 - dnd-kit 다중 드래그 미지원 우회: 단일 고스트로 드래그 → 드롭 순간 그룹 relocate
 - 한계: 전체 접기 토글이 통합툴바 게이팅(`showToolbar`)을 따라 비텍스트 블록 활성 시 함께 비활성 (필요 시 항상-활성 분리 가능)
 
+### Phase 45a: 블록편집 기능 개선 (45 보강) ✅
+
+45의 버그픽스·보강 + 편집창 블록 인셋 개편. 신규 Phase 번호를 쓰지 않는다. 상세: `docs/phasedocs/Phase45a 블록편집 기능 개선.md` (스케치 v5 + 목업 `P5 E형 최종 확정판.html`)
+
+| Stage | 변경 |
+|------|------|
+| 1 · 삭제 스크롤 | `handleDeleteBlock`의 활성 승계를 `filtered[0]`(무조건 첫 블록)에서 **삭제 자리를 이어받는 블록**으로. 부수효과를 updater 밖으로 빼 StrictMode 논점 제거. 삭제된 id를 `selectedBlockIds`에서 정리. `skipNextBlockScrollRef`를 자동 스크롤 effect **맨 앞**에서 소비 |
+| 2 · 접힘 바 버튼 | 전체접기 모드 접힘 바에 '요약에 넣기' 스위치·삭제 버튼 노출(`deleteButton` 공용화). 스페이서 무조건 삽입. 스위치·버튼에 `onDoubleClick` 차단 |
+| 3 · 선택·이동 | 전체접기 모드에서 바 클릭 무스크롤(직접 스크롤 경로가 `collapseMode` 가드를 우회하고 있었다). **Shift+클릭=연속 범위**, **Alt+클릭=개별 토글**, 선택 조작은 `collapseMode` 게이트. `onSelect`/`onToggleSelect` → `onBarClick({shift, alt})` 통합 |
+| 4 · 인셋 E형 | 비활성 블록 = 전폭·직각·상하 헤어라인 / 활성·선택 = radius 8 + 1px `--block-border-active` + 그림자. `outline` 삭제. 편집 패널 `padding: '8px 0'`. 좌측 기준선 16px 통일. § 돌출 폐지 → 바 내부 인라인 |
+
+- **교훈**: 활성 블록을 바꾸는 모든 경로는 자동 스크롤 effect와 `skipNextBlockScrollRef` 계약을 맺어야 한다. Phase 56이 `handleSelectBlockBar`에 직접 스크롤을 넣으면서 Phase 45의 접기 모드 가드를 우회한 것이 Stage 3의 회귀 사례
+- U자 프레임 3면은 **유지**한다(v5 Q7=B). `EditorView`·`ProblemView`·`FolderView` 3곳 공유라 한 곳만 걷으면 화면 간 문법이 갈리고, 이중 외곽은 블록 좌우 선 제거만으로 이미 해소된다
+- **검수 대기(덕수)**: Stage 4 시각 대조(목업 기준, 단 프레임 3면은 살아 있는 상태) · 활성↔비활성 전환 시 본문 x좌표 불변 · 활성 카드 그림자 좌우 클리핑 정도 · 짧은 문항에서 편집↔미리보기 경계
+
 ## Phase 46: 콘텐츠 이미지 배경 treatment ✅
 
 이미지 블록 배경 처리(blend/frame) + 흑백 토글. 상세: `docs/phasedocs/Phase46 콘텐츠 이미지 배경 treatment.md`
