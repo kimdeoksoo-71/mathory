@@ -48,11 +48,14 @@ export const MARKER_LINE_RE = new RegExp(
   `|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])`
 );
 
-/** 행 시작 (a)~(e) → marker span */
-export const ALPHA_LINE_RE = /^\(([a-e])\)/;
+/** 행 시작 (a)~(e) → marker span.
+ *  뒤 공백은 [ \t]*로 흡수한다 — 입력에 띄어쓰기를 하건 안 하건 마커·본문
+ *  간격이 같아야 한다(Phase 60 P2). 간격은 CSS의 마커 고정폭이 공급한다.
+ *  ⚠ \s*는 개행까지 삼켜 다음 줄을 빨아들인다 (Phase 57). */
+export const ALPHA_LINE_RE = /^\(([a-e])\)[ \t]*/;
 
-/** 행 시작 (i)~(v) → marker span */
-export const ROMAN_LINE_RE = /^\((iii|ii|iv|v|i)\)/;
+/** 행 시작 (i)~(v) → marker span. 뒤 공백 흡수는 위와 같다. */
+export const ROMAN_LINE_RE = /^\((iii|ii|iv|v|i)\)[ \t]*/;
 
 /** 행 시작 (가)~(차) 리터럴 → marker span. 뒤 공백은 정규식이 흡수한다(Phase 60 P2).
  *  ⚠ 레거시와 달리 매핑 테이블이 없으므로 5개 상한을 둘 이유가 없다. 상한을 남기면
