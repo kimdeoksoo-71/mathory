@@ -8,6 +8,9 @@ import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
+import {
+  MARKER_LINE_RE, ALPHA_LINE_RE, ROMAN_LINE_RE, CIRCLED_NUM_LINE_RE,
+} from '../../lib/locale';
 import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
 import 'katex/dist/katex.min.css';
 
@@ -107,9 +110,7 @@ function preprocessLocale(text: string): string {
   const forced: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isMarkerLine =
-      /^\((iii|ii|iv|v|i|[a-e])\)/.test(line.trimStart()) ||
-      /^[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/.test(line.trimStart());
+    const isMarkerLine = MARKER_LINE_RE.test(line);
     const prevLine = forced.length > 0 ? forced[forced.length - 1] : '';
     if (isMarkerLine && prevLine.trim() !== '') {
       forced.push('');
@@ -141,20 +142,20 @@ function preprocessLocale(text: string): string {
 
   // 3. (a)~(e) → (가)~(마) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만
   const gana: Record<string, string> = { a: '가', b: '나', c: '다', d: '라', e: '마' };
-  t = t.replace(/^\(([a-e])\)/gm, (_, ch) =>
+  t = t.replace(new RegExp(ALPHA_LINE_RE.source, 'gm'), (_, ch) =>
     `<span class="marker-gana">(${gana[ch]})</span>`);
   t = t.replace(/([^a-zA-Z0-9\n])\(([a-e])\)/g, (_, pre, ch) => `${pre}(${gana[ch]})`);
 
   // 4. (i)~(v) → ㄱ.~ㅁ. — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만
   const giyeok: Record<string, string> = { i: 'ㄱ', ii: 'ㄴ', iii: 'ㄷ', iv: 'ㄹ', v: 'ㅁ' };
-  t = t.replace(/^\((iii|ii|iv|v|i)\)/gm, (_, r) =>
+  t = t.replace(new RegExp(ROMAN_LINE_RE.source, 'gm'), (_, r) =>
     `<span class="marker-giyeok">${giyeok[r]}.</span>`);
   t = t.replace(/([^a-zA-Z0-9\n])\((iii|ii|iv|v|i)\)/g, (_, pre, r) => `${pre}${giyeok[r]}.`);
 
   // 4-1. ①②③ … 행 시작: marker span(내어쓰기용)
   //      마커 뒤 공백은 [ \t]*로만 — \s*는 개행까지 삼켜서 내용 없는 원문자 줄들이 뭉친다
   //      (lib/locale.ts convertCircledList와 동일)
-  t = t.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/gm,
+  t = t.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'),
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 
   // 5. Fig.N → [그림N]

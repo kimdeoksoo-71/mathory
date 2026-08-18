@@ -23,6 +23,36 @@ const GIYEOK: Record<string, string> = {
   i: 'ㄱ', ii: 'ㄴ', iii: 'ㄷ', iv: 'ㄹ', v: 'ㅁ',
 };
 
+// ===== 마커 정규식 (사본 공유 — Phase 60 P4) =====
+// ⚠ components/editor/EditorPreview.tsx의 인라인 preprocessLocale이 이 상수들을 import한다.
+//    정규식을 두 파일에 따로 적어 두면 조용히 이격된다 (실제로 그런 상태였다).
+// ⚠ 전부 /g 없이 정의한다 — 소비처가 new RegExp(RE.source, 'gm')로 인스턴스를 만들어
+//    lastIndex 오염을 피한다 (lib/solutionOutline.ts:72와 같은 처방).
+
+/** 행 선두 들여쓰기 = "개행 아닌 공백".
+ *  행 단위로 자른 뒤 .test()하는 자리에만 쓴다 → 개행이 애초에 들어올 수 없다.
+ *  \s와 문자 집합이 같아 기존 동작을 그대로 보존하면서, 개행 배제가 클래스 자체에
+ *  박혀 있어 혹시 /gm으로 재사용해도 안전하다.
+ *  ⚠ [ \t]나 [ \t\u00A0\u3000]으로 좁히면 NBSP·전각 공백·en space 등이 빠져
+ *    HWP·웹에서 붙여넣은 문항의 문단 분리가 조용히 회귀한다. */
+const IND = '[^\\S\\n\\r]*';
+
+/** 행 시작이 마커인가 — 마커 행 앞에 빈 줄을 넣어 독립 <p>를 보장할 때 쓴다. */
+export const MARKER_LINE_RE = new RegExp(
+  `^${IND}(?:\\((?:iii|ii|iv|v|i|[a-e])\\)|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])`
+);
+
+/** 행 시작 (a)~(e) → marker span */
+export const ALPHA_LINE_RE = /^\(([a-e])\)/;
+
+/** 행 시작 (i)~(v) → marker span */
+export const ROMAN_LINE_RE = /^\((iii|ii|iv|v|i)\)/;
+
+/** 행 시작 ①~⑮ → marker span.
+ *  뒤 공백은 [ \t]*로만 먹는다 — \s*를 쓰면 개행까지 삼켜서, 내용이 아직 없는
+ *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
+export const CIRCLED_NUM_LINE_RE = /^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
+
 // ===== 수식 영역 보호 =====
 
 interface MathProtection {
@@ -61,9 +91,7 @@ function insertMarkerLineBreaks(text: string): string {
   const result: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const isMarkerLine =
-      /^\s*\((iii|ii|iv|v|i|[a-e])\)/.test(line) ||
-      /^\s*[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/.test(line);
+    const isMarkerLine = MARKER_LINE_RE.test(line);
     const prevLine = result.length > 0 ? result[result.length - 1] : '';
     if (isMarkerLine && prevLine.trim() !== '') {
       result.push('');
@@ -118,7 +146,7 @@ export function convertSubcaseMarkers(text: string): string {
 
 /** (a) → (가) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만 */
 function convertAlphaList(text: string): string {
-  let result = text.replace(/^\(([a-e])\)/gm, (_, ch) => {
+  let result = text.replace(new RegExp(ALPHA_LINE_RE.source, 'gm'), (_, ch) => {
     const korean = GANA[ch];
     return korean ? `<span class="marker-gana">(${korean})</span>` : `(${ch})`;
   });
@@ -131,7 +159,7 @@ function convertAlphaList(text: string): string {
 
 /** (i) → ㄱ. — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만 */
 function convertRomanList(text: string): string {
-  let result = text.replace(/^\((iii|ii|iv|v|i)\)/gm, (_, r) => {
+  let result = text.replace(new RegExp(ROMAN_LINE_RE.source, 'gm'), (_, r) => {
     const korean = GIYEOK[r];
     return korean ? `<span class="marker-giyeok">${korean}.</span>` : `(${r})`;
   });
@@ -146,7 +174,7 @@ function convertRomanList(text: string): string {
  *  마커 뒤 공백은 [ \t]*로만 먹는다 — \s*를 쓰면 개행까지 삼켜서, 내용이 아직 없는
  *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
 function convertCircledList(text: string): string {
-  return text.replace(/^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/gm,
+  return text.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'),
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 }
 
