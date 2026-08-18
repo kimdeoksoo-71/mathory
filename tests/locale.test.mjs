@@ -52,22 +52,24 @@ test('L5 행 중간 리터럴은 무변환 (문장 속 인용)', () => {
   assert.equal(P('앞의 ㄱ. 항목을 보면'), '앞의 ㄱ. 항목을 보면');
 });
 
-/* ═══ L6·L7 — 레거시 무회귀 ═══ */
+/* ═══ L6·L7 — 레거시 (a)/(i)는 변환하지 않는다 (Phase 60 후속) ═══ */
 
-test('L6 레거시 (a)~(e)/(i)~(v) 변환 유지 + 뒤 공백 흡수', () => {
-  assert.equal(P('(a)내용'), `${gana('가')}내용`);
-  assert.equal(P('(a) 내용'), `${gana('가')}내용`);
-  assert.equal(P('(e) x'), `${gana('마')}x`);
-  assert.equal(P('(i) x'), `${giyeok('ㄱ')}x`);
-  assert.equal(P('(iii)x'), `${giyeok('ㄷ')}x`);
-  assert.equal(P('(v) x'), `${giyeok('ㅁ')}x`);
-  // 행 중간은 텍스트만 치환하고 공백은 보존한다
-  assert.equal(P('조건 (a) 에 의해'), '조건 (가) 에 의해');
+test('L6 레거시 (a)~(e)/(i)~(v)는 변환하지 않고 원문 그대로 둔다', () => {
+  // 두 표기가 공존하면 "무엇을 쓰면 무엇이 나오는지"가 흐려진다 → 변환을 걷어냈다.
+  assert.equal(P('(a) 내용'), '(a) 내용');
+  assert.equal(P('(e) x'), '(e) x');
+  assert.equal(P('(i) x'), '(i) x');
+  assert.equal(P('(iii)x'), '(iii)x');
+  assert.equal(P('조건 (a)에 의해'), '조건 (a)에 의해');   // 행 중간도 무변환
 });
 
-test('L7 레거시 범위 밖 (f)·(vi)는 무변환 — 5개 상한 유지', () => {
-  assert.equal(P('(f) x'), '(f) x');
-  assert.equal(P('(vi) x'), '(vi) x');
+test('L7 그래도 레거시 마커 행의 문단 분리는 유지한다 (옛 문항 가독성)', () => {
+  // 변환은 없애되 MARKER_LINE_RE에는 남긴다 — 안 그러면 remark-breaks 부재 때문에
+  // 옛 문항의 `(a) …`↵`(b) …`가 한 문단으로 뭉쳐 읽을 수 없게 된다.
+  assert.equal(P('(a) 하나\n(b) 둘'), '(a) 하나\n\n(b) 둘');
+  assert.equal(P('(i) 하나\n(ii) 둘'), '(i) 하나\n\n(ii) 둘');
+  // 마커가 아닌 행은 그대로 (뭉침이 정상 동작)
+  assert.equal(P('첫 줄\n둘째 줄'), '첫 줄\n둘째 줄');
 });
 
 /* ═══ L8 — 마커 행 분리 (§0.2 결함 회귀 방지) ═══ */
@@ -137,7 +139,7 @@ test('L13 행 선두 들여쓰기는 \\s 전종을 받는다 — [ \\t]로 좁�
 });
 
 test('L14 마커 뒤 공백 흡수는 개행을 먹지 않는다 — 문단 경계 보존', () => {
-  assert.equal(P('(a)\n\n다음'), `${gana('가')}\n\n다음`);
+  assert.equal(P('(a)\n\n다음'), '(a)\n\n다음');   // 레거시는 무변환이지만 경계는 보존
   assert.equal(P('(가)\n\n다음'), `${gana('가')}\n\n다음`);
   assert.equal(P('ㄱ.\n\n다음'), `${giyeok('ㄱ')}\n\n다음`);
   // 내용 없는 원문자 줄이 뭉치지 않는다 (Phase 57 회귀 방지)

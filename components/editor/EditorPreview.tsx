@@ -9,8 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import {
-  MARKER_LINE_RE, ALPHA_LINE_RE, ROMAN_LINE_RE, CIRCLED_NUM_LINE_RE,
-  GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
+  MARKER_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
 } from '../../lib/locale';
 import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
 import 'katex/dist/katex.min.css';
@@ -141,21 +140,9 @@ function preprocessLocale(text: string): string {
     (_, bullet, label) => `${bullet}<span class="marker-case-sub">**${label}.**</span>`
   );
 
-  // 3. (a)~(e) → (가)~(마) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만
-  const gana: Record<string, string> = { a: '가', b: '나', c: '다', d: '라', e: '마' };
-  t = t.replace(new RegExp(ALPHA_LINE_RE.source, 'gm'), (_, ch) =>
-    `<span class="marker-gana">(${gana[ch]})</span>`);
-  t = t.replace(/([^a-zA-Z0-9\n])\(([a-e])\)/g, (_, pre, ch) => `${pre}(${gana[ch]})`);
-
-  // 4. (i)~(v) → ㄱ.~ㅁ. — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만
-  const giyeok: Record<string, string> = { i: 'ㄱ', ii: 'ㄴ', iii: 'ㄷ', iv: 'ㄹ', v: 'ㅁ' };
-  t = t.replace(new RegExp(ROMAN_LINE_RE.source, 'gm'), (_, r) =>
-    `<span class="marker-giyeok">${giyeok[r]}.</span>`);
-  t = t.replace(/([^a-zA-Z0-9\n])\((iii|ii|iv|v|i)\)/g, (_, pre, r) => `${pre}${giyeok[r]}.`);
-
-  // 4-2. (가)~(차) · ㄱ.~ㅊ. 리터럴 → marker span (Phase 60 P1)
-  //      레거시 변환이 만든 행은 `<span …>`으로 시작해 여기 걸리지 않는다(멱등).
-  //      (lib/locale.ts convertGanaLiteral/convertGiyeokLiteral과 동일 — 정규식은 공유 상수)
+  // 3. (가)~(차) · ㄱ.~ㅊ. → marker span (Phase 60 P1)
+  //    ⚠ (a)/(i) 레거시 변환은 없다 — Phase 60 후속에서 삭제했다.
+  //    (lib/locale.ts convertGanaLiteral/convertGiyeokLiteral과 동일 — 정규식은 공유 상수)
   t = t.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'),
     (_, ch) => `<span class="marker-gana">(${ch})</span>`);
   t = t.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'),

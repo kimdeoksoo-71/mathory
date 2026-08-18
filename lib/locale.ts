@@ -4,8 +4,10 @@
  * 저장: 작성 로케일의 표기를 그대로 (한국 문항 → (가)(나), ㄱ.ㄴ. 리터럴)
  *       — 국제 표준으로의 역변환은 하지 않는다
  *       (Phase 60 D1: "글로벌 통일을 버리고 로케일 블록으로")
- * 표시: 레거시 국제 표기((a)/(i))는 여전히 (가)/ㄱ.로 변환해 옛 문항 호환을 유지.
- *       그 밖에 \tag{1}, \ref{1}, Fig. 1, Table 1, ㉠㉡㉢, [그림1], [표1]
+ * 표시: 로케일 변환은 \tag{1}, \ref{1}, Fig. 1, Table 1, [그림1], [표1] 등.
+ *       ⚠ (a)→(가), (i)→ㄱ. 변환은 **없다** (Phase 60 후속에서 삭제). 두 표기가
+ *         공존하면 "무엇을 쓰면 무엇이 나오는지"가 흐려져 오히려 혼란스럽다.
+ *         옛 문항의 (a)는 그대로 보이며, 손볼 때 리터럴로 고친다.
  * 
  * 원본 데이터는 절대 수정하지 않음 — 표시 단계에서만 변환
  */
@@ -17,14 +19,6 @@ import { LEGACY_CASE_RE } from './caseBlock';
 export const CIRCLED_CONSONANTS = [
   '㉠','㉡','㉢','㉣','㉤','㉥','㉦','㉧','㉨','㉩','㉪','㉫','㉬','㉭'
 ];
-
-const GANA: Record<string, string> = {
-  a: '가', b: '나', c: '다', d: '라', e: '마',
-};
-
-const GIYEOK: Record<string, string> = {
-  i: 'ㄱ', ii: 'ㄴ', iii: 'ㄷ', iv: 'ㄹ', v: 'ㅁ',
-};
 
 // ===== 마커 정규식 (사본 공유 — Phase 60 P4) =====
 // ⚠ components/editor/EditorPreview.tsx의 인라인 preprocessLocale이 이 상수들을 import한다.
@@ -40,7 +34,13 @@ const GIYEOK: Record<string, string> = {
  *    HWP·웹에서 붙여넣은 문항의 문단 분리가 조용히 회귀한다. */
 const IND = '[^\\S\\n\\r]*';
 
-/** 행 시작이 마커인가 — 마커 행 앞에 빈 줄을 넣어 독립 <p>를 보장할 때 쓴다. */
+/** 행 시작이 마커인가 — 마커 행 앞에 빈 줄을 넣어 독립 <p>를 보장할 때 쓴다.
+ *
+ *  ⚠ 레거시 `(a)~(e)`·`(i)~(v)`는 **변환하지 않지만 여기에는 남긴다**(Phase 60 후속).
+ *    변환을 걷어내면서 이것까지 빼면, 옛 문항의 `(a) …`↵`(b) …`가 remark-breaks 부재
+ *    때문에 한 문단으로 뭉쳐 읽을 수 없게 된다. 행 분리는 마크다운 렌더 보조일 뿐
+ *    로케일 변환이 아니므로 남기는 것이 맞다 — 옛 문항은 `(a)`가 그대로 보이되
+ *    줄은 유지되어, 고칠 자리가 눈에 띈다. */
 export const MARKER_LINE_RE = new RegExp(
   `^${IND}(?:\\((?:iii|ii|iv|v|i|[a-e])\\)` +
   `|\\((?:가|나|다|라|마|바|사|아|자|차)\\)` +
@@ -48,18 +48,11 @@ export const MARKER_LINE_RE = new RegExp(
   `|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])`
 );
 
-/** 행 시작 (a)~(e) → marker span.
- *  뒤 공백은 [ \t]*로 흡수한다 — 입력에 띄어쓰기를 하건 안 하건 마커·본문
- *  간격이 같아야 한다(Phase 60 P2). 간격은 CSS의 마커 고정폭이 공급한다.
- *  ⚠ \s*는 개행까지 삼켜 다음 줄을 빨아들인다 (Phase 57). */
-export const ALPHA_LINE_RE = /^\(([a-e])\)[ \t]*/;
-
-/** 행 시작 (i)~(v) → marker span. 뒤 공백 흡수는 위와 같다. */
-export const ROMAN_LINE_RE = /^\((iii|ii|iv|v|i)\)[ \t]*/;
-
-/** 행 시작 (가)~(차) 리터럴 → marker span. 뒤 공백은 정규식이 흡수한다(Phase 60 P2).
- *  ⚠ 레거시와 달리 매핑 테이블이 없으므로 5개 상한을 둘 이유가 없다. 상한을 남기면
- *    (바)를 쓴 사용자가 "그 줄만 내어쓰기가 빠지는" 조용한 결함을 겪는다 (D9). */
+/** 행 시작 (가)~(차) → marker span. 뒤 공백은 정규식이 흡수한다 — 띄어쓰기를 하건
+ *  안 하건 마커·본문 간격이 같아야 한다(Phase 60 P2). 간격은 CSS 고정폭이 공급한다.
+ *  ⚠ \s*는 개행까지 삼켜 다음 줄을 빨아들인다 (Phase 57).
+ *  ⚠ 범위 10개 — 매핑 테이블이 없으므로 상한을 둘 이유가 없다. 상한을 남기면 (바)를
+ *    쓴 사용자가 "그 줄만 내어쓰기가 빠지는" 조용한 결함을 겪는다 (D9). */
 export const GANA_LITERAL_RE = /^\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
 
 /** 행 시작 ㄱ.~ㅊ. 리터럴 → marker span */
@@ -98,10 +91,11 @@ function restoreMath(text: string, placeholders: string[]): string {
 // ===== 변환 함수들 =====
 
 /**
- * (a)~(e), (i)~(v) 시작 행 앞에 빈 줄 강제 삽입 → 독립 <p> 보장
- * 이전 줄이 내용이 있고 빈 줄이 아닌 경우에만 삽입
- * 
- * ★ 반드시 convertAlphaList, convertRomanList 이전에 호출해야 함
+ * 마커 행(MARKER_LINE_RE) 앞에 빈 줄 강제 삽입 → 독립 <p> 보장.
+ * 이전 줄이 내용이 있고 빈 줄이 아닌 경우에만 삽입.
+ *
+ * ★ 반드시 marker span 변환 이전에 호출해야 한다 — 변환 뒤에는 행이 `<span …>`으로
+ *   시작해 MARKER_LINE_RE에 걸리지 않는다.
  */
 function insertMarkerLineBreaks(text: string): string {
   const lines = text.split('\n');
@@ -159,32 +153,6 @@ export function convertSubcaseMarkers(text: string): string {
     /^(-\s+)\*\*(Case\s+\d+[a-z])\.\*\*/gm,
     (_, bullet, label) => `${bullet}<span class="marker-case-sub">**${label}.**</span>`
   );
-}
-
-/** (a) → (가) — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만 */
-function convertAlphaList(text: string): string {
-  let result = text.replace(new RegExp(ALPHA_LINE_RE.source, 'gm'), (_, ch) => {
-    const korean = GANA[ch];
-    return korean ? `<span class="marker-gana">(${korean})</span>` : `(${ch})`;
-  });
-  result = result.replace(/([^a-zA-Z0-9\n])\(([a-e])\)/g, (_, pre, ch) => {
-    const korean = GANA[ch];
-    return korean ? `${pre}(${korean})` : `${pre}(${ch})`;
-  });
-  return result;
-}
-
-/** (i) → ㄱ. — 행 시작: marker span(내어쓰기용), 행 중간: 텍스트만 */
-function convertRomanList(text: string): string {
-  let result = text.replace(new RegExp(ROMAN_LINE_RE.source, 'gm'), (_, r) => {
-    const korean = GIYEOK[r];
-    return korean ? `<span class="marker-giyeok">${korean}.</span>` : `(${r})`;
-  });
-  result = result.replace(/([^a-zA-Z0-9\n])\((iii|ii|iv|v|i)\)/g, (_, pre, r) => {
-    const korean = GIYEOK[r];
-    return korean ? `${pre}${korean}.` : `${pre}(${r})`;
-  });
-  return result;
 }
 
 /** (가)~(차) 리터럴 → 행 시작 marker span (Phase 60 P1).
@@ -245,10 +213,10 @@ export function preprocessLocale(text: string, locale: Locale): string {
   let processed = insertMarkerLineBreaks(cleaned);
 
   // 3단계: 텍스트 변환
-  processed = convertAlphaList(processed);
-  processed = convertRomanList(processed);
-  processed = convertGanaLiteral(processed);      // Phase 60 P1 — 직접 입력한 (가)~(차)
-  processed = convertGiyeokLiteral(processed);    // Phase 60 P1 — 직접 입력한 ㄱ.~ㅊ.
+  //   ⚠ 레거시 (a)/(i) → (가)/ㄱ. 변환은 없다 (Phase 60 후속에서 삭제). 옛 문항의
+  //     `(a)`는 이제 그대로 렌더된다 — 손볼 문항은 그때그때 리터럴로 고친다.
+  processed = convertGanaLiteral(processed);
+  processed = convertGiyeokLiteral(processed);
   processed = convertCircledList(processed);
   processed = convertRefReferences(processed);
   processed = convertTextTags(processed);
@@ -261,8 +229,6 @@ export function preprocessLocale(text: string, locale: Locale): string {
 
 export {
   insertMarkerLineBreaks,
-  convertAlphaList,
-  convertRomanList,
   convertGanaLiteral,
   convertGiyeokLiteral,
   convertCircledList,
@@ -272,6 +238,4 @@ export {
   convertTableLabels,
   protectMath,
   restoreMath,
-  GANA,
-  GIYEOK,
 };
