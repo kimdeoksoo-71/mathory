@@ -1543,14 +1543,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleDeleteBlock = useCallback((blockId: string) => {
     if (currentBlocks.length <= 1) return;   // C3: 마지막 블록은 삭제 안 함(no-op)
     pushUndo();
-    setCurrentBlocks((prev) => {
-      if (prev.length <= 1) return prev;
-      const filtered = prev.filter((b) => b.id !== blockId);
-      if (activeBlockId === blockId) {
-        setActiveBlockId(filtered[0]?.id || null);
-      }
-      return filtered;
+
+    /* Phase 45a D1 — 부수효과는 전부 updater 밖에서. updater 안에서 setState·ref를
+       건드리면 StrictMode 이중 실행에서 안전성을 따져야 하는데, currentBlocks가
+       이미 스코프에 있으므로(위 가드가 그것을 읽는다) 들어갈 이유가 없다. */
+    const idx = currentBlocks.findIndex((b) => b.id === blockId);
+    if (idx !== -1 && activeBlockId === blockId) {
+      // 삭제 자리를 이어받는 블록(다음 → 없으면 이전). 첫 블록으로 튀지 않는다.
+      const nextId = currentBlocks[idx + 1]?.id ?? currentBlocks[idx - 1]?.id ?? null;
+      skipNextBlockScrollRef.current = true;   // D2: 삭제는 시야를 움직이지 않는다
+      setActiveBlockId(nextId);
+    }
+    // stale id가 남으면 handleDragEnd의 size>1 묶음 판정이 어긋난다
+    setSelectedBlockIds((prev) => {
+      if (!prev.has(blockId)) return prev;
+      const next = new Set(prev);
+      next.delete(blockId);
+      return next;
     });
+
+    setCurrentBlocks((prev) => prev.filter((b) => b.id !== blockId));
   }, [setCurrentBlocks, activeBlockId, currentBlocks, pushUndo]);
 
   const handleAddBlock = useCallback((type: Block['type'] = 'text') => {
@@ -2177,12 +2189,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   /* ─── 블록 활성화 시 기본 자동 스크롤 (탭 전환·초기 진입 등) ─── */
   // 핸들러(handleBlockFocus / handleSelectBlockBar)가 직접 스크롤을 처리한 경우엔 skip
   useEffect(() => {
-    if (!activeBlockId) return;
-    if (collapseMode) return;
+    /* Phase 45a D2 — 플래그는 반드시 맨 앞에서 소비한다. collapseMode 가드 뒤에 두면
+       전체접기 중엔 소비되지 않고 남아, 나중에 접기를 푸는 순간(deps에 collapseMode가
+       있다) 엉뚱한 전환 하나를 삼킨다. activeBlockId가 null이 되는 삭제 경로에서도
+       플래그가 정리되도록 !activeBlockId 가드보다도 앞이다. */
     if (skipNextBlockScrollRef.current) {
       skipNextBlockScrollRef.current = false;
       return;
     }
+    if (!activeBlockId) return;
+    if (collapseMode) return;
     const timer = setTimeout(() => {
       const container = editorPanelRef.current;
       if (!container) return;
