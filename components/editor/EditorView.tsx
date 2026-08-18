@@ -618,8 +618,7 @@ function SortableEditorBlock({
   onTitleChange,
   onDelete,
   onToggleCollapse,
-  onSelect,
-  onToggleSelect,
+  onBarClick,
   onMediaUpload,
   onImageWidthChange,
   onImageTreatmentChange,
@@ -651,8 +650,8 @@ function SortableEditorBlock({
   onTitleChange: (title: string) => void;
   onDelete: () => void;
   onToggleCollapse: () => void;
-  onSelect: () => void;
-  onToggleSelect: () => void;
+  /* Phase 45a D5-d — 클릭 하나에 prop 3개를 두지 않고 수식어를 넘겨 부모가 분기한다 */
+  onBarClick: (mods: { shift: boolean; alt: boolean }) => void;
   onMediaUpload: (file: File, kind: ImageMediaKind, blockId: string) => Promise<void>;
   onImageWidthChange: (blockId: string, width: number) => void;
   onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
@@ -761,8 +760,12 @@ function SortableEditorBlock({
       {/* ── Block Header — 활성 블록 또는 전체접기 모드일 때 표시 ── */}
       {showBar && (
       <div
-        onClick={(e) => { if (e.shiftKey) onToggleSelect(); else onSelect(); }}
+        onClick={(e) => onBarClick({ shift: e.shiftKey, alt: e.altKey })}
         onDoubleClick={() => { if (collapseMode) onToggleCollapse(); }}
+        /* D5-e: 일반 모드에서는 수식어가 무시되므로 힌트도 걸지 않는다 */
+        title={collapseMode
+          ? '클릭: 선택 · Shift+클릭: 범위 · Alt+클릭: 개별 토글'
+          : undefined}
         style={{
           position: 'relative',
           display: 'flex', alignItems: 'center', gap: 4,
@@ -981,6 +984,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 전체 접기 모드 + 다중선택 (세션 한정, 새로고침/탭전환 시 초기화)
   const [collapseMode, setCollapseMode] = useState(false);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<string>>(new Set());
+  /* Phase 45a D4 — collapseMode를 콜백 deps에 넣으면 토글할 때마다 콜백이 새로 만들어져
+     전 블록이 리렌더된다. useBlockHistory의 captureRef 관용대로 ref로 읽는다. */
+  const collapseModeRef = useRef(collapseMode);
+  collapseModeRef.current = collapseMode;
+  /* Phase 45a D5 — 범위 선택 앵커(마지막 일반 클릭 블록). id 유효성은 쓸 때
+     indexOf로 재검증하므로 별도 무효화 로직이 필요 없다(undo 세대 교체에도 자동 대응). */
+  const selectionAnchorRef = useRef<string | null>(null);
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
@@ -1808,7 +1818,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setCollapseMode((on) => {
       const next = !on;
       setCurrentBlocks((prev) => prev.map((b) => ({ ...b, collapsed: next })));
-      if (!next) setSelectedBlockIds(new Set());
+      // D5-c: 켤 때도 초기화 — 이전 모드에서 남은 선택이 따라 들어오면 안 된다
+      setSelectedBlockIds(new Set());
       return next;
     });
   }, [setCurrentBlocks]);
@@ -1955,17 +1966,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, []);
 
-  /* ─── 상단바 클릭: 단일 선택(활성화) / Ctrl+클릭: 다중선택 토글 ─── */
+  /* ─── 상단바 클릭: 단일 선택(활성화) + 범위 선택 앵커 지정 ─── */
   const handleSelectBlockBar = useCallback((blockId: string) => {
-    // 상단바 클릭: 블록 상단을 양쪽 패널 상단 ~80px 아래로
-    skipNextBlockScrollRef.current = true;
     setActiveBlockId(blockId);
     setActiveMathId(-1);   // D16: handleBlockFocus를 거치지 않는 경로 — stale 강조 제거
     setSelectedBlockIds(new Set());
+    selectionAnchorRef.current = blockId;   // D5-a
+    /* Phase 45a D4 — 전체접기 모드에서는 시야를 고정한다. 자동 스크롤 effect는
+       collapseMode를 보고 멈추지만 아래 두 줄은 직접 호출이라 가드를 우회했고,
+       그래서 바를 누를 때마다 목록이 튀었다. skipNext 세팅도 같은 게이트 안에
+       둔다 — 밖에 두면 소비되지 않은 플래그가 남는다. */
+    if (collapseModeRef.current) return;
+    skipNextBlockScrollRef.current = true;
     scrollEditorToBlockTop(blockId);
     scrollPreviewToBlockTop(blockId);
   }, [scrollEditorToBlockTop, scrollPreviewToBlockTop]);
 
+  /* ─── Alt+클릭: 개별 토글(비연속 선택) ─── */
   const handleToggleSelectBlock = useCallback((blockId: string) => {
     setSelectedBlockIds((prev) => {
       const next = new Set(prev);
@@ -1974,6 +1991,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return next;
     });
   }, []);
+
+  /* ─── Shift+클릭: 앵커~대상 연속 구간으로 선택집합 교체 (Phase 45a D5-b) ───
+        activeBlockId는 건드리지 않는다 — handleDragEnd의 묶음 판정(1962)은
+        '드래그한 블록'이 선택집합에 있는지만 보므로 활성 블록과 무관하고,
+        활성을 옮기면 불필요한 스크롤·리렌더가 따라온다. */
+  const handleRangeSelectBlock = useCallback((blockId: string) => {
+    const ids = currentBlocks.map((b) => b.id);
+    const to = ids.indexOf(blockId);
+    if (to === -1) return;
+    const from = selectionAnchorRef.current ? ids.indexOf(selectionAnchorRef.current) : -1;
+    if (from === -1) {
+      // 앵커 소실(삭제·탭 전환·undo) → 대상 1개만 선택하고 새 앵커로
+      setSelectedBlockIds(new Set([blockId]));
+      selectionAnchorRef.current = blockId;
+      return;
+    }
+    const [lo, hi] = from <= to ? [from, to] : [to, from];
+    // 앵커는 유지 — 같은 앵커로 범위를 넓혔다 좁혔다 할 수 있어야 한다
+    setSelectedBlockIds(new Set(ids.slice(lo, hi + 1)));
+  }, [currentBlocks]);
 
   /* ─── DnD ─── */
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -3187,8 +3224,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onTitleChange={(title) => handleBlockTitleChange(block.id, title)}
                     onDelete={() => handleDeleteBlock(block.id)}
                     onToggleCollapse={() => handleToggleBlockCollapse(block.id)}
-                    onSelect={() => handleSelectBlockBar(block.id)}
-                    onToggleSelect={() => handleToggleSelectBlock(block.id)}
+                    onBarClick={(mods) => {
+                      /* D5-c: 선택 조작은 전체접기 모드에서만. 일반 모드에서 Shift+클릭이
+                         선택집합을 만들면 (전체접기를 켜도 지워지지 않아) 유령 선택이 된다. */
+                      if (collapseMode && mods.shift) handleRangeSelectBlock(block.id);
+                      else if (collapseMode && mods.alt) handleToggleSelectBlock(block.id);
+                      else handleSelectBlockBar(block.id);
+                    }}
                     onMediaUpload={handleBlockMediaUpload}
                     onImageWidthChange={handleImageWidthChange}
                     onImageTreatmentChange={handleImageTreatmentChange}
