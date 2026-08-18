@@ -3315,9 +3315,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ─── */}
+        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ───
+              marginLeft = 편집창 블록 띠와의 채널. Phase 45a에서 편집 패널의 우측
+              패딩 16px이 사라져(전폭) 띠 우측 끝 → 미리보기 첫 글자가 48px → 32px로
+              좁아졌다. 여기서 되돌린다(→ 56px). 전폭 띠는 하드 엣지라 예전보다
+              조금 더 벌린다.
+              ⚠ 편집 패널에 우측 패딩을 주는 식으로 벌리면 안 된다 — 블록이 좌측만
+                붙고 우측은 들어가 비대칭이 된다. 미리보기 패딩을 키우는 것도 안 된다
+                — width가 35em+64px 고정이라 본문 측정폭 35em이 깎인다. */}
         <div data-noscroll="preview-column" style={{
-          width: `calc(35em + 64px)`, flexShrink: 0,
+          width: `calc(35em + 64px)`, flexShrink: 0, marginLeft: 24,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
