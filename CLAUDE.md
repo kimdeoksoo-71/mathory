@@ -163,7 +163,6 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **남은 검증(덕수)**: ① 인쇄 PDF 전후 동일 — `docs/phaseSketch/phase60 before.pdf`가 기준선, 판정 기준은 `phase60 before 관측.md`, 비교는 픽셀 diff ② 앱 마커 굵기·`ㄱ.` 여백 변화 확인 ③ `/shared`·`/p` 하드 로드 정렬 수정 확인
 
 다음 작업 후보:
-- **P6 긴 display 수식 접기** (Phase 58에서 분리) — 최상위 `\\` display 수식 전용. `aligned`·`gathered`·`array`는 `.mspace.newline`을 방출하지 않아 행 단위 접기가 불가능하다. 착수 전 전 문항에서 두 문법의 사용 비율부터 조사할 것
 - PDF 정밀 레이아웃 (Puppeteer 또는 jsPDF)
 - UI 디자인 (docs/ui-design-reference.md 참조)
 - Mathpix OCR API 통합

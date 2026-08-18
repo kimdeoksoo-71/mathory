@@ -1425,7 +1425,7 @@ Phase 55 자체 VCS의 직접 확장. 블록 구조 조작(추가·삭제·이�
 | P1 제목 블록 (D1·D1'·D2) | ✅ | 2026-08-16 | `1.5/1.3/1.15em → 1.18/1.08/1.0em`, weight 700, h2 언더라인 제거, 래퍼 `paddingTop` `1.5em → 0.5em`(인쇄만 `1em`) |
 | P2 톤 시스템 (D3~D9·D13·D14) | ✅ | 2026-08-16 | `lib/keyTone.ts` + `.tone-baseline` 분리 + 5개 사이트. dim `--tone-dim #675F52`, key는 색 + 굵기 600 |
 | P3 툴바 "핵심문장" (D7) | ✅ | 2026-08-16 | `lib/mathIndex.ts` 추출 + `toggleKeyWrap()` + 브라켓 계열 `KeySentenceIcon`. 단축키 미배정 |
-| P6 긴 display 수식 접기 (D12) | ⏸ 분리 | — | 타당성은 확인됐으나 적용 범위가 house style 전용이라 별도 Phase로 |
+| P6 긴 display 수식 접기 (D12) | ❌ **폐기** | 2026-08-18 | 분리 후 Phase 59 **요약 보기**가 같은 목적(긴 풀이의 조망)을 이미 달성했다. 중복 기능을 얹을 이유가 없다는 덕수 판단. 사양은 Phase 58 §6에 보존 — 되살릴 일이 생기면 거기서 시작 |
 
 **핵심 교훈 1 — 제목 위 여백은 2항이 아니라 3항이었다**: v2는 `[래퍼 paddingTop 1.5em] + [h2 marginTop 1em] = 2.5em`으로, v3는 "em 마진은 자기 font-size 기준"을 잡아 `= 2.8em`으로 계산했다. 둘 다 틀렸다 — **앞 블록에서 이월된 마진**이라는 세 번째 항이 빠졌다. EditorPreview의 borderless root가 `padding:0 · border:none · overflow:visible`이고 `height:100%`는 부모가 auto라 계산값이 `auto`가 되므로(CSS 2.1 §10.5), 앞 문단의 `margin-bottom`이 블록 래퍼까지 그대로 탈출한다. headless Chrome 하니스로 실측한 현행은 **3.4em(text 뒤) ~ 3.9em(display 수식·리스트·① 밭 뒤)** 으로 목표 2.4em의 1.4~1.6배였다. → `paddingTop`을 0.5em으로 낮춰 2.18~2.68em(평균 2.4em). 앞 블록 타입에 따른 ±0.25em 변동은 남으며, 이를 없애려면 `paddingTop`을 `marginTop`으로 바꿔 세 마진을 하나로 상쇄시켜야 하는데 `[data-block-id]` 래퍼가 Phase 56 `computeBlockAwareScrollTop`의 스크롤 앵커라 채택하지 않았다.
 
