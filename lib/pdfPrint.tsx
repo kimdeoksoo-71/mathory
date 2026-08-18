@@ -22,6 +22,35 @@ export interface PdfPrintTab {
 }
 
 /**
+ * 인쇄 직전 웹폰트 대기.
+ *
+ * layout.tsx가 Noto Serif KR을 `display=swap`으로 받고 @font-face 'MathoryCircled'도
+ * swap이라, 폰트가 도착하기 전에 window.print()가 스냅샷을 뜨면 굵기 요청(600/700)이
+ * 폴백에 흡수돼 **제목·경우 라벨이 본문과 같은 굵기로 인쇄된다**. 새로고침 직후 인쇄하면
+ * 재현되고, 같은 문항을 두 번 뽑아도 결과가 달라진다(Phase 60 T4 대조에서 제목 잉크가
+ * 20% 넘게 차이났다 — 글자 폭은 픽셀 단위로 같은데 획 굵기만 달랐다).
+ *
+ * ⚠ 반드시 타임아웃을 건다 — 폰트 CDN이 죽었을 때 인쇄 자체가 막히면 안 된다.
+ *   시간이 지나면 폴백 글꼴로라도 인쇄되는 편이 낫다.
+ * ⚠ unicode-range 폰트('MathoryCircled' = ①~⑳)는 그 범위의 문자를 함께 넘겨야
+ *   매칭된다 — 두 번째 인자 없이 부르면 아무것도 로드하지 않는다.
+ */
+async function waitForPrintFonts(timeoutMs = 3000): Promise<void> {
+  if (typeof document === 'undefined' || !document.fonts) return;
+  // --font-print 스택에서 실제로 쓰는 조합. 본문 400 · 제목/라벨/마커 600 · key 700.
+  const faces = [
+    document.fonts.load('400 10pt "Noto Serif KR"'),
+    document.fonts.load('600 10pt "Noto Serif KR"'),
+    document.fonts.load('700 10pt "Noto Serif KR"'),
+    document.fonts.load('10pt "MathoryCircled"', '\u2460'),
+  ].map((p) => p.catch(() => undefined));
+  await Promise.race([
+    Promise.all(faces).then(() => document.fonts.ready),
+    new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+  ]);
+}
+
+/**
  * 탭 배열을 받아 A3 2단 PDF로 인쇄. 파일명은 title로 지정 (부적합 문자 치환).
  * PrintableContent 컴포넌트를 숨겨진 컨테이너에 렌더 → DOM 이동 → window.print().
  */
@@ -81,6 +110,9 @@ export async function printProblemPdf(params: {
       new Promise((resolve) => setTimeout(resolve, 2000)),
     ]);
   }
+
+  // 폰트가 도착한 뒤에 스냅샷을 떠야 굵기가 제대로 인쇄된다 (위 주석 참조)
+  await waitForPrintFonts();
 
   window.print();
 
