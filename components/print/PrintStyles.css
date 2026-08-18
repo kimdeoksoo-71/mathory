@@ -121,9 +121,17 @@
   font-family: var(--font-print) !important;
   font-size: 1em !important;   /* .print-body .katex = 1em = 본문 10pt */
 }
-.marker-gana, .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
-p:has(> .marker-gana:first-child),
-p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
+/* ⚠ .print-body 접두 필수 — 이 파일은 EditorView.tsx:51이 import해서 앱 화면에도
+     로드된다. 접두가 없으면 인쇄 값(고정폭 2.5em·굵기 600)이 화면으로 새고, 반대로
+     PrintStyles를 안 부르는 공개 라우트(/shared·/p)만 규칙이 빠져 정렬이 깨진다.
+     실제로 Phase 60 전까지 그 상태였다. 화면 규칙은 globals.css가 소유한다.
+   ⚠ p 쪽 선택자는 `> …:first-child` 형태를 유지한다. 화면(후손형)과 매칭이 갈리는
+     DOM은 실존하지만(`<p><em>x</em> <span class="marker-gana">…`), 마커 span은 오직
+     행 시작 치환으로만 생기고 그 행은 항상 문단 첫머리라 파이프라인 산출물에서는
+     만들어지지 않는다. 인쇄 산출물 보존이 우선이라 형태를 그대로 둔다. */
+.print-body .marker-gana, .print-body .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
+.print-body p:has(> .marker-gana:first-child),
+.print-body p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
 .marker-circled { display: inline-block; min-width: 2em; font-weight: 600; text-indent: 0; }
 p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em; }
 /* D1 (Phase 57) — 연속 ① 문단을 "리스트 한 덩어리"로: 밭 위/아래만 11pt, 항목 사이는 행간만.

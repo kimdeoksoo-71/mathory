@@ -377,13 +377,37 @@ ol {
   margin: 0.4em 0;
 }
 
-/* ═══ Ordered list markers — 내어쓰기 (hanging indent) ═══ */
-p:has(.marker-gana) {
+/* ═══ (가)(나) · ㄱ.ㄴ. 마커 — 화면 (Phase 60 P2) ═══
+   마커 고정폭 규칙은 지금까지 PrintStyles.css에만 있었고, EditorView.tsx가 그 파일을
+   import하는 덕에 "우연히" 앱 화면에도 걸려 있었다. 독립 공개 라우트(/shared·/p)는
+   PrintStyles를 부르지 않아 규칙이 빠져 첫 줄이 0.8em 어긋났다 — 같은 스냅샷이
+   "앱에서 열기"와 "새 탭"에서 다르게 보이던 원인이다.
+   → 화면은 여기가, 인쇄는 PrintStyles(.print-body 접두)가 소유한다.
+   ⚠ 인쇄 노드는 iframe이 아니라 document.body에 직접 붙는다(lib/pdfPrint.tsx) →
+     .preview-content 스코프가 없으면 이 규칙이 인쇄로 샌다.
+   ⚠ min-width는 반드시 아래 p 내어쓰기 폭과 같은 값이어야 한다. 어긋나면 첫 줄
+     본문 시작점과 랩 라인이 그 차이만큼 벌어진다.
+   ⚠ text-indent: 0 — p의 내어쓰기(-2.5em)가 inline-block 안쪽 첫 줄에 다시 적용되는
+     것을 막는 가드. CLAUDE.md "글자 주위에 상자를 두르지 말 것"의 예외 사유가 정확히
+     이 가드다(Phase 57 P5는 가드가 없어서 깨졌다). .marker-circled의 확립된 전례. */
+.preview-content .marker-gana,
+.preview-content .marker-giyeok {
+  display: inline-block;
+  text-indent: 0;
+  /* 화면 마커는 본문과 같은 굵기 — PrintStyles에서 새어 들어와 화면에도 걸려 있던
+     font-weight: 600을 명시적으로 되돌린다. 인쇄만 600을 유지한다(의도된 예외).
+     Phase 58 톤 시스템은 마커 span을 겨냥한 규칙이 없어 inherit가 dim 상태까지 따라간다. */
+  font-weight: inherit;
+}
+.preview-content .marker-gana   { min-width: 2.5em; }
+.preview-content .marker-giyeok { min-width: 2em; }   /* `ㄱ.`이 `(가)`보다 좁다 */
+
+.preview-content p:has(.marker-gana) {
   padding-left: 2.5em;
   text-indent: -2.5em;
 }
 
-p:has(.marker-giyeok) {
+.preview-content p:has(.marker-giyeok) {
   padding-left: 2em;
   text-indent: -2em;
 }
