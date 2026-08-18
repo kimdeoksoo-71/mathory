@@ -1,8 +1,11 @@
 /**
  * Mathory Locale Preprocessing
  * 
- * 저장: 국제 표준 (a)(b)(c), (i)(ii)(iii), \tag{1}, \ref{1}, Fig. 1, Table 1
- * 표시: 한국 로케일 → (가)(나)(다), ㄱ.ㄴ.ㄷ., ㉠㉡㉢, [그림1], [표1]
+ * 저장: 작성 로케일의 표기를 그대로 (한국 문항 → (가)(나), ㄱ.ㄴ. 리터럴)
+ *       — 국제 표준으로의 역변환은 하지 않는다
+ *       (Phase 60 D1: "글로벌 통일을 버리고 로케일 블록으로")
+ * 표시: 레거시 국제 표기((a)/(i))는 여전히 (가)/ㄱ.로 변환해 옛 문항 호환을 유지.
+ *       그 밖에 \tag{1}, \ref{1}, Fig. 1, Table 1, ㉠㉡㉢, [그림1], [표1]
  * 
  * 원본 데이터는 절대 수정하지 않음 — 표시 단계에서만 변환
  */
@@ -39,7 +42,10 @@ const IND = '[^\\S\\n\\r]*';
 
 /** 행 시작이 마커인가 — 마커 행 앞에 빈 줄을 넣어 독립 <p>를 보장할 때 쓴다. */
 export const MARKER_LINE_RE = new RegExp(
-  `^${IND}(?:\\((?:iii|ii|iv|v|i|[a-e])\\)|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])`
+  `^${IND}(?:\\((?:iii|ii|iv|v|i|[a-e])\\)` +
+  `|\\((?:가|나|다|라|마|바|사|아|자|차)\\)` +
+  `|[ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ]\\.` +
+  `|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])`
 );
 
 /** 행 시작 (a)~(e) → marker span */
@@ -47,6 +53,14 @@ export const ALPHA_LINE_RE = /^\(([a-e])\)/;
 
 /** 행 시작 (i)~(v) → marker span */
 export const ROMAN_LINE_RE = /^\((iii|ii|iv|v|i)\)/;
+
+/** 행 시작 (가)~(차) 리터럴 → marker span. 뒤 공백은 정규식이 흡수한다(Phase 60 P2).
+ *  ⚠ 레거시와 달리 매핑 테이블이 없으므로 5개 상한을 둘 이유가 없다. 상한을 남기면
+ *    (바)를 쓴 사용자가 "그 줄만 내어쓰기가 빠지는" 조용한 결함을 겪는다 (D9). */
+export const GANA_LITERAL_RE = /^\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
+
+/** 행 시작 ㄱ.~ㅊ. 리터럴 → marker span */
+export const GIYEOK_LITERAL_RE = /^([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
 
 /** 행 시작 ①~⑮ → marker span.
  *  뒤 공백은 [ \t]*로만 먹는다 — \s*를 쓰면 개행까지 삼켜서, 내용이 아직 없는
@@ -170,6 +184,21 @@ function convertRomanList(text: string): string {
   return result;
 }
 
+/** (가)~(차) 리터럴 → 행 시작 marker span (Phase 60 P1).
+ *  행 중간은 이미 리터럴이라 변환할 것이 없다.
+ *  레거시 변환 뒤에 두어도 안전하다 — 그쪽이 만든 행은 `<span …>`으로 시작해
+ *  `^\(`에 걸리지 않는다(멱등). */
+function convertGanaLiteral(text: string): string {
+  return text.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'),
+    (_, ch) => `<span class="marker-gana">(${ch})</span>`);
+}
+
+/** ㄱ.~ㅊ. 리터럴 → 행 시작 marker span (Phase 60 P1) */
+function convertGiyeokLiteral(text: string): string {
+  return text.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'),
+    (_, ch) => `<span class="marker-giyeok">${ch}.</span>`);
+}
+
 /** ①②③ … 행 시작 → marker span (수식 표시와 같은 들여쓰기)
  *  마커 뒤 공백은 [ \t]*로만 먹는다 — \s*를 쓰면 개행까지 삼켜서, 내용이 아직 없는
  *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
@@ -215,6 +244,8 @@ export function preprocessLocale(text: string, locale: Locale): string {
   // 3단계: 텍스트 변환
   processed = convertAlphaList(processed);
   processed = convertRomanList(processed);
+  processed = convertGanaLiteral(processed);      // Phase 60 P1 — 직접 입력한 (가)~(차)
+  processed = convertGiyeokLiteral(processed);    // Phase 60 P1 — 직접 입력한 ㄱ.~ㅊ.
   processed = convertCircledList(processed);
   processed = convertRefReferences(processed);
   processed = convertTextTags(processed);
@@ -229,6 +260,8 @@ export {
   insertMarkerLineBreaks,
   convertAlphaList,
   convertRomanList,
+  convertGanaLiteral,
+  convertGiyeokLiteral,
   convertCircledList,
   convertRefReferences,
   convertTextTags,

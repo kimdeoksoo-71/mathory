@@ -113,8 +113,10 @@ const BLOCK_PRESETS: Record<string, string> = {
   // 경우 블록은 빈 프리셋 — 첫 줄에 조건을 쓰면 그 줄이 제목행이 된다(D9).
   case: '',
   subcase: '',
-  gana: '(a) \n(b) \n(c) ',
-  roman: '(i) \n(ii) \n(iii) ',
+  // Phase 60 P1: 이름(그리고 렌더 결과)이 한국식이므로 입력도 한국 리터럴로.
+  //   저장되는 raw_text도 그대로다 — 국제 표준으로의 역변환은 하지 않는다(D1).
+  gana: '(가) \n(나) \n(다) ',
+  roman: 'ㄱ. \nㄴ. \nㄷ. ',
   box: '',
   choices: '',
   image: '',
