@@ -55,8 +55,14 @@ export function maskForProofread(text: string): { masked: string; placeholders: 
     // 라인 시작인지 확인
     const atLineStart = i === 0 || text[i - 1] === '\n';
     if (atLineStart) {
-      // (a)~(z) 또는 (i)~(v) 마커
-      const markerMatch = text.slice(i).match(/^\(([a-z]+|[ivx]+)\)\s*/);
+      // 마커: 레거시 (a)~(z)·(i)~(v) + 한국 리터럴 (가)~(차)·ㄱ.~ㅊ. (Phase 60 P3)
+      // ⚠ 뒤 공백은 [ \t]*로만 — \s*는 개행을 placeholder 안으로 빨아들여, 내용이 아직
+      //   없는 연속 마커 행(`(가) `↵`(나) ` = 블록 프리셋의 모습)이 Claude에게
+      //   `⟦M0⟧⟦M1⟧⟦M2⟧` 한 줄로 전달된다. 항목이 몇 개인지 알 수 없는 형태라
+      //   교정 품질이 떨어진다(복원은 정상이므로 원문 손상은 없다). 실측 확인.
+      const markerMatch = text.slice(i).match(
+        /^(?:\(([a-z]+|[ivx]+)\)|\((?:가|나|다|라|마|바|사|아|자|차)\)|[ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ]\.)[ \t]*/
+      );
       if (markerMatch) {
         out += push(markerMatch[0]);
         i += markerMatch[0].length;
