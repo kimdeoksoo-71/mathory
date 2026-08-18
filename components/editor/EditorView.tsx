@@ -705,6 +705,10 @@ function SortableEditorBlock({
     border: emphasized
       ? '0.5px solid var(--block-border-active)'
       : '0.5px solid transparent',
+    /* 활성 카드의 아래 변은 카드 윤곽이자 '블록 사이 구분선'을 겸한다.
+       윤곽 색(진한 --block-border-active)을 그대로 쓰면 바로 아래 블록의 윗선이
+       불필요하게 강조돼 보인다(덕수 검수) → 이 변만 일반 구분선 색으로 낮춘다. */
+    ...(emphasized ? { borderBottomColor: 'var(--block-hairline)' } : null),
     ...(emphasized || hideTopLine ? null : {
       borderTopColor: 'var(--block-hairline)',
     }),
@@ -793,8 +797,10 @@ function SortableEditorBlock({
           background: block.collapsed ? 'transparent' : 'var(--block-bg-active)',
           fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
-          // 본문이 보일 때만 헤더↔에디터 구분선 (카드 테두리와 키를 맞춘다)
-          borderBottom: !block.collapsed ? '1px solid var(--block-border-active)' : 'none',
+          /* 본문이 보일 때만 헤더↔에디터 구분선. 카드 '내부' 선이므로 윤곽보다 약해야 한다
+             — 카드 테두리 색·두께에 맞췄더니 두껍고 진했다(덕수 검수).
+             하단 툴바의 borderTop과 같은 값으로 되돌려 위아래 대칭을 유지한다. */
+          borderBottom: !block.collapsed ? '0.5px solid var(--border-primary)' : 'none',
           // 활성 카드일 때만 첫 둥근 모서리 유지 (비활성 플랫 행은 직각)
           borderTopLeftRadius: emphasized ? 7.5 : 0, borderTopRightRadius: emphasized ? 7.5 : 0,
         }}
