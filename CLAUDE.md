@@ -66,7 +66,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - `\tag{n}`: 수식 내 → `\tag*{(n)}` (**수학 모드**라 `.mopen/.mord/.mclose`로 렌더 — `.text`가 아니다), 텍스트 행 끝 → `<span class="tag-marker">(n)</span>`
 - `\ref{n}`: 수식 내 → `\text{(n)}`, 텍스트 → `(n)` 직접 치환
 - `①~⑮`: 문자 그대로 보존 (행 시작분만 `<span class="marker-circled">`로 감싸 내어쓰기). 글리프는 `@font-face 'MathoryCircled'` + `unicode-range: U+2460-2473`이 AppleGothic으로 대체 — **마크업 없음**
-- `(a)~(e)` → `(가)~(마)`, `(i)~(v)` → `ㄱ.~ㅁ.` (각 5개 제한, 중복 방지)
+- `(a)~(e)` → `(가)~(마)`, `(i)~(v)` → `ㄱ.~ㅁ.` (각 5개 제한 — **레거시**. 매핑 테이블 크기가 상한의 근거)
+- **리터럴 `(가)~(차)` · `ㄱ.~ㅊ.`은 그대로 입력·저장하고 렌더에서만 span을 씌운다 (각 10개, Phase 60)** — 매핑이 없으므로 상한을 둘 이유가 없다
+- **마커 뒤 공백은 정규식이 흡수한다** — 간격은 입력 공백이 아니라 CSS 고정폭이 공급
 - `Fig.N` → `[그림N]`, `Table N` → `[표N]`
 
 ## 작업 규칙
@@ -84,12 +86,15 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **스크롤 패널에 `paddingBottom:100vh` 금지**: `box-sizing:border-box`에서 요소 높이는 패딩 합보다 작아질 수 없어 패널이 부모보다 커지고, `overflow:hidden` 부모에 복구 불가한 스크롤 틈이 생긴다(CM `scrollRectIntoView`가 밀어붙임). "문서 끝 여백"은 **스페이서 div**로 줄 것 (Phase 56)
 - **`[data-noscroll]` 컨테이너는 세로 스크롤 금지**: 좌·우 칼럼과 content-frame. 스크롤되면 dev 콘솔에 경고가 뜬다 → 어떤 요소가 세로 overflow를 만든 것이니 그 원인을 제거할 것 (Phase 56)
 - **조건부 `style` 객체에 longhand 병합 주의**: shorthand(`padding`)가 뒤에 오면 앞의 longhand(`paddingBottom`)를 조용히 덮어쓴다 → 스프레드 순서에 의존하지 말고 충돌 불가능한 구조를 택할 것
+- **`PrintStyles.css`는 화면에도 로드된다 (Phase 60)**: `EditorView.tsx:51`이 직접 import하고 AppShell이 EditorView를 정적 import한다 → **앱 전 페이지**. 따라서 **인쇄 전용 규칙에는 `.print-body` 접두가 필수**다(파일 118행 주석이 이미 못 박은 규약). 접두를 빠뜨리면 인쇄 값이 화면으로 새고, 동시에 이 파일을 안 부르는 곳만 규칙이 빠진다. 반대로 화면 규칙은 `globals.css`가 `.preview-content` 스코프로 소유한다 — 인쇄가 iframe이 아니라 같은 document라 **양방향 스코프**가 필요하다
+- **공개 뷰어는 두 CSS 환경에서 렌더된다 (Phase 60)**: 앱 셸 임베드(`AppShell` 783·791, BazaarView '앱에서 열기')와 독립 라우트(`/p/[problemId]`·`/shared/[shareId]`, 새 탭). 전이적 import closure 실측 — AppShell(123파일)은 PrintStyles에 도달하고 `/p`(36)·`/shared`(29)는 도달하지 않는다. **공개 페이지 스타일은 라우트 2개 + 임베드를 다 확인할 것**
+- **행이 분리되는 이유는 `insertMarkerLineBreaks`뿐이다**: 렌더 파이프라인에 `remark-breaks`가 **없다**(`EditorPreview` 300 · `PrintableContent` 126 = `[remarkMath, remarkGfm]`) → CommonMark soft break가 공백이 되어 연속 행이 한 문단으로 합쳐진다. 마커 계열을 추가하면 반드시 `MARKER_LINE_RE`(lib/locale.ts)에도 넣을 것
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
 - **column-fill: auto**: 왼쪽 단 먼저 채움 (balance가 기본값)
 - **setext heading 방지**: `-` 줄 앞에 빈 줄 삽입 (`preventSetextHeadings`)
-- **locale.ts와 EditorPreview.tsx 범위 동기화**: (a)~(e) = `[a-e]`, (i)~(v) 반드시 일치. `preventSetextHeadings`(preprocess.ts ↔ EditorPreview.tsx)도 사본 2개
+- **locale.ts와 EditorPreview.tsx 범위 동기화**: **마커 정규식은 `lib/locale.ts`의 export 상수 하나를 양쪽이 공유한다**(`MARKER_LINE_RE`·`ALPHA_LINE_RE`·`ROMAN_LINE_RE`·`GANA_LITERAL_RE`·`GIYEOK_LITERAL_RE`·`CIRCLED_NUM_LINE_RE`, Phase 60 P4) — 사본에 정규식을 다시 적지 말 것. **단계 순서·`locale` 게이트 유무는 아직 사본**이라 그쪽은 여전히 손으로 맞춰야 한다. `preventSetextHeadings`(preprocess.ts ↔ EditorPreview.tsx)도 사본 2개
 - **글자 주위에 상자를 두르지 말 것 (`inline-block` 래핑)**: `text-indent` 같은 상속 인라인 속성이 래퍼 안쪽 첫 줄에 **다시** 적용된다. `p:has(.marker-circled){text-indent:-2em}` 때문에 합성 원문자의 숫자가 원 밖으로 튀어나갔다. 글리프 모양을 바꿔야 하면 **`@font-face` + `unicode-range`로 폰트를 갈아끼울 것** — 마크업이 없으면 깨질 것도 없다 (Phase 57 P5)
 - **행 단위 전처리에서 `\s*` 금지, `[ \t]*`를 쓸 것**: `\s`는 개행을 포함해 다음 줄을 빨아들인다. `^①\s*`가 내용 없는 원문자 줄들을 한 문단으로 뭉치던 버그가 이것 (Phase 57)
 - **여백을 논하기 전에 기준선을 실측할 것**: 전역 리셋 `* { margin: 0 }`(globals.css:100-104) 때문에 화면 `<p>`의 문단 간격은 오랫동안 **0**이었다(인쇄만 `.print-body p` 6pt). "UA 기본 1em"을 가정하면 산식이 3배로 어긋난다 (Phase 57)
@@ -110,7 +115,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - 여백: 상하 30mm, 좌우 20mm
 - 본문: 2단, 단 간격 10mm, column-fill: auto
 - 부가 요소 없음 (구분선, 머리말, 꼬리말, 페이지 번호 미구현 — CSS 인쇄 한계)
-- iframe 방식 인쇄 (시스템 다이얼로그 직접 호출, 미리보기 창 없음)
+- **iframe이 아니다** — `lib/pdfPrint.tsx`가 숨은 div에 렌더 → `.print-root`를 `document.body`에 직접 붙여 `window.print()` (시스템 다이얼로그 직접 호출, 미리보기 창 없음). ⇒ **globals.css가 인쇄 노드에도 전부 적용된다**
 
 ## 블록 타입
 
@@ -136,7 +141,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **경우 블록 안은 최상위와 같은 들여쓰기 규칙 (Phase 59 §11-2)**: display 수식이 본문보다 한 단(3em/인쇄 2em) 더 들어간다 → `.katex-display`에 override를 두지 **않는다**. 반대로 `.callout-block`은 `padding-left: 0`으로 죽인다(한 줄 강조 장치라 이중 들여쓰기가 군더더기) — **전례를 복사해 되돌리지 말 것**. 리스트·① 밭은 기본 1em이 약해 같은 한 단으로 올리며, 인쇄 ① 규칙은 globals의 `!important`를 이기려면 `!important`가 필요하다
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경에서 3.49:1). 로고 레드 `#D97757`은 2.52:1로 **미달**이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 59 완료
+## 현재 Phase: 60 진행 중
 
 Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md` — **§0-0이 최종 사양**, §11이 실사용 개정 기록
@@ -147,6 +152,14 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·`**`·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
 - 로직 검증: `npm run test:case` (27개)
+
+### Phase 60 — list 로케일 블록 개편 (구현 완료 · 검증 대기)
+
+문서: `docs/phaseSketch/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
+
+- **저장 철학이 바뀌었다**: "저장은 국제 표준, 표시만 로케일"을 버리고 **로케일 블록** — 한국 문항은 `(가)`·`ㄱ.`을 그대로 입력·저장한다. 레거시 `(a)`/`(i)` 변환은 옛 문항 호환용으로 유지
+- 로직 검증: `npm run test:locale` (15개)
+- **남은 검증(덕수)**: ① 인쇄 PDF 전후 동일 — `docs/phaseSketch/phase60 before.pdf`가 기준선, 판정 기준은 `phase60 before 관측.md`, 비교는 픽셀 diff ② 앱 마커 굵기·`ㄱ.` 여백 변화 확인 ③ `/shared`·`/p` 하드 로드 정렬 수정 확인
 
 다음 작업 후보:
 - **P6 긴 display 수식 접기** (Phase 58에서 분리) — 최상위 `\\` display 수식 전용. `aligned`·`gathered`·`array`는 `.mspace.newline`을 방출하지 않아 행 단위 접기가 불가능하다. 착수 전 전 문항에서 두 문법의 사용 비율부터 조사할 것
