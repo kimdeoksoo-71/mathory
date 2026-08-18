@@ -45,7 +45,7 @@ export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, on
   if (data.status === 'loading') {
     return (
       <div className="proofread-box" style={{
-        margin: '4px 0 10px', padding: '8px 12px',
+        margin: '4px 16px 10px', padding: '8px 12px',
         background: 'var(--bg-secondary)',
         border: '1px dashed var(--border-light)',
         borderRadius: 8, fontSize: 12, color: 'var(--text-muted)',
@@ -59,7 +59,7 @@ export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, on
   if (data.status === 'failed') {
     return (
       <div className="proofread-box" style={{
-        margin: '4px 0 10px', padding: '8px 12px',
+        margin: '4px 16px 10px', padding: '8px 12px',
         background: '#fdecea', border: '1px solid #f5c6cb',
         borderRadius: 8, fontSize: 12, color: '#721c24',
         display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'var(--font-ui)',
@@ -76,7 +76,7 @@ export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, on
 
   return (
     <div className="proofread-box" style={{
-      margin: '4px 0 10px', padding: '8px 12px',
+      margin: '4px 16px 10px', padding: '8px 12px',
       background: '#fffbeb', border: '1px solid #fde68a',
       borderRadius: 8, fontSize: 12.5, color: '#5b4708',
       fontFamily: 'var(--font-ui)',

@@ -280,7 +280,7 @@ function MediaBlockContent({
   if (block.type === 'svg' && block.raw_text) {
     const svgHeight = block.svg_height || SVG_BLOCK_HEIGHT;
     return (
-      <div style={{ padding: 8 }}>
+      <div style={{ padding: '8px 16px' }}>
         <SvgViewer
           url={block.raw_text}
           initialView={block.svg_initial_view}
@@ -335,7 +335,7 @@ function MediaBlockContent({
   if (block.type === 'ggb' && block.raw_text) {
     const ggbHeight = block.ggb_height || GGB_BLOCK_HEIGHT;
     return (
-      <div style={{ padding: 8 }}>
+      <div style={{ padding: '8px 16px' }}>
         <GgbViewer
           url={block.raw_text}
           initialCoords={block.ggb_initial_coords}
@@ -392,7 +392,7 @@ function MediaBlockContent({
     const src = srcMatch?.[1] || '';
     const maxW = 600;
     return (
-      <div style={{ padding: 8, textAlign: 'center' }}>
+      <div style={{ padding: '8px 16px', textAlign: 'center' }}>
         <img src={src} alt="" style={{ width: Math.min(imgWidth, maxW), maxWidth: '90%', borderRadius: 8, ...imageTreatmentStyle(block) }} />
         <div style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -675,25 +675,32 @@ function SortableEditorBlock({
   } = useSortable({ id: block.id });
 
   const isHeading = block.type === 'heading';
-  // 제목 블록은 접힘 시 좌측으로 14px 돌출 (마진으로 블록 자체를 밀고, 바 패딩으로 내용 위치 고정)
-  const headingJut = block.collapsed && isHeading ? 14 : 0;
+
+  /* ─── Phase 45a E형 블록 인셋 ───────────────────────────────────────────
+     이중 외곽(클레이 프레임 세로선 ≥ 블록 세로선 + 그 사이 16px 완충대)을
+     안쪽에서 푼다. 비활성 블록의 세로선을 지우면 화면에 남는 닫힌 윤곽은
+     활성 카드뿐 — 활성=인테리어(둥근 진한 면), 비활성=공통영역(면+가로선).
+     선택 블록은 활성과 같은 문법을 쓴다(전체접기 모드 재배치용 표시).
+     ⚠ 비활성의 좌우 1px은 transparent로 '자리를 잡아 둔다'. 테두리를 아예
+        빼면 활성 전환 순간 내용물이 1px 밀린다.                          */
+  const emphasized = isActive || selected;
 
   const style: React.CSSProperties = {
     transform: CSS.Translate.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     marginBottom: 6,
-    marginLeft: -headingJut,
-    // 단일 실제 테두리 (거터 배경이 덮지 않음 → 좌측 이중선 해소, 모서리 유지)
-    // 0.5px = 레티나에서 1물리픽셀 헤어라인 (1px은 2물리픽셀이라 두껍게 보임)
-    border: '0.5px solid var(--border-block)',
-    borderRadius: 8,
-    background: isActive ? 'var(--block-bg-active)' : 'var(--block-bg)',
+    border: emphasized
+      ? '1px solid var(--block-border-active)'
+      : '1px solid transparent',
+    ...(emphasized ? null : {
+      borderTopColor: 'var(--block-hairline)',
+      borderBottomColor: 'var(--block-hairline)',
+    }),
+    borderRadius: emphasized ? 8 : 0,
+    background: emphasized ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
-    boxShadow: isActive ? 'var(--block-shadow-active)' : 'none',
-    // 다중선택 표시 (전체접기 모드 재배치용)
-    outline: selected ? '2px solid var(--accent-primary)' : 'none',
-    outlineOffset: '-1px',
+    boxShadow: emphasized ? 'var(--block-shadow-active)' : 'none',
   };
 
   // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
@@ -751,7 +758,7 @@ function SortableEditorBlock({
       {showSummaryOnlyBar && (
         <div style={{
           display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
-          padding: '2px 8px 0', position: 'relative', zIndex: 1,
+          padding: '2px 16px 0', position: 'relative', zIndex: 1,   // D6″-g 정렬
         }}>
           {summaryToggle}
         </div>
@@ -769,23 +776,24 @@ function SortableEditorBlock({
         style={{
           position: 'relative',
           display: 'flex', alignItems: 'center', gap: 4,
-          // 돌출분(headingJut)만큼 좌측 패딩을 더해 내용물(grip·라벨) 절대위치 고정
-          padding: '4px 8px', paddingLeft: 8 + headingJut,
-          background: 'var(--block-bg-active)',
+          // E형 D6″-g: 좌우 16px = .cm-content 패딩과 같은 선. 바와 본문의 좌변이 맞는다
+          padding: '4px 16px',
+          /* 펼침 바는 카드 내부 헤더 틴트를 유지하고, 접힘 바는 투명으로 두어
+             래퍼 배경(활성/선택 = 진한 면, 비활성 = 플랫 행)이 그대로 비치게 한다 */
+          background: block.collapsed ? 'transparent' : 'var(--block-bg-active)',
           fontSize: 12, color: 'var(--text-muted)',
           fontFamily: 'var(--font-ui)', userSelect: 'none',
-          // 본문이 보일 때만 헤더↔에디터 구분선
-          borderBottom: !block.collapsed ? '0.5px solid var(--border-primary)' : 'none',
-          // 접힘 모드에서 첫 둥근 모서리 유지
-          borderTopLeftRadius: 8, borderTopRightRadius: 8,
+          // 본문이 보일 때만 헤더↔에디터 구분선 (카드 테두리와 키를 맞춘다)
+          borderBottom: !block.collapsed ? '1px solid var(--block-border-active)' : 'none',
+          // 활성 카드일 때만 첫 둥근 모서리 유지 (비활성 플랫 행은 직각)
+          borderTopLeftRadius: emphasized ? 7 : 0, borderTopRightRadius: emphasized ? 7 : 0,
         }}
       >
-        {/* 제목 블록 접힘 시 좌측 돌출부 섹션마크 (돌출 패딩 안쪽에 배치 → 내용물 위치 불변) */}
-        {headingJut > 0 && (
+        {/* 제목 블록 접힘 표시 (D7″-c: 거터가 사라져 돌출 문법 자체가 소멸 → 바 내부 인라인) */}
+        {block.collapsed && isHeading && (
           <span style={{
-            position: 'absolute', left: 5, top: '50%', transform: 'translateY(-50%)',
-            fontSize: 13, fontWeight: 700, lineHeight: 1, color: 'var(--accent-primary)',
-            pointerEvents: 'none',
+            fontSize: 13, fontWeight: 700, lineHeight: 1,
+            color: 'var(--accent-primary)', pointerEvents: 'none',
           }}>§</span>
         )}
 
@@ -3202,7 +3210,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onNavigate={handleSearchNavigate}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 16px', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '8px 0', minHeight: 0 }}>
             <div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>
