@@ -21,6 +21,9 @@ import RestoreConfirm from './RestoreConfirm';
  *   조작 버튼을 타임라인 항목 안에 두지 않는 이유: 항목 자체가 <button>이라 중첩이 무효 HTML이고
  *   클릭이 버블링돼 버전 선택이 함께 발동한다. 타임라인은 표시 전용으로 유지한다.
  */
+/** 드로어 폭. EditorView의 밀어내기 계산(rightPanelWidth)이 같은 값을 써야 하므로 공유한다. */
+export const VERSION_DRAWER_WIDTH = 460;
+
 export default function VersionDrawer({
   problemId,
   open,
@@ -267,22 +270,49 @@ export default function VersionDrawer({
   );
 
   return (
+    /* agent 패널(CommentPanel)과 같은 문법: fixed 오버레이가 아니라 EditorView 루트
+       기준 absolute. 덮지 않고 편집·미리보기를 왼쪽으로 밀어낸다(덕수) —
+       미는 쪽은 EditorView의 rightPanelWidth가 담당하므로 폭 상수를 공유한다.
+       zIndex는 EditorView 안의 최대치(리사이즈 핸들 100)보다 위로 둔다 — 이 드로어가
+       스태킹 컨텍스트를 만들므로, 안에서 열리는 RestoreConfirm(fixed·zIndex 1400)이
+       바깥 요소를 덮으려면 드로어 자신이 위에 있어야 한다. */
     <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, maxWidth: '92vw',
-      transform: open ? 'translateX(0)' : 'translateX(100%)', transition: 'transform 0.22s ease',
-      background: 'var(--bg-panel, #fff)', borderLeft: '1px solid var(--border-light)',
-      boxShadow: open ? '-6px 0 24px rgba(0,0,0,0.08)' : 'none',
-      display: 'flex', flexDirection: 'column', zIndex: 1200,
+      position: 'absolute', top: 0, right: 0, bottom: 0,
+      width: VERSION_DRAWER_WIDTH, maxWidth: '90vw',
+      background: 'var(--bg-panel-agent)',
+      display: open ? 'flex' : 'none', flexDirection: 'column', zIndex: 110,
+      fontFamily: 'var(--font-ui)',
     }}>
-      {/* 헤더 — 스코프: 현재 작업본 */}
+      {/* ═══ 1행: 제목 + 닫기 ═══ agent 패널 헤더와 같은 규격(높이 57 = 사이드바 헤더 정렬) */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, minHeight: 57, padding: '0 14px',
-        borderBottom: '1px solid var(--border-light)', flexShrink: 0, background: 'var(--bg-functional)',
+        display: 'flex', alignItems: 'center', gap: 12,
+        padding: '0 16px',
+        minHeight: 57, boxSizing: 'border-box',
+        borderBottom: '1px solid var(--border-light, #eee)',
+        flexShrink: 0,
       }}>
-        <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', flexShrink: 0 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
           버전 기록
-        </span>
+        </div>
+        <div style={{ flex: 1 }} />
+        <button onClick={onClose} title="버전 기록 닫기" aria-label="닫기" style={{
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          color: 'var(--text-muted)', padding: 0, lineHeight: 1, display: 'flex', flexShrink: 0,
+        }}><IconClose size={16} /></button>
+      </div>
 
+      {/* ═══ 2행: 이름 저장 ═══ agent 패널의 세션 바와 같은 자리·같은 규격.
+            컨테이너 값(높이 41·padding·선·바탕)을 CommentPanel의 SessionTabBar와
+            맞춰 둘 것 — 갈리면 두 패널을 오갈 때 헤더가 흔들린다. */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '0 12px',
+        minHeight: 41, boxSizing: 'border-box',
+        borderBottom: '1px solid var(--border-light, #eee)',
+        background: 'var(--bg-primary, #FAF9F7)',
+        overflowX: 'auto',
+        flexShrink: 0,
+      }}>
         {nameEditor?.scope === 'header' ? (
           nameInput(commitNamedSave, '이 버전의 이름 (Enter)')
         ) : (
@@ -292,18 +322,13 @@ export default function VersionDrawer({
             title="현재 작업본에 이름 붙여 저장"
             aria-label="현재 작업본에 이름 붙여 저장"
             style={{
-              display: 'flex', alignItems: 'center', gap: 4, marginLeft: 4,
+              display: 'flex', alignItems: 'center', gap: 4,
               border: '1px solid var(--border-light)', borderRadius: 5, padding: '3px 8px',
               background: 'transparent', color: 'var(--text-secondary)',
               cursor: metaBusy ? 'wait' : 'pointer', fontSize: 11, fontWeight: 600,
             }}
           ><IconTag size={13} />이름 저장</button>
         )}
-
-        <button onClick={onClose} title="닫기" aria-label="닫기" style={{
-          marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer',
-          color: 'var(--text-muted)', padding: 4, lineHeight: 1, display: 'flex', flexShrink: 0,
-        }}><IconClose size={16} /></button>
       </div>
 
       {/* 알림 */}

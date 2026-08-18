@@ -34,7 +34,7 @@ import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import { fastScrollTo, computeBlockAwareScrollTop, computeMathCenterScrollTop } from '../../lib/editorScroll';
 import SaveStatus from './SaveStatus';
 import ToggleSwitch from '../ui/ToggleSwitch';
-import VersionDrawer from '../version/VersionDrawer';
+import VersionDrawer, { VERSION_DRAWER_WIDTH } from '../version/VersionDrawer';
 import { useBlockHistory } from '../../hooks/useBlockHistory';
 import type { HistoryEntry } from '../../hooks/useBlockHistory';
 import type {
@@ -994,6 +994,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
   const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
   const discussionOpen = panelMode !== null;
+  /* 우측 패널이 차지하는 폭 — 댓글·agent와 버전 기록 드로어가 같은 규약을 쓴다.
+     둘 다 덮지 않고 편집·미리보기를 왼쪽으로 밀어낸다(기타 개선 3-2).
+     동시에 열리면 넓은 쪽 기준(드로어가 zIndex 60으로 앞에 온다). */
+  const rightPanelWidth = Math.max(
+    discussionOpen ? panelWidth : 0,
+    versionDrawerOpen ? VERSION_DRAWER_WIDTH : 0,
+  );
+  const rightPanelOpen = rightPanelWidth > 0;
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const commentSessionId = useMemo(
@@ -2850,7 +2858,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
       )}
 
-      {/* Phase 55 Stage 4·5: 버전 기록 드로어 (position:fixed) */}
+      {/* Phase 55 Stage 4·5: 버전 기록 드로어. 루트 기준 absolute — 덮지 않고
+          편집·미리보기를 밀어낸다(rightPanelWidth). agent 패널과 같은 규약. */}
       <VersionDrawer
         problemId={problemId}
         open={versionDrawerOpen}
@@ -2875,7 +2884,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         padding: '0 16px',
         minHeight: 57, boxSizing: 'border-box',
         // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
-        paddingRight: discussionOpen ? `calc(${panelWidth}px + 40px)` : 16,
+        paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
         transition: 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-functional)',
         flexShrink: 0, flexWrap: 'wrap',
@@ -3010,7 +3019,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center',
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
-        paddingRight: discussionOpen ? `calc(${panelWidth}px + 40px)` : 16,
+        paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
         transition: 'padding-right 0.2s',
         background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
@@ -3206,7 +3215,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       {/* ═══ Row 3: Split View — 외부 래퍼(아이보리 백드롭, 토론 패널 자리 확보) ═══ */}
       <div style={{
         flex: 1, display: 'flex', minHeight: 0,
-        paddingRight: discussionOpen ? `calc(${panelWidth}px + 8px)` : 0, // 토론 패널 + 8px 여백
+        paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 8px)` : 0, // 우측 패널 + 8px 여백
         transition: 'padding-right 0.2s',
       }}>
 
