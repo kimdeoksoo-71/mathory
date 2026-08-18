@@ -702,11 +702,14 @@ function SortableEditorBlock({
   // 요약에 넣은 블록은 비활성일 때도 그 사실이 보여야 한다 → 스위치만 있는 얇은 바를 남긴다
   const showSummaryOnlyBar = !showBar && block.showInSummary === true;
 
-  /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다 */
+  /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다.
+     Phase 45a D3-c: click의 stopPropagation은 dblclick을 막지 않는다(별개 이벤트 타입) →
+     바의 onDoubleClick(개별 펼침)이 걸리지 않도록 따로 차단한다. */
   const summaryToggle = (
     <span
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}
       style={{ display: 'inline-flex', marginRight: 2 }}
     >
       <ToggleSwitch
@@ -719,6 +722,22 @@ function SortableEditorBlock({
       />
     </span>
   );
+
+  /* 삭제 버튼 — 접힘 바·펼침 바 공용 (Phase 45a D3-a) */
+  const deleteButton = canDelete ? (
+    <button
+      onClick={(e) => { e.stopPropagation(); onDelete(); }}
+      onPointerDown={(e) => e.stopPropagation()}
+      onDoubleClick={(e) => e.stopPropagation()}   // D3-c
+      style={{
+        border: 'none', background: 'none', cursor: 'pointer',
+        padding: 2, display: 'flex', color: 'var(--text-faint)',
+      }}
+      title="블록 삭제"
+    >
+      <IconTrash size={12} />
+    </button>
+  ) : null;
 
   // 접힌 상단바에 보여줄 첫 줄 미리보기 (## 등 마크다운 기호 제거)
   const previewText = useMemo(() => {
@@ -786,6 +805,13 @@ function SortableEditorBlock({
                 textOverflow: 'ellipsis', flex: 1, minWidth: 0,
               }}>{previewText}</span>
             )}
+
+            {/* D3-b: previewText가 비면 위 span 자체가 렌더되지 않아 버튼이 라벨에
+                달라붙는다 → 스페이서는 무조건 둔다 */}
+            <div style={{ flex: 1 }} />
+
+            {summaryToggle}
+            {deleteButton}
           </>
         ) : (
           <>
@@ -819,20 +845,7 @@ function SortableEditorBlock({
             <div style={{ flex: 1 }} />
 
             {summaryToggle}
-
-            {canDelete && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                onPointerDown={(e) => e.stopPropagation()}
-                style={{
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  padding: 2, display: 'flex', color: 'var(--text-faint)',
-                }}
-                title="블록 삭제"
-              >
-                <IconTrash size={12} />
-              </button>
-            )}
+            {deleteButton}
           </>
         )}
       </div>
