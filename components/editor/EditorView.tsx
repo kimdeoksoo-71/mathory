@@ -2890,10 +2890,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         flexShrink: 0, flexWrap: 'wrap',
       }}>
         <button onClick={handleBackWithSave} style={{
-          border: 'none', background: 'none', cursor: 'pointer',
-          color: 'var(--text-muted)', display: 'flex', padding: 4, borderRadius: 4,
-        }} title="뒤로">
-          <IconChevronLeft />
+          border: 'none', cursor: 'pointer',
+          background: 'var(--accent-primary)', color: '#fff',
+          display: 'inline-flex', alignItems: 'center', gap: 2,
+          padding: '4px 10px 4px 6px', borderRadius: 999,
+          fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 600,
+          lineHeight: 1, whiteSpace: 'nowrap',
+          transition: 'background 0.15s',
+        }}
+          title="보기 화면으로"
+          onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-hover)'; }}
+          onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-primary)'; }}
+        >
+          <IconChevronLeft size={13} color="#fff" />
+          <span>보기</span>
         </button>
 
         <FolderPathBar
