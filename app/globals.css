@@ -164,6 +164,29 @@
      펼침(채움)과 구별이 안 된다. 하위경우는 지름이 작으므로 따로 더 얇게 준다. */
   --case-ring: 0.07em;
 
+  /* 경우 블록의 거터 좌표 (Phase 59a). x = 0 이 본문 좌단이고 음수가 본문 바깥이다.
+     rail·dot·chevron을 본문 밖으로 내보내 "구조 신호는 거터, 본문은 본문"을 만든다.
+     ⚠ 셋은 서로 간섭한다. 값을 바꿀 땐 함께 볼 것:
+         dot 우단     = rail_x + 0.26em   (dot 지름 0.52em)
+         chevron 좌단 = chevron_x - 0.5em (상자 폭 1em)
+       현재 여유 = -1.54em → -1.2em = 0.34em. 전부 em이라 글꼴 11~24px에서 비례 유지된다.
+     ⚠ 필요한 거터 폭은 dot 좌단까지 2.06em(실사용 2.2em)이다 — 각 렌더 사이트가
+       그만큼의 좌측 여백을 확보해야 하고, overflow:hidden 경계 안쪽이어야 한다.
+     ⚠ .section-head의 padding/margin 1.6em은 chevron 히트 영역이지 이 좌표계가 아니다.
+       숫자가 비슷하다고 묶지 말 것 — 한쪽만 조정할 때 다른 쪽이 끌려간다. */
+  --case-rail-x:    -1.8em;
+  --case-chevron-x: -0.7em;
+
+  /* 코칭 블록의 신호색 (Phase 59a). GitHub alert 팔레트를 가져오되 **한 단 진한 700 계열**을 쓴다.
+     GitHub light 기본값(Important #8250df · Caution #cf222e)은 라벨 어절이 텍스트라
+     4.5:1을 넘겨야 하는데 가장 어두운 실배경에서 3.81 / 4.05로 미달한다.
+     채택값 실측: #F4EFE7 6.42/6.87 · #E8DFCE 5.55/5.95 · #FEFDFB 7.22/7.74 — 전부 통과.
+     ⚠ 구속 조건은 FolderView 카드 배경 **#E8DFCE**다(#EDE6DA가 아니다 — 커밋 78a780f).
+     ⚠ 이 색과 dim 본문(#675F52)의 대비는 1.17~1.25:1뿐이다. 라벨을 색만으로 구분시키지
+       말 것 — 아이콘 + 600 굵기가 실제 식별 수단이다. */
+  --coach-important: #6639ba;
+  --coach-caution:   #a40e26;
+
   /* Sizing */
   --sidebar-expanded: 260px;
   --sidebar-collapsed: 56px;
@@ -257,9 +280,19 @@ textarea:focus-visible {
      letter-spacing: -0.01em이 함께 들어가 이미 공개된 페이지의 줄바꿈이 바뀐다.
      색만 필요한 곳은 .tone-baseline만 붙일 것.
    ⚠ .katex에 명시 color가 걸려 있다 — 조상에 color를 줘도 수식엔 닿지 않는다.
-     수식 색을 바꾸려면 반드시 .katex를 직접 겨냥해 이 규칙을 특이도로 이겨야 한다. */
+     수식 색을 바꾸려면 .katex를 직접 겨냥해야 한다.
+
+   ⚠ Phase 59a: 수식 규칙을 :where()로 감싸 특이도를 (0,2,0) → (0,1,0)으로 **내렸다**.
+     선택자 대상도 값도 그대로다. 오직 특이도만 내린 이유:
+       톤 절의 dim(.solution-tone .katex = (0,2,0))이 이 기준선을 이겨야 하는데,
+       dim 쪽을 (0,3,0)으로 올리면 이번엔 그 dim을 되이겨야 하는 복귀 규칙들
+       — .solution-tone strong .katex, .solution-tone h1~h3 .katex = 둘 다 (0,2,1) —
+       이 도리어 져서 **강조 안 수식과 제목 안 수식이 흐려진다**(클래스 수가 먼저다).
+       기준선을 내리면 dim도 복귀도 인쇄 복원도 전부 순서·특이도 걱정 없이 산다.
+     → 이제 .katex를 직접 겨냥한 (0,2,0) 이상이면 무엇이든 이 기준선을 이긴다.
+     ⚠ 이 값을 다시 올리지 말 것. 올리는 순간 위 연쇄가 통째로 되살아난다. */
 .tone-baseline        { color: var(--text-secondary); }
-.tone-baseline .katex { color: var(--text-primary); }
+.tone-baseline :where(.katex) { color: var(--text-primary); }
 
 /* 타이포그래피(색 제외) — 앱 내부 열람/편집 화면 전용 */
 .problem-content-toned {
@@ -269,51 +302,56 @@ textarea:focus-visible {
   letter-spacing: -0.01em;
 }
 
-/* ═══ Phase 58 P2 — key sentence 톤 시스템 ═══
-   풀이(question 외 탭)에서 routine을 한 단계 물리고 key만 앞으로 낸다.
-   key 마커는 인라인 `**` 하나뿐이다 — 강조문(callout)은 들여쓰기 전용이라
-   여기에 아무 규칙도 두지 않는다(D13). callout 내부는 조상의 톤을 그대로 상속한다.
+/* ═══ Phase 58 P2 — 강조 톤 시스템 · Phase 59a 기본화 ═══
+   풀이(question 외 탭)에서 본문을 한 단계 물리고 강조(`**`)만 앞으로 낸다.
+   강조 마커는 인라인 `**` 하나뿐이다 — 들여쓰기 블록(callout)은 위치 전용이라
+   여기에 아무 규칙도 두지 않는다(D13). 내부는 조상의 톤을 그대로 상속한다.
 
-   dim/full은 신규 색을 만들지 않고 기존 토큰 2종을 재사용한다(D3-A):
-     dim  = --text-secondary  (현행 본문색 그대로 → 비key 텍스트는 픽셀 무변화)
-     full = --text-primary    (현행 수식색)
-   실제로 변하는 것은 ① 비key 수식이 본문 톤으로 내려앉고 ② key가 진해지는 것 둘뿐이다.
-   명암비(실측): secondary는 클레이 배경에서 6.35/5.86/7.15:1, primary는 12.51/11.54/14.08:1.
-   더 강한 후퇴가 필요하면 :root에 --tone-dim: #675F52 한 줄만 추가하면 된다(5.50/5.08/6.19:1). */
+   ⚠ Phase 59a에서 **.has-key 조건을 없앴다**. Phase 58의 D4("`**`가 하나도 없는
+     문항은 톤 낮추기를 발동시키지 않는다 = opt-in")를 의도적으로 폐기한 것이다.
+     이유: 마커 유무가 문항 전체의 인상을 바꿔 버려 문항 간 외관이 들쭉날쭉했고,
+     레거시 `**Case n.**` 라벨의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다.
+     이제 풀이 탭은 언제나 dim이고 `**` 구간만 앞으로 나온다.
+   ⚠ 그 대가로 `**`가 없던 기존 풀이는 본문이 소폭(#5D5647 → #675F52),
+     **수식이 대폭**(#2D2A23 → #675F52) 물러난다. 과하면 --tone-dim을
+     #5D5647로 되돌리면 "글자 무변화 + 수식만 하강"이 된다(토큰 한 줄).
 
-/* 톤 낮추기는 has-key일 때만 발동한다 (D4 — 마커 없는 문항 보호) */
-.solution-tone.has-key        { color: var(--tone-dim, var(--text-secondary)); }
-/* ⚠ 이 줄이 없으면 수식은 전혀 흐려지지 않는다 — .tone-baseline .katex(0,2,0)를
-     특이도(0,3,0)로 이겨야 한다 (D3') */
-.solution-tone.has-key .katex { color: var(--tone-dim, var(--text-secondary)); }
+   dim = --tone-dim(#675F52) / full = --text-primary(#2D2A23).
+   명암비: dim은 클레이 5.50 / 카드(#E8DFCE) 4.76 / 공유 6.19 — 전부 4.5:1 통과.
+   ⚠ 구속 조건은 FolderView 카드 배경 #E8DFCE다(#EDE6DA가 아니다 — 커밋 78a780f). */
 
-/* key 복귀 — 텍스트와 그 안의 수식까지 (0,3,1)로 위 규칙을 이긴다 */
-.solution-tone.has-key strong,
-.solution-tone.has-key strong .katex { color: var(--text-primary); }
+/* ⚠ 이 절은 반드시 위 .tone-baseline 절 **뒤**에 와야 한다.
+     글자색 .solution-tone(0,1,0)과 .tone-baseline(0,1,0)이 동률이라 순서로 이긴다.
+     (수식색은 :where 덕분에 순서와 무관하다 — 위 주석 참조) */
+.solution-tone        { color: var(--tone-dim); }
+.solution-tone .katex { color: var(--tone-dim); }   /* (0,2,0) > 기준선 (0,1,0) */
+
+/* 강조 복귀 — 텍스트와 그 안의 수식까지. (0,1,1)/(0,2,1)로 dim을 이긴다 */
+.solution-tone strong,
+.solution-tone strong .katex { color: var(--text-primary); }
 
 /* D5(개정) — key는 색 + 굵기 두 신호로 구분한다.
    당초 설계는 "색으로만"이었으나(굵기+색 이중 신호 회피), 실사용에서 dim↔full 간격이
    1.97:1뿐이라 본문 크기에서 강조/비강조가 거의 구별되지 않았다(덕수 판정) → 굵기 복원.
    - 600(semibold): 제목이 700이므로 한 단계 아래를 써서 제목 > key > 본문 위계를 지킨다.
      --weight-* 토큰 범위 안이라 "700 금지" 규칙과도 충돌하지 않는다.
-   - ⚠ key 안 수식은 굵어지지 않는다. KaTeX가 `font: normal 1.21em …` shorthand로
+   - ⚠ 강조 안 수식은 굵어지지 않는다. KaTeX가 `font: normal 1.21em …` shorthand로
      font-weight를 normal로 리셋하기 때문이다(katex.min.css). 수식은 색만 진해진다.
      인쇄(D6')와 같은 상황이며, 글리프 왜곡이 없는 편이 조판상 낫다. */
-.solution-tone.has-key strong { font-weight: var(--weight-semibold); }
+.solution-tone strong { font-weight: var(--weight-semibold); }
 
-/* D9' — 제목은 has-key 여부·dim 값과 무관하게 현행 색에 고정한다.
-   현재 제목은 EditorPreview 인라인 style에 color가 없어 secondary를 상속하고 있다.
-   has-key일 때만 진해지면 문항마다 제목 색이 달라지고 "진한 것 = key"라는 신호도 흐려진다.
-   dim을 --tone-dim으로 승격해도 제목만 따라 흐려지지 않게 막는 가드이기도 하다. */
-.solution-tone.has-key h1,
-.solution-tone.has-key h2,
-.solution-tone.has-key h3 { color: var(--text-secondary); }
-/* 제목 안 수식도 현행(primary) 유지. 위 h1~h3 규칙(0,3,0)은 제목 자신을 칠할 뿐이고,
-   .katex는 .solution-tone.has-key .katex(0,3,0)가 직접 잡아 dim이 되어버린다.
-   (0,3,1)로 되돌린다 — "제목은 현행 그대로"를 글자와 수식 양쪽에서 지킨다. */
-.solution-tone.has-key h1 .katex,
-.solution-tone.has-key h2 .katex,
-.solution-tone.has-key h3 .katex { color: var(--text-primary); }
+/* D9' — 제목은 dim 값과 무관하게 현행 색에 고정한다.
+   제목은 EditorPreview 인라인 style에 color가 없어 secondary를 상속하고 있다.
+   dim(--tone-dim)이 제목까지 끌고 내려가면 "진한 것 = 강조"라는 신호가 흐려진다. */
+.solution-tone h1,
+.solution-tone h2,
+.solution-tone h3 { color: var(--text-secondary); }
+/* 제목 안 수식도 현행(primary) 유지. 위 h1~h3 규칙(0,1,1)은 제목 자신을 칠할 뿐이고,
+   .katex는 .solution-tone .katex(0,2,0)가 직접 잡아 dim이 되어버린다.
+   (0,2,1)로 되돌린다 — "제목은 현행 그대로"를 글자와 수식 양쪽에서 지킨다. */
+.solution-tone h1 .katex,
+.solution-tone h2 .katex,
+.solution-tone h3 .katex { color: var(--text-primary); }
 
 /* Display math: 왼쪽 정렬 + 들여쓰기 */
 .katex-display,
@@ -506,7 +544,7 @@ p:has(.marker-circled) {
    - 화면 문단 간격은 전역 리셋(* { margin:0 })으로 지금까지 0이었다 → 인쇄와 같은 0.6em을 신설.
      (인쇄는 .print-body p { margin: 0 0 6pt } = 본문 10pt 기준 0.6em으로 이미 존재)
    - 그 위에 +0.5em → 화면 1.1em / 인쇄 11pt. 두 값의 배율이 같아 화면·인쇄 체감이 일치한다.
-   - 같은 값을 display 수식(EditorPreview 인라인 <style>)·ul/ol·① 원문자 밭·강조문에 공통 적용.
+   - 같은 값을 display 수식(EditorPreview 인라인 <style>)·ul/ol·① 원문자 밭·들여쓰기 블록에 공통 적용.
    ⚠ 스코프는 .preview-content 한정 — 전역 ul/ol(206·240)은 앱 UI가 쓰므로 건드리지 않는다(D5). */
 
 /* 문단 간격 — bottom-only (인접 문단 collapse로 정확히 0.6em).
@@ -543,7 +581,9 @@ p:has(.marker-circled) {
   margin-bottom: 1.1em;
 }
 
-/* ═══ Phase 57 P3 — 강조문(callout) 블록 ═══
+/* ═══ Phase 57 P3 — 들여쓰기(callout) 블록 ═══   [Phase 59a: 구 '강조문']
+   ⚠ 이름이 바뀐 이유: 이 블록은 위치(들여쓰기)만 담당하고 색·굵기(강조)와 무관하다.
+     '강조'는 인라인 `**` 하나만 가리킨다. 여기에 톤 규칙을 두지 말 것(D13).
    테두리 없이 "왼쪽 끝이 display 수식과 같은 위치"라는 것만으로 도드라지게 한다.
    수식 밖 텍스트 행에 \tag{n}을 달 수 있어, 수식 흐름 중 한 행만 참조번호를 매길 때 쓴다. */
 .callout-block {
@@ -555,32 +595,66 @@ p:has(.marker-circled) {
    구조가 .callout-block > (EditorPreview) > .preview-content > p 이므로 callout이 바깥이다.
    특이도 (0,2,1)로 .preview-content p(0,1,1)를 이긴다. */
 .callout-block .preview-content p { margin: 0; }
-/* 강조문 안 독립행 수식은 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 */
+/* 들여쓰기 블록 안 독립행 수식은 래퍼가 이미 들여쓴 상태 → 이중 들여쓰기 방지 */
 .callout-block .katex-display { padding-left: 0; }
 
-/* ═══ Phase 59 — 경우(case) 블록 ═══
-   rail·dot은 1em을 중심선으로 공유한다. 하위경우는 박스가 아니라 텍스트만
-   들여쓰므로 레일 규칙 3개가 case·subcase에 그대로 적용된다 (D12′).
+/* ═══ Phase 59a — 코칭(coach) 블록 ═══
+   강조 4축 중 '신호'. GitHub alert의 시각 문법(왼쪽 색 바 + 아이콘 + 라벨 어절)이다.
+
+   ⚠ 좌단은 본문 0이다. 안쪽 패딩 1em은 **상자의 내부 여백이지 들여쓰기가 아니다** —
+     글상자 3종(gana·roman·box)이 이미 같은 일을 하고 아무도 그것을 들여쓰기라 부르지
+     않는다. 위치 강조가 필요하면 그건 들여쓰기 블록(callout)의 일이다.
+   ⚠ 그래서 경우 사이에 끼어도(.case-gap) rail(-1.8em)과 바(0)가 겹치지 않는다.
+   ⚠ --coach-accent는 .coach-important/.coach-caution이 세우고 .coach-block이 쓴다.
+     두 클래스는 **같은 요소**에 있어야 한다(coachClassName이 그렇게 만든다). */
+.coach-block {
+  margin: 1.1em 0;                                   /* K1 — 다른 블록과 동일 */
+  border-left: 0.25em solid var(--coach-accent);
+  padding-left: 1em;
+}
+.coach-important { --coach-accent: var(--coach-important); }
+.coach-caution   { --coach-accent: var(--coach-caution); }
+
+/* 제목 줄 — 아이콘 + 라벨 어절. 아이콘은 stroke="currentColor"라 이 색을 따라온다.
+   ⚠ 특이도 (0,2,0)이 필수다. (0,1,0)으로 두면 .solution-tone(0,1,0)과 동률이 되어
+     소스 순서에 목숨을 걸게 된다 — Phase 59a F1에서 배운 것을 여기서 미리 지킨다.
+     구조 신호는 톤 불변이라는 원칙(dot·rail과 동일)의 구현이기도 하다. */
+.coach-block .coach-label {
+  display: flex;
+  align-items: center;
+  gap: 0.35em;
+  margin-bottom: 0.35em;
+  color: var(--coach-accent);
+  font-family: var(--font-ui);
+  font-weight: var(--weight-semibold);
+  font-size: 0.9em;
+  letter-spacing: 0.01em;
+}
+.coach-block .coach-label svg { flex-shrink: 0; }
+/* 마지막 문단의 꼬리 마진(0.6em)은 패딩 안에 갇혀 바가 아래로 삐져나온 것처럼 보인다 */
+.coach-block .preview-content > p:last-child { margin-bottom: 0; }
+
+/* ═══ Phase 59 — 경우(case) 블록 · Phase 59a 개편 ═══
+   rail·dot은 --case-rail-x(-1.8em)를 중심선으로 공유한다 — 본문 영역 **바깥**이다.
+   하위경우도 같은 rail을 쓴다(inner rail 없음, D12′).
+
+   ⚠ Phase 59a: 경우 본문의 좌단은 일반 텍스트와 **똑같은 0**이다. Phase 59가 세웠던
+     2단 들여쓰기(본문 3em / 하위 6em / 그 안 수식·리스트 6em·9em)는 전면 철거됐다.
+     경우 안의 display 수식·리스트·① 밭은 **최상위 규칙을 그대로 승계**하므로
+     여기에 어떤 override도 두지 않는다. 전례를 찾아 되살리지 말 것.
    ⚠ .case-block에 상하 padding을 주지 말 것. 지금은 자식 <p>의 마진이 블록 밖으로
      빠져나와(부모-자식 collapse) 형제 간격이 정확히 1.1em이지만, 상하 padding이
-     1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 아래 -1.1em 브리지가 짧아진다. */
+     1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 아래 -1.1em 브리지가 짧아진다.
+   ⚠ 좌우 padding도 두지 않는다. \tag float:right의 기준선은 컨테이너 우단인데,
+     padding이 0이면 그것이 곧 본문 우단이라 별도 선언이 필요 없다. */
 .case-block {
   position: relative;
   margin: 1.1em 0;      /* K1 — .callout-block과 동일 */
-  padding-left: 3em;    /* .katex-display·.callout-block과 동일 값·동일 em 기준 */
-  padding-right: 0;     /* \tag float:right 기준선을 컨테이너 우단에 맞춤 */
 }
-.case-block.case-sub { padding-left: 6em; }   /* 하위경우 — 텍스트만 한 단 더 */
 /* 경우 사이에 낀 블록 — rail을 관통시킨다.
-   이미지·SVG·GGB는 여기까지만(중앙 정렬·전폭이라 padding을 주면 그림이 밀린다).
-   나머지(강조문·목록·글상자·텍스트)는 경우 본문과 같은 좌측 기준을 받는다 —
-   0에서 시작하면 목록 불릿·글상자 테두리가 rail(1em) 위에 겹쳐 지나간다. */
+   Phase 59a: rail이 거터로 나갔으므로 개재 블록도 좌측 기준이 0이다(타입 불문).
+   Phase 59의 .case-gap-body(텍스트 계열만 3em)는 철거됐다 — 걸릴 것이 없어졌다. */
 .case-gap { position: relative; }
-.case-gap-body { padding-left: 3em; padding-right: 0; }
-/* 경우 안과 같은 규칙 — 그래야 "경우에 넣어 쓴 목록"과 "경우 사이에 둔 목록"이 같은 자리에 선다 */
-.case-gap-body .preview-content > ul,
-.case-gap-body .preview-content > ol { margin-left: 3em; }
-.case-gap-body .preview-content p:has(.marker-circled) { margin-left: 3em !important; }
 
 /* ── rail ──
    런은 "첫 dot에서 시작해 마지막 dot에서 끝나는 하나의 선"이다. 블록마다 조각을
@@ -597,7 +671,7 @@ p:has(.marker-circled) {
 .case-gap::before {
   content: '';
   position: absolute;
-  left: 1em; margin-left: -0.5px; width: 1px;   /* 헤어라인 — 굵으면 구조선이 본문을 누른다 */
+  left: var(--case-rail-x); margin-left: -0.5px; width: 1px;   /* 헤어라인 — 굵으면 구조선이 본문을 누른다 */
   top: 0.9em;           /* 런 시작 = .preview-content line-height 1.8의 절반 = 첫 행 중심 */
   bottom: 0;
   background: var(--case-rail);
@@ -622,7 +696,7 @@ p:has(.marker-circled) {
 .case-block::after {
   content: '';
   position: absolute;
-  left: 1em; top: 0.9em;
+  left: var(--case-rail-x); top: 0.9em;
   transform: translate(-50%, -50%);
   width: 0.52em; height: 0.52em; border-radius: 50%;
   box-sizing: border-box;
@@ -644,6 +718,17 @@ p:has(.marker-circled) {
 /* 이어짓기(제목행 없는 case) — 번호도 dot도 없고 레일만 이어진다 */
 .case-block.case-cont::after { content: none; }
 
+/* FolderView 카드 예외 (Phase 59a Q5) — 카드에서는 rail·dot을 그리지 않는다.
+   카드 본문은 .problem-content-scaled가 overflow:hidden + 좌측 패딩 0이라 거터(-1.8em)에
+   그린 것이 통째로 잘린다. 그 overflow는 카드 '잘림' 연출과 하단 페이드의 기준이라
+   제거할 수 없고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 2.2em 밀려난다.
+   카드는 question 블록만 담는 축약 미리보기라 경우 블록이 올 일이 사실상 없다 →
+   잘린 rail보다 없는 rail이 낫다. 라벨(C1.)은 텍스트라 그대로 남는다.
+   ⚠ 5개 렌더 사이트 중 여기 하나만의 예외다. 확대 적용하지 말 것. */
+.problem-card .case-block::before,
+.problem-card .case-gap::before,
+.problem-card .case-block::after { content: none; }
+
 /* 라벨·제목행 */
 .case-label {
   margin-right: 0.4em;
@@ -654,49 +739,38 @@ p:has(.marker-circled) {
    제목행 안에 **를 쓰면 그 부분만 600으로 올라가 구분이 살아난다. */
 .case-block p:has(> .case-label:first-child) { font-weight: var(--weight-medium); }
 
-/* ── 경우 안의 들여쓰기 (Phase 59 C·D) ──
-   경우 블록 안에서는 **최상위와 똑같은 규칙**이 그대로 산다: 본문 대비 display 수식이
-   한 단(3em) 더 들어간다. 그래서 .katex-display에 아무 override도 두지 않는다.
-   ⚠ 강조문(.callout-block)은 반대로 padding-left를 0으로 죽인다 — 그쪽은 한 줄짜리
-     강조 장치라 이중 들여쓰기가 군더더기지만, 경우는 본문을 담는 컨테이너라
-     내부 위계가 살아야 한다. 전례를 복사해 되돌리지 말 것.
-   리스트·① 밭도 같은 한 단을 받아 display 수식과 좌단이 맞는다(기본 1em은 너무 약하다). */
-.case-block .preview-content > ul,
-.case-block .preview-content > ol { margin-left: 3em; }
-.case-block .preview-content p:has(.marker-circled) { margin-left: 3em !important; }
+/* ── 경우 안의 들여쓰기 (Phase 59a: 규칙 없음) ──
+   경우 블록 안은 **최상위와 완전히 같다**. 본문 0, display 수식 3em, 리스트·① 밭은
+   각자의 기본값 — 전부 최상위 규칙을 그대로 받는다.
+   ⚠ Phase 59는 여기에 ul/ol 3em·① 3em !important·.katex-display 무개입이라는
+     별도 좌표계를 두었다. Phase 59a에서 전량 삭제했다. "경우 안은 한 단 더"라는
+     규칙은 더 이상 없으므로, 어긋나 보인다면 최상위 규칙을 봐야 한다. */
 
-/* 톤 가드 — 케이스 제목행은 구조 신호다. has-key 여부와 무관하게 현행 색에 고정한다.
-   근거와 형태는 아래 h1~h3 가드(D9′)와 1:1 대응이다.
-   특이도: 색 규칙 (0,5,1) / 수식 규칙 (0,6,1) > .solution-tone.has-key .katex (0,3,0) */
-.solution-tone.has-key .case-label,
-.solution-tone.has-key .case-block p:has(> .case-label:first-child) { color: var(--text-secondary); }
-.solution-tone.has-key .case-block p:has(> .case-label:first-child) .katex { color: var(--text-primary); }
+/* 톤 가드 — 케이스 제목행은 구조 신호다. 현행 색에 고정한다.
+   근거와 형태는 위 h1~h3 가드(D9′)와 1:1 대응이다.
+   특이도: 색 (0,2,0)/(0,4,1) · 수식 (0,5,1) > dim .solution-tone .katex (0,2,0).
+   ⚠ 인쇄에서는 이 가드(0,5,1)가 인쇄 복원(0,3,0)까지 이겨 경우 제목행 안 수식만
+     #000이 아니라 #2D2A23으로 나온다. Phase 59a 이전에도 (0,6,1) vs (0,4,0)으로
+     같았던 기존 동작이며 육안 구별이 안 된다 — 회귀로 오인하지 말 것. */
+.solution-tone .case-label,
+.solution-tone .case-block p:has(> .case-label:first-child) { color: var(--text-secondary); }
+.solution-tone .case-block p:has(> .case-label:first-child) .katex { color: var(--text-primary); }
 
 /* ─── 요약 보기(outline) ───
-   발췌는 전부 <strong>이라 has-key 복귀 규칙이 자동으로 primary+600을 준다.
-   여기에는 레이아웃만 둔다 — dim 무효화 같은 규칙은 필요 없다. */
-/* 요약 보기의 발췌는 제목보다 한 단 들어간다 — 제목(1em)과 위계를 구별하고
-   경우 제목행(3em)과 좌단을 맞춘다. 경우 안 발췌는 3em(경우) + 3em = 6em이 되어
-   "경우 안 내용은 한 단 더"라는 본문 규칙과 그대로 맞는다. */
-/* ⚠ margin이 아니라 padding으로 들여쓸 것. 경우 사이에 낀 발췌는 .case-gap을 함께
-   달고 rail을 그리는데, margin을 주면 박스가 통째로 밀려 rail이 1em이 아니라
-   4em에 그려진다(그 구간만 레일이 끊기고 엉뚱한 자리에 세로선이 하나 더 생긴다). */
-.outline-keys { margin: 0.35em 0; padding-left: 3em; }
-/* 경우와 경우 사이(런 안)의 발췌는 경우 안 발췌와 같은 자리에 선다 —
-   그 블록이 전체 보기에서 서는 자리(강조문·목록 6em)와도 일치한다.
-   런 밖(첫 경우 앞·마지막 경우 뒤)의 섹션 발췌는 3em 그대로. */
-.outline-keys.case-gap { padding-left: 6em; }
-.outline-keys .preview-content p { margin-bottom: 0.35em; }
-.outline-keys .preview-content p:last-child { margin-bottom: 0; }
+   Phase 59a: `**` 발췌 기능을 폐기해 .outline-keys 절이 통째로 사라졌다.
+   요약에 남는 것은 이제 정확히 셋이다 — 제목 · 경우/하위 경우 제목행 ·
+   작성자가 '요약에 넣기'로 고른 블록. 발췌 관련 레이아웃 규칙을 되살리지 말 것. */
 
 /* ── 여닫이 줄 ──
-   chevron은 어느 쪽도 내용을 오른쪽으로 밀지 않는다.
-   - 제목 줄: chevron이 1em 폭을 차지하고 제목 좌단이 정확히 1em(경우 rail 선)에 선다.
+   chevron은 어느 쪽도 내용을 오른쪽으로 밀지 않는다. Phase 59a에서 두 chevron의
+   glyph 중심을 --case-chevron-x(-0.7em) 한 열에 맞췄다 — 제목 줄과 경우 줄이
+   같은 세로선에 서야 요약 보기의 뼈대가 하나로 읽힌다.
+   - 제목 줄: chevron이 1em 폭을 차지하고 제목 좌단이 본문(0)에 선다.
      세로는 baseline 정렬 — 제목은 h1/h2/h3마다 font-size와 margin-top이 달라
      (게다가 EditorPreview 인라인 style이라 CSS로 못 만진다) 고정 높이로는 맞출 수 없다.
      baseline에 맡기면 세 크기 모두 자동으로 글자 줄에 붙는다.
-   - 경우 줄: chevron을 .case-block 기준으로 절대배치해 dot 바로 오른쪽에 둔다.
-     흐름에서 빠지므로 제목행은 3em 그대로다. */
+   - 경우 줄: chevron을 .case-block 기준으로 절대배치해 dot 바로 오른쪽(거터 안)에 둔다.
+     흐름에서 빠지므로 제목행 좌단은 본문(0) 그대로다. */
 .section-head {
   display: flex;
   align-items: baseline;
@@ -727,7 +801,10 @@ p:has(.marker-circled) {
 }
 .case-head .outline-chevron {
   position: absolute;         /* 기준은 .case-block (position: relative) */
-  left: 1.5em;                /* dot(1em) 바로 오른쪽, 제목행(3em) 앞 */
+  /* ⚠ width 명시 필수 — 없으면 상자가 svg 크기(내용)로 줄어 left가 '중심'이 아니라
+     '좌단'을 가리키게 되고, 토큰 이름과 실제 의미가 어긋난다. */
+  width: 1em;
+  left: calc(var(--case-chevron-x) - 0.5em);   /* glyph 중심 = --case-chevron-x */
   top: 0.9em;                 /* dot과 같은 세로선 */
   transform: translateY(-50%);
 }
@@ -748,14 +825,21 @@ p:has(.marker-circled) {
   font-family: var(--font-ui);
   padding: 0.35em 0.4em;
 }
-/* chevron은 모바일(hover 없음) 대비 요약 보기에서 상시 표시한다 */
+/* chevron은 모바일(hover 없음) 대비 요약 보기에서 상시 표시한다.
+   ⚠ justify-content: center 필수 (Phase 59a). 상자 폭(1em)이 glyph보다 넓은데
+     기본값 flex-start면 glyph가 좌측에 붙어 중심이 상자 중심보다 왼쪽으로 밀린다
+     → 제목 줄 chevron이 경우 줄과 0.1em 어긋난다.
+   ⚠ svg 크기도 em이어야 한다. IconChevron은 size={12} 고정 px이라, 그대로 두면
+     글꼴을 줄일수록 chevron만 상대적으로 커져 11px에서 dot과 겹친다(em/px 혼합). */
 .outline-chevron {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   color: var(--text-faint);
   flex-shrink: 0;
   transition: transform 0.15s;
 }
+.outline-chevron svg { width: 0.8em; height: 0.8em; }
 
 /* ═══ Phase 57 P5 — 원문자(①~⑳)
    구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui/--font-print 스택 한 줄이 전부다.

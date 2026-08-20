@@ -152,16 +152,20 @@ export function buildCaseGapKeys(blocks: CaseBlockLike[]): Set<string> {
   return gaps;
 }
 
-/** 개재 블록 중 좌측 여백을 주면 안 되는 타입 — 중앙 정렬(이미지)이거나 전폭 뷰어다. */
-const GAP_MEDIA_TYPES = new Set(['image', 'svg', 'ggb']);
-
 /**
  * 경우 사이에 낀 블록에 붙일 className.
- * 텍스트 계열은 경우 본문과 같은 좌측 기준(`case-gap-body`)을 받는다 — 안 그러면
- * 목록 불릿·글상자 테두리가 rail(1em) 위에 겹쳐 지나간다.
+ *
+ * Phase 59a: rail이 본문 바깥(거터)으로 나가면서 타입 분기가 사라졌다. Phase 59는
+ * 텍스트 계열에만 `case-gap-body`(3em)를 붙여 목록 불릿·글상자 테두리가 rail(1em)
+ * 위를 지나가지 않게 막았는데, 이제 rail이 본문과 겹칠 일 자체가 없다.
+ *
+ * ⚠ 인자를 남겨 둔 것은 호출 5곳(EditorView·TabBody·FolderView·ProblemTabContent·
+ *   PrintableContent)을 건드리지 않기 위해서다. 타입별 처리가 다시 필요해지면
+ *   여기서 분기를 되살릴 수 있다.
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function caseGapClassName(type: string): string {
-  return GAP_MEDIA_TYPES.has(type) ? 'case-gap' : 'case-gap case-gap-body';
+  return 'case-gap';
 }
 
 /** 렌더 사이트가 최상위 블록 요소에 붙일 className (D15′).

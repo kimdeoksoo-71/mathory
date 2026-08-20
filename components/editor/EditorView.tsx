@@ -24,6 +24,8 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
+import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
+import CoachLabel from '../ui/CoachLabel';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
@@ -83,14 +85,20 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   text: '텍스트',
   heading: '제목',
   list: '목록',
-  callout: '강조문',
+  // Phase 59a: '강조문' → '들여쓰기'. 애초 도입 목적이 "수식/독립 문장에 참조번호를
+  //   붙이기 좋게 별도 들여쓴 문단"이라 강조 개념이 아니었다. '강조'는 이제 인라인
+  //   `**` 하나만 가리킨다 — 타입 id·클래스·DB는 그대로다(라벨만 바뀐다).
+  callout: '들여쓰기',
+  // Phase 59a: 코칭 — 강조 4축 중 '신호'. 색·아이콘은 GitHub alert 문법을 가져왔다
+  coach_important: '코칭 (Important)',
+  coach_caution: '코칭 (Caution)',
   // Phase 59: 첫 줄이 제목행(조건), 둘째 줄부터 본문. 번호는 렌더 시 자동 부여
   case: '경우',
   subcase: '하위 경우',
   // Phase 57: 명칭 재조정 — 테두리 상자를 두른다는 사실이 이름에 드러나도록
   gana: '(가), (나) 상자',
   roman: 'ㄱ, ㄴ 상자',
-  box: '빈 글상자',
+  box: '글상자',                        // Phase 59a: '빈 글상자' → '글상자'
   choices: '선택지',
   image: '그림',
   svg: 'SVG',
@@ -99,7 +107,8 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 
 /** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
 const BLOCK_TYPES: Block['type'][] = [
-  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box', 'choices', 'image',
+  'text', 'heading', 'list', 'callout', 'coach_important', 'coach_caution',
+  'case', 'subcase', 'gana', 'roman', 'box', 'choices', 'image',
 ];
 
 /** 블록 생성 시 기본 내용 */
@@ -110,6 +119,9 @@ const BLOCK_PRESETS: Record<string, string> = {
   // `- ` 빈 항목이 setext underline으로 오판되지 않도록 preventSetextHeadings에 D11 가드가 있음.
   list: '- \n- \n- \n\n① \n② \n③ ',
   callout: '',
+  // 코칭도 빈 프리셋 — 라벨(Important/Caution)은 렌더 시 붙으므로 raw_text는 본문만이다
+  coach_important: '',
+  coach_caution: '',
   // 경우 블록은 빈 프리셋 — 첫 줄에 조건을 쓰면 그 줄이 제목행이 된다(D9).
   case: '',
   subcase: '',
@@ -126,13 +138,15 @@ const BLOCK_PRESETS: Record<string, string> = {
 
 /** 텍스트 기반 블록 (CodeMirror 에디터 사용) */
 const TEXT_BASED_TYPES: Set<string> = new Set([
-  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box', 'choices',
+  'text', 'heading', 'list', 'callout', 'coach_important', 'coach_caution',
+  'case', 'subcase', 'gana', 'roman', 'box', 'choices',
 ]);
 
 /** 블록 분할 허용 타입 (choices, image 제외)
  *  case 계열도 허용한다 — 분할로 생기는 뒤 블록은 항상 'text'라 번호가 늘지 않는다. */
 const SPLITTABLE_TYPES: Set<string> = new Set([
-  'text', 'heading', 'list', 'callout', 'case', 'subcase', 'gana', 'roman', 'box',
+  'text', 'heading', 'list', 'callout', 'coach_important', 'coach_caution',
+  'case', 'subcase', 'gana', 'roman', 'box',
 ]);
 
 /** 레거시 타입 → text 정규화 (DB 마이그레이션용) */
@@ -730,11 +744,13 @@ function SortableEditorBlock({
   /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다.
      Phase 45a D3-c: click의 stopPropagation은 dblclick을 막지 않는다(별개 이벤트 타입) →
      바의 onDoubleClick(개별 펼침)이 걸리지 않도록 따로 차단한다.
-     ⚠ 제목 블록에는 두지 않는다 — 제목은 요약의 '뼈대'라 항상 들어간다.
-       buildOutline이 heading을 만나면 섹션을 열고 즉시 continue하므로
-       showInSummary 검사에 아예 도달하지 않는다(lib/solutionOutline.ts:102-105).
-       즉 이 블록에서는 스위치가 아무 일도 하지 않아 오해만 준다. */
-  const summaryToggle = isHeading ? null : (
+     ⚠ 제목 블록과 경우 계열에는 두지 않는다 — 둘 다 요약의 '뼈대'라 항상 들어가고,
+       buildOutline이 showInSummary를 아예 읽지 않는다(heading은 즉시 continue,
+       case 계열은 `!isCaseBlock` 조건으로 제외). 스위치가 아무 일도 하지 않으면서
+       오해만 주는 자리다 (Phase 59a R5 — 제목 블록의 선례를 경우까지 넓힌 것).
+     ⚠ 이어짓기(제목행 없는 case)도 마찬가지로 요약에 남지 않는다. 남기고 싶은 내용은
+       경우 **사이 블록**에 두고 그 블록의 스위치를 켜면 된다. */
+  const summaryToggle = isHeading || isCaseBlock(block.type) ? null : (
     <span
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -747,7 +763,7 @@ function SortableEditorBlock({
         onToggle={() => onSummaryChange(block.id, block.showInSummary ? undefined : true)}
         title={block.showInSummary
           ? '요약 보기에서 뺍니다'
-          : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·핵심문장·경우만 남기는 것이 기본)'}
+          : '요약 보기에도 이 블록을 남깁니다 (요약은 제목·경우만 남기는 것이 기본)'}
       />
     </span>
   );
@@ -3334,22 +3350,27 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 35em + 좌우 패딩 32px) ───
+        {/* ─── Right: Preview (고정 폭 35em + 좌 3.5em / 우 32px) ───
               marginLeft = 편집창 블록 띠와의 채널. Phase 45a에서 편집 패널의 우측
               패딩 16px이 사라져(전폭) 띠 우측 끝 → 미리보기 첫 글자가 48px → 32px로
-              좁아졌다. 여기서 되돌린다(→ 56px). 전폭 띠는 하드 엣지라 예전보다
-              조금 더 벌린다.
+              좁아졌고, 기타 개선 4(83c8f47)에서 56px로 되돌렸다.
+              Phase 59a: 그 채널 안으로 경우 rail(거터 2.06em)이 들어온다 → 좌측 패딩만
+              3.5em으로 키운다. 실측 착지값(15px 기준):
+                띠 → rail 빈 공간 = 24 + 52.5 − 30.9 = 45.6px  (≈ Phase 45a 이전 채널 48px)
+                띠 → 본문 첫 글자 = 24 + 52.5 = 76.5px
               ⚠ 편집 패널에 우측 패딩을 주는 식으로 벌리면 안 된다 — 블록이 좌측만
-                붙고 우측은 들어가 비대칭이 된다. 미리보기 패딩을 키우는 것도 안 된다
-                — width가 35em+64px 고정이라 본문 측정폭 35em이 깎인다. */}
+                붙고 우측은 들어가 비대칭이 된다.
+              ⚠ 패딩을 키운 만큼 width도 키울 것 — 안 그러면 본문 측정폭 35em이 깎인다.
+                width의 em과 paddingLeft의 em은 이 열의 fontSize(contentFontSize)를
+                같은 base로 쓰므로 글꼴을 바꿔도 35em이 보존된다. */}
         <div data-noscroll="preview-column" style={{
-          width: `calc(35em + 64px)`, flexShrink: 0, marginLeft: 24,
+          width: `calc(38.5em + 32px)`, flexShrink: 0, marginLeft: 24,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned tone-baseline" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned tone-baseline" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 20px 3.5em', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
             {/* Phase 58 P2 — 톤 스코프. 미리보기는 활성 탭 하나만 렌더하므로 activeTab으로 판정한다 */}
-            <div className={toneClass(activeTab, currentBlocks)} style={activeTab === 'question' ? {
+            <div className={toneClass(activeTab)} style={activeTab === 'question' ? {
               background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
             } : undefined}>
             {currentBlocks.map((block, i) => {
@@ -3435,8 +3456,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       activeMathId={isActivePreview ? activeMathId : undefined}
                       onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                     />
+                  ) : isCoachBlock(block.type) ? (
+                    /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+                    <div className={coachClassName(block.type)}>
+                      <CoachLabel type={block.type} />
+                      <EditorPreview
+                        content={block.raw_text}
+                        borderless
+                        locale="ko"
+                        activeMathId={isActivePreview ? activeMathId : undefined}
+                        onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
+                      />
+                    </div>
                   ) : block.type === 'callout' ? (
-                    /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+                    /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
                     <div className="callout-block">
                       <EditorPreview
                         content={block.raw_text}

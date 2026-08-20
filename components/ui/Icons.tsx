@@ -477,3 +477,34 @@ export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
     </svg>
   );
 }
+
+/* Phase 59a — 코칭 블록 아이콘 2종.
+   GitHub octicon(report / stop)의 실루엣을 이 파일 규격(viewBox 24 · strokeWidth 1.8 ·
+   fill none · stroke=currentColor)으로 다시 그린 것이다.
+   ⚠ lucide·octicons 패키지를 추가하지 않는다 — 아이콘 2개 때문에 의존성을 늘릴 이유가 없고,
+     외부 세트는 이 파일의 획 두께·viewBox 규격과 어긋나 12종 사이에서 혼자 튄다.
+   ⚠ 느낌표의 점은 길이 0에 가까운 선 + strokeLinecap="round"로 만든다(원을 따로 그리면
+     stroke 기반인 다른 획과 굵기가 어긋난다). */
+
+export function IconCoachImportant({ size = 14, color = 'currentColor' }: IconProps) {
+  // 말풍선 + 느낌표 — "이건 알고 가라"
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="2.5" y="3.5" width="19" height="14" rx="2.5" />
+      <path d="M7.5 17.5v3.5l4-3.5" />
+      <line x1="12" y1="7" x2="12" y2="11.5" />
+      <line x1="12" y1="14.2" x2="12" y2="14.3" />
+    </svg>
+  );
+}
+
+export function IconCoachCaution({ size = 14, color = 'currentColor' }: IconProps) {
+  // 팔각형(정지) + 느낌표 — "여기서 빠진다"
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.6 2.5h6.8l4.9 4.9v6.8l-4.9 4.9H8.6l-4.9-4.9V7.4z" />
+      <line x1="12" y1="7.3" x2="12" y2="12.4" />
+      <line x1="12" y1="15.4" x2="12" y2="15.5" />
+    </svg>
+  );
+}

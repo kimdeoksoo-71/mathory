@@ -3,43 +3,15 @@
    렌더 사이트 5곳(EditorView 미리보기 · ProblemView · FolderView ·
    ProblemTabContent · PrintableContent)이 공유한다.
 
-   설계 요지 (v4 최종 D4·D9·D13):
-   - key 마커는 인라인 `**` **하나뿐**이다. 강조문(callout) 블록은 들여쓰기로
-     위치를 강조하는 레이아웃 블록이고 톤과 무관하므로 판정에 넣지 않는다.
-   - 풀이에 `**`가 하나도 없으면 톤 낮추기를 아예 발동시키지 않는다(opt-in).
-     → 마커 없는 기존 문항은 시각 변화 0.
-   - 판정 단위는 블록이 아니라 **탭 전체(블록 배열)**다. 블록 3에만 key가 있어도
-     블록 1~5가 전부 흐려져야 대비가 성립한다.
+   설계 요지 (Phase 58 D9·D13 + Phase 59a 기본화):
+   - 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기(callout) 블록은 위치만 담당하는
+     레이아웃 블록이고 톤과 무관하므로 판정에 넣지 않는다 (Phase 59a: 구 '강조문').
+   - ⚠ Phase 59a: **마커 유무 판정을 폐기했다.** Phase 58의 D4는 "`**`가 하나도 없는
+     풀이는 톤을 발동시키지 않는다(opt-in)"였으나, 그 결과 문항마다 인상이 달라졌고
+     레거시 `**Case n.**` 라벨의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다.
+     이제 풀이 탭이면 언제나 톤이 걸린다 → `solutionHasKey`와 정규식 2종이 사라졌다.
+   - 남은 판정 축은 **탭 하나**뿐이다(D9).
    ═══════════════════════════════════════════════════════════════ */
-
-/**
- * CommonMark 유효 강조(`**...**`)의 근사.
- * - 여는 `**` 뒤와 닫는 `**` 앞이 비공백이어야 한다(`** text **`는 강조가 아니다).
- * - lookbehind를 쓰지 않는다 — 구형 Safari 대비.
- * - 근사로 충분하다: 오탐의 최악 결과가 "톤 시스템이 켜짐"이라 파괴적이지 않다.
- */
-export const KEY_STRONG_RE = /\*\*(?=\S)[\s\S]*?\S\*\*/;
-
-/**
- * Phase 59 — 요약 보기의 key 발췌용. 패턴은 위와 같고 `g`만 붙였다.
- * ⚠ 판정용(`test`)과 추출용(`exec`)을 반드시 분리할 것. `g` 정규식은 lastIndex를
- *   들고 다니므로 하나를 돌려 쓰면 test가 한 번 걸러 한 번 통과하는 식으로 오작동한다.
- * ⚠ 소비처(lib/solutionOutline.ts)는 이 상수를 직접 exec하지 말고 source로
- *   지역 인스턴스를 만들어 쓴다 — 모듈 전역 상태를 공유하지 않기 위해서다.
- */
-export const KEY_STRONG_RE_GLOBAL = /\*\*(?=\S)[\s\S]*?\S\*\*/g;
-
-/**
- * 이 탭의 블록 배열에 key 마커가 하나라도 있는가.
- *
- * ⚠ 블록 타입으로 거르지 않는다. `TEXT_BASED_TYPES`는 EditorView.tsx의 모듈 로컬
- *   상수라 export되지 않고, 사본을 두면 "블록 타입 상수 6종은 전부 EditorView 상단"
- *   규칙이 깨진다. 타입 게이트 없이 raw_text만 봐도 실질 오탐이 없다
- *   (image/svg/ggb의 raw_text는 URL·`<img src>`라 `**`가 등장하지 않는다).
- */
-export function solutionHasKey(blocks: { raw_text: string }[]): boolean {
-  return blocks.some((b) => KEY_STRONG_RE.test(b.raw_text));
-}
 
 /**
  * 이 탭이 톤 시스템 스코프에 드는가 (D9).
@@ -53,10 +25,11 @@ export function isToneScoped(tabId: string): boolean {
  * 렌더 사이트가 컨테이너에 붙일 className 조각을 만든다.
  * 5곳이 같은 문자열을 쓰도록 여기서 한 번에 결정한다.
  *
- * @param tabId  탭 id (question / solution / extra_N)
- * @param blocks 그 탭의 블록 배열
+ * ⚠ Phase 59a로 한 줄이 됐지만 함수는 유지한다 — 5개 사이트가 같은 문자열을 쓰게
+ *   하는 단일 출처라는 존재 이유는 그대로다. 사이트에 리터럴을 흩뿌리지 말 것.
+ *
+ * @param tabId 탭 id (question / solution / extra_N)
  */
-export function toneClass(tabId: string, blocks: { raw_text: string }[]): string {
-  if (!isToneScoped(tabId)) return '';
-  return solutionHasKey(blocks) ? 'solution-tone has-key' : 'solution-tone';
+export function toneClass(tabId: string): string {
+  return isToneScoped(tabId) ? 'solution-tone' : '';
 }

@@ -22,6 +22,8 @@ import {
 } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
+import CoachLabel from '../ui/CoachLabel';
+import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -307,8 +309,17 @@ export default function FolderView({
           </div>
         );
       }
+      if (isCoachBlock(block.type)) {
+        /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+        return (
+          <div key={block.id || `q-${i}`} className={coachClassName(block.type)}>
+            <CoachLabel type={block.type} />
+            <EditorPreview content={block.raw_text} borderless locale="ko" />
+          </div>
+        );
+      }
       if (block.type === 'callout') {
-        /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+        /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
         return (
           <div key={block.id || `q-${i}`} className="callout-block">
             <EditorPreview content={block.raw_text} borderless locale="ko" />
@@ -586,8 +597,10 @@ export default function FolderView({
                     {/* 하단 fade out 그라데이션으로 잘린 부분 자연스럽게 */}
                     <div className="problem-card-fade" style={{
                       position: 'absolute', bottom: 0, left: 0, right: 0, height: 36,
-                      // 카드 배경(--block-bg-active #EDE6DA)으로 페이드 — 시작색도 같은 RGB의 투명값(회색 끼임 방지)
-                      background: 'linear-gradient(180deg, rgba(237,230,218,0) 0%, var(--block-bg-active) 100%)',
+                      // 카드 배경(--block-bg-active #E8DFCE)으로 페이드 — 시작색도 같은 RGB의 투명값(회색 끼임 방지)
+                      // ⚠ 하드코딩이라 토큰이 바뀌면 따라오지 않는다. 커밋 78a780f이 토큰만
+                      //   #EDE6DA → #E8DFCE로 옮기면서 여기가 어긋나 있었다(Phase 59a에서 정정).
+                      background: 'linear-gradient(180deg, rgba(232,223,206,0) 0%, var(--block-bg-active) 100%)',
                       pointerEvents: 'none',
                     }} />
                   </div>

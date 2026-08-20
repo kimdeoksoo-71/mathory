@@ -127,8 +127,13 @@ function ScrollColumn({ children, divider }: { children: React.ReactNode; divide
 function ContentCard({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
-      width: '100%', maxWidth: 'calc(35em + 72px)', background: 'var(--bg-card, #fff)', borderRadius: 8,
-      padding: '32px 36px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box',
+      /* Phase 59a: 경우 rail이 본문 좌측 바깥(거터 2.06em = 31px@15)에 그려진다.
+         카드 fontSize가 15 고정이라 필요 폭도 고정이다 — 좌측만 40px로 벌리고
+         그만큼 maxWidth를 키워 본문 폭 35em을 보존한다.
+         ⚠ 1단·2단 분기가 같은 ContentCard를 쓰므로 여기 한 곳이 둘 다 해결한다.
+           카드에도 ScrollColumn에도 overflow:hidden이 없어 잘림 위험은 없다. */
+      width: '100%', maxWidth: 'calc(35em + 76px)', background: 'var(--bg-card, #fff)', borderRadius: 8,
+      padding: '32px 36px 32px 40px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box',
       fontSize: 15,
     }}>
       {children}

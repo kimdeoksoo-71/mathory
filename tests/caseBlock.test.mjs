@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildCaseLabels, buildCaseGapKeys, injectCaseLabel, splitCaseTitle, letters, caseClassName } from '../.test-build/lib/caseBlock.js';
-import { buildOutline, extractKeySentences, hasOutlineContent } from '../.test-build/lib/solutionOutline.js';
+import { buildOutline, hasOutlineContent } from '../.test-build/lib/solutionOutline.js';
 
 let seq = 0;
 const B = (type, raw_text) => ({ id: `b${seq++}`, block_key: `k${seq}`, type, raw_text, order: seq });
@@ -139,19 +139,20 @@ test('caseClassName', () => {
   assert.equal(caseClassName('case', true, { closed: true }), 'case-block case-closed');
 });
 
-/* ═══ key 발췌 ═══ */
+/* ═══ Phase 59a — `**` 발췌 폐기 ═══
+   Phase 59는 `**…**`를 요약에 따로 뽑아 보여줬다(kind:'keys'). 하나의 마커가
+   강조·발췌·톤 트리거 3역을 겸해 "강조 범위"와 "요약 범위"가 묶여 있었기에 폐기했다.
+   아래 두 테스트가 그 폐기를 못 박는다 — 되살아나면 여기서 잡힌다. */
 
-test('extractKeySentences: 마커를 포함해 뽑는다', () => {
-  assert.deepEqual(extractKeySentences('앞 **핵심이다** 뒤'), ['**핵심이다**']);
-  assert.deepEqual(extractKeySentences('**$x=1$일 때 최소**'), ['**$x=1$일 때 최소**']);
-  assert.deepEqual(extractKeySentences('강조 없음'), []);
+test('Phase 59a: `**`는 요약에 아무 항목도 만들지 않는다', () => {
+  const blocks = [B('text', '앞 **핵심이다** 뒤\n**$x=1$일 때 최소**')];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items, []);
 });
 
-test('extractKeySentences: Phase 54 레거시 라벨 행은 통째로 제외', () => {
-  assert.deepEqual(extractKeySentences('**Case 1.** 조건'), []);
-  assert.deepEqual(extractKeySentences('- **Case 1a.** 조건'), []);
-  // 라벨 행이 아닌 곳의 강조는 그대로 살린다
-  assert.deepEqual(extractKeySentences('**Case 1.** 조건\n**진짜 핵심**'), ['**진짜 핵심**']);
+test('Phase 59a: `**`만 있는 풀이는 요약 보기 게이트를 열지 않는다', () => {
+  // 제목도 경우도 없으면 보여줄 뼈대가 없다 → 훅이 full로 강제 해제한다
+  assert.equal(hasOutlineContent(buildOutline([B('text', '설명 **핵심**')])), false);
 });
 
 /* ═══ 구조 보기 ═══ */
@@ -166,21 +167,23 @@ test('buildOutline: 제목이 섹션 경계, 첫 제목 앞은 전문 섹션', (
   ];
   const s = buildOutline(blocks);
   assert.equal(s.length, 3);
-  assert.equal(s[0].heading, null);
-  assert.equal(s[0].items[0].head, '**한 줄**');
+  assert.equal(s[0].heading, null);             // 첫 제목 앞은 전문 섹션
   assert.equal(s[1].heading.raw_text, '## 1단계');
-  assert.equal(s[1].items[0].head, '**핵심 A**');
-  assert.equal(s[2].items.length, 0);           // 발췌 없는 섹션은 제목만 남는다
+  assert.equal(s[2].heading.raw_text, '## 2단계');
+  // Phase 59a: 본문의 `**`는 항목이 되지 않는다 → 세 섹션 모두 항목 0
+  assert.deepEqual(s.map((x) => x.items.length), [0, 0, 0]);
+  // 펼침 원본은 그대로 들고 있어야 한다(요약을 끄면 보여줄 것)
+  assert.deepEqual(s.map((x) => x.blocks.length), [1, 1, 1]);
 });
 
-test('buildOutline: 경우 항목은 제목행 + 본문 발췌, 제목행 자체는 발췌에서 제외', () => {
+test('buildOutline: 경우 항목은 제목행 + 펼침용 본문 (Phase 59a: 발췌 없음)', () => {
   const blocks = [B('case', '**$a>1$인 경우**\n본문 **본문 핵심** 이어짐')];
   const [sec] = buildOutline(blocks);
   const item = sec.items[0];
   assert.equal(item.kind, 'case');
   assert.equal(item.head, '<span class="case-label">C1.</span> **$a>1$인 경우**');
-  assert.equal(item.keys, '**본문 핵심**');     // 제목행의 강조는 중복 표시하지 않는다
-  assert.equal(item.body, '본문 **본문 핵심** 이어짐');
+  assert.equal(item.body, '본문 **본문 핵심** 이어짐');   // 펼치면 통째로 나온다
+  assert.equal(item.keys, undefined);                     // 접으면 제목행만
 });
 
 test('buildOutline: 레거시 Case 라벨은 한 블록 안에서 여럿이어도 전부 항목이 된다', () => {
@@ -188,11 +191,12 @@ test('buildOutline: 레거시 Case 라벨은 한 블록 안에서 여럿이어�
     '**Case 1.** $a>1$\n내용 **중요**\n**Case 2.** $a<1$\n- **Case 2a.** $b>0$\n마무리')];
   const [sec] = buildOutline(blocks);
   const kinds = sec.items.map((i) => `${i.kind}${i.sub ? ':sub' : ''}`);
-  assert.deepEqual(kinds, ['case', 'keys', 'case', 'case:sub']);
+  // Phase 59a: 라벨 행만 항목이 된다. 사이의 `내용 **중요**`는 더 이상 발췌되지 않는다
+  assert.deepEqual(kinds, ['case', 'case', 'case:sub']);
   assert.equal(sec.items[0].head, '**Case 1.** $a>1$');
-  assert.equal(sec.items[1].head, '**중요**');
-  assert.equal(sec.items[3].head, '**Case 2a.** $b>0$');   // 리스트 마커는 떼고 우리 들여쓰기를 쓴다
-  assert.equal(sec.items[3].body, undefined);              // 레거시는 여닫이 대상이 아니다
+  assert.equal(sec.items[1].head, '**Case 2.** $a<1$');
+  assert.equal(sec.items[2].head, '**Case 2a.** $b>0$');   // 리스트 마커는 떼고 우리 들여쓰기를 쓴다
+  assert.equal(sec.items[2].body, undefined);              // 레거시는 여닫이 대상이 아니다
 });
 
 test('buildOutline: 이미지·선택지는 스켈레톤에 남지 않는다', () => {
@@ -207,11 +211,13 @@ test('hasOutlineContent: 제목만 있어도 true', () => {
   assert.equal(hasOutlineContent(buildOutline([B('text', '강조 없는 문단')])), false);
 });
 
-test('buildOutline: 이어짓기 블록은 발췌만 남긴다', () => {
+test('buildOutline: 이어짓기 블록은 요약에 남지 않는다 (Phase 59a)', () => {
+  // 직전 경우의 연속이라 독립 항목이 될 근거가 없다. 요약에 남기려면 그 내용을
+  // 경우 '사이 블록'에 두고 그 블록의 showInSummary를 켠다.
   const blocks = [B('case', '가\n본문'), B('case', '\n이어짐 **핵심**')];
   const [sec] = buildOutline(blocks);
-  assert.deepEqual(sec.items.map((i) => i.kind), ['case', 'keys']);
-  assert.equal(sec.items[1].head, '**핵심**');
+  assert.deepEqual(sec.items.map((i) => i.kind), ['case']);
+  assert.equal(sec.blocks.length, 2);           // 펼침 원본에는 둘 다 있다
 });
 
 test('buildOutline: 작성자가 고른 그림만 요약에 남는다', () => {
@@ -236,13 +242,98 @@ test('buildOutline: "요약에 넣기"는 블록 종류를 가리지 않는다 (
     { ...B('box', '글상자 요약'), showInSummary: true },
   ];
   const [sec] = buildOutline(blocks);
-  assert.deepEqual(sec.items.map((i) => i.kind), ['keys', 'block', 'block']);
-  assert.equal(sec.items[1].block.raw_text, table);
-  assert.equal(sec.items[2].block.raw_text, '글상자 요약');
+  // Phase 59a: 앞 문단의 `**핵심**`은 항목이 되지 않는다 → 고른 블록 둘만 남는다
+  assert.deepEqual(sec.items.map((i) => i.kind), ['block', 'block']);
+  assert.equal(sec.items[0].block.raw_text, table);
+  assert.equal(sec.items[1].block.raw_text, '글상자 요약');
 });
 
-test('buildOutline: 넣기로 한 블록은 발췌를 따로 만들지 않는다 (통째로 이미 보인다)', () => {
+test('buildOutline: 넣기로 한 블록은 통째로 한 항목이다', () => {
   const blocks = [{ ...B('text', '설명 **핵심이다** 뒤'), showInSummary: true }];
   const [sec] = buildOutline(blocks);
   assert.deepEqual(sec.items.map((i) => i.kind), ['block']);
+});
+
+test('Phase 59a: 경우 블록의 showInSummary는 읽히지 않는다 (스위치 은닉과 짝)', () => {
+  // 경우 제목행은 자동으로 항목이 되므로 스위치가 할 일이 없다. 편집창도 case 계열에는
+  // 스위치를 노출하지 않는다 → 남아 있는 true 값은 조용히 무시되어야 한다(마이그레이션 0).
+  const blocks = [{ ...B('case', '조건\n본문'), showInSummary: true }];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['case']);   // 'block'이 아니라 'case'
+  assert.equal(sec.items[0].head, '<span class="case-label">C1.</span> 조건');
+});
+
+/* ═══ Phase 59a 후속 — 경우 구역(segment) ═══
+   경우 제목행을 누르면 그 경우 블록 하나가 아니라 '구역' 전체가 열려야 한다.
+   구역 = 자기 자신 + 다음 **제목행 있는** 경우 전까지. 그래야 작성자가 경우 본문의
+   일부를 들여쓰기 블록 등으로 떼어내도 요약에서 그 뒷부분에 닿을 수 있다. */
+
+test('구역: 경우는 뒤따르는 블록을 거느리고, 다음 경우에서 끊긴다', () => {
+  const blocks = [
+    B('case', 'C1 조건\nC1 본문'),
+    B('callout', '떼어낸 들여쓰기'),
+    B('text', 'C1 나머지'),
+    B('case', 'C2 조건\nC2 본문'),
+    B('text', 'C2 나머지'),
+  ];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['case', 'case']);
+  assert.deepEqual(sec.items[0].segment.map((b) => b.raw_text), ['떼어낸 들여쓰기', 'C1 나머지']);
+  assert.deepEqual(sec.items[1].segment.map((b) => b.raw_text), ['C2 나머지']);   // 마지막은 섹션 끝까지
+});
+
+test('구역: 하위 경우도 경계가 된다', () => {
+  const blocks = [B('case', 'C1\n본문'), B('text', 'C1 뒤'), B('subcase', 'C1a\n본문'), B('text', 'C1a 뒤')];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => `${i.kind}${i.sub ? ':sub' : ''}`), ['case', 'case:sub']);
+  assert.deepEqual(sec.items[0].segment.map((b) => b.raw_text), ['C1 뒤']);
+  assert.deepEqual(sec.items[1].segment.map((b) => b.raw_text), ['C1a 뒤']);
+});
+
+test('구역: 이어짓기는 경계가 아니라 직전 경우에 딸려 들어간다', () => {
+  // 이어짓기의 정의가 "직전 경우의 연속"이므로 구역을 끊으면 안 된다.
+  // (Stage 3에서 요약에서 사라졌던 이어짓기 내용이 이 경로로 다시 닿는다)
+  const blocks = [
+    B('case', 'C1\n본문'),
+    B('image', '<img src="a">'),
+    B('case', '\n이어지는 내용'),
+    B('text', '더'),
+    B('case', 'C2\n본문'),
+  ];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['case', 'case']);
+  assert.deepEqual(sec.items[0].segment.map((b) => b.type), ['image', 'case', 'text']);
+});
+
+test('구역: 제목 블록에서 끊긴다', () => {
+  const blocks = [B('case', 'C1\n본문'), B('text', 'C1 뒤'), B('heading', '## 다음'), B('text', '새 섹션')];
+  const s = buildOutline(blocks);
+  assert.equal(s.length, 2);
+  assert.deepEqual(s[0].items[0].segment.map((b) => b.raw_text), ['C1 뒤']);
+  assert.equal(s[1].items.length, 0);            // 새 섹션의 텍스트는 어느 구역에도 안 든다
+});
+
+test('구역: 첫 경우보다 위의 블록은 어느 구역에도 들지 않는다', () => {
+  const blocks = [{ ...B('text', '머리말'), showInSummary: true }, B('case', 'C1\n본문'), B('text', 'C1 뒤')];
+  const [sec] = buildOutline(blocks);
+  assert.deepEqual(sec.items.map((i) => i.kind), ['block', 'case']);   // 머리말은 독립 항목
+  assert.deepEqual(sec.items[1].segment.map((b) => b.raw_text), ['C1 뒤']);
+});
+
+test('구역: 요약에 넣은 블록은 pinned에도, segment에도 들어간다 (접힘/펼침 배타 렌더)', () => {
+  // 접힘 = pinned만, 펼침 = segment만 그린다. 동시에 그리면 같은 블록이 두 번 나온다.
+  const pin = { ...B('callout', '핵심 조건'), showInSummary: true };
+  const blocks = [B('case', 'C1\n본문'), pin, B('text', '평범한 뒷부분')];
+  const [sec] = buildOutline(blocks);
+  const it = sec.items[0];
+  assert.deepEqual(it.pinned.map((b) => b.raw_text), ['핵심 조건']);
+  assert.deepEqual(it.segment.map((b) => b.raw_text), ['핵심 조건', '평범한 뒷부분']);
+});
+
+test('구역: 본문이 비어도 거느린 블록이 있으면 여닫이 대상이다', () => {
+  // 제목행만 쓰고 내용을 전부 다음 블록들로 뺀 구성 — 이때도 눌러서 열려야 한다.
+  const blocks = [B('case', '조건만 적은 경우'), B('text', '실제 내용')];
+  const [sec] = buildOutline(blocks);
+  assert.equal(sec.items[0].body, '');
+  assert.equal(sec.items[0].segment.length, 1);
 });

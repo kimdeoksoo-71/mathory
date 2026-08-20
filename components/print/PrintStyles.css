@@ -42,12 +42,16 @@
 
    ⚠ 이 복원 규칙이 반드시 필요하다. globals.css는 .print-root 서브트리에도 적용되고,
      @media print의 `* { print-color-adjust: exact }`(위) 때문에 회색이 그대로 인쇄된다.
-   ⚠ 특이도: .print-body .solution-tone.has-key (0,3,0) > globals의 (0,2,0).
-   ⚠ key 안 수식은 굵어지지 않는다(D6') — KaTeX가 자체 `font: normal` shorthand로
+   ⚠ 특이도(Phase 59a, .has-key 소멸 후): 여기 (0,2,0)/(0,3,0)/(0,2,1)이
+     globals의 dim (0,1,0)/(0,2,0)/(0,1,1)을 **파일 간 순서와 무관하게** 이긴다.
+     globals의 기준선이 :where로 (0,1,0)까지 내려갔으므로 여유는 더 늘었다.
+   ⚠ 단 하나의 예외: globals의 케이스 제목행 가드(0,5,1)는 여기를 이긴다 →
+     경우 제목행 안 수식만 #2D2A23으로 인쇄된다. 변경 전에도 같았던 기존 동작이다.
+   ⚠ 강조 안 수식은 굵어지지 않는다(D6') — KaTeX가 자체 `font: normal` shorthand로
      weight를 리셋하기 때문이다. 텍스트 굵기만으로 문장 단위 식별은 충분하다고 판단했다. */
-.print-body .solution-tone.has-key,
-.print-body .solution-tone.has-key .katex { color: inherit; }
-.print-body .solution-tone.has-key strong { font-weight: 700; }
+.print-body .solution-tone,
+.print-body .solution-tone .katex { color: inherit; }
+.print-body .solution-tone strong { font-weight: 700; }
 
 .print-tab-section { break-before: column; }
 .print-tab-label {
@@ -140,7 +144,8 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body p:has(.marker-circled) + p:has(.marker-circled) { margin-top: 0; }
 .print-body p:has(.marker-circled):not(:has(+ p .marker-circled)) { margin-bottom: 11pt; }
 
-/* ── Phase 57 P3: 강조문(callout) 블록 — 테두리 없이 들여쓰기로만 도드라지게 ── */
+/* ── Phase 57 P3: 들여쓰기(callout) 블록 — 테두리 없이 위치로만 도드라지게 ──
+   [Phase 59a: 구 '강조문'. 이 블록은 위치만 담당하고 강조(색·굵기)와 무관하다] */
 .print-body .callout-block {
   margin: 11pt 0;       /* K1 — 독립행 수식과 동일 */
   padding-left: 2em;    /* 인쇄 display 수식 fleqn 들여쓰기(24행)와 동일 */
@@ -150,7 +155,29 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body .callout-block p { margin: 0; }   /* .print-body p의 0 0 6pt 상쇄 */
 .print-body .callout-block .katex-display.fleqn > .katex { padding-left: 0 !important; }
 
-/* ── Phase 59: 경우(case) 블록 ──
+/* ── Phase 59a: 코칭(coach) 블록 ──
+   인쇄는 흑백이 기본이라 색 신호가 죽는다 → 바는 #000, 라벨은 700으로 형태 신호를 세운다.
+   컬러 인쇄를 원하면 아래 --coach-accent 한 줄만 지우면 화면 색을 그대로 쓴다
+   (--case-dot: #000과 같은 방식).
+   ⚠ break-inside는 걸지 않는다 — 코칭은 길 수 있다(경우 블록과 같은 판단, callout과 반대).
+     제목 줄만 고아가 되지 않게 막는다. */
+.print-body .coach-block {
+  margin: 11pt 0;
+  border-left: 0.3mm solid #000;
+  padding-left: 1em;
+  --coach-accent: #000;
+}
+.print-body .coach-block .coach-label {
+  font-weight: 700;
+  break-after: avoid;
+}
+.print-body .coach-block p:last-child { margin-bottom: 0; }
+
+/* ── Phase 59: 경우(case) 블록 · Phase 59a 개편 ──
+   ⚠ Phase 59a: 본문 좌단은 일반 텍스트와 같은 0이고 rail·dot은 -1.2em(거터)에 있다.
+     -1.2em = 12pt ≈ 4.23mm, dot 반경까지 5.01mm가 단 간격 10mm를 파고들어
+     좌측 단 본문까지 4.99mm가 남는다. 왼쪽 단의 rail은 페이지 여백(20mm) 쪽이라 무관.
+     화면(-1.8em)과 값이 다른 이유: 인쇄는 단 간격이 물리적으로 좁다.
    ⚠ 세로 기준은 0.85em이다 — .print-body의 line-height가 1.7이라 첫 행 중심이
      0.85em이다. 화면(.preview-content line-height 1.8 → 0.9em)과 값이 다르다.
    ⚠ dot은 #000 채움. 인쇄는 톤 시스템조차 100%로 되돌리는(색 위계를 죽이는)
@@ -160,24 +187,18 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body .case-block {
   position: relative;
   margin: 11pt 0;        /* K1 인쇄 — .callout-block과 동일 */
-  padding-left: 2em;     /* 인쇄 display 수식 fleqn 들여쓰기와 동일 */
-  padding-right: 0;
   --case-dot: #000;
 }
-.print-body .case-block.case-sub { padding-left: 4em; }
+/* 개재 블록 — Phase 59a: rail이 거터로 나갔으므로 좌측 기준이 0이다(타입 불문).
+   Phase 59의 .case-gap-body(2em) 계열 3규칙은 철거됐다. */
 .print-body .case-gap { position: relative; }
-/* 개재 블록의 좌측 기준 — 화면과 같은 원칙(미디어 제외) */
-.print-body .case-gap-body { padding-left: 2em; padding-right: 0; }
-.print-body .case-gap-body > ul,
-.print-body .case-gap-body > ol { margin-left: 2em; }
-.print-body .case-gap-body > p:has(.marker-circled) { margin-left: 2em !important; }
 /* rail — 화면과 같은 원리(위쪽 브리지 + 마지막 dot에서 종단, 불투명).
    브리지 14pt는 인쇄 간격(경우 11pt·테두리 블록 12pt)보다 크고,
    최소 간격 11pt + 첫 dot 8.5pt보다 작아야 한다는 양쪽 제약에서 나온 값이다. */
 .print-body .case-block::before,
 .print-body .case-gap::before {
   content: ''; position: absolute;
-  left: 0.7em; margin-left: -0.075mm; width: 0.15mm;
+  left: -1.2em; margin-left: -0.075mm; width: 0.15mm;
   top: 0.85em; bottom: 0;
   background: #8a8a8a;
 }
@@ -190,7 +211,7 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 }
 .print-body .case-block::after {
   content: ''; position: absolute;
-  left: 0.7em; top: 0.85em;
+  left: -1.2em; top: 0.85em;
   transform: translate(-50%, -50%);
   width: 0.44em; height: 0.44em; border-radius: 50%;
   box-sizing: border-box;
@@ -200,15 +221,9 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-body .case-block.case-cont::after { content: none; }
 /* 제목행 고아 방지만 — break-inside는 걸지 않는다(경우는 길 수 있다. callout과 반대 판단) */
 .print-body .case-block p:has(> .case-label:first-child) { break-after: avoid; font-weight: 600; }
-/* 경우 안 들여쓰기 — 화면과 같은 원칙(§C·D). display 수식은 @media print의 fleqn 2em을
-   그대로 받으므로 override를 두지 않는다. 리스트·① 밭만 같은 한 단으로 맞춘다. */
-/* ⚠ 자식 결합자 필수 — 중첩 리스트(li > ul)까지 밀면 안 된다.
-   인쇄는 .preview-content 래퍼가 없어 마크다운 산출물이 .case-block의 직속 자식이다. */
-.print-body .case-block > ul,
-.print-body .case-block > ol { margin-left: 2em; }
-/* ⚠ !important 필수 — globals.css의 p:has(.marker-circled){margin-left:1em !important}가
-   .print-root 서브트리에도 적용된다. 특이도로는 못 이긴다(실측으로 확인). */
-.print-body .case-block > p:has(.marker-circled) { margin-left: 2em !important; }
+/* 경우 안 들여쓰기 — Phase 59a: 규칙 없음. 최상위와 완전히 같다.
+   display 수식은 @media print의 fleqn 2em(24행)을, 리스트·① 밭은 각자의 기본값을
+   그대로 받는다. Phase 59의 ul/ol 2em·① 2em !important는 전량 삭제됐다. */
 
 /* ── bordered 블록 (gana, roman, box) ── */
 .print-bordered-block {

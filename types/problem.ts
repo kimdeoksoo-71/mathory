@@ -154,10 +154,12 @@ export interface Block {
   /** Phase 55: 블록의 영속 정체성(nanoid). doc id는 저장마다 재발급되므로 버전 diff·복원 매칭 키로 사용. */
   block_key?: string;
   order: number;
-  /** Phase 57: 'list'(목록) · 'callout'(강조문) 추가 — 둘 다 텍스트 계열, additive라 마이그레이션 불필요
+  /** Phase 57: 'list'(목록) · 'callout'(들여쓰기 — 구 '강조문') 추가 — 둘 다 텍스트 계열, additive라 마이그레이션 불필요
    *  Phase 59: 'case'(경우) · 'subcase'(하위 경우) 추가 — 같은 additive 패턴.
    *            첫 줄이 제목행이고 번호는 렌더 시 산출한다(lib/caseBlock.ts). */
-  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'list' | 'callout' | 'case' | 'subcase' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
+  /** Phase 59a: 'coach_important' · 'coach_caution' 추가 — 텍스트 계열, additive라
+   *  마이그레이션 불필요(type은 이미 자유 문자열로 저장된다). Firestore 규칙 변경 0. */
+  type: 'text' | 'heading' | 'math_block' | 'bullet' | 'list' | 'callout' | 'coach_important' | 'coach_caution' | 'case' | 'subcase' | 'gana' | 'roman' | 'box' | 'choices' | 'image' | 'svg' | 'ggb';
   raw_text: string;
   step_label?: string;
   title?: string;

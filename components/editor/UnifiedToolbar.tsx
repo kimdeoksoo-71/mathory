@@ -790,12 +790,14 @@ export default function UnifiedToolbar({
 
   const rightItems: { key: string; node: React.ReactNode }[] = [
     {
-      /* Phase 58 P3 — 핵심문장 토글. rightItems는 폭이 좁아지면 끝부터 hide되므로
-         맨 앞에 둬야 좁은 화면에서 살아남는다. */
+      /* Phase 58 P3 — 강조 토글(구 '핵심문장'). rightItems는 폭이 좁아지면 끝부터
+         hide되므로 맨 앞에 둬야 좁은 화면에서 살아남는다.
+         ⚠ Phase 59a에서 이름만 '강조'로 바꿨다 — 내부 식별자(KeySentenceIcon·
+           keyToggle*)는 그대로 두었으니 이름으로 검색할 때 주의. */
       key: 'keysent',
       node: (
         <IconButton
-          title={keyToggleRejected ? '감쌀 수 없는 선택입니다 (문단·수식 경계 확인)' : '핵심문장 (**로 강조)'}
+          title={keyToggleRejected ? '감쌀 수 없는 선택입니다 (문단·수식 경계 확인)' : '강조 (**…**)'}
           onClick={onToggleKey}
         >
           {/* ⚠ display:flex 필수 — 인라인 span이면 내부 svg가 baseline 정렬을 받아

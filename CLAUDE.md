@@ -111,9 +111,10 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **제목 스타일은 `EditorPreview.tsx` 인라인 style이 유일한 진실**: globals.css의 heading 절은 규칙 없는 주석이고, 인라인 style은 `!important` 없는 모든 시트 규칙을 이긴다 → **CSS로는 못 바꾼다.** h1/h2/h3는 한 벌이므로 하나만 고치면 위계가 역전한다 (Phase 58 D1')
 - **`--katex-scale`은 `em` 단위 포함 값**(현재 `1.08em`): 무단위로 바꾸면 `font-size`에 invalid라 declaration이 통째로 폐기되고 `.katex`가 katex.min.css의 `font: normal 1.21em`으로 되돌아가 **오히려 커진다**. 소비처는 `.preview-content .katex` 한 곳뿐 (Phase 58 P4)
 - **원문자(①~⑳) 크기 레버는 `@font-face`의 `size-adjust` 하나뿐**(현재 88%): 합성을 안 쓰므로 전용 CSS 클래스가 없다. `--font-print`도 같은 family를 공유해 화면·인쇄가 함께 줄어든다. Safari 17 미만은 디스크립터를 무시할 뿐이라 안전 (Phase 58 P5)
-- **명암비 계산은 `((c+0.055)/1.055)^2.4`** — `/1.055`를 빠뜨리면 판정이 뒤집힌다. 실배경은 흰색이 아니라 클레이 3종(`--bg-content #F4EFE7` / FolderView 카드 `--block-bg-active #EDE6DA` / 공유뷰 `--bg-card #FEFDFB`)이고, **구속 조건은 가장 어두운 `#EDE6DA`** 하나다 (Phase 58 D3)
-- **`.problem-content-toned .katex`가 수식에 명시 color를 준다**: 조상에 `color`를 줘도 수식엔 닿지 않는다. 수식 색을 바꾸려면 `.katex`를 직접 겨냥해 특이도로 이겨야 한다 (Phase 58 D3')
-- **key sentence 톤 시스템 (Phase 58 P2)**: key 마커는 인라인 `**` **하나뿐**이다. 강조문(callout)은 들여쓰기로 위치를 강조하는 레이아웃 블록이고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). `**`가 없는 풀이는 톤 낮추기 미발동(D4). 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
+- **명암비 계산은 `((c+0.055)/1.055)^2.4`** — `/1.055`를 빠뜨리면 판정이 뒤집힌다. 실배경은 흰색이 아니라 클레이 3종(`--bg-content #F4EFE7` / FolderView 카드 `--block-bg-active` / 공유뷰 `--bg-card #FEFDFB`)이고, **구속 조건은 가장 어두운 카드 배경** 하나다 (Phase 58 D3). ⚠ **그 값은 `#E8DFCE`다 — `#EDE6DA`가 아니다**(커밋 `78a780f`이 토큰만 옮기고 문서를 안 고쳐 Phase 58·59 문서가 한동안 stale했다. Phase 59a C1에서 전량 정정). 재계산값: `--case-dot` 3.28 / `--tone-dim` 4.76 — 둘 다 통과하지만 dot의 여유는 0.28뿐이다
+- **수식 색은 `.tone-baseline :where(.katex)`가 소유한다**: 조상에 `color`를 줘도 수식엔 닿지 않으므로 `.katex`를 **직접 겨냥**해야 한다 (Phase 58 D3'). ⚠ `.problem-content-toned .katex`는 `font-size`만 준다 — 색은 Phase 58에서 `.tone-baseline`으로 분리됐다(오래 stale했던 기술, Phase 59a G9에서 정정)
+- **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
+- **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
 - **툴바 아이콘은 `UnifiedToolbar.tsx` 안의 인라인 SVG 컴포넌트 계열**: `SVG_PROPS`(viewBox 64, stroke 3.5) + `CORNER_BRACKETS` 공유, `stroke="currentColor"`. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다 (Phase 58 P3)
 
@@ -127,12 +128,14 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 블록 타입
 
-`text · heading · list(목록) · callout(강조문) · case(경우) · subcase(하위 경우) · gana · roman · box · choices · image · svg · ggb`
+`text · heading · list(목록) · callout(들여쓰기) · coach_important · coach_caution(코칭) · case(경우) · subcase(하위 경우) · gana · roman · box · choices · image · svg · ggb`
 (+ 레거시 `math_block`·`bullet` → text로 정규화)
 
-- **강조의 두 축은 독립이다 (Phase 58 D13)**: `callout`은 **들여쓰기(위치)** 강조, 인라인 `**`는 **톤(색·굵기)** 강조. 따로 써도 되고 같이 써도 된다. display 수식 `$$…$$`은 블록 문법이라 `**`로 감쌀 수 없으므로, 톤 강조가 필요하면 인라인으로 바꿔 `**$…$**`로 쓴다(인라인 수식에도 `\displaystyle`이 자동 주입되므로 조판은 그대로다). 들여쓰기까지 원하면 그 행을 callout에 둔다
+- **강조의 네 축은 독립이다 (Phase 58 D13 → Phase 59a 확장)**: `callout`(UI 이름 **'들여쓰기'**)은 **위치**, 인라인 `**`는 **색·굵기**, `coach_*`는 **신호**, '요약에 넣기' 스위치는 **요약 구성**. 넷은 서로 무관하고 겹쳐 써도 된다. ⚠ **'강조'라는 낱말은 이제 `**` 하나만 가리킨다** — Phase 58까지 블록 이름('강조문')과 마커('핵심문장')가 서로의 영역을 침범해 무엇을 쓰면 무엇이 나오는지가 흐려졌다. 레이아웃 장치에 '강조'를 다시 붙이지 말 것. display 수식 `$$…$$`은 블록 문법이라 `**`로 감쌀 수 없으므로, 톤 강조가 필요하면 인라인으로 바꿔 `**$…$**`로 쓴다(인라인 수식에도 `\displaystyle`이 자동 주입되므로 조판은 그대로다). 들여쓰기까지 원하면 그 행을 callout에 둔다
 
-- 상수 6종은 전부 `EditorView.tsx` 상단(BLOCK_TYPE_LABELS · BLOCK_TYPES · BLOCK_PRESETS · TEXT_BASED_TYPES · SPLITTABLE_TYPES · BORDERED_TYPES)
+- **코칭 블록 (Phase 59a)**: `coach_important` · `coach_caution`. GitHub alert의 시각 문법(왼쪽 색 바 + 아이콘 + 라벨)을 **블록 타입**으로 가져왔다 — `> [!IMPORTANT]` 인라인 문법은 지원하지 않는다(블록이 편집 단위이므로 **타입이 의미를 나른다**). 라벨은 raw_text가 아니라 렌더가 붙인다(경우 번호와 같은 방침) → `lib/coachBlock.ts` + `components/ui/CoachLabel.tsx`를 5사이트가 공유한다. 색 `--coach-important #6639ba` / `--coach-caution #a40e26`은 GitHub light 기본값이 카드 배경에서 3.81·4.05로 **텍스트 4.5:1에 미달**해 한 단 진한 700 계열로 올린 값이다. ⚠ 코칭 색과 dim 본문(`#675F52`)의 대비는 **1.2:1뿐** — 라벨 식별은 색이 아니라 **아이콘 + 600 굵기**가 담당한다. ⚠ 상자 안쪽 패딩(1em)은 **들여쓰기가 아니라 상자의 내부 여백**이다(글상자 3종의 전례). 바깥 좌단은 본문 0이라 경우 사이에 끼어도 rail(-1.8em)과 겹치지 않는다
+- **타입 추가는 배선이 거의 없다 (Phase 59a C15 실측)**: 블록 기계장치가 전부 타입 키라, 코칭 2종을 넣는 데 든 것은 **타입 union 1줄 + `EditorView` 상수 4곳 + 렌더 5사이트 + CSS 2곳 + 아이콘 2개**가 전부였다. `normalizeBlockType`·`EmptyBlockChips`·사이트별 `BORDERED_TYPES` 사본 4개·`exportMd`(타입을 `<!-- block: {type} -->`로 흘린다)는 **무변경**. Firestore 규칙 0 · 마이그레이션 0 · 서버 0
+- 상수 6종은 전부 `EditorView.tsx` 상단(BLOCK_TYPE_LABELS · BLOCK_TYPES · BLOCK_PRESETS · TEXT_BASED_TYPES · SPLITTABLE_TYPES · BORDERED_TYPES). ⚠ **`BORDERED_TYPES`만은 사본이 4개 더 있다**(TabBody · FolderView · ProblemTabContent · PrintableContent) — "6종은 전부 상단"이라는 문장의 유일한 예외다
 - **렌더 사이트 5곳** — 특수 타입 분기를 추가하려면 전부 손봐야 한다:
   `EditorView`(미리보기) · `ProblemView` · `FolderView` · `ProblemTabContent`(공유) · `PrintableContent`(인쇄)
   앞 4곳은 `<EditorPreview borderless>` 경유 → `.preview-content` CSS가 자동 적용. 인쇄만 자체 ReactMarkdown(`.print-body`)
@@ -145,23 +148,38 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **`.case-block`에 상하 padding 금지 (Phase 59 G7)**: 지금은 자식 `<p>` 마진이 블록 밖으로 빠져나와(부모-자식 collapse) 형제 간격이 정확히 K1(1.1em)이다. 상하 padding이 1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 rail 브리징(`bottom: -1.1em`)이 짧아진다
 - **`$$x=1$$`를 한 줄로 쓰면 인라인 수식이 된다 (Phase 59 실측)**: `.katex-display`가 생기지 않아 들여쓰기·상하 여백(K1) 규칙이 전부 비껴간다. 독립행 수식은 반드시 `$$` / 내용 / `$$` 세 줄로. 경우 블록은 제목행 뒤 빈 줄까지 `injectCaseLabel`이 렌더 시 보장한다(안 그러면 본문이 제목행 문단에 흡수된다)
 - **연결선(rail)은 조각을 이어 붙인 것이다 (Phase 59 §11-1)**: `.case-block`/`.case-gap`이 각자 조각을 그리고 **위쪽으로** 브리지해 잇는다. ① 브리지가 위쪽이어야 종단(마지막 dot)이 정확하고 ② 색이 불투명해야 겹친 구간이 진해지지 않으며 ③ 브리지 1.5em(인쇄 14pt)은 "최대 간격보다 크고 최소 간격+0.9em보다 작아야" 한다는 양쪽 제약의 값이다. 블록 마진을 바꾸면 이 값을 다시 볼 것
-- **경우 구역의 좌측 기준은 세 자리다 (Phase 59 §11-6)**: `rail·dot 1em` / `경우 본문·제목행 3em` / `한 단 더(수식·리스트·발췌) 6em` — 인쇄는 0.7/2/4em. 경우 사이에 낀 블록도 이 기준을 따라야 목록 불릿·글상자 테두리가 rail 위에 겹치지 않는다(이미지·SVG·GGB만 예외 — 중앙 정렬이라 밀린다). **들여쓰기는 `padding-left`로 줄 것** — `margin-left`를 쓰면 rail을 그리는 박스가 통째로 밀려 세로선이 엉뚱한 자리에 하나 더 생긴다
-- **경우 블록 안은 최상위와 같은 들여쓰기 규칙 (Phase 59 §11-2)**: display 수식이 본문보다 한 단(3em/인쇄 2em) 더 들어간다 → `.katex-display`에 override를 두지 **않는다**. 반대로 `.callout-block`은 `padding-left: 0`으로 죽인다(한 줄 강조 장치라 이중 들여쓰기가 군더더기) — **전례를 복사해 되돌리지 말 것**. 리스트·① 밭은 기본 1em이 약해 같은 한 단으로 올리며, 인쇄 ① 규칙은 globals의 `!important`를 이기려면 `!important`가 필요하다
-- **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경에서 3.49:1). 로고 레드 `#D97757`은 2.52:1로 **미달**이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
+- **구조 신호는 거터, 본문은 본문 (Phase 59a §1 — Phase 59 §11-6을 대체)**: rail·dot·chevron은 본문 **왼쪽 바깥**에 있고 경우 본문의 좌단은 **일반 텍스트와 같은 0**이다. 좌표는 `:root`의 `--case-rail-x(-1.8em)` · `--case-chevron-x(-0.7em)` 두 토큰이 전부이고 인쇄 rail만 `-1.2em` 리터럴이다(단 간격 10mm 제약). ⚠ 셋은 서로 간섭한다 — dot 우단 = `rail_x + 0.26em`, chevron 좌단 = `chevron_x - 0.5em`, 현재 여유 0.34em. **필요 거터 폭은 2.06em(실사용 2.2em)** 이고 각 렌더 사이트가 그만큼을 `overflow:hidden` 경계 **안쪽**에 확보해야 한다. Phase 59가 세웠던 2단 들여쓰기(본문 3em/하위 6em/그 안 6·9em, `.case-gap-body`, 경우 안 ul·① override)는 **전량 철거**됐다 — 전례를 찾아 되살리지 말 것
+- **경우 블록 안은 최상위와 **완전히** 같다 (Phase 59a)**: 본문 0, display 수식 3em, 리스트·① 밭은 각자의 기본값. override가 하나도 없다. 어긋나 보이면 최상위 규칙을 봐야 한다. **좌표는 `padding-left`로 줄 것** — `margin-left`를 쓰면 rail을 그리는 박스가 통째로 밀려 세로선이 엉뚱한 자리에 하나 더 생긴다
+- **em/px를 섞으면 글꼴 크기에서 무너진다 (Phase 59a C5)**: 거터 좌표가 전부 em인데 chevron 아이콘만 `size={12}` 고정 px이라, 글꼴을 줄일수록 chevron이 상대적으로 커져 11px에서 dot과 **겹쳤다**(15px에서는 2.1px 여유라 안 보인다). `.outline-chevron svg { width: .8em }`로 em화했고, `justify-content: center`가 없으면 1em 상자 안에서 glyph가 좌측에 붙어 두 chevron 열이 0.1em 어긋난다(F6). **좌표를 손대면 반드시 11 / 15 / 24px 세 조건 전부 실측할 것** — 한 크기만 보면 못 잡는다. 같은 이유로 `LABEL_GAP`도 `2.8 * contentFontSize`로 비례화했다
+- **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
+- **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 60 진행 중 · 45a 완료(검수 대기)
+## 현재 Phase: 59a 완료(미푸시) · 60 검증 대기 · 45a 완료(검수 대기)
+
+### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현 완료 · 배포 대기)
+
+문서: `docs/phasedocs/Phase59a Case 레이아웃·강조 체계 정비.md`
+(계보: v1 web 방향 → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 착수판** → 구현)
+
+Phase 59가 옳은 의도로 쌓은 **표현 계층**을 데이터 계약은 그대로 둔 채 걷어낸 Phase다.
+산출물의 절반이 삭제다 — 2단 들여쓰기 체계 · `.case-gap-body` · `.outline-keys` ·
+`extractKeySentences` 계열 · `.has-key` · `solutionHasKey`·`KEY_STRONG_RE`.
+**Firestore 규칙 0 · 마이그레이션 0 · 서버 0.** 위 각 절의 ⚠ 항목이 실제 규약이다.
 
 Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 문서: `docs/phasedocs/Phase59 요약 보기·경우 블록.md` — **§0-0이 최종 사양**, §11이 실사용 개정 기록
 
 - **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C1.` · `C2a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
 - **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
-- **요약 보기에 그림 남기기 (Phase 59 §11-9)**: 요약은 제목·핵심문장·경우 제목행만 남기는 것이 원칙이고, `Block.showInSummary`가 **유일한 예외**다 — 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기" 스위치**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)로 켠다. 블록 종류를 가리지 않으므로 표를 담은 텍스트 블록·글상자도 같은 방식이다. **단 제목 블록에는 스위치를 두지 않는다** — `buildOutline`이 `heading`을 만나면 섹션을 열고 즉시 `continue`해(`lib/solutionOutline.ts:102-105`) `showInSummary` 검사에 아예 도달하지 않으므로, 스위치가 아무 일도 하지 않으면서 오해만 준다. 렌더는 사이트별 `renderBlock`을 그대로 재사용한다 — ⚠ 스켈레톤에서 그 결과를 div로 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그림 앞뒤로 끊긴다
+- **요약에 남는 것은 정확히 셋 (Phase 59 §11-9 → Phase 59a 개정)**: ① 제목 블록 ② 경우·하위 경우 제목행 ③ `Block.showInSummary`를 켠 블록. 스위치는 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기"**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)이고 블록 종류를 가리지 않는다. ⚠ **제목 블록과 경우 계열에는 스위치를 두지 않는다** — 둘 다 자동으로 들어가고 `buildOutline`이 `showInSummary`를 아예 읽지 않으므로(heading은 즉시 `continue`, case는 `!isCaseBlock` 조건으로 제외) 스위치가 아무 일도 하지 않으면서 오해만 준다. ⚠ **Phase 59의 `**` 발췌(kind:'keys'·`.outline-keys`·`extractKeySentences`)는 Phase 59a에서 폐기됐다** — 하나의 마커가 강조·발췌·톤 트리거 3역을 겸해 "강조할 범위"와 "요약에 남길 범위"가 묶여 있었다. 되살리지 말 것
+- **경우 제목행을 누르면 '구역'이 열린다 (Phase 59a 후속)**: 펼침 단위는 경우 블록 하나가 아니라 **그 경우 + 다음 '제목행 있는' 경우 직전까지의 모든 블록**이다. 경계는 제목 블록에서도 끊기고, **이어짓기는 경계가 아니다**(직전 경우의 연속이므로 딸려 들어간다 — 덕분에 이어짓기 내용이 요약에서 다시 닿는다). 이유: 경우 본문의 일부를 들여쓰기 블록으로 떼어내면 예전 방식에서는 뒷부분이 요약에서 영영 사라져 **"분리하면 요약이 망가지니 분리를 못 하는"** 상태였다. `OutlineItem.segment`(구역 전체)와 `.pinned`(그중 스위치 켠 것)를 `buildOutline`이 만들고, 렌더는 **접힘 = pinned / 펼침 = segment 배타**다(동시에 그리면 같은 블록이 두 번 나온다)
+- **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
 - **우측 패널 3종은 한 규약이다 (2026-08-18)**: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
 - **`position: absolute`로 바꾸면 그 안의 `fixed` 모달이 갇힌다 (2026-08-18)**: 포지션+zIndex를 가진 요소는 **스태킹 컨텍스트**를 만든다 → `VersionDrawer`(absolute·110) 안의 `RestoreConfirm`(fixed·1400)에서 1400은 드로어 내부에서만 유효하다. 모달이 바깥을 덮으려면 **드로어 자신이** 그 화면의 최대 zIndex(EditorView는 리사이즈 핸들 100)보다 위여야 한다
-- **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·`**`·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. 접으면 제목·`**` 발췌·경우 제목행만 남는다. Phase 54 레거시 `**Case n.**`도 **행 단위 스캔**으로 항목 승격
-- 로직 검증: `npm run test:case` (27개)
+- **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. ⚠ Phase 59a로 발췌가 사라지면서 **이 게이트가 닫히는 문항이 늘었다**(제목도 경우도 없이 `**`만 있던 풀이가 전부 해당) → `OutlineToggle`의 disabled 툴팁도 함께 고쳤다. Phase 54 레거시 `**Case n.**`은 **행 단위 스캔**으로 항목 승격(이것만 남았다)
+- **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다
+- 로직 검증: `npm run test:case` (35개)
 
 ### Phase 60 — list 로케일 블록 개편 (구현 완료 · 검증 대기)
 

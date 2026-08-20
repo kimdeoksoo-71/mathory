@@ -12,6 +12,8 @@ import SvgViewer from '../viewer/SvgViewer';
 import GgbViewer from '../viewer/GgbViewer';
 import OutlineSections from './OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
+import CoachLabel from '../ui/CoachLabel';
+import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
 import { IconCheck, IconCopy } from '../ui/Icons';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -26,7 +28,12 @@ import { IconCheck, IconCopy } from '../ui/Icons';
    ═══════════════════════════════════════════════════════════════ */
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
-const LABEL_GAP = 28;
+/* 라벨 열 ↔ 본문 사이 간격. Phase 59a: 경우 rail이 이 틈으로 나오므로 px 고정을 버리고
+   글꼴에 비례시킨다 — 라벨 열 폭이 이미 `7 * contentFontSize`라 정합적이다.
+   2.8em = dot 좌단 2.06em + 라벨과의 여유 0.74em.
+   ⚠ 고정 px으로 되돌리지 말 것: 28px은 24px 글꼴에서 1.17em이라 dot이 라벨을 파고들고,
+     11px에서는 2.55em이라 rail이 본문에서 멀어진다(em/px 혼합 함정). */
+const LABEL_GAP_EM = 2.8;
 
 interface Props {
   tab: TabMeta;
@@ -138,8 +145,17 @@ export default function TabBody({
         </div>
       );
     }
+    if (isCoachBlock(block.type)) {
+      /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+      return (
+        <div key={block.id} className={coachClassName(block.type)}>
+          <CoachLabel type={block.type} />
+          <EditorPreview content={block.raw_text} borderless locale="ko" />
+        </div>
+      );
+    }
     if (block.type === 'callout') {
-      /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+      /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
       return (
         <div key={block.id} className="callout-block">
           <EditorPreview content={block.raw_text} borderless locale="ko" />
@@ -162,7 +178,7 @@ export default function TabBody({
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP,
+      display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP_EM * contentFontSize,
       marginTop: tabIdx === 0 ? 24 : 0,
       marginBottom: isOpen ? '5em' : '1.5em',
     }}>
@@ -223,7 +239,7 @@ export default function TabBody({
         }}>
           {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
           <div
-            className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id, blocks)}`}
+            className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id)}`}
             style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
           >
             {scoped && outline.mode === 'outline' ? (

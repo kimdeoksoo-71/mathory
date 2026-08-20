@@ -14,6 +14,9 @@ import { IconChevron } from '../ui/Icons';
    renderBlock을 렌더프롭으로 받는다. 여기서 공유하는 것은 "무엇을 접고 무엇을
    남기는가"라는 골격뿐이다.
 
+   Phase 59a: 남는 것은 제목 · 경우 제목행 · 작성자가 고른 블록 셋뿐이다.
+   `**` 발췌 렌더는 폐기됐다.
+
    ⚠ 경우 항목만 제목/본문 두 EditorPreview로 나뉜다. 이 컴포넌트는 열람 2뷰
      전용이고 두 뷰는 onClickMath를 쓰지 않으므로 data-math-id 충돌(v2 E7)이
      발생하지 않는다. full 모드의 경우 블록은 사이트 renderBlock이 단일
@@ -73,7 +76,8 @@ function CaseItem({
   open: boolean;
   onToggle: (key: string, el: HTMLElement | null) => void;
 }) {
-  const toggleable = item.body !== undefined && item.body.trim() !== '';
+  // 펼칠 것 = 자기 본문 + 거느린 구역. 둘 다 없으면 정적 줄(레거시 라벨 항목)이다.
+  const toggleable = (item.body ?? '').trim() !== '' || (item.segment?.length ?? 0) > 0;
   const cls = caseClassName(
     item.sub ? 'subcase' : 'case',
     !!item.labeled,
@@ -92,11 +96,9 @@ function CaseItem({
         <div className="case-head is-static">{head}</div>
       )}
       <div id={bodyId}>
-        {open && item.body ? (
-          <EditorPreview content={item.body} borderless locale="ko" />
-        ) : item.keys ? (
-          <div className="outline-keys"><EditorPreview content={item.keys} borderless locale="ko" /></div>
-        ) : null}
+        {/* 이 안에는 경우 블록 **자신의** 본문만 넣는다. 거느린 구역은 바깥에서
+            형제로 그린다 — 여기 넣으면 .case-block 안에 갇혀 rail 인접이 끊긴다. */}
+        {open && item.body ? <EditorPreview content={item.body} borderless locale="ko" /> : null}
       </div>
     </div>
   );
@@ -110,26 +112,30 @@ export default function OutlineSections({
       {sections.map((sec) => {
         const open = openSections.has(sec.key);
         const bodyId = `outline-sec-${sec.key}`;
-        // 경우 항목 사이에 낀 발췌는 rail이 관통해야 한다 — 전체 렌더의 .case-gap과 같은 규칙
-        const firstCase = sec.items.findIndex((i) => i.kind === 'case');
-        const lastCase = sec.items.map((i) => i.kind).lastIndexOf('case');
+        /* Phase 59a: 항목은 'case'와 'block' 둘뿐이다. 발췌(kind:'keys')가 폐기되면서
+           "경우 사이에 낀 발췌에 .case-gap을 붙인다"는 firstCase/lastCase 계산도 사라졌다. */
         const skeleton = (
           <>
-            {sec.items.map((item, idx) => (
-              item.kind === 'case'
-                ? <CaseItem key={item.itemKey} item={item} open={openCases.has(item.itemKey)} onToggle={onToggleCase} />
-                : item.kind === 'block'
-                /* 작성자가 고른 그림 — 사이트 renderBlock을 그대로 쓴다(자체 key 보유).
-                   ⚠ 여기서 div로 한 번 더 감싸면 .case-gap이 형제가 아니게 되어
-                     rail이 그림 앞뒤로 끊긴다. renderBlock 결과를 그대로 흘릴 것. */
-                ? renderBlock(item.block!, 0)
-                : (
-                  <div key={item.itemKey}
-                    className={`outline-keys${idx > firstCase && idx < lastCase ? ' case-gap' : ''}`}>
-                    <EditorPreview content={item.head} borderless locale="ko" />
-                  </div>
-                )
-            ))}
+            {sec.items.map((item, idx) => {
+              /* 작성자가 고른 블록 — 사이트 renderBlock을 그대로 쓴다(자체 key 보유).
+                 ⚠ 여기서 div로 한 번 더 감싸면 .case-gap이 형제가 아니게 되어
+                   rail이 그 블록 앞뒤로 끊긴다. renderBlock 결과를 그대로 흘릴 것. */
+              if (item.kind !== 'case') return renderBlock(item.block!, idx);
+
+              /* 경우 구역 — 펼치면 거느린 블록 전부, 접으면 '요약에 넣기'를 켠 것만.
+                 ⚠ 둘을 동시에 그리면 pinned 블록이 두 번 나온다(펼침 목록이 이미 포함).
+                 ⚠ Fragment로 감싸는 것이 요점이다. DOM 노드를 만들지 않으므로
+                   .case-block과 뒤따르는 .case-gap이 **형제로 남아** rail 브리징이
+                   전체 보기와 똑같이 동작한다. div로 감싸면 그 순간 죽는다 (D15′). */
+              const isOpen = openCases.has(item.itemKey);
+              const trailing = (isOpen ? item.segment : item.pinned) ?? [];
+              return (
+                <React.Fragment key={item.itemKey}>
+                  <CaseItem item={item} open={isOpen} onToggle={onToggleCase} />
+                  {trailing.map((b, i) => renderBlock(b, i))}
+                </React.Fragment>
+              );
+            })}
           </>
         );
 

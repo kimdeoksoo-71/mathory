@@ -31,10 +31,12 @@ export default function OutlineToggle({ mode, onToggle, disabled }: Props) {
       disabled={disabled}
       /* 탭 라벨('문제'·'풀이')과 자형을 맞춘다 — 바로 그 아래·옆에 놓이는 글자다 */
       labelStyle={{ fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}
+      /* Phase 59a: `**` 발췌가 폐기돼 요약에 남는 것이 셋으로 정리됐다.
+         disabled 문구를 안 고치면 "강조를 넣었는데 왜 안 켜지나"가 된다. */
       title={disabled
-        ? '제목·핵심문장·경우 블록이 없습니다'
+        ? '제목·경우 블록이 없습니다'
         : outline
-          ? '켜짐 — 제목·핵심문장·경우만 보입니다. 끄면 전체가 펼쳐집니다'
+          ? '켜짐 — 제목·경우·요약에 넣은 블록만 보입니다. 끄면 전체가 펼쳐집니다'
           : '꺼짐 — 풀이 전체가 보입니다. 켜면 요약만 남습니다'}
     />
   );

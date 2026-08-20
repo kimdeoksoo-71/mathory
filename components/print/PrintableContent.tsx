@@ -13,6 +13,8 @@ import './PrintStyles.css';
 import { preprocess, Locale } from '../../lib/preprocess';
 import { toneClass } from '../../lib/keyTone';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import CoachLabel from '../ui/CoachLabel';
+import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
 
 export interface PrintBlock {
   id: string;
@@ -66,7 +68,7 @@ export default function PrintableContent({
              .tone-baseline은 붙이지 않는다 — 인쇄 본문색은 #000으로 별도 체계다. */
           <div
             key={tab.label + tabIdx}
-            className={[tabIdx > 0 ? 'print-tab-section' : '', toneClass(tab.id, tab.blocks)]
+            className={[tabIdx > 0 ? 'print-tab-section' : '', toneClass(tab.id)]
               .filter(Boolean).join(' ')}
           >
             <div className="print-tab-label">{tab.label}</div>
@@ -100,8 +102,14 @@ export default function PrintableContent({
                 ) : isCaseBlock(block.type) ? (
                   /* Phase 59: 경우 — 래퍼가 이미 .case-block이므로 라벨만 주입한다 */
                   <PrintBlockRenderer content={injectCaseLabel(block.raw_text, caseLabel)} locale={locale} />
+                ) : isCoachBlock(block.type) ? (
+                  /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+                  <div className={coachClassName(block.type)}>
+                    <CoachLabel type={block.type} />
+                    <PrintBlockRenderer content={block.raw_text} locale={locale} />
+                  </div>
                 ) : block.type === 'callout' ? (
-                  /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+                  /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
                   <div className="callout-block">
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
                   </div>

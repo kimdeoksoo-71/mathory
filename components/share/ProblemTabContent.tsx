@@ -10,6 +10,8 @@ import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapCl
 import { useOutlineState } from '../../hooks/useOutlineState';
 import OutlineSections from '../problem/OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
+import CoachLabel from '../ui/CoachLabel';
+import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
@@ -81,8 +83,17 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
       );
     }
 
+    if (isCoachBlock(block.type)) {
+      /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+      return (
+        <div key={block.id} className={coachClassName(block.type)}>
+          <CoachLabel type={block.type} />
+          <EditorPreview content={block.raw_text} borderless locale="ko" />
+        </div>
+      );
+    }
     if (block.type === 'callout') {
-      /* Phase 57: 강조문 — 테두리 없이 display 수식과 같은 들여쓰기·상하 여백 */
+      /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
       return (
         <div key={block.id} className="callout-block">
           <EditorPreview content={block.raw_text} borderless locale="ko" />
@@ -111,7 +122,7 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
          이미 공개된 페이지의 줄바꿈이 바뀐다. 색만 담은 .tone-baseline만 쓸 것.
          (line-height 1.8·font-family는 EditorPreview root가 이미 주고 있다) */
     /* --case-dot-fill: 접힘 dot의 속을 이 카드의 배경색으로 채운다(기본값은 앱의 클레이) */
-    <div className={`tone-baseline ${toneClass(tabId, sorted)}`.trim()}
+    <div className={`tone-baseline ${toneClass(tabId)}`.trim()}
       style={{ ['--case-dot-fill' as any]: 'var(--bg-card, #fff)' }}>
       {scoped && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
