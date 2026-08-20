@@ -154,7 +154,12 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 59a 완료(미푸시) · 60 검증 대기 · 45a 완료(검수 대기)
+## 현재 Phase: 진행 중인 Phase 없음 (59a·60·45a 전건 검수 완료)
+
+- **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). 배포 대기(미푸시분 있음)
+- **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
+- **Phase 45a** — 구현·검수 완료(2026-08-20)
+- **Phase 28(Mathpix OCR)** — 2026-04-22 구현 완료, 2026-08-20 API 키 등록·실동작 확인으로 **완전 종료**
 
 ### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현 완료 · 배포 대기)
 
@@ -181,15 +186,15 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다
 - 로직 검증: `npm run test:case` (35개)
 
-### Phase 60 — list 로케일 블록 개편 (구현 완료 · 검증 대기)
+### Phase 60 — list 로케일 블록 개편 (완료 · 검증 통과)
 
 문서: `docs/phaseSketch/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
 
 - **저장 철학이 바뀌었다**: "저장은 국제 표준, 표시만 로케일"을 버리고 **로케일 블록** — 한국 문항은 `(가)`·`ㄱ.`을 그대로 입력·저장한다. 레거시 `(a)`/`(i)` 변환은 옛 문항 호환용으로 유지
 - 로직 검증: `npm run test:locale` (15개)
-- **남은 검증(덕수)**: ① 인쇄 PDF 전후 동일 — `docs/phaseSketch/phase60 before.pdf`가 기준선, 판정 기준은 `phase60 before 관측.md`, 비교는 픽셀 diff ② 앱 마커 굵기·`ㄱ.` 여백 변화 확인 ③ `/shared`·`/p` 하드 로드 정렬 수정 확인
+- **덕수 검증 완료(2026-08-20)**: ① 인쇄 PDF 전후 동일(`phase60 before.pdf` 대조) ② 앱 마커 굵기·`ㄱ.` 여백 ③ `/shared`·`/p` 하드 로드 정렬 — 전항 통과
 
 다음 작업 후보:
 - PDF 정밀 레이아웃 (Puppeteer 또는 jsPDF)
 - UI 디자인 (docs/ui-design-reference.md 참조)
-- Mathpix OCR API 통합
+- 공개 전 버그 청소 (`docs/prelaunch-bug-cleanup.md`)

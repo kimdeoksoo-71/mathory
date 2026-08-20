@@ -684,7 +684,7 @@ problems/{id}
 | EditorView 툴바에 OCR 버튼 | ✅ | 2026-04-22 | 맞춤법 ✓ 버튼 뒤, 블록 미선택 시 비활성 |
 | 파일 업로드 → 커서 위치 삽입 | ✅ | 2026-04-22 | `editorRefs.insertText(payload, payload.length)` |
 | 로딩 상태 | ✅ | 2026-04-22 | 버튼 스피너 + disabled |
-| `.env.local` 키 등록 | ⬜ |  | 덕수 직접 등록 (MATHPIX_APP_ID, MATHPIX_APP_KEY) |
+| `.env.local` 키 등록 | ✅ | 2026-08-20 | 덕수 직접 등록 (MATHPIX_APP_ID, MATHPIX_APP_KEY). 실동작 확인으로 Phase 28 완전 종료 |
 
 ### 변경 파일 목록
 
@@ -1556,6 +1556,50 @@ dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 v2에서 나
 
 **부수 성과**: `--block-bg-active`가 `#E8DFCE`로 바뀐 뒤(`78a780f`) 문서 3곳이 stale이던 것과
 FolderView 페이드 그라데이션의 하드코딩 색 불일치를 함께 정정했다.
+
+---
+
+## Phase 60: list 로케일 블록 개편 ✅
+
+문서: `docs/phaseSketch/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
+커밋 `73fe9f7` … `49e2a06` · 덕수 검증 완료 2026-08-20
+
+**저장 철학을 뒤집었다.** Phase 60 이전의 원칙은 "저장은 국제 표준(`(a)`·`(i)`), 표시만 로케일"이었다.
+그러나 `(a)`를 치면 `(가)`가 나오고 저장은 `(a)`로 되는 구조는 **"무엇을 쓰면 무엇이 나오는지"가
+흐려져** 실사용에서 계속 혼란을 일으켰다. 한국 문항은 `(가)`·`ㄱ.`을 **그대로 입력·저장**하고
+렌더에서 span만 씌우는 **로케일 블록**으로 바꿨다.
+
+| 단계 | 내용 |
+|---|---|
+| P1 | `(가)~(차)` · `ㄱ.~ㅊ.` 직접 입력·저장 (각 10개). 프리셋도 한국 리터럴로 |
+| P2 | 레거시 마커 뒤 공백을 정규식이 흡수 — 간격은 입력 공백이 아니라 **CSS 고정폭**이 공급 |
+| P2 | 마커 CSS 소유권 분리 — 화면은 `globals.css`(`.preview-content` 스코프), 인쇄는 `.print-body` 접두 |
+| P3 | `proofread`가 리터럴 마커를 오탈자로 잡지 않도록 마스킹 |
+| P4 | 마커 정규식을 `lib/locale.ts`의 export 상수 하나로 통합(양쪽이 공유, 사본 금지) |
+| 후속 | `(a)→(가)`·`(i)→ㄱ.` **변환 삭제**. 단 `MARKER_LINE_RE`에는 `(a)`/`(i)`를 남겼다 |
+
+**핵심 교훈 1 — 변환은 편의가 아니라 부채였다**: 두 표기가 공존하는 한 사용자는 자기가 친 것과
+저장된 것과 보이는 것이 각각 무엇인지 계속 추적해야 한다. 옛 문항의 `(a)`는 그대로 보이게 두고
+손볼 때 리터럴로 고치는 쪽이 낫다. **단 행 분리(`MARKER_LINE_RE`)까지 빼면 안 된다** — 렌더
+파이프라인에 `remark-breaks`가 없어 연속 행이 한 문단으로 뭉치기 때문이다(변환이 아니라 마크다운
+렌더 보조라 별개 문제다).
+
+**핵심 교훈 2 — 인쇄 전 웹폰트를 기다려야 한다**: `--font-print`의 Noto Serif KR은 `display=swap`이라,
+폰트가 오기 전에 `window.print()`가 스냅샷을 뜨면 **굵기 요청(600/700)이 폴백에 흡수돼** 제목·라벨이
+본문 굵기로 인쇄된다. 글자 폭은 그대로고 획만 얇아져 원인 짚기가 매우 어렵다.
+`lib/pdfPrint.tsx`의 `waitForPrintFonts()`가 `document.fonts.load` + `fonts.ready`로 막되
+**타임아웃 필수**(CDN이 죽어도 폴백으로 인쇄돼야 한다). unicode-range 폰트는 `load(font, '①')`처럼
+**그 범위의 문자를 함께 넘겨야** 매칭된다.
+
+**핵심 교훈 3 — CSS 로드 범위를 실측할 것**: `PrintStyles.css`는 `EditorView.tsx`가 직접 import하고
+AppShell이 EditorView를 정적 import하므로 **앱 전 페이지에 로드된다.** 인쇄 전용 규칙에 `.print-body`
+접두를 빠뜨리면 인쇄 값이 화면으로 샌다. 반대로 공개 뷰어는 **두 CSS 환경**에서 렌더된다 —
+앱 셸 임베드는 PrintStyles에 도달하고 독립 라우트(`/p`·`/shared`)는 도달하지 않는다(전이적 import
+closure 실측: 123 / 36 / 29 파일). **공개 페이지 스타일은 라우트 2개 + 임베드를 다 확인할 것.**
+
+**검증**: 로직은 `npm run test:locale` 15개. 인쇄는 `phase60 before.pdf`를 기준선으로 픽셀 대조
+(판정 기준 `phase60 before 관측.md`) → T4 통과. 덕수 최종 검증에서 인쇄 PDF 전후 동일 ·
+앱 마커 굵기·`ㄱ.` 여백 · `/shared`·`/p` 하드 로드 정렬 전항 통과.
 
 ---
 
