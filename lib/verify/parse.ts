@@ -353,6 +353,56 @@ export function anchorByQuote(
   return best ? { blockKey: best.blockKey, found: true } : { blockKey: null, found: false };
 }
 
+/**
+ * 인용이 원문의 **어느 글자 범위**인지. 리포트 지적 → 편집창의 그 자리로 보내는 데 쓴다.
+ *
+ * `anchorByQuote`가 "어느 블록인가"를 정한다면 이쪽은 "그 블록의 어디인가"를 정한다.
+ * 블록 상단으로만 보내면 긴 블록에서 엉뚱한 내용이 화면 중앙에 온다.
+ *
+ * 대조 시 **공백과 `$`를 함께 무시**한다 — 모델이 인용을 옮기며 공백을 다듬거나
+ * `$` 구분자를 떨어뜨리는 일이 실제로 있다(실측 2026-08-22).
+ * 전문이 안 맞으면 최장 일치 접두(≥12자)로 물러선다.
+ */
+export function findQuoteRange(
+  content: string,
+  quote: string,
+): { from: number; to: number } | null {
+  const src = String(content ?? '');
+  const q = String(quote ?? '');
+  if (!src || !q) return null;
+
+  // 정규화 문자열과 "정규화 index → 원문 index" 지도를 함께 만든다
+  const map: number[] = [];
+  let norm = '';
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (/[\s$]/.test(ch)) continue;
+    norm += ch;
+    map.push(i);
+  }
+  const nq = q.replace(/[\s$]/g, '');
+  if (!norm || !nq) return null;
+
+  const span = (at: number, len: number) => ({
+    from: map[at],
+    to: map[Math.min(at + len - 1, map.length - 1)] + 1,
+  });
+
+  const hit = norm.indexOf(nq);
+  if (hit !== -1) return span(hit, nq.length);
+
+  // 접두 폴백 — 길이를 줄여 가며 처음 걸리는 지점. 이분 탐색(접두 일치는 단조)
+  let lo = 0;
+  let hi = Math.min(nq.length, norm.length);
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    if (norm.indexOf(nq.slice(0, mid)) !== -1) lo = mid;
+    else hi = mid - 1;
+  }
+  if (lo < QUOTE_MIN_PREFIX) return null;
+  return span(norm.indexOf(nq.slice(0, lo)), lo);
+}
+
 /* ═══════════════════════════════════════════════════════ */
 /* 5. 2차 판정 매핑 · 합성                                    */
 /* ═══════════════════════════════════════════════════════ */

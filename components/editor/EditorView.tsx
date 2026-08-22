@@ -12,6 +12,7 @@ import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
 import { runVerifyFlow, computeVerifyHashes, verifyBlocksOf } from '../../lib/verifyFlow';
+import { findQuoteRange } from '../../lib/verify/parse';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -2722,24 +2723,75 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     } : prev));
   }, [problem, user, dirty, handleSave, allBlocks, editAnswer, editTitle, tabs, activeTab]);
 
-  /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다. */
-  const handleJumpToBlock = useCallback((blockKey: string) => {
+  /**
+   * 리포트 지적 → **그 인용이 있는 자리**로.
+   *
+   * 블록 상단으로만 보내면 긴 블록에서 엉뚱한 내용이 화면 중앙에 온다 → `findQuoteRange`로
+   * 글자 범위를 찾아 거기로 간다. 강조·중앙 정렬은 "미리보기 수식 클릭" 경로가 이미 갖춘
+   * 장치를 그대로 쓴다(`highlightMath` = 행 회색 + 구간 노랑, `activeMathId` = 미리보기 강조).
+   *
+   * ⚠ 앵커는 `block_key`다 — doc id는 저장마다 갈린다.
+   */
+  const handleJumpToBlock = useCallback((blockKey: string, quote: string) => {
     for (const t of tabs) {
       const blk = (allBlocks[t.id] || []).find((b) => blockKeyOf(b) === blockKey);
       if (!blk) continue;
       if (t.id !== activeTab) switchTab(t.id);   // ⚠ switchTab은 자동저장을 동반한다
+
+      /* 접힌 블록은 펴야 편집창·미리보기 모두에 그려진다 (수식 클릭 경로와 동일).
+         ⚠ `setCurrentBlocks`를 쓰면 안 된다 — 그쪽은 클로저의 `activeTab`에 쓰므로
+            방금 `switchTab`한 경우 **이전 탭**을 건드린다. 대상 탭을 명시한다. */
+      setAllBlocks((prev) => ({
+        ...prev,
+        [t.id]: (prev[t.id] || []).map((b) => (b.id === blk.id ? { ...b, collapsed: false } : b)),
+      }));
       setActiveBlockId(blk.id);
+      // 다른 블록에 남은 선택·하이라이트 정리
+      for (const [id, ref] of Object.entries(editorRefs.current)) {
+        if (id !== blk.id && ref) { ref.clearSelection(); ref.clearMathHighlight(); }
+      }
       /* Phase 45a 계약 — 직접 스크롤을 호출하는 핸들러는 자동 스크롤 effect의 게이트를
          우회하므로 같은 조건(collapseMode)을 자기 안에 다시 적는다. */
       if (collapseModeRef.current) return;
       skipNextBlockScrollRef.current = true;
-      scrollEditorToBlockTop(blk.id);
-      scrollPreviewToBlockTop(blk.id);
+
+      setTimeout(() => {
+        const ref = editorRefs.current[blk.id];
+        if (!ref) return;
+        const content = ref.getContent();
+        const range = findQuoteRange(content, quote);
+        if (!range) {
+          // 인용을 못 찾으면 블록 중앙으로라도 보낸다 (아무 일도 안 일어난 것보다 낫다)
+          setActiveMathId(-1);
+          scrollEditorToBlockTop(blk.id);
+          scrollPreviewToBlockCenter(blk.id);
+          return;
+        }
+
+        ref.focus();
+        ref.setSelection(range.from, range.from);
+        ref.highlightMath(range.from, range.to);
+
+        /* 인용이 수식 안이면 미리보기에서도 그 수식을 칠하고 중앙에 둔다.
+           수식이 아니면(산문 인용) 미리보기는 블록 중앙까지만 — 문장 단위 앵커가 없다. */
+        const mathId = findMathIdAtCursor(buildMathIndex(content), range.from);
+        if (mathId >= 0) {
+          setActiveMathId(mathId);
+          scrollEditorToMathCenter(blk.id);
+          scrollPreviewToMathCenter(blk.id, mathId);
+        } else {
+          setActiveMathId(-1);
+          scrollEditorToCursorCenter(blk.id);
+          scrollPreviewToBlockCenter(blk.id);
+        }
+      }, 120);
       return;
     }
     setStatus('그 블록은 더 이상 없습니다');
     setTimeout(() => setStatus(''), 2500);
-  }, [tabs, allBlocks, activeTab, switchTab, scrollEditorToBlockTop, scrollPreviewToBlockTop]);
+  }, [tabs, allBlocks, activeTab, switchTab,
+      scrollEditorToBlockTop, scrollEditorToCursorCenter, scrollEditorToMathCenter,
+      scrollPreviewToBlockCenter, scrollPreviewToMathCenter]);
 
   /* ─── 자동저장: EditorView 이탈(onBack) / unmount ─── */
   const skipUnmountSaveRef = useRef<boolean>(false);

@@ -275,7 +275,7 @@ export default function ProblemView({
 
   /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다.
    *  ⚠ 열람뷰는 탭이 접혀 있을 수 있다 → 먼저 펴고 렌더를 기다린 뒤 스크롤한다. */
-  const handleJumpToBlock = useCallback((blockKey: string) => {
+  const handleJumpToBlock = useCallback((blockKey: string, _quote: string) => {
     if (!problem) return;
     for (const tab of (problem.tabs || DEFAULT_TABS)) {
       const blk = (problem.tabBlocks[tab.id] || []).find((b) => blockKeyOf(b) === blockKey);
@@ -286,9 +286,14 @@ export default function ProblemView({
           const container = contentScrollRef.current;
           const el = container?.querySelector(`[data-block-id="${blk.id}"]`) as HTMLElement | null;
           if (!container || !el) return;
-          const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top
-                    + container.scrollTop - 80;
-          fastScrollTo(container, top, 300);
+          // 화면 세로 중앙에 둔다 (편집창과 같은 규칙). 블록이 화면보다 크면 상단 기준
+          const r = el.getBoundingClientRect();
+          const cr = container.getBoundingClientRect();
+          const blockTop = r.top - cr.top + container.scrollTop;
+          const top = r.height < cr.height
+            ? blockTop + r.height / 2 - cr.height / 2
+            : blockTop - 80;
+          fastScrollTo(container, Math.max(0, top), 300);
         });
       }, 60);
       return;

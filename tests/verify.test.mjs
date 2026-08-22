@@ -163,6 +163,45 @@ test('anchorByQuote — 여러 블록에 걸리면 첫 블록 (문서 순서)', 
   assert.equal(V.anchorByQuote('같은 문장', dup).blockKey, 'a');
 });
 
+/* ═══ 인용 → 원문 글자 범위 (편집창 점프용) ═══ */
+
+const DOC = '조건에서 $f(1) = 0$ 이다.\n따라서 $x = 2$ 또는 $x = -3$ 이다.';
+
+test('findQuoteRange — 공백 차이를 넘어 정확한 범위', () => {
+  const r = V.findQuoteRange(DOC, '$x = 2$');
+  assert.ok(r);
+  assert.equal(DOC.slice(r.from, r.to), 'x = 2');
+});
+
+test('findQuoteRange — 모델이 $ 를 떨어뜨려도 찾는다', () => {
+  const r = V.findQuoteRange(DOC, 'f(1)=0');
+  assert.ok(r);
+  assert.equal(DOC.slice(r.from, r.to), 'f(1) = 0');
+});
+
+test('findQuoteRange — 뒤에 군더더기가 붙으면 최장 접두로', () => {
+  const r = V.findQuoteRange(DOC, '따라서 $x = 2$ 또는 $x = -3$ 이다. 원문에 없는 말');
+  assert.ok(r);
+  assert.ok(DOC.slice(r.from, r.to).startsWith('따라서'));
+});
+
+test('findQuoteRange — 정확히 있으면 짧아도 찾는다 (하한은 접두 추측에만)', () => {
+  // `$x = 2$`처럼 정규화하면 3자인 정당한 인용이 있다 → 전문 일치에 길이 하한을 걸면 안 된다
+  const r = V.findQuoteRange(DOC, '조건');
+  assert.equal(DOC.slice(r.from, r.to), '조건');
+});
+
+test('findQuoteRange — 없으면 null', () => {
+  assert.equal(V.findQuoteRange(DOC, '$y = 99$ 라고 했다'), null);
+  assert.equal(V.findQuoteRange('', 'x'), null);
+  assert.equal(V.findQuoteRange(DOC, ''), null);
+});
+
+test('findQuoteRange — 접두 폴백은 12자 미만이면 포기한다', () => {
+  // 앞 몇 글자만 겹치는 인용 → 우연 일치로 엉뚱한 데로 보내지 않는다
+  assert.equal(V.findQuoteRange(DOC, '조건XYZ 전혀 다른 문장이 길게 이어진다'), null);
+});
+
 /* ═══ 판정 매핑 · 합성 ═══ */
 
 test('synthesizeVerdict — fail≥1 → fail / check≥1 → check / 빈 배열 → ok', () => {

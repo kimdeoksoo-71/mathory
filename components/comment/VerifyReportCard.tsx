@@ -70,8 +70,8 @@ export default function VerifyReportCard({
   report, onJumpToBlock,
 }: {
   report: VerifyReport;
-  /** 지적 → 블록 이동. 편집 화면에서만 주입된다(열람뷰에는 없다) */
-  onJumpToBlock?: (blockKey: string) => void;
+  /** 지적 → 그 인용이 있는 자리로 이동 */
+  onJumpToBlock?: (blockKey: string, quote: string) => void;
 }) {
   const [answerOpen, setAnswerOpen] = useState(false);
   const meta = VERDICT_META[report.verdict] ?? VERDICT_META.check;
@@ -190,14 +190,14 @@ function FindingRow({
 }: {
   finding: VerifyFinding;
   index: number;
-  onJumpToBlock?: (blockKey: string) => void;
+  onJumpToBlock?: (blockKey: string, quote: string) => void;
 }) {
   const isFail = finding.verdict === 'fail';
   const canJump = !!onJumpToBlock && !!finding.blockKey;
 
   return (
     <div
-      onClick={canJump ? () => onJumpToBlock!(finding.blockKey!) : undefined}
+      onClick={canJump ? () => onJumpToBlock!(finding.blockKey!, finding.quote) : undefined}
       title={canJump ? '클릭하면 해당 블록으로 이동합니다' : undefined}
       style={{
         padding: '6px 0',

@@ -59,8 +59,8 @@ interface CommentPanelProps {
   /** Phase 61b: 정밀 검증 실행. **편집 화면에서만 전달** — prop 유무가 곧 게이트다
    *  (onInsertGraphBlock 선례). 열람뷰(ProblemView)에는 넘기지 않는다. */
   onRunVerify?: (kind: VerifyKind, sessionId: string) => Promise<void>;
-  /** Phase 61b: 리포트 지적 → 해당 블록으로 이동. 〃 */
-  onJumpToBlock?: (blockKey: string) => void;
+  /** Phase 61b: 리포트 지적 → 그 인용이 있는 자리로 이동. 〃 */
+  onJumpToBlock?: (blockKey: string, quote: string) => void;
   /** Phase 61b: 검증 대상 총 글자 수(사전 차단용). 편집 화면에서만 전달.
    *  kind별로 다르다 — 문제 검증은 문제 탭만, 풀이 검증은 문제+풀이를 함께 보낸다. */
   verifyCharCount?: (kind: VerifyKind) => number;
@@ -1467,8 +1467,8 @@ function CommentThreadView({
   onDelete: (commentId: string) => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
-  /** Phase 61b: 리포트 지적 → 블록 이동 (편집 화면에서만) */
-  onJumpToBlock?: (blockKey: string) => void;
+  /** Phase 61b: 리포트 지적 → 인용 자리로 이동 */
+  onJumpToBlock?: (blockKey: string, quote: string) => void;
 }) {
   const { parent, replies } = thread;
   const parentIsAI = parent.authorType === 'ai';
@@ -1547,8 +1547,8 @@ function CommentItem({
   onDelete: () => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
-  /** Phase 61b: 리포트 지적 → 블록 이동 (편집 화면에서만) */
-  onJumpToBlock?: (blockKey: string) => void;
+  /** Phase 61b: 리포트 지적 → 인용 자리로 이동 */
+  onJumpToBlock?: (blockKey: string, quote: string) => void;
 }) {
   const isMine = !info.isAI && comment.authorUid === currentUid;
 
