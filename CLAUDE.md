@@ -36,6 +36,10 @@ components/print/
 components/layout/
   AppShell.tsx             — 메인 앱 레이아웃
   Sidebar.tsx              — 사이드바
+components/import/
+  SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a)
+lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수)
+app/api/sheet-import/      — 스프레드시트 읽기 프록시 (읽기 전용 스코프)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -154,12 +158,13 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 진행 중인 Phase 없음 (59a·60·45a 전건 검수 완료)
+## 현재 Phase: 진행 중인 Phase 없음 (61a·59a·60·45a 전건 검수 완료)
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). 배포 대기(미푸시분 있음)
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
 - **Phase 45a** — 구현·검수 완료(2026-08-20)
 - **Phase 28(Mathpix OCR)** — 2026-04-22 구현 완료, 2026-08-20 API 키 등록·실동작 확인으로 **완전 종료**
+- **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수 완료. 미푸시. 아래 절 참조
 
 ### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현 완료 · 배포 대기)
 
@@ -185,6 +190,38 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. ⚠ Phase 59a로 발췌가 사라지면서 **이 게이트가 닫히는 문항이 늘었다**(제목도 경우도 없이 `**`만 있던 풀이가 전부 해당) → `OutlineToggle`의 disabled 툴팁도 함께 고쳤다. Phase 54 레거시 `**Case n.**`은 **행 단위 스캔**으로 항목 승격(이것만 남았다)
 - **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다
 - 로직 검증: `npm run test:case` (35개)
+
+### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 검수 통과 · 미푸시)
+
+문서: `docs/phaseSketch/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md` (§10이 구현 기록)
+
+gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore 규칙 0 · 마이그레이션 0.**
+사이드바 '시트 가져오기' → 모달(시트 → 행 → 폴더 → 미리보기 → 저장).
+
+- **서버는 얇은 읽기 프록시, 저장은 클라이언트**: `app/api/sheet-import/route.ts`는 시트를 읽어
+  행 JSON만 준다(Firestore 미접촉). 저장은 기존 `createProblem`/`saveTabBlock`을 그대로 탄다 →
+  수동 생성과 경로가 같아 규칙·VCS와 자연히 정합
+- **자격증명은 `spreadsheets.readonly` 스코프**로 잠근다 — 쓰기 API를 "안 부르는" 게 아니라 **못 부른다**
+- **인증이 필수다**: 기존 AI 라우트(`proofread`·`ocr`·`discuss`·`ai-complete`)는 무인증이지만 그건 *비용*만
+  새는 것이고, 이 라우트는 무인증이면 **시트 전문이 공개**된다. ID 토큰 릴레이 + `identitytoolkit
+  accounts:lookup` 검증 + `AUDITION_ALLOWED_UIDS` 허용목록(비면 전원 거부). ⚠️ `github/export`처럼
+  "토큰을 Firestore REST에 넘겨 규칙이 대행"하는 트릭은 **Firestore를 안 거치는 라우트엔 못 쓴다**
+- **미리보기와 저장은 같은 배열을 본다**: `toPersistedBlock`이 `raw_text`를 정규화하므로, 미리보기가
+  정규화 **전** 텍스트를 그리면 검수가 무의미해진다. 미리보기 진입 시 persisted 배열을 확정해 공유한다
+- **블록 렌더는 타입 분기 필수**: `EditorPreview`는 마크다운 문자열 렌더러라 **choices를 모른다**.
+  `text`→`EditorPreview` / `choices`→`ChoicesBlock` (렌더 사이트들과 같은 규약)
+- **중복 키는 `source_id` + `stem_hash`**: 시트에 id가 같고 본문이 다른 그룹이 67개 있다.
+  id만 쓰면 서로 다른 문항을 조용히 건너뛴다. ⚠️ **휴지통 문항은 중복이 아니다** — Mathory의 '삭제'는
+  휴지통 이동이라 문서가 남는다. 중복이어도 **체크를 막지 않고** 기본만 해제한다
+- **`lib/sheetImport.ts`에 import 문을 두지 말 것**: `npm run test:sheet`가 이 파일 하나를 tsc로
+  단독 컴파일한다. 타입도 로컬 정의. `--rootDir .`이 있어야 산출물이 `.test-build/lib/`로 떨어진다
+- **`$$` 앞뒤 빈 줄 정규화를 여기서 하지 말 것** — `toPersistedBlock`이 소유한다. 두 곳에서 하면 규칙이 갈린다
+- **Sheets 응답 함정**: ① 행 끝의 빈 셀이 잘려 온다 → 16칸 패딩 필수 ② `UNFORMATTED_VALUE`의
+  체크박스 해제는 boolean `false`인데, 먼저 `String()`을 걸면 `"false"`라는 **비어 있지 않은 문자열**이
+  되어 truthy 검사가 전부 참이 된다 → **원시값으로 판정할 것**
+- **GAS 코드 인용은 GitHub origin/main만을 원천으로 하고 커밋 해시를 남길 것** — `~/Documents`의
+  로컬 사본이 stale해 같은 파일을 두고 숫자가 갈린 왕복이 있었다(2026-08-22 clone으로 교체 완료)
+- 로직 검증: `npm run test:sheet` (35개)
 
 ### Phase 60 — list 로케일 블록 개편 (완료 · 검증 통과)
 
