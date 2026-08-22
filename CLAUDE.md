@@ -40,6 +40,12 @@ components/import/
   SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a)
 lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수)
 app/api/sheet-import/      — 스프레드시트 읽기 프록시 (읽기 전용 스코프)
+lib/verify/               — 정밀 검증 (Phase 61b, 전부 import 0 순수 모듈)
+  prompts.ts               — 프롬프트 3세트 · 함수형 치환 · 블록 라벨링
+  parse.ts                 — JSON 4단계 폴백 · LaTeX 복구 · 앵커 · 합성
+  providerParams.ts        — AI 요청 바디 조립 (회귀 스냅샷 대상)
+app/api/verify/            — 2단 교차검증 라우트 (Firestore 미접촉)
+lib/apiAuth.ts             — ID 토큰 검증 공용 (sheet-import · verify)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -158,7 +164,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: 진행 중인 Phase 없음 (61a·59a·60·45a 전건 검수 완료)
+## 현재 Phase: **Phase 61b(정밀 검증)** — 스텝 0~5 구현 완료, 스텝 2 관문(프롬프트 실물 확정) 대기
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
@@ -190,6 +196,51 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. ⚠ Phase 59a로 발췌가 사라지면서 **이 게이트가 닫히는 문항이 늘었다**(제목도 경우도 없이 `**`만 있던 풀이가 전부 해당) → `OutlineToggle`의 disabled 툴팁도 함께 고쳤다. Phase 54 레거시 `**Case n.**`은 **행 단위 스캔**으로 항목 승격(이것만 남았다)
 - **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다
 - 로직 검증: `npm run test:case` (35개)
+
+### Phase 61b — 정밀 검증 (구현 완료 · 실물 조정 대기)
+
+문서: `docs/phaseSketch/Phase61b 정밀 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61b 절
+
+시트 STEP3의 **비대칭 교차검증**(1차 Gemini 후보 생성 → 2차 Claude 엄격 판정)을 이식.
+**Firestore 규칙 0 · 마이그레이션 0.** agent 대화창의 칩 2개로 실행하고, 리포트는 일반
+AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무변경**으로 이어진다.
+
+- **`"\frac"`은 JSON 파싱이 *성공하면서* 망가진다** — `\f`가 유효 이스케이프라 결과가
+  `␌`+`"rac"`이 된다. 오류가 없으니 파싱 폴백으로는 못 잡고, 복구는 **파싱 후 · `trim()` 전**에만
+  가능하다. `parseAndRepair()` 하나로 묶어 순서 실수를 차단했다. **tool_use·structured output을
+  써도 면제되지 않는다** — 어느 경로든 결국 `JSON.parse`를 지난다
+- **프롬프트 치환은 함수형 콜백 필수** — `String.replace`에 값을 문자열로 넘기면 `$$`·`$&`가
+  치환 패턴으로 해석돼 LaTeX가 손상된다. (시트 STEP1이 아직 안 고쳐진 자리이니 베끼지 말 것)
+- **앵커는 모델의 `[블록 n]` 신고가 아니라 인용 실재성으로 서버가 확정한다** — 공백 제거 전문
+  매칭 → **최장 일치 접두(≥12자)** → 실패 시 `check` 강등. ⚠ **고정 길이 접두는 안 된다** —
+  인용이 블록보다 길면(모델이 문장을 이어 쓴 흔한 실패) 명백한 일치를 놓친다
+- **Opus 4.8은 `thinking`을 생략하면 사고가 꺼진 채 돈다** — 오류·경고 없이 품질만 조용히
+  떨어진다. `budget_tokens`(400) · assistant prefill(400) · `tool_choice:{type:'any'}`
+  (최종 JSON 턴 불가)는 전부 금지
+- **2차 판정이 완료되지 않은 검증은 검증이 아니다** — 1차·2차 실패, 예산 부족, 도구 상한 초과는
+  전부 리포트를 만들지 않고 오류로 끝낸다. **1차 후보를 지적으로 노출하지 말 것** — recall 편향
+  후보가 그대로 보이면 2차가 존재하는 이유(보수 판정)가 무너진다
+- **2차 `code_execution`은 시트에 전례가 없다** — `QualityVerification.gs`의 Claude payload에
+  `tools`가 아예 없다(파일 전체 0건). 이식이 아니라 신규 요소라 `VERIFY_JUDGE_CODE_EXEC` env로
+  게이트하고 **기본 off**다. `pause_turn` 루프의 유일한 발동 원인이 이것이다
+- **stale은 "저장 경로 훅"으로 만들 수 없다** — `handleSave`가 탭 구분 없이 매 저장마다 전 탭을
+  delete-all → re-add 하므로 "질문 탭이면" 분기가 없다 → **탭 정규화 해시 비교**
+  (`collectCurrentContent`+`hashPerTab`). problem 해시엔 **answer를 함께** 넣는다
+  (`canonicalizeTab`은 제목·정답을 포함하지 않는데 `answerCheck`가 answer에 의존한다).
+  ⚠ `last_version_tab_hashes`는 `!silent`일 때만 갱신되므로 신호로 쓰지 말 것
+- **`verification` 쓰기는 `setVerification` 전용** — `updateProblem`은 `updated_at`을 갱신하는데
+  목록이 `updated_at desc` 정렬이라 검증만으로 문항이 맨 위로 올라온다
+- **`verification`에 findings·derivedAnswer를 넣지 말 것** — 그 문서는 public·member가 읽는다
+- **`<details>`를 리포트에 쓰지 말 것** — `stripForHistory`가 `[검산 코드 첨부됨]`으로 치환해
+  히스토리에 거짓 문구가 들어간다. 접기는 카드 자체 상태로
+- **검증 칩이 오너 전용인 것은 정책이 아니라 규칙 강제다** — AI 댓글 create는 오너만 허용이라
+  비오너는 비용만 쓰고 저장에서 실패한다. 게이트는 `onRunVerify` prop 주입(편집 화면 전용,
+  `onInsertGraphBlock` 선례) + `currentUid === ownerUid`
+- **클라이언트가 `lib/verify/prompts`를 import하면 프롬프트 전문이 클라 번들에 실린다** —
+  답안 형식 산출은 서버가 하고 클라는 재료만 넘긴다
+- ⚠ 리포트 댓글은 **멤버가 전부 읽는다**(`firestore.rules:234-236`, 세션 구분 없음).
+  `memberTabVisibility`로 탭을 가린 멤버에게 `quote`·`derivedAnswer`는 새 정보다 — 알고 둔 것
+- 로직 검증: `npm run test:verify` (37개)
 
 ### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 배포 · 프로덕션 확인)
 

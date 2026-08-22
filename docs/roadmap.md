@@ -1655,6 +1655,92 @@ id만 썼으면 **68문항을 조용히 잃었다**.
 
 ---
 
+## Phase 61b: 정밀 검증 (agent 대화창 통합) 🚧
+
+문서: `docs/phaseSketch/Phase61b 정밀 검증 구현 계획서 v4 실행판.md`
+(계보: v1 web → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 실행판** → 구현)
+
+시트 시스템 STEP3의 **비대칭 교차검증**(1차 Gemini 후보 생성 → 2차 Claude 엄격 판정)을
+Mathory 서버 라우트로 이식했다. **Firestore 규칙 0 · 마이그레이션 0 · 서버 저장 0.**
+
+### 구현 완료 (스텝 0~5)
+
+| 스텝 | 내용 |
+|------|------|
+| 0 | `lib/ai-provider.ts` additive 옵션(thinking·effort·code exec·pause_turn) + `getVerifyProviders` + `lib/apiAuth.ts` 공용 추출 |
+| 1 | `lib/verify/prompts.ts` · `lib/verify/parse.ts` (둘 다 import 0) + `npm run test:verify` |
+| 2 | `app/api/verify/route.ts` — 인증·예산·비용·실패 정책 |
+| 3 | CommentPanel 검증 칩 2개 + 비용 확인 팝오버 |
+| 4 | `mathory-verify` 리포트 카드 + 블록 점프 + `stripForHistory` |
+| 5 | `Problem.verification` + 탭 해시 stale + 목록 배지 |
+
+### 남은 것
+
+- **스텝 2 관문(프롬프트 실물 확정)** — 실제 문항 3~5건 수동 호출로 중검출·과검출을
+  조정하고 `VERIFY_JUDGE_CODE_EXEC` on/off를 대조해 F1 기본값을 정한다. **판정 품질은
+  사양이 아니라 실물로 정한다.**
+- Vercel env 등록: `VERIFY_GEMINI_MODEL`·`VERIFY_CLAUDE_MODEL`·`VERIFY_JUDGE_CODE_EXEC`
+  (전부 기본값 있음, 선택) / `VERIFY_ALLOWED_UIDS`(없으면 `AUDITION_ALLOWED_UIDS` 폴백)
+- 시트에서 `pushPromptCsvToGithub` 1회 실행 — STEP3 프롬프트 2세트가 pmt.csv에 없다
+  (실측 12행이 전부 STEP1·2). 원문 확보 후 문안 대조.
+- 수동 회귀 1회씩: discuss · proofread · 시트 가져오기
+
+### 설계 결정 (이유가 있는 것만)
+
+- **서버는 검증 엔진 프록시, 저장은 클라이언트** — discuss 관례. 리포트가 일반 AI
+  메시지라 후속 대화가 기존 discuss 파이프라인 **무변경**으로 된다.
+- **2차 판정이 완료되지 않은 검증은 검증이 아니다** — 1차 실패·2차 실패·예산 부족·
+  도구 상한 초과는 전부 리포트를 만들지 않고 오류로 끝낸다. 1차 후보는 recall 편향이라
+  지적으로 노출하면 2차가 존재하는 이유(보수 판정)가 무너진다.
+- **앵커는 인용 실재성으로 서버가 확정한다** — 모델의 `[블록 n]` 신고를 믿지 않는다.
+  공백 제거 전문 매칭 → 최장 일치 접두(≥12자) → 실패 시 `check` 강등 + 환각 신호 표시.
+- **2차 `code_execution`은 시트에 전례가 없다** — `QualityVerification.gs`의 Claude
+  payload에는 `tools`가 아예 없다(파일 전체에 0건). 이식이 아니라 신규 요소라
+  `VERIFY_JUDGE_CODE_EXEC` env로 게이트하고 기본 off로 둔다(F1).
+- **정답 불일치는 후보 0이어도 통과시키지 않는다** — 대조가 어긋난 것 자체가 의심
+  지점이라 후보를 자동 생성해 2차로 넘겨 원인(문제 결함/풀이 오류/정답 입력 실수)을 가린다.
+
+### 함정 (구현 중 실제로 밟은 것)
+
+- **`"\frac"`은 JSON 파싱이 *성공하면서* 망가진다** — `\f`가 유효 이스케이프(form feed)라
+  결과가 `␌`+`"rac"`이 된다. 오류가 없으니 파싱 폴백으로는 못 잡는다. 복구는 오직
+  **파싱 후**에만 가능하고, `trim()`보다 **먼저** 해야 한다(선두 제어문자가 공백으로 소실된다).
+  `parseAndRepair()` 하나로 묶어 호출 순서 실수를 차단했다.
+- **프롬프트 치환에 `String.replace`의 문자열 인자를 쓰면 안 된다** — 값 안의 `$$`·`$&`가
+  치환 패턴으로 해석돼 LaTeX가 손상된다. 함수형 콜백 필수.
+- **앵커 폴백을 고정 길이 접두로 두면 안 된다** — 인용이 블록보다 길고 뒤에 군더더기가
+  붙은 경우(모델이 문장을 이어 쓴 흔한 실패), 고정 20자가 블록 전체(19자)를 넘어서면
+  명백한 일치를 놓친다. **최장 일치 접두**를 찾으면 양쪽 길이에 무관하다.
+- **Opus 4.8은 `thinking`을 생략하면 사고가 꺼진 채 돈다** — 오류도 경고도 없고 품질만
+  조용히 떨어진다. `budget_tokens`는 400이므로 되살리지 말 것. assistant prefill도 400이라
+  JSON을 `{`로 강제할 수 없다(그래서 견고 파싱이 필요하다).
+- **`tool_choice:{type:'any'}`를 검증에 쓰면 안 된다** — 도구 호출을 강제하면 모델이
+  최종 JSON 턴을 낼 수 없다. 검산은 프롬프트로 유도한다.
+- **stale을 "저장 경로 훅"으로 만들 수 없다** — `handleSave`는 탭 구분 없이 매 저장마다
+  전 탭을 delete-all → re-add 한다. "질문 탭이면" 분기가 존재하지 않는다 → **탭 정규화
+  해시 비교**로 정한다. `snapshotCurrent`의 `last_version_tab_hashes`는 `!silent`일 때만
+  갱신되므로 신호로 쓰면 안 된다.
+- **`updateProblem`으로 `verification`을 쓰면 목록 순서가 바뀐다** — `updated_at`을
+  serverTimestamp로 갱신하는데 목록이 `updated_at desc` 정렬이다. `setVerification` 전용.
+- **`<details>`를 리포트에 쓰면 안 된다** — `stripForHistory`가 `[검산 코드 첨부됨]`으로
+  치환해 히스토리에 거짓 문구가 들어간다.
+- **클라이언트가 `lib/verify/prompts`를 import하면 프롬프트 전문이 클라 번들에 실린다** —
+  답안 형식 산출을 서버로 옮기고 재료만 넘긴다.
+
+### 잔여 리스크 (알고 두는 것)
+
+- 리포트 댓글은 `commentsVisible`이 켜진 **멤버가 전부 읽는다**(`firestore.rules:234-236`).
+  `memberTabVisibility`로 풀이 탭을 가린 멤버에게 `quote`·`derivedAnswer`는 새 정보다.
+  공개 뷰어는 `commentStream=false`라 차단된다. 오너 전용 생성 + 멤버 한정 열람을 수용한
+  결과이고, 대안(answerCheck만 반환 / 오너 전용 서브컬렉션)은 진단 가치 상실 / 규칙 변경으로 더 나쁘다.
+- `VERIFY_ALLOWED_UIDS` 미설정 시 `AUDITION_ALLOWED_UIDS` 폴백 — 두 기능의 사용자 집합이
+  갈리는 날 분리해야 한다.
+- 300초 예산이 2콜 직렬에 넉넉하지 않다. 스텝 2 실측이 판단 근거다.
+
+**검증**: `npm run test:verify` 37개 · 프로덕션 빌드 통과(`/api/verify` = `ƒ` Dynamic).
+
+---
+
 ## UI 정리 (Phase 간 소규모)
 
 Phase 신설 대신 기록하는 규격 통일 작업.
