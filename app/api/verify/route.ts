@@ -23,12 +23,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, verifyUid } from '../../../lib/apiAuth';
 import { getVerifyProviders } from '../../../lib/ai-provider';
 import {
-  PROMPT_PROBLEM_FIRST, PROMPT_SOLUTION_FIRST, PROMPT_JUDGE,
+  PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE,
   fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
   type LabeledBlock,
 } from '../../../lib/verify/prompts';
 import {
-  parseAndRepair, sanitizeFindings, anchorByQuote, indexJudgments,
+  parseAndRepair, sanitizeFindings, mergeCandidates, anchorByQuote, indexJudgments,
   synthesizeVerdict, compareAnswer, repairLatexControlCharsInString,
   type RawFinding, type VerifyKind,
 } from '../../../lib/verify/parse';
@@ -42,10 +42,19 @@ export const maxDuration = 300;
  *  "검증했다"는 거짓 신호가 남으므로 자르지 않고 거절한다. */
 const MAX_INPUT_CHARS = 15_000;
 
-/** 1차 후보 상한 (시트 QCONFIG.MAX_CANDIDATES) */
-const MAX_CANDIDATES = 8;
+/** 1차 패스 **하나당** 후보 상한 (시트 QCONFIG.MAX_CANDIDATES) */
+const MAX_CANDIDATES_PER_PASS = 8;
+/** 병합 후 상한. 풀이 검증은 계산·표기 / 논리 두 패스라 합이 커진다 */
+const MAX_CANDIDATES = 12;
 
-const FIRST_MAX_TOKENS = 8_000;
+/**
+ * ⚠️ **thinking 토큰이 이 예산을 같이 먹는다.** thinkingLevel HIGH로 예산을 소진하면 남은
+ *    자리에 JSON을 억지로 채우느라 `reason`이 같은 문장의 반복·영문 진행 메모로 퇴화한다
+ *    (실측 2026-08-22: 1차 출력 10,713토큰을 쓴 행에서 후보 6건의 reason이 전부 쓰레기,
+ *     그런데 `quote`는 정확했다 — 지점은 맞히고 설명만 무너진다).
+ *    시트의 STEP3 1차(`callGeminiForQualityOnce_`)는 maxOutputTokens를 아예 걸지 않는다.
+ */
+const FIRST_MAX_TOKENS = 32_000;
 /** 시트 QCONFIG.CLAUDE_MAX_TOKENS — thinking + 응답 합산 하드캡 */
 const JUDGE_MAX_TOKENS = 16_000;
 
@@ -163,9 +172,11 @@ export async function POST(req: NextRequest) {
       gemini: env.geminiModel, claude: env.claudeModel,
     });
 
-    /* ── ❶ 1차: 후보 생성 (recall) ── */
-    const firstPrompt = kind === 'problem' ? PROMPT_PROBLEM_FIRST : PROMPT_SOLUTION_FIRST;
-    const firstUser = fillTemplate(firstPrompt.user, {
+    /* ── ❶ 1차: 후보 생성 (recall) ──
+       문제 검증은 한 패스, 풀이 검증은 **계산·표기 / 논리 두 패스**다(시트 STEP2·STEP3 구조).
+       한 프롬프트에 태그를 다 넣으면 눈에 띄는 표기·계산이 먼저 소모되고 논리가 묻힌다.
+       ⚠ 두 호출은 **병렬**이다 — 직렬로 보내면 300초 예산이 무너진다. */
+    const vars = {
       problem: labelBlocks(problemBlocks),
       solution: labelBlocks(solutionBlocks),
       format: deriveAnswerFormat({
@@ -173,40 +184,51 @@ export async function POST(req: NextRequest) {
         hasGanaOrRoman: !!body.hasGanaOrRoman,
         answer: String(body.answer ?? ''),
       }),
-    });
+    };
+    const passes = kind === 'problem' ? [PROMPT_PROBLEM_FIRST] : SOLUTION_FIRST_PASSES;
 
-    const firstRes = await first.complete(firstPrompt.system, firstUser, FIRST_MAX_TOKENS, {
-      geminiThinkingLevel: 'HIGH',
-      geminiJsonMime: true,
-    });
-    const firstJson = parseAndRepair(firstRes.content) as Record<string, unknown> | null;
-    if (!firstJson) {
+    const firstResults = await Promise.all(passes.map((pr) =>
+      first.complete(pr.system, fillTemplate(pr.user, vars), FIRST_MAX_TOKENS, {
+        geminiThinkingLevel: 'HIGH',
+        geminiJsonMime: true,
+      })));
+
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for (const r of firstResults) { inputTokens += r.inputTokens; outputTokens += r.outputTokens; }
+    const usdFirst = cost(inputTokens, outputTokens, env.geminiCostIn, env.geminiCostOut);
+
+    const firstJsons = firstResults.map((r) => parseAndRepair(r.content) as Record<string, unknown> | null);
+    // 패스가 **전부** 실패했을 때만 오류다. 하나가 살면 그것으로 진행한다 —
+    // 두 패스는 서로 독립이므로 한쪽 실패가 다른 쪽을 버릴 이유가 없다.
+    if (firstJsons.every((j) => j === null)) {
       throw new ApiError(502, '1차 검토 응답을 해석하지 못했습니다 — 잠시 후 다시 시도하세요');
     }
 
-    let inputTokens = firstRes.inputTokens;
-    let outputTokens = firstRes.outputTokens;
-    const usdFirst = cost(firstRes.inputTokens, firstRes.outputTokens, env.geminiCostIn, env.geminiCostOut);
-
-    // 그림 의존으로 판단 불가 — AI가 스스로 내린 판정만 skip이 된다 (B-8)
-    if (firstJson.skip === true) {
+    // 그림 의존으로 판단 불가 — AI가 스스로 내린 판정만 skip이 된다 (B-8).
+    // 두 패스가 다 skip일 때만 skip이다(한쪽만이면 나머지 패스의 후보를 살린다).
+    const alive = firstJsons.filter((j): j is Record<string, unknown> => j !== null);
+    if (alive.every((j) => j.skip === true)) {
       return NextResponse.json({
         report: report(kind, 'skip', [], {
           models: { first: env.geminiModel, judge: null },
-          note: String(firstJson.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
+          note: String(alive[0]?.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
         }),
         usage: { inputTokens, outputTokens, costUsd: round4(usdFirst) },
       });
     }
 
     const derivedAnswer = kind === 'problem'
-      ? repairLatexControlCharsInString(String(firstJson.derived_answer ?? '')).trim()
+      ? repairLatexControlCharsInString(String(alive[0]?.derived_answer ?? '')).trim()
       : undefined;
     const answerCheck = kind === 'problem'
       ? compareAnswer(String(body.answer ?? ''), derivedAnswer)
       : undefined;
 
-    const candidates = sanitizeFindings(firstJson.candidates, kind, MAX_CANDIDATES);
+    const candidates = mergeCandidates(
+      alive.map((j) => sanitizeFindings(j.candidates, kind, MAX_CANDIDATES_PER_PASS)),
+      MAX_CANDIDATES,
+    );
 
     /* ── ❷ 정답 불일치는 후보가 0이어도 그냥 넘길 수 없다 (V2) ──
        일치 대조가 어긋났다는 것 자체가 의심 지점이다. 원인(문제 결함/풀이 오류/정답 입력

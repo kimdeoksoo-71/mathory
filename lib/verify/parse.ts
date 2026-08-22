@@ -269,6 +269,29 @@ export function sanitizeFindings(arr: unknown, kind: VerifyKind, cap = 8): RawFi
   return out;
 }
 
+/**
+ * 여러 1차 패스의 후보를 합친다 (풀이 검증은 계산·표기 / 논리 두 패스로 나뉜다).
+ *
+ * - 인용이 같은(공백 무시) 후보는 한 건으로 본다 — 두 패스가 같은 줄을 다른 각도로 짚을 수 있다.
+ * - id는 병합 후 **다시 매긴다.** 2차 판정이 id로 맞물리므로 패스별 id를 그대로 두면 충돌한다.
+ * - 패스 순서를 섞지 않고 이어 붙인다 — 앞 패스가 먼저 판정된다는 보장은 필요 없지만,
+ *   결정적 순서라야 같은 입력에 같은 리포트가 나온다.
+ */
+export function mergeCandidates(lists: RawFinding[][], cap: number): RawFinding[] {
+  const out: RawFinding[] = [];
+  const seen = new Set<string>();
+  for (const list of lists) {
+    for (const c of list) {
+      const key = normalizeForQuoteCheck(c.quote) || `\u0000${c.reason}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ ...c, id: `c${out.length + 1}` });
+      if (out.length >= cap) return out;
+    }
+  }
+  return out;
+}
+
 /* ═══════════════════════════════════════════════════════ */
 /* 4. 인용 실재성 → 블록 앵커 확정                            */
 /* ═══════════════════════════════════════════════════════ */

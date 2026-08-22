@@ -170,28 +170,34 @@ function formatGuideFromType(t, answer, P) {
 async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts }) {
   const t0 = Date.now();
   const targetBlocks = kind === 'problem' ? problemBlocks : solutionBlocks;
-  const firstPrompt = kind === 'problem' ? P.PROMPT_PROBLEM_FIRST : P.PROMPT_SOLUTION_FIRST;
-
-  const firstUser = P.fillTemplate(firstPrompt.user, {
+  // 문제 = 한 패스 / 풀이 = 계산·표기 + 논리 두 패스. ⚠ 병렬 (라우트와 동일)
+  const passes = kind === 'problem' ? [P.PROMPT_PROBLEM_FIRST] : P.SOLUTION_FIRST_PASSES;
+  const vars = {
     problem: P.labelBlocks(problemBlocks),
     solution: P.labelBlocks(solutionBlocks),
     format: opts.formatGuide,
-  });
+  };
 
-  const g = await callGemini(firstPrompt.system, firstUser, opts.geminiModel,
-    V.buildGeminiConfig(8000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }));
+  const gs = await Promise.all(passes.map((pr) =>
+    callGemini(pr.system, P.fillTemplate(pr.user, vars), opts.geminiModel,
+      V.buildGeminiConfig(32000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
+  const gIn = gs.reduce((n, g) => n + g.inputTokens, 0);
+  const gOut = gs.reduce((n, g) => n + g.outputTokens, 0);
 
-  const firstJson = V.parseAndRepair(g.content);
-  if (!firstJson) return { error: '1차 응답 파싱 실패', raw: g.content.slice(0, 600), ms: Date.now() - t0 };
+  const jsons = gs.map((g) => V.parseAndRepair(g.content));
+  if (jsons.every((j) => !j)) {
+    return { error: '1차 응답 파싱 실패', raw: gs[0].content.slice(0, 600), ms: Date.now() - t0 };
+  }
+  const alive = jsons.filter(Boolean);
 
-  if (firstJson.skip === true) {
-    return { verdict: 'skip', findings: [], note: firstJson.skip_reason,
-             tokens: [g.inputTokens, g.outputTokens], ms: Date.now() - t0, judged: false };
+  if (alive.every((j) => j.skip === true)) {
+    return { verdict: 'skip', findings: [], note: alive[0].skip_reason,
+             tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
   }
 
-  const derivedAnswer = kind === 'problem' ? String(firstJson.derived_answer || '').trim() : undefined;
+  const derivedAnswer = kind === 'problem' ? String(alive[0].derived_answer || '').trim() : undefined;
   const answerCheck = kind === 'problem' ? V.compareAnswer(answer, derivedAnswer) : undefined;
-  const candidates = V.sanitizeFindings(firstJson.candidates, kind, 8);
+  const candidates = V.mergeCandidates(alive.map((j) => V.sanitizeFindings(j.candidates, kind, 8)), 12);
 
   if (answerCheck === 'mismatch' && !candidates.some((c) => c.tag === '정답불일치')) {
     candidates.unshift({ id: 'c0', tag: '정답불일치', quote: '',
@@ -203,7 +209,7 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
 
   if (candidates.length === 0) {
     return { verdict: 'ok', findings: [], note: '(후보 없음)', derivedAnswer, answerCheck,
-             rawCandidates, tokens: [g.inputTokens, g.outputTokens], ms: Date.now() - t0, judged: false };
+             rawCandidates, tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
   }
 
   const anchors = candidates.map((c) => V.anchorByQuote(c.quote, targetBlocks));
@@ -225,7 +231,7 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
   const judgments = judgeJson?.judgments;
   if (!Array.isArray(judgments)) {
     return { error: '2차 응답 파싱 실패', raw: c.content.slice(0, 600), rawCandidates,
-             tokens: [g.inputTokens + c.inputTokens, g.outputTokens + c.outputTokens], ms: Date.now() - t0 };
+             tokens: [gIn + c.inputTokens, gOut + c.outputTokens], ms: Date.now() - t0 };
   }
 
   const rulings = V.indexJudgments(judgments);
@@ -247,7 +253,7 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
     verdict: V.synthesizeVerdict(findings), findings, derivedAnswer, answerCheck,
     rawCandidates, rejected: rawCandidates.length - findings.length,
     stopReason: c.stopReason,
-    tokens: [g.inputTokens + c.inputTokens, g.outputTokens + c.outputTokens],
+    tokens: [gIn + c.inputTokens, gOut + c.outputTokens],
     ms: Date.now() - t0, judged: true,
   };
 }
