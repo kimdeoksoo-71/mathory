@@ -39,6 +39,56 @@ export interface Problem {
   last_editor_uid?: string;                    // 마지막 편집자 (협업 대비)
   // Phase 61a: 시트 가져오기 출처. additive — 마이그레이션 0, Firestore 규칙 0.
   import_source?: ImportSource;
+  // Phase 61b: 정밀 검증 상태 요약. additive — 마이그레이션 0, Firestore 규칙 0.
+  verification?: VerificationState;
+}
+
+/**
+ * Phase 61b — 문항의 검증 상태 요약(목록 배지용).
+ *
+ * ⚠️ **findings·derivedAnswer를 여기에 넣지 말 것.** 이 문서는 오너뿐 아니라
+ *    공개 문항이면 비로그인 열람자까지, 멤버면 멤버까지 읽는다(`firestore.rules:82`).
+ *    상세는 리포트 메시지(tab_comments)에만 둔다.
+ */
+export type VerificationState = Partial<Record<VerifyKind, {
+  verdict: VerifyVerdict;
+  verifiedAt: number;
+  /** 검증 대상 탭의 정규화 해시. 편집 후 stale 판정의 기준 */
+  contentHash: string;
+  /** 검증 이후 해당 탭이 바뀌었는가. 되돌리면 자동으로 다시 false가 된다 */
+  stale?: boolean;
+  /** 리포트가 저장된 tab_comments 문서 id */
+  reportCommentId?: string;
+}>>;
+
+export type VerifyKind = 'problem' | 'solution';
+export type VerifyVerdict = 'ok' | 'check' | 'fail' | 'skip';
+
+/** 검증 리포트 본문. `mathory-verify` 펜스로 메시지에 실려 간다 */
+export interface VerifyFinding {
+  tag: string;
+  verdict: 'fail' | 'check';
+  /** 인용 매칭으로 서버가 확정한 앵커. 못 찾으면 null (환각 신호) */
+  blockKey: string | null;
+  quote: string;
+  reason: string;
+  suggestion?: string;
+  quoteFound: boolean;
+}
+
+export interface VerifyReport {
+  kind: VerifyKind;
+  verdict: VerifyVerdict;
+  findings: VerifyFinding[];
+  /** ⚠️ 카드 토글로만 노출한다. markdown 본문에 넣지 말 것 —
+   *  `stripForHistory`가 `<details>`를 "검산 코드 첨부됨"으로 오치환하고,
+   *  요약은 공개 뷰어 폴백이라 정답이 그대로 실린다 */
+  derivedAnswer?: string;
+  answerCheck?: 'match' | 'mismatch' | 'no_answer';
+  /** judge가 null = 후보 0으로 2차 미호출 (2차 실패는 리포트 자체가 없다) */
+  models: { first: string; judge: string | null };
+  note?: string;
+  verifiedAt: number;
 }
 
 /**

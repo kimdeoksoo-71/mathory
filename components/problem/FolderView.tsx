@@ -16,6 +16,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import SvgViewer from '../viewer/SvgViewer';
 import BlockchainBadge from '../ui/BlockchainBadge';
+import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
   IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare,
@@ -567,6 +568,7 @@ export default function FolderView({
                         <span style={{ marginLeft: 1 }}>{agentCountsMap[problem.id]}</span>
                       </span>
                     )}
+                    <VerifyBadge problem={problem} size={11} />
                     <BlockchainBadge problem={problem} size={13} />
                     <button
                       onPointerDown={(e) => e.stopPropagation()}

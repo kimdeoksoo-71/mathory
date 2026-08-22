@@ -1,15 +1,16 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection } from '../../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection, VerifyKind, VerifyReport } from '../../types/problem';
 import {
-  getProblemWithBlocks, updateProblem,
+  getProblemWithBlocks, updateProblem, setVerification,
   saveTabBlock, deleteBlock, deleteAllTabBlocks,
 } from '../../lib/firestore';
-import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
+import { watchAllComments, countComments, countAgentSessions, addComment } from '../../lib/comments';
 import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
+import { buildReportMarkdown } from '../comment/VerifyReportCard';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -31,7 +32,7 @@ import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
 import { canonicalize } from '../../lib/version/canonicalize';
-import { sha256 } from '../../lib/version/hash';
+import { sha256, hashPerTab } from '../../lib/version/hash';
 import { writeDraft, readDraft, clearDraft } from '../../lib/version/draft';
 import { fastScrollTo, computeBlockAwareScrollTop, computeMathCenterScrollTop } from '../../lib/editorScroll';
 import SaveStatus from './SaveStatus';
@@ -958,6 +959,35 @@ interface EditorViewProps {
 }
 
 /* ═══ 메인 EditorView ═══ */
+
+/**
+ * Phase 61b — 검증 대상 탭의 정규화 해시.
+ *
+ * 조합을 직접 만들지 않고 Phase 55 파이프라인을 재사용한다:
+ *   `collectCurrentContent`(toPersistedBlock 통과본 + 탭 로드 실패 가드) → `hashPerTab`.
+ *
+ * ⚠️ problem 해시에는 **answer를 함께 넣는다.** `canonicalizeTab`은 제목·정답을 포함하지
+ *    않는데(meta는 canonicalize에만 있다), 문제 검증의 `answerCheck`는 `Problem.answer`에
+ *    의존하므로 정답만 고쳐도 그 리포트는 낡는다.
+ * ⚠️ `snapshotCurrent`의 `last_version_tab_hashes`를 쓰면 안 된다 — 스냅샷은 `!silent`일
+ *    때만 돌아 자동저장(탭 전환·이탈)에서 신호가 샌다.
+ */
+async function computeVerifyHashes(args: {
+  tabs: TabMeta[];
+  blocksByTab: Record<string, Block[]>;
+  title: string;
+  answer: string;
+  tabLoadErrors?: Record<string, string>;
+}): Promise<Partial<Record<VerifyKind, string>>> {
+  const content = collectCurrentContent(args);
+  const per = await hashPerTab(content);
+  const out: Partial<Record<VerifyKind, string>> = {};
+  if (per['question'] !== undefined) {
+    out.problem = await sha256(`${per['question']}\n#answer:${args.answer || ''}`);
+  }
+  if (per['solution'] !== undefined) out.solution = per['solution'];
+  return out;
+}
 
 export default function EditorView({ problemId, folders, onBack }: EditorViewProps) {
   const { user } = useAuth();
@@ -2513,6 +2543,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [problem, user, tabs, allBlocks, editTitle, editAnswer]);
 
   const savingRef = useRef(false);
+  /** Phase 61b: 직전 저장의 성공 여부. setSaveError는 state라 같은 tick에 못 읽는다. */
+  const lastSaveOkRef = useRef(true);
   const handleSave = useCallback(async (silent = false) => {
     if (!problem) return;
     if (savingRef.current) return;
@@ -2610,12 +2642,41 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setOrigBlockIds(newOrigIds);
         // 저장 시 블록 ID가 갱신되어 교정 결과 매칭이 깨지므로 초기화
         setProofreadResults({});
+
+        /* ─── Phase 61b: 검증 stale 판정 ───
+           ⚠ "질문 탭을 저장하면" 같은 분기를 둘 수 없다 — 위 루프가 매 저장마다 **전 탭**을
+             다시 쓴다. 그래서 저장 경로 훅이 아니라 **탭 정규화 해시 비교**로 정한다.
+             목록은 불리언만 읽으므로 렌더 비용은 그대로 0이고, 되돌리면 자동 해제된다.
+           ⚠ collectCurrentContent는 탭 로드 실패 시 VersionLoadError를 던진다 → 저장 자체를
+             깨뜨리지 않도록 통째로 감싼다. 실패하면 stale은 손대지 않는다. */
+        const verif = refreshed.verification;
+        if (verif && (verif.problem || verif.solution)) {
+          try {
+            const hashes = await computeVerifyHashes({
+              tabs: loadedTabs, blocksByTab: blocksMap,
+              title: editTitle, answer: editAnswer,
+              tabLoadErrors: refreshed.tabLoadErrors || {},
+            });
+            for (const kind of ['problem', 'solution'] as VerifyKind[]) {
+              const cur = verif[kind];
+              const now = hashes[kind];
+              if (!cur || now === undefined) continue;
+              const next = now !== cur.contentHash;
+              if (next !== !!cur.stale) {
+                await setVerification(problem.id, kind, { ...cur, stale: next });
+              }
+            }
+          } catch (e) {
+            console.warn('[Phase61b] 검증 stale 계산 생략:', e);
+          }
+        }
       }
 
       // 저장 성공: dirty 해제. setAllBlocks가 effect를 다시 트리거할 수 있으므로
       // skipDirtyRef로 그 한 번을 무시.
       skipDirtyRef.current = true;
       setDirty(false);
+      lastSaveOkRef.current = true;
 
       // Phase 55 계층1: 저장 성공 → 상태 갱신 + 드래프트 정리 (서버본과 동기화됨)
       setSaveError(false);
@@ -2633,6 +2694,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     } catch (error) {
       setStatus(`에러: ${error}`);
       setSaveError(true);   // Phase 55 계층1: 저장 실패 표시
+      lastSaveOkRef.current = false;
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -2645,6 +2707,121 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     handleSave(true);
     setActiveTab(nextTabId);
   }, [activeTab, handleSave]);
+
+  /* ═══ Phase 61b: 정밀 검증 ═══ */
+
+  /** 검증에 넘길 블록. 미디어 블록은 텍스트가 없으므로 제외하고 hasImages로만 센다. */
+  const verifyBlocksOf = useCallback((tabId: string) => (
+    (allBlocks[tabId] || [])
+      .filter((b) => !['image', 'svg', 'ggb'].includes(b.type))
+      .map((b) => ({
+        blockKey: blockKeyOf(b),
+        type: b.type,
+        text: (b.title ? `### ${b.title}\n` : '') + (b.raw_text || ''),
+      }))
+      .filter((b) => b.text.trim())
+  ), [allBlocks]);
+
+  /** 칩이 팝오버를 열기 **전에** 부른다 — 비용 0으로 막을 수 있는 것을 호출 뒤에 알리지 않는다 */
+  const verifyCharCount = useCallback((kind: VerifyKind) => {
+    const q = verifyBlocksOf('question');
+    const sol = kind === 'solution' ? verifyBlocksOf('solution') : [];
+    return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
+  }, [verifyBlocksOf]);
+
+  const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
+    if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');
+
+    /* ⚠ 검증 대상은 **저장본**이다. 미저장 편집이 있으면 "지금 화면"을 검증했다고 믿는데
+         서버본이 검증되고 지적 위치도 어긋난다. 저장이 실패하면 실행하지 않는다.
+         덤으로 toPersistedBlock이 block_key를 영속시켜 리포트 앵커가 안정된다. */
+    if (dirty) {
+      await handleSave(true);
+      if (!lastSaveOkRef.current) throw new Error('저장에 실패해 검증을 중단했습니다');
+    }
+
+    const problemBlocks = verifyBlocksOf('question');
+    const solutionBlocks = kind === 'solution' ? verifyBlocksOf('solution') : [];
+    const targetTab = kind === 'solution' ? 'solution' : 'question';
+    const targetRaw = allBlocks[targetTab] || [];
+
+    const idToken = await user.getIdToken();
+    const res = await fetch('/api/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({
+        kind, problemBlocks, solutionBlocks,
+        answer: editAnswer || '',
+        // 답안 형식 문구는 서버가 만든다 — 클라가 lib/verify/prompts를 import하면
+        // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
+        hasChoices: (allBlocks['question'] || []).some((b) => b.type === 'choices'),
+        hasGanaOrRoman: (allBlocks['question'] || []).some((b) => b.type === 'gana' || b.type === 'roman'),
+        hasImages: targetRaw.some((b) => ['image', 'svg', 'ggb'].includes(b.type)),
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) throw new Error(data.error || `검증 실패 (HTTP ${res.status})`);
+
+    const report = data.report as VerifyReport;
+
+    // 리포트는 일반 AI 메시지로 저장한다 → 후속 대화가 기존 discuss 파이프라인 무변경으로 된다
+    const commentId = await addComment({
+      problemId: problem.id,
+      tabId: activeTab,
+      authorUid: 'ai:verify',
+      content: buildReportMarkdown(report),
+      parentCommentId: null,
+      authorType: 'ai',
+      modelId: 'verify',
+      discussionSessionId: sessionId,
+      aiUsage: {
+        inputTokens: data.usage?.inputTokens || 0,
+        outputTokens: data.usage?.outputTokens || 0,
+        costUsd: data.usage?.costUsd || 0,
+      },
+    });
+
+    const hashes = await computeVerifyHashes({
+      tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer || '',
+      tabLoadErrors: tabLoadErrorsRef.current,
+    });
+    await setVerification(problem.id, kind, {
+      verdict: report.verdict,
+      verifiedAt: report.verifiedAt,
+      contentHash: hashes[kind] || '',
+      stale: false,
+      reportCommentId: commentId,
+    });
+    setProblem((prev) => (prev ? {
+      ...prev,
+      verification: {
+        ...(prev.verification || {}),
+        [kind]: {
+          verdict: report.verdict, verifiedAt: report.verifiedAt,
+          contentHash: hashes[kind] || '', stale: false, reportCommentId: commentId,
+        },
+      },
+    } : prev));
+  }, [problem, user, dirty, handleSave, verifyBlocksOf, allBlocks, editAnswer, editTitle, tabs, activeTab]);
+
+  /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다. */
+  const handleJumpToBlock = useCallback((blockKey: string) => {
+    for (const t of tabs) {
+      const blk = (allBlocks[t.id] || []).find((b) => blockKeyOf(b) === blockKey);
+      if (!blk) continue;
+      if (t.id !== activeTab) switchTab(t.id);   // ⚠ switchTab은 자동저장을 동반한다
+      setActiveBlockId(blk.id);
+      /* Phase 45a 계약 — 직접 스크롤을 호출하는 핸들러는 자동 스크롤 effect의 게이트를
+         우회하므로 같은 조건(collapseMode)을 자기 안에 다시 적는다. */
+      if (collapseModeRef.current) return;
+      skipNextBlockScrollRef.current = true;
+      scrollEditorToBlockTop(blk.id);
+      scrollPreviewToBlockTop(blk.id);
+      return;
+    }
+    setStatus('그 블록은 더 이상 없습니다');
+    setTimeout(() => setStatus(''), 2500);
+  }, [tabs, allBlocks, activeTab, switchTab, scrollEditorToBlockTop, scrollPreviewToBlockTop]);
 
   /* ─── 자동저장: EditorView 이탈(onBack) / unmount ─── */
   const skipUnmountSaveRef = useRef<boolean>(false);
@@ -3517,6 +3694,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
           onInsertGraphBlock={handleInsertGraphBlock}
+          onRunVerify={handleRunVerify}
+          onJumpToBlock={handleJumpToBlock}
+          verifyCharCount={verifyCharCount}
           width={panelWidth}
         />
       )}

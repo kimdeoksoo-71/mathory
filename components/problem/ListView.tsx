@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Problem, UserProfile, MemberRole } from '../../types/problem';
 import { updateMemberRole, removeMember } from '../../lib/membership';
+import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import { IconDotsVertical, IconShare, IconCopy, IconTrash } from '../ui/Icons';
@@ -146,6 +147,7 @@ export default function ListView({
                   <span style={{ marginLeft: 1 }}>{ac}</span>
                 </span>
               )}
+              <VerifyBadge problem={p} size={11} />
               <BlockchainBadge problem={p} size={12} />
             </div>
 

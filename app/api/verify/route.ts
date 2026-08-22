@@ -24,7 +24,7 @@ import { ApiError, verifyUid } from '../../../lib/apiAuth';
 import { getVerifyProviders } from '../../../lib/ai-provider';
 import {
   PROMPT_PROBLEM_FIRST, PROMPT_SOLUTION_FIRST, PROMPT_JUDGE,
-  fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars,
+  fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
   type LabeledBlock,
 } from '../../../lib/verify/prompts';
 import {
@@ -87,7 +87,10 @@ interface VerifyRequestBody {
   problemBlocks?: LabeledBlock[];
   solutionBlocks?: LabeledBlock[];
   answer?: string;
-  answerFormat?: string;
+  /** 답안 형식 문구의 재료. 문구 자체는 서버가 만든다 —
+   *  클라가 prompts를 import하면 프롬프트 전문이 클라이언트 번들에 실린다. */
+  hasChoices?: boolean;
+  hasGanaOrRoman?: boolean;
   hasImages?: boolean;
 }
 
@@ -165,7 +168,11 @@ export async function POST(req: NextRequest) {
     const firstUser = fillTemplate(firstPrompt.user, {
       problem: labelBlocks(problemBlocks),
       solution: labelBlocks(solutionBlocks),
-      format: String(body.answerFormat || '표준 수치 형식'),
+      format: deriveAnswerFormat({
+        hasChoices: !!body.hasChoices,
+        hasGanaOrRoman: !!body.hasGanaOrRoman,
+        answer: String(body.answer ?? ''),
+      }),
     });
 
     const firstRes = await first.complete(firstPrompt.system, firstUser, FIRST_MAX_TOKENS, {

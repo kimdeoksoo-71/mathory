@@ -5,7 +5,7 @@ import ToggleSwitch from '../ui/ToggleSwitch';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import {
   ProblemComment, TabMeta, UserProfile, DiscussionSession, AIModelConfig, Block,
-  tabSubcollection,
+  VerifyKind, tabSubcollection,
 } from '../../types/problem';
 import { db } from '../../lib/firebase';
 import {
@@ -21,6 +21,7 @@ import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/f
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import { AIBrandIcon } from './AIBrandIcon';
+import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 
@@ -32,6 +33,7 @@ const HISTORY_LIMIT = 5;
 function stripForHistory(content: string): string {
   return content
     .replace(/```mathory-graph[\s\S]*?```/g, '[그래프 첨부됨]')
+    .replace(/```mathory-verify[\s\S]*?```/g, '[검증 리포트 첨부됨]')
     .replace(/<details>[\s\S]*?<\/details>/g, '[검산 코드 첨부됨]')
     .trim();
 }
@@ -54,6 +56,14 @@ interface CommentPanelProps {
   onInsertGraphBlock?: (save: GraphBlockSave) => Promise<string | void>;
   /** Phase 44: 드래그 리사이즈된 패널 폭 (px 숫자). 미전달 시 기본 35em */
   width?: number | string;
+  /** Phase 61b: 정밀 검증 실행. **편집 화면에서만 전달** — prop 유무가 곧 게이트다
+   *  (onInsertGraphBlock 선례). 열람뷰(ProblemView)에는 넘기지 않는다. */
+  onRunVerify?: (kind: VerifyKind, sessionId: string) => Promise<void>;
+  /** Phase 61b: 리포트 지적 → 해당 블록으로 이동. 〃 */
+  onJumpToBlock?: (blockKey: string) => void;
+  /** Phase 61b: 검증 대상 총 글자 수(사전 차단용). 편집 화면에서만 전달.
+   *  kind별로 다르다 — 문제 검증은 문제 탭만, 풀이 검증은 문제+풀이를 함께 보낸다. */
+  verifyCharCount?: (kind: VerifyKind) => number;
 }
 
 interface DisplayInfo {
@@ -75,6 +85,10 @@ interface PendingAI {
   error?: string;
   /** 재시도 시 사용할 원본 호출 컨텍스트 */
   retryContext?: DiscussRequestContext;
+  /** Phase 61b: 'verify'면 aiModels에 없는 합성 항목이다 — 재시도 경로가 다르다 */
+  kind?: 'discuss' | 'verify';
+  /** Phase 61b: 검증 재시도용 */
+  verifyKind?: VerifyKind;
 }
 
 interface DiscussRequestContext {
@@ -91,6 +105,7 @@ export default function CommentPanel({
   mode = 'agent',
   bodyFontSize = 15,
   onClose, onCommentsChange, onInsertGraphBlock,
+  onRunVerify, onJumpToBlock, verifyCharCount,
   width = '35em',
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
@@ -652,9 +667,44 @@ export default function CommentPanel({
   };
 
   // ─── 에러 재시도 ───
+  /* ─── Phase 61b: 정밀 검증 실행 ───
+     칩·팝오버는 여기, 실제 호출·저장은 EditorView(onRunVerify)가 한다.
+     진행/오류 표시는 discuss의 PendingAIBubble을 그대로 재사용한다(합성 항목). */
+  const runVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
+    if (!onRunVerify) return;
+    const modelId = `verify:${kind}`;
+    setPendingAI((prev) => [
+      ...prev.filter((p) => !(p.modelId === modelId && p.sessionId === sessionId)),
+      {
+        modelId, sessionId, kind: 'verify', verifyKind: kind,
+        nickname: kind === 'problem' ? '문제 검증' : '풀이 검증',
+        emoji: '🔍', provider: 'anthropic',
+      },
+    ]);
+    try {
+      await onRunVerify(kind, sessionId);
+      await refreshComments();
+      setPendingAI((prev) => prev.filter((p) => !(p.modelId === modelId && p.sessionId === sessionId)));
+    } catch (err) {
+      setPendingAI((prev) =>
+        prev.map((p) =>
+          p.modelId === modelId && p.sessionId === sessionId
+            ? { ...p, error: err instanceof Error ? err.message : '검증 실패' }
+            : p,
+        ),
+      );
+    }
+  }, [onRunVerify, refreshComments]);
+
   const handleRetryAI = async (modelId: string, sessionId: string) => {
     const pending = pendingAI.find((p) => p.modelId === modelId && p.sessionId === sessionId);
-    if (!pending || !pending.retryContext) return;
+    if (!pending) return;
+    // Phase 61b: 검증 항목은 aiModels에 없다 — 그쪽 경로로 보낸다
+    if (pending.kind === 'verify') {
+      if (pending.verifyKind) await runVerify(pending.verifyKind, sessionId);
+      return;
+    }
+    if (!pending.retryContext) return;
     const model = aiModels.find((m) => m.modelId === modelId);
     if (!model) return;
     // error 표시 제거, pending 상태로 되돌림
@@ -846,6 +896,7 @@ export default function CommentPanel({
                 editingId={editingId}
                 graphAutoActivate={thread.parent.id === freshAiCommentId}
                 onSaveGraphAsBlock={onInsertGraphBlock}
+                onJumpToBlock={onJumpToBlock}
                 onSetReplying={(id) => {
                   setReplyingTo(id);
                   if (id) {
@@ -862,7 +913,8 @@ export default function CommentPanel({
               <PendingAIBubble
                 key={`${p.sessionId}:${p.modelId}`}
                 pending={p}
-                onRetry={p.error && p.retryContext ? () => handleRetryAI(p.modelId, p.sessionId) : undefined}
+                onRetry={p.error && (p.retryContext || p.kind === 'verify')
+                  ? () => handleRetryAI(p.modelId, p.sessionId) : undefined}
                 onDismiss={p.error ? () => handleDismissError(p.modelId, p.sessionId) : undefined}
               />
             ))}
@@ -930,15 +982,27 @@ export default function CommentPanel({
             onSubmit={handleSendMessage}
             toolsAtBottom={isCommentsMode}
             headerLeft={isAISession ? (
-              <AIChipBar
-                models={aiModels}
-                selectedIds={selectedModelIds}
-                onToggle={(modelId) =>
-                  setSelectedModelIds((prev) =>
-                    prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
-                  )
-                }
-              />
+              <>
+                <AIChipBar
+                  models={aiModels}
+                  selectedIds={selectedModelIds}
+                  onToggle={(modelId) =>
+                    setSelectedModelIds((prev) =>
+                      prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId],
+                    )
+                  }
+                />
+                {/* Phase 61b: 검증 칩 — onRunVerify가 있고(편집 화면) 오너일 때만.
+                    오너 제한은 정책이 아니라 규칙이 강제한다: AI 댓글 create는 오너만
+                    허용되므로(firestore.rules) 비오너는 비용만 쓰고 저장에서 실패한다. */}
+                {onRunVerify && currentUid === ownerUid && (
+                  <VerifyChips
+                    busy={pendingAI.some((p) => p.kind === 'verify' && !p.error)}
+                    charCount={verifyCharCount}
+                    onRun={(kind) => runVerify(kind, activeSessionId)}
+                  />
+                )}
+              </>
             ) : undefined}
           />
         </div>
@@ -1192,6 +1256,102 @@ function AIChipBar({
 }
 
 /* ═══════════════════════════════════════════════════════ */
+/* VerifyChips (Phase 61b)                                  */
+/* ═══════════════════════════════════════════════════════ */
+
+/** agent 컨텍스트와 같은 상한. 초과분을 잘라 검증하면 "검증했다"는 거짓 신호가 남는다 */
+const VERIFY_CHAR_CAP = 15_000;
+
+function VerifyChips({
+  busy, charCount, onRun,
+}: {
+  busy: boolean;
+  charCount?: (kind: VerifyKind) => number;
+  onRun: (kind: VerifyKind) => void;
+}) {
+  const [confirm, setConfirm] = useState<VerifyKind | null>(null);
+  const [tooLong, setTooLong] = useState<number | null>(null);
+
+  const ask = (kind: VerifyKind) => {
+    // ⚠ 팝오버를 열기 **전에** 길이를 본다 — 비용 0으로 막을 수 있는 것을 호출 뒤에 알리지 않는다
+    const n = charCount ? charCount(kind) : 0;
+    if (n > VERIFY_CHAR_CAP) { setTooLong(n); setConfirm(null); return; }
+    setTooLong(null);
+    setConfirm((prev) => (prev === kind ? null : kind));
+  };
+
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      {(['problem', 'solution'] as VerifyKind[]).map((kind) => (
+        <button
+          key={kind}
+          onClick={() => ask(kind)}
+          disabled={busy}
+          title={busy ? '검증이 진행 중입니다' : 'AI 교차검증을 실행합니다 (API 비용 발생)'}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            border: `1px solid ${confirm === kind ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
+            background: confirm === kind ? 'var(--accent-soft)' : 'transparent',
+            color: busy ? 'var(--text-faint)' : 'var(--text-secondary)',
+            borderRadius: 12, padding: '2px 8px', fontSize: 11,
+            cursor: busy ? 'default' : 'pointer', fontFamily: 'var(--font-ui)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          🔍 {kind === 'problem' ? '문제 검증' : '풀이 검증'}
+        </button>
+      ))}
+
+      {tooLong !== null && (
+        <span style={{ fontSize: 10.5, color: 'var(--accent-danger)' }}>
+          문항이 너무 깁니다 — {tooLong.toLocaleString()}자 / {VERIFY_CHAR_CAP.toLocaleString()}자
+        </span>
+      )}
+
+      {confirm && (
+        <div style={{
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 20,
+          width: 250, padding: 10, borderRadius: 6,
+          border: '1px solid var(--border-primary)', background: 'var(--bg-card)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
+          fontSize: 11.5, color: 'var(--text-secondary)', lineHeight: 1.5,
+        }}>
+          <div style={{ marginBottom: 8 }}>
+            <b style={{ color: 'var(--text-primary)' }}>
+              {confirm === 'problem' ? '문제' : '풀이'}
+            </b>
+            를 두 모델로 교차검증합니다.<br />
+            <span style={{ color: 'var(--text-muted)' }}>API 비용이 발생하고 1~2분 걸립니다.</span>
+          </div>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setConfirm(null)}
+              style={{
+                border: '1px solid var(--border-primary)', background: 'transparent',
+                borderRadius: 4, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
+              }}
+            >
+              취소
+            </button>
+            <button
+              onClick={() => { const k = confirm; setConfirm(null); onRun(k); }}
+              style={{
+                border: 'none', background: 'var(--accent-primary)', color: '#fff',
+                borderRadius: 4, padding: '3px 10px', fontSize: 11, cursor: 'pointer',
+                fontFamily: 'var(--font-ui)', fontWeight: 600,
+              }}
+            >
+              실행
+            </button>
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════ */
 /* PendingAIBubble                                          */
 /* ═══════════════════════════════════════════════════════ */
 function PendingAIBubble({
@@ -1255,7 +1415,7 @@ function CommentThreadView({
   replyingToId, editingId,
   onSetReplying, onSetEditing,
   onEditSubmit, onDelete,
-  graphAutoActivate, onSaveGraphAsBlock,
+  graphAutoActivate, onSaveGraphAsBlock, onJumpToBlock,
 }: {
   thread: { parent: ProblemComment; replies: ProblemComment[] };
   getDisplayInfo: (c: ProblemComment) => DisplayInfo;
@@ -1270,6 +1430,8 @@ function CommentThreadView({
   onDelete: (commentId: string) => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
+  /** Phase 61b: 리포트 지적 → 블록 이동 (편집 화면에서만) */
+  onJumpToBlock?: (blockKey: string) => void;
 }) {
   const { parent, replies } = thread;
   const parentIsAI = parent.authorType === 'ai';
@@ -1295,6 +1457,7 @@ function CommentThreadView({
         onDelete={() => onDelete(parent.id)}
         graphAutoActivate={graphAutoActivate}
         onSaveGraphAsBlock={onSaveGraphAsBlock}
+        onJumpToBlock={onJumpToBlock}
       />
 
       {replies.length > 0 && (
@@ -1331,7 +1494,7 @@ function CommentItem({
   isEditing, isReplying,
   onSetEditing, onSetReplying,
   onEditSubmit, onDelete,
-  graphAutoActivate, onSaveGraphAsBlock,
+  graphAutoActivate, onSaveGraphAsBlock, onJumpToBlock,
 }: {
   comment: ProblemComment;
   info: DisplayInfo;
@@ -1347,8 +1510,15 @@ function CommentItem({
   onDelete: () => void;
   graphAutoActivate?: boolean;
   onSaveGraphAsBlock?: (save: GraphBlockSave) => Promise<string | void>;
+  /** Phase 61b: 리포트 지적 → 블록 이동 (편집 화면에서만) */
+  onJumpToBlock?: (blockKey: string) => void;
 }) {
   const isMine = !info.isAI && comment.authorUid === currentUid;
+
+  /* ─── Phase 61b: 검증 리포트 — 펜스를 카드로 바꿔 그린다.
+        `mathory-graph`와 달리 EditorPreview를 거치지 않는다(마크다운이 아니라 구조화 데이터라
+        본문 렌더러가 알 이유가 없다). 펜스를 뺀 요약만 EditorPreview로 넘긴다. ─── */
+  const verify = info.isAI ? extractVerifyReport(comment.content) : null;
 
   /* ─── Phase 42: 그래프 내보내기 (블록 저장·GGB 다운로드 — 액션 행 버튼) ─── */
   const hasGraph = info.isAI && comment.content.includes('```mathory-graph');
@@ -1475,11 +1645,14 @@ function CommentItem({
         ) : (
           <div className={`comment-body ${info.isAI ? 'ai-body' : ''}`}>
             <EditorPreview
-              content={comment.content}
+              content={verify ? verify.body : comment.content}
               borderless autoHeight locale="ko"
               graphAutoActivate={graphAutoActivate}
               onRegisterGraphExport={hasGraph ? handleRegisterExport : undefined}
             />
+            {verify && (
+              <VerifyReportCard report={verify.report} onJumpToBlock={onJumpToBlock} />
+            )}
           </div>
         )}
       </div>

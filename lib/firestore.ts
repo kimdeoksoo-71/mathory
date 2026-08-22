@@ -16,7 +16,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { deleteAllVersions } from './version/prune';
-import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection } from '../types/problem';
+import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, DEFAULT_TABS, tabSubcollection, VerifyKind, VerificationState } from '../types/problem';
 
 // ===== 특수 폴더 상수 =====
 export const TRASH_FOLDER_ID = '__trash__';
@@ -59,6 +59,23 @@ export async function updateProblem(problemId: string, data: Partial<Problem>): 
   await updateDoc(doc(db, 'problems', problemId), {
     ...updateData,
     updated_at: serverTimestamp(),
+  });
+}
+
+/**
+ * Phase 61b: 검증 상태만 갱신.
+ *
+ * ⚠️ `updateProblem`을 쓰면 안 된다 — 그쪽은 무조건 `updated_at`을 serverTimestamp로
+ *    갱신하는데 목록이 `updated_at desc` 정렬이라, 편집하지도 않은 문항이 검증만으로
+ *    맨 위로 올라온다.
+ */
+export async function setVerification(
+  problemId: string,
+  kind: VerifyKind,
+  patch: NonNullable<VerificationState[VerifyKind]>,
+): Promise<void> {
+  await updateDoc(doc(db, 'problems', problemId), {
+    [`verification.${kind}`]: patch,
   });
 }
 
