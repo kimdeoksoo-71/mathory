@@ -56,6 +56,7 @@ function parseArgs(argv) {
     if (k === '--rows') a.rows = argv[++i];
     else if (k === '--sample') a.sample = Number(argv[++i]);
     else if (k === '--flagged') a.flagged = true;
+    else if (k === '--with-answer') a.withAnswer = true;
     else if (k === '--file') a.file = argv[++i];
     else if (k === '--kind') a.kind = argv[++i];
     else if (k === '--judge-code-exec') a.judgeCodeExec = true;
@@ -268,7 +269,10 @@ function printResult(label, r, sheetRef) {
   console.log(`  ${ICON[r.verdict] || '?'} ${r.verdict}${r.note ? ` ${r.note}` : ''}`
             + `  (${(r.ms / 1000).toFixed(1)}s${cost})`);
   if (sheetRef !== undefined) console.log(`  시트 대조: ${sheetRef || '(빈칸)'}`);
-  if (r.answerCheck) console.log(`  정답대조: ${r.answerCheck}${r.derivedAnswer ? ` (도출: ${r.derivedAnswer})` : ''}`);
+  if (r.answerCheck) {
+    const mark = { match: '✓ 일치', mismatch: '✕ 불일치', no_answer: '− 등록 정답 없음' }[r.answerCheck];
+    console.log(`  정답대조: ${mark}${r.derivedAnswer ? `  (AI 도출: ${r.derivedAnswer})` : ''}`);
+  }
   if (r.judged) console.log(`  후보 ${r.rawCandidates.length}건 → 확정 ${r.findings.length}건 (기각 ${r.rejected})`);
   for (const [i, f] of (r.findings || []).entries()) {
     console.log(`   ${i + 1}. [${f.tag}] ${f.verdict}`
@@ -351,6 +355,12 @@ function printResult(label, r, sheetRef) {
       }
       // 풀이 검증인데 풀이가 없는 행은 표본에서 뺀다 (그냥 건너뛰면 표본 수가 줄어든다)
       if (args.kind === 'solution') pool = pool.filter((r) => r.solution);
+      /* D열(등록 정답)은 3.9%만 채워져 있다 → 그냥 표본을 뽑으면 answerCheck가 전부
+         no_answer로 빠져 **정답 대조 경로를 한 번도 밟지 못한다.** 문제 검증을 볼 때 켤 것. */
+      if (args.withAnswer) {
+        pool = pool.filter((r) => r.answer);
+        console.log(`등록 정답이 있는 행: ${pool.length}개`);
+      }
       const n = args.sample || 3;
       // 균등 간격 표본 — 앞쪽만 쏠리지 않게
       const step = Math.max(1, Math.floor(pool.length / n));
