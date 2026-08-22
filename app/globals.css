@@ -865,3 +865,23 @@ img.twemoji {
   vertical-align: -0.125em;
   display: inline-block;
 }
+
+/* ═══ 수식·인용 하이라이트 (Phase 56 편집창 → Phase 61b 열람뷰 공용) ═══
+   ⚠️ 이 클래스는 공용 컴포넌트 `EditorPreview`가 붙인다. 규칙을 소비처(EditorView) 안에만
+      두면 다른 화면에서는 클래스가 붙어도 **아무 일도 일어나지 않는다** — 실제로 열람뷰가
+      그런 상태였다. 붙이는 쪽이 공용이면 스타일도 공용이어야 한다. */
+.math-highlight-active {
+  /* 편집창 cm-math-hl과 동일한 연한 노랑 */
+  background-color: rgba(255, 224, 51, 0.30) !important;
+  border-radius: 3px;
+}
+
+/* 인용이 수식이 아닐 때(산문) 블록 자체를 잠깐 비춘다 — 편집창의 '행 회색'에 대응 */
+.verify-jump-flash {
+  animation: verify-jump-flash 2.4s ease-out;
+  border-radius: 4px;
+}
+@keyframes verify-jump-flash {
+  0%, 40% { background-color: rgba(255, 224, 51, 0.28); }
+  100%    { background-color: transparent; }
+}

@@ -241,6 +241,14 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
   저장 먼저"를 앞에 붙인다(열람뷰는 애초에 저장본만 보인다)
 - **⚠️ `lib/verifyFlow.ts`를 `lib/verify/`에 두지 말 것** — 그 폴더는 전부 import 0 순수 모듈이고
   `npm run test:verify`가 tsc로 단독 컴파일한다. verifyFlow는 firestore·comments를 import한다
+- **⚠️ 공용 컴포넌트가 붙이는 클래스는 스타일도 공용이어야 한다**: `.math-highlight-active`는
+  `EditorPreview`(공용)가 붙이는데 규칙이 `EditorView`의 인라인 `<style>` 안에만 있었다 →
+  다른 화면에서는 클래스가 붙어도 **아무 일도 일어나지 않았다**. `globals.css`로 옮겼다
+  (`.verify-jump-flash`도 같은 자리). 붙이는 쪽과 그리는 쪽의 스코프를 맞출 것
+- **인용 앵커는 두 층이고 정규화 기준이 같아야 한다**: `anchorByQuote`(어느 블록 → `blockKey`,
+  즉 **클릭 가능 여부**)와 `findQuoteRange`(그 블록의 어디). 둘 다 **공백과 `$`를 함께 무시**한다
+  — 모델이 인용을 옮기며 `$`를 떨어뜨리는 일이 실제로 있고, 한쪽만 고치면 "블록은 못 찾는데
+  글자는 찾는" 상태가 되어 지적이 조용히 클릭 불가가 된다(실제로 그랬다). 테스트가 고정한다
 - **리포트 카드의 수식은 `renderInlineMathHtml`(lib/katex-render.ts)로 그린다**: 프롬프트가
   수식을 `$...$`로 쓰게 하므로 평문으로 두면 카드가 통째로 LaTeX 소스로 보인다. `EditorPreview`를
   쓰지 않는 이유는 그쪽이 마크다운 **문서** 렌더러라 `.preview-content`의 글자 크기·문단 여백을

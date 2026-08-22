@@ -16,6 +16,8 @@ import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
 import { runVerifyFlow, verifyBlocksOf } from '../../lib/verifyFlow';
 import { blockKeyOf } from '../../lib/caseBlock';
+import { findQuoteRange } from '../../lib/verify/parse';
+import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { fastScrollTo } from '../../lib/editorScroll';
 import { getUserProfile } from '../../lib/users';
 import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
@@ -273,27 +275,62 @@ export default function ProblemView({
     } : prev));
   }, [problem, user]);
 
-  /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다.
-   *  ⚠ 열람뷰는 탭이 접혀 있을 수 있다 → 먼저 펴고 렌더를 기다린 뒤 스크롤한다. */
-  const handleJumpToBlock = useCallback((blockKey: string, _quote: string) => {
+  /**
+   * 리포트 지적 → 그 인용 자리로. 앵커는 block_key다 — doc id는 저장마다 갈린다.
+   *
+   * 편집창과 달리 CodeMirror가 없으므로 강조는 DOM에 직접 건다:
+   *   인용이 수식이면 그 `.katex`에 `math-highlight-active`(편집창 미리보기와 같은 클래스),
+   *   산문이면 블록 자체를 잠깐 비춘다.
+   * ⚠ 열람뷰는 탭이 접혀 있을 수 있다 → 먼저 펴고 렌더를 기다린 뒤 스크롤한다.
+   */
+  /** 검증 계열 게이트. ⚠ `isOwnerView`는 authorUid 없는 레거시 문항을 오너로 치는데,
+   *  규칙상 그런 문항은 AI 댓글 작성이 막힌다 → 여기서는 authorUid 일치를 요구한다
+   *  (CommentPanel의 칩 게이트 `currentUid === ownerUid`와 같은 기준). */
+  const isVerifyOwner = !!user && !!problem?.authorUid && problem.authorUid === user.uid;
+
+  const handleJumpToBlock = useCallback((blockKey: string, quote: string) => {
     if (!problem) return;
     for (const tab of (problem.tabs || DEFAULT_TABS)) {
       const blk = (problem.tabBlocks[tab.id] || []).find((b) => blockKeyOf(b) === blockKey);
       if (!blk) continue;
       if (!openTabs[tab.id]) setOpenTabs((prev) => ({ ...prev, [tab.id]: true }));
+
+      // 인용이 몇 번째 수식인지 (raw_text 기준 — 미리보기의 data-math-id와 같은 순서)
+      const range = findQuoteRange(blk.raw_text || '', quote);
+      const mathId = range
+        ? findMathIdAtCursor(buildMathIndex(blk.raw_text || ''), range.from)
+        : -1;
+
       setTimeout(() => {
         requestAnimationFrame(() => {
           const container = contentScrollRef.current;
           const el = container?.querySelector(`[data-block-id="${blk.id}"]`) as HTMLElement | null;
           if (!container || !el) return;
-          // 화면 세로 중앙에 둔다 (편집창과 같은 규칙). 블록이 화면보다 크면 상단 기준
-          const r = el.getBoundingClientRect();
+
+          // 이전 강조 정리 (연속 클릭 시 두 곳이 동시에 켜지지 않게)
+          container.querySelectorAll('.math-highlight-active')
+            .forEach((c) => c.classList.remove('math-highlight-active'));
+          container.querySelectorAll('.verify-jump-flash')
+            .forEach((c) => c.classList.remove('verify-jump-flash'));
+
+          const mathEl = mathId >= 0
+            ? el.querySelector(`.katex[data-math-id="${mathId}"]`) as HTMLElement | null
+            : null;
+          const target = mathEl ?? el;
+          (mathEl ?? el).classList.add(mathEl ? 'math-highlight-active' : 'verify-jump-flash');
+
+          // 강조 대상을 화면 세로 중앙에 (화면보다 크면 상단 기준)
+          const r = target.getBoundingClientRect();
           const cr = container.getBoundingClientRect();
-          const blockTop = r.top - cr.top + container.scrollTop;
           const top = r.height < cr.height
-            ? blockTop + r.height / 2 - cr.height / 2
-            : blockTop - 80;
+            ? r.top - cr.top + container.scrollTop + r.height / 2 - cr.height / 2
+            : r.top - cr.top + container.scrollTop - 80;
           fastScrollTo(container, Math.max(0, top), 300);
+
+          // 수식 강조는 잠깐만 — 남아 있으면 "지금 여기"라는 신호가 죽는다
+          if (mathEl) {
+            window.setTimeout(() => mathEl.classList.remove('math-highlight-active'), 4000);
+          }
         });
       }, 60);
       return;
@@ -962,7 +999,7 @@ export default function ProblemView({
           onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
           onRunVerify={handleRunVerify}
-          onJumpToBlock={handleJumpToBlock}
+          onJumpToBlock={isVerifyOwner ? handleJumpToBlock : undefined}
           verifyCharCount={verifyCharCount}
           width={panelWidth}
         />

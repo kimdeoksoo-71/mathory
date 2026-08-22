@@ -2995,11 +2995,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         .scaled-editor .cm-editor { font-size: ${contentFontSize}px !important; }
         .scaled-editor .cm-content { font-size: ${contentFontSize}px !important; }
         .scaled-preview > div > div > div { font-size: ${contentFontSize}px !important; }
-        .math-highlight-active {
-          /* 편집창 cm-math-hl과 동일한 연한 노랑으로 통일 */
-          background-color: rgba(255, 224, 51, 0.30) !important;
-          border-radius: 3px;
-        }
       `}</style>
 
       {/* Phase 55 계층1: 크래시 복구 배너 */}
