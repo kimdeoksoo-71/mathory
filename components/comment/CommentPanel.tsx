@@ -1005,7 +1005,6 @@ export default function CommentPanel({
             placeholder=""
             inputHeight={inputHeight}
             onSubmit={handleSendMessage}
-            toolsAtBottom={isCommentsMode}
             headerLeft={isAISession ? (
               /* ⚠️ AIChipBar는 전폭 <div>다 — fragment로 나란히 두면 검증 칩이 아랫줄로 밀린다.
                     한 줄에 흐르도록 flex 컨테이너로 감싼다. */
