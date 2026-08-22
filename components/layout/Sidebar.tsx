@@ -9,7 +9,7 @@ import ShareTree, { ShareGroup } from './ShareTree';
 import { ShareScope } from '../../lib/share-scope';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
-  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare,
+  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
@@ -634,6 +634,8 @@ export interface SidebarProps {
   user: User | null;
   onNewProblem: () => void;
   onSearch: () => void;
+  /** Phase 61a: 시트에서 문항 가져오기 */
+  onSheetImport: () => void;
   onSelectFolder: (folder: Folder) => void;
   onNewFolder: () => void;
   onFolderAction: (action: 'rename' | 'delete', folder: Folder) => void;
@@ -671,6 +673,7 @@ export default function Sidebar({
   user,
   onNewProblem,
   onSearch,
+  onSheetImport,
   onSelectFolder,
   onNewFolder,
   onFolderAction,
@@ -847,6 +850,7 @@ export default function Sidebar({
       <div style={{ padding: collapsed ? '8px 8px' : '8px 12px' }}>
         <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={collapsed} onClick={onNewProblem} />
         <SidebarItem icon={<IconSearch />} label="검색" collapsed={collapsed} onClick={onSearch} />
+        <SidebarItem icon={<IconDownload />} label="시트 가져오기" collapsed={collapsed} onClick={onSheetImport} />
       </div>
 
       {/* ═══ Single DndContext: Folders + Recent Problems ═══ */}

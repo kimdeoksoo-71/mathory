@@ -24,6 +24,7 @@ import BazaarView from '../share/BazaarView';
 import PublicProblemView from '../share/PublicProblemView';
 import SnapshotView from '../share/SnapshotView';
 import ShareTargetModal from '../share/ShareTargetModal';
+import SheetImportModal from '../import/SheetImportModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
@@ -100,6 +101,8 @@ export default function AppShell() {
   const nicknameNudgedRef = useRef(false);
   // Phase 49: 공유 대상 관리 모달
   const [shareModalProblem, setShareModalProblem] = useState<Problem | null>(null);
+  // Phase 61a: 시트 가져오기 마법사
+  const [sheetImportOpen, setSheetImportOpen] = useState(false);
   // 검색 인덱스: problemId → 본문 텍스트(소문자). 첫 검색 시 lazy 로드.
   const [searchTextIndex, setSearchTextIndex] = useState<Record<string, string>>({});
   const [searchIndexLoading, setSearchIndexLoading] = useState(false);
@@ -640,6 +643,10 @@ export default function AppShell() {
         user={user}
         onNewProblem={handleNewProblem}
         onSearch={() => setShowSearch(true)}
+        onSheetImport={() => {
+          if (!user) { alert('로그인이 필요합니다.'); return; }
+          setSheetImportOpen(true);
+        }}
         onSelectFolder={handleSelectFolder}
         onNewFolder={handleNewFolder}
         onFolderAction={handleFolderAction}
@@ -814,6 +821,11 @@ export default function AppShell() {
           onClose={() => setNicknameModal(null)}
           onSaved={() => setNicknameModal(null)}
         />
+      )}
+
+      {/* Phase 61a: 시트 가져오기. user 없이는 열리지 않는다(라우트가 ID 토큰을 요구한다) */}
+      {sheetImportOpen && user && (
+        <SheetImportModal user={user} onClose={() => setSheetImportOpen(false)} />
       )}
 
       {shareModalProblem && (
