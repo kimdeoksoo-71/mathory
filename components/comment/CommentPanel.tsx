@@ -1316,7 +1316,7 @@ function VerifyChips({
           disabled={busy}
           title={busy ? '검증이 진행 중입니다' : 'AI 교차검증을 실행합니다 (API 비용 발생)'}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 3,
+            display: 'inline-flex', alignItems: 'center',
             border: `1px solid ${confirm === kind ? 'var(--accent-primary)' : 'var(--border-primary)'}`,
             background: confirm === kind ? 'var(--accent-soft)' : 'transparent',
             color: busy ? 'var(--text-faint)' : 'var(--text-secondary)',
@@ -1325,7 +1325,7 @@ function VerifyChips({
             whiteSpace: 'nowrap',
           }}
         >
-          🔍 {kind === 'problem' ? '문제 검증' : '풀이 검증'}
+          {kind === 'problem' ? '문제 검증' : '풀이 검증'}
         </button>
       ))}
 
