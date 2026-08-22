@@ -825,7 +825,12 @@ export default function AppShell() {
 
       {/* Phase 61a: 시트 가져오기. user 없이는 열리지 않는다(라우트가 ID 토큰을 요구한다) */}
       {sheetImportOpen && user && (
-        <SheetImportModal user={user} onClose={() => setSheetImportOpen(false)} />
+        <SheetImportModal
+          user={user}
+          folders={folders}
+          onClose={() => setSheetImportOpen(false)}
+          onImported={() => { loadData(); }}
+        />
       )}
 
       {shareModalProblem && (
