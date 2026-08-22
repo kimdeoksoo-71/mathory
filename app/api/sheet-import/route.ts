@@ -20,6 +20,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { JWT } from 'google-auth-library';
 import { SHEET_COL, SHEET_COL_COUNT, checkHeaders, parseRowInput } from '../../../lib/sheetImport';
+import { ApiError, verifyUid } from '../../../lib/apiAuth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,11 +32,6 @@ type SheetName = (typeof SHEETS)[number];
 /** Vercel 응답 한도(4.5MB) 앞에서 멈춘다. 행당 실측 ~3KB → 약 1,300행 지점. */
 const MAX_PAYLOAD_BYTES = 4_000_000;
 
-/** 사용자에게 그대로 보여줄 수 있는 오류만 만든다 — 원본 에러 객체는 절대 흘리지 않는다
- *  (github/export의 ApiError 관례). */
-class ApiError extends Error {
-  constructor(public status: number, public userMessage: string) { super(userMessage); }
-}
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status });
 
 /* ═══ 환경변수 ═══ */
@@ -66,28 +62,7 @@ function readEnv() {
 
 /* ═══ 인증 ═══ */
 
-async function verifyUid(authorization: string | null, apiKey: string, allowedUids: string[]): Promise<string> {
-  const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : '';
-  if (!token) throw new ApiError(401, '로그인이 필요합니다');
-
-  const res = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken: token }),
-      cache: 'no-store',
-    },
-  );
-  if (!res.ok) throw new ApiError(401, '로그인이 만료되었습니다 — 새로고침 후 다시 시도하세요');
-
-  const uid = (await res.json())?.users?.[0]?.localId;
-  if (typeof uid !== 'string' || !uid) throw new ApiError(401, '로그인 정보를 확인하지 못했습니다');
-
-  // 허용목록이 비어 있으면 전원 거부(fail-closed). 열어 두는 쪽으로 실패하지 않는다.
-  if (!allowedUids.includes(uid)) throw new ApiError(403, '이 기능을 사용할 권한이 없습니다');
-  return uid;
-}
+// Phase 61b: `verifyUid`·`ApiError`는 `lib/apiAuth.ts`로 이동(검증 라우트와 공용).
 
 /* ═══ 시트 읽기 ═══ */
 

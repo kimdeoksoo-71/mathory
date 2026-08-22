@@ -2,6 +2,9 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import type { AIModelConfig } from '../types/problem';
+import {
+  buildClaudeParams, buildGeminiConfig, resolveMaxToolTurns,
+} from './verify/providerParams';
 
 export interface AIProviderResult {
   content: string;
@@ -9,6 +12,8 @@ export interface AIProviderResult {
   outputTokens: number;
   /** 통계용: 응답에 코드 실행(SymPy 검산)이 포함되었는지 */
   hasCodeExecution?: boolean;
+  /** Phase 61b: pause_turn 재요청 상한에 걸려 응답이 미완성인지. 검증 라우트가 실패 처리에 쓴다 */
+  truncated?: boolean;
 }
 
 /**
@@ -34,8 +39,30 @@ export interface CompleteOptions {
   jsonMode?: boolean;
   /** 검산 트리거 감지 시 Claude의 code_execution tool 호출을 강제 (tool_choice).
    *  Anthropic Claude는 시스템 프롬프트만으론 도구를 잘 안 부르는 경향이 있어
-   *  명시적으로 강제해야 안정적으로 SymPy를 실행함. */
+   *  명시적으로 강제해야 안정적으로 SymPy를 실행함.
+   *  ⚠️ Phase 61b 검증 라우트에서는 쓰지 말 것 — 도구 호출을 강제하면 모델이
+   *     최종 JSON 턴을 낼 수 없다 (D9). */
   forceCodeExecution?: boolean;
+
+  /* ─── Phase 61b (정밀 검증) additive. 미전달 시 요청 바디는 기존과 완전히 동일하다 ─── */
+
+  /** Claude adaptive thinking. ⚠️ Opus 4.8은 이 값을 생략하면 **사고가 꺼진 채** 돈다 —
+   *  오류도 경고도 없이 품질만 조용히 떨어지므로 검증 경로는 반드시 지정할 것.
+   *  ⚠️ `budget_tokens`는 Opus 4.7+ 에서 400이다. 되살리지 말 것. */
+  thinking?: 'adaptive';
+  /** Claude `output_config.effort`. 검증 2차 판정은 'high' (시트 STEP3 등가) */
+  effort?: 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  /** 인스턴스 생성 시의 code execution 기본값을 호출 단위로 덮어쓴다.
+   *  Phase 61b F1: 2차 판정의 code_execution은 시트에 전례가 없는 신규 요소라 env로 게이트한다. */
+  enableCodeExecution?: boolean;
+  /** Claude `pause_turn` 재요청 상한 (기본 3). 서버 도구가 붙은 요청은 턴이 끊길 수 있고,
+   *  그대로 두면 JSON이 잘린 채 온다. */
+  maxToolTurns?: number;
+  /** Gemini `generationConfig.thinkingConfig.thinkingLevel` (시트 STEP3 1차는 'HIGH') */
+  geminiThinkingLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
+  /** Gemini `generationConfig.responseMimeType = 'application/json'`.
+   *  ⚠️ 켜도 `\f` 계열 이스케이프 손상은 막지 못한다 — 파싱 후 복구가 여전히 필요하다. */
+  geminiJsonMime?: boolean;
 }
 
 export interface AIProvider {
@@ -65,12 +92,12 @@ class GeminiProvider implements AIProvider {
     systemPrompt: string,
     userPrompt: string,
     maxTokens = 1024,
-    _opts?: CompleteOptions, // Gemini는 JSON mode 미사용 (필요해지면 responseMimeType 활용)
+    _opts?: CompleteOptions, // jsonMode(OpenAI 전용)는 미사용. Phase 61b의 geminiJsonMime·geminiThinkingLevel은 사용.
   ): Promise<AIProviderResult> {
     const model = this.genAI.getGenerativeModel({
       model: this.modelName,
       systemInstruction: systemPrompt,
-      generationConfig: { maxOutputTokens: maxTokens },
+      generationConfig: buildGeminiConfig(maxTokens, _opts) as { maxOutputTokens: number },
       ...(this.enableCodeExecution ? { tools: [{ codeExecution: {} }] } : {}),
     });
     const result = await model.generateContent(userPrompt);
@@ -342,30 +369,53 @@ class ClaudeProvider implements AIProvider {
     maxTokens = 1024,
     opts?: CompleteOptions, // Anthropic은 JSON mode 미지원. forceCodeExecution은 사용.
   ): Promise<AIProviderResult> {
-    // SDK 0.32.1은 code_execution tool 타입을 모르므로 params를 unknown cast로 전달
-    const params: Record<string, unknown> = {
-      model: this.modelName,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    };
-    if (this.enableCodeExecution) {
-      // code_execution_20250825는 모든 지원 모델에서 사용 가능 (Bash 기반).
-      // 호출되는 도구는 bash_code_execution / text_editor_code_execution / (legacy) code_execution
-      // 으로 분기되며, 결과 블록도 *_code_execution_tool_result로 다양함.
-      params.tools = [{ type: 'code_execution_20250825', name: 'code_execution' }];
-      // 검산 트리거가 명시되면 도구를 반드시 호출하도록 강제 (Claude 한정).
-      // {type: 'tool', name}은 runtime 호출명(bash_code_execution 등)과 불일치 가능성 있어
-      // {type: 'any'}로 "어떤 도구라도 호출 필수"로 강제 — 우리는 도구 1개만 정의했으므로 결과는 동일.
-      if (opts?.forceCodeExecution) {
-        params.tool_choice = { type: 'any' };
-      }
+    // SDK 0.32.1은 code_execution tool 타입을 모르므로 params를 unknown cast로 전달.
+    // 조립은 lib/verify/providerParams.ts의 순수 함수에 있다 (Phase 61b — 회귀 스냅샷 대상).
+    // code_execution_20250825는 모든 지원 모델에서 사용 가능 (Bash 기반).
+    // 호출되는 도구는 bash_code_execution / text_editor_code_execution / (legacy) code_execution
+    // 으로 분기되며, 결과 블록도 *_code_execution_tool_result로 다양함.
+    const messages: unknown[] = [{ role: 'user', content: userPrompt }];
+
+    // Phase 61b: 서버 도구가 붙은 요청은 stop_reason='pause_turn'으로 끊길 수 있다.
+    // 토론에서는 "답이 짧다"로 끝나지만 검증에서는 JSON이 잘린 채 와서 리포트가 통째로 날아간다.
+    // → assistant 턴을 그대로 이어 붙여 재요청한다. 도구가 없으면 1회로 끝나 기존 동작과 동일.
+    const maxTurns = resolveMaxToolTurns(opts);
+    let inputTokens = 0;
+    let outputTokens = 0;
+    let truncated = false;
+    const contentBlocks: unknown[] = [];
+    let lastStopReason: string | null = null;
+
+    for (let turn = 0; ; turn++) {
+      const params = buildClaudeParams({
+        model: this.modelName,
+        system: systemPrompt,
+        messages,
+        maxTokens,
+        enableCodeExecution: this.enableCodeExecution,
+        opts,
+      });
+      const rawRes = await this.client.messages.create(
+        params as unknown as Parameters<typeof this.client.messages.create>[0],
+      );
+      // 스트리밍 미사용이지만 SDK 타입이 Stream | Message 합집합 — 비스트리밍 분기 단언
+      const turnRes = rawRes as Anthropic.Messages.Message;
+      inputTokens += turnRes.usage.input_tokens;
+      outputTokens += turnRes.usage.output_tokens;
+      contentBlocks.push(...(turnRes.content as unknown[]));
+      // SDK 0.32.1의 stop_reason 유니온에는 'pause_turn'이 없다(서버 도구 이후 추가된 값) → 문자열로 넓힌다
+      lastStopReason = turnRes.stop_reason as string | null;
+
+      if (lastStopReason !== 'pause_turn') break;
+      if (turn >= maxTurns) { truncated = true; break; }
+      messages.push({ role: 'assistant', content: turnRes.content });
     }
-    const rawRes = await this.client.messages.create(
-      params as unknown as Parameters<typeof this.client.messages.create>[0],
-    );
-    // 스트리밍 미사용이지만 SDK 타입이 Stream | Message 합집합 — 비스트리밍 분기 단언
-    const res = rawRes as Anthropic.Messages.Message;
+
+    const res = {
+      content: contentBlocks,
+      stop_reason: lastStopReason,
+      usage: { input_tokens: inputTokens, output_tokens: outputTokens },
+    } as unknown as Anthropic.Messages.Message;
 
     // content 블록 순회 — text/code/result 분리
     // bash_code_execution / text_editor_code_execution / legacy code_execution 모두 처리
@@ -419,11 +469,15 @@ class ClaudeProvider implements AIProvider {
     if (res.stop_reason === 'max_tokens') {
       content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
     }
+    if (truncated) {
+      content += '\n\n_…도구 호출이 상한에 도달해 응답이 미완성입니다._';
+    }
     return {
       content,
-      inputTokens: res.usage.input_tokens,
-      outputTokens: res.usage.output_tokens,
+      inputTokens,
+      outputTokens,
       hasCodeExecution: codeBlocks.length > 0,
+      ...(truncated ? { truncated: true } : {}),
     };
   }
 }
@@ -470,6 +524,33 @@ export function getProviderForModel(config: AIModelConfig): AIProvider {
   // DeepSeek/xAI는 Responses API 미지원 — chat.completions 기반 OpenAICompat 사용. max_tokens.
   const baseURL = PROVIDER_BASE_URLS[config.provider];
   return new OpenAICompatProvider(apiKey, baseURL, config.apiModelName, false);
+}
+
+// ═══ Phase 61b: 정밀 검증 전용 provider (env 고정 모델) ═══
+
+/**
+ * 검증 라우트용 provider 2개.
+ *
+ * `getProviderForModel`을 못 쓰는 이유: 그쪽은 Firestore `ai_models` 문서(AIModelConfig)
+ * 전체를 요구하는데, 검증 모델은 env로 고정하므로 그 문서가 없다.
+ *
+ * code execution은 **인스턴스 기본값을 false로 둔다** — Phase 61b F1:
+ * 시트 STEP3의 2차 판정(`QualityVerification.gs:573-584`)에는 `tools`가 아예 없다.
+ * 즉 검산은 "이식"이 아니라 신규 요소라 호출 단위 옵션(`enableCodeExecution`)으로만 켠다.
+ */
+export function getVerifyProviders(models: { gemini: string; claude: string }): {
+  first: AIProvider;
+  judge: AIProvider;
+} {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다');
+  const claudeKey = process.env.ANTHROPIC_API_KEY;
+  if (!claudeKey) throw new Error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다');
+
+  return {
+    first: new GeminiProvider(geminiKey, models.gemini, false),
+    judge: new ClaudeProvider(claudeKey, models.claude, false),
+  };
 }
 
 // ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
