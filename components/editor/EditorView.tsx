@@ -2746,23 +2746,52 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const targetRaw = allBlocks[targetTab] || [];
 
     const idToken = await user.getIdToken();
-    const res = await fetch('/api/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({
-        kind, problemBlocks, solutionBlocks,
-        answer: editAnswer || '',
-        // 답안 형식 문구는 서버가 만든다 — 클라가 lib/verify/prompts를 import하면
-        // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
-        hasChoices: (allBlocks['question'] || []).some((b) => b.type === 'choices'),
-        hasGanaOrRoman: (allBlocks['question'] || []).some((b) => b.type === 'gana' || b.type === 'roman'),
-        hasImages: targetRaw.some((b) => ['image', 'svg', 'ggb'].includes(b.type)),
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(data.error || `검증 실패 (HTTP ${res.status})`);
+    /* ⚠ 요청은 **두 번**이다 (1차 후보 생성 → 2차 판정). 한 요청에 다 넣으면 어려운 문항에서
+         Vercel maxDuration(300초)을 넘긴다 — 실측 228초. 쪼개면 각 단계가 300초를 온전히 받아
+         thinking을 낮춰 품질을 깎지 않아도 된다. 중간 상태(후보 배열)는 클라가 들고 다시 보낸다. */
+    const callVerify = async (payload: Record<string, unknown>) => {
+      const res = await fetch('/api/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) throw new Error(data.error || `검증 실패 (HTTP ${res.status})`);
+      return data;
+    };
 
-    const report = data.report as VerifyReport;
+    const base = {
+      kind, problemBlocks, solutionBlocks,
+      answer: editAnswer || '',
+      // 답안 형식 문구는 서버가 만든다 — 클라가 lib/verify/prompts를 import하면
+      // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
+      hasChoices: (allBlocks['question'] || []).some((b) => b.type === 'choices'),
+      hasGanaOrRoman: (allBlocks['question'] || []).some((b) => b.type === 'gana' || b.type === 'roman'),
+      hasImages: targetRaw.some((b) => ['image', 'svg', 'ggb'].includes(b.type)),
+    };
+
+    const first = await callVerify({ ...base, phase: 'first' });
+
+    // 1차가 이미 결론을 낸 경우(그림 의존 skip · 후보 없음) — 2차를 부르지 않는다
+    let report: VerifyReport;
+    let usage = first.usage;
+    if (first.report) {
+      report = first.report as VerifyReport;
+    } else {
+      const second = await callVerify({
+        ...base, phase: 'judge',
+        candidates: first.candidates,
+        derivedAnswer: first.derivedAnswer,
+        answerCheck: first.answerCheck,
+      });
+      report = second.report as VerifyReport;
+      usage = {
+        inputTokens: (first.usage?.inputTokens || 0) + (second.usage?.inputTokens || 0),
+        outputTokens: (first.usage?.outputTokens || 0) + (second.usage?.outputTokens || 0),
+        costUsd: (first.usage?.costUsd || 0) + (second.usage?.costUsd || 0),
+      };
+    }
+    const data = { usage };
 
     // 리포트는 일반 AI 메시지로 저장한다 → 후속 대화가 기존 discuss 파이프라인 무변경으로 된다
     const commentId = await addComment({

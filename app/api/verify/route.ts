@@ -17,11 +17,17 @@
  * ⚠️ **2차 판정이 완료되지 않은 검증은 검증이 아니다** (D13′). 1차 후보는 recall 편향이라
  *    그대로 보여 주면 2차가 존재하는 이유(보수 판정)가 무너진다 → 실패 시 리포트를 만들지
  *    않고 오류를 돌려준다. 클라이언트는 `verification`을 갱신하지 않는다.
+ *
+ * ⚠️ **요청은 두 번이다** (`phase: 'first'` → `phase: 'judge'`).
+ *    한 요청에 다 넣으면 어려운 문항에서 `maxDuration`(Vercel Pro 상한 300초)을 넘긴다 —
+ *    실측 2026-08-22: 1차 두 패스(thinking HIGH) + 2차가 한 문항에 228초. 최악이라는 보장도 없다.
+ *    쪼개면 각 단계가 온전히 300초를 받으므로 **thinking을 낮춰 품질을 깎지 않아도 된다.**
+ *    중간 상태(후보 배열)는 클라이언트가 들고 다시 보낸다 — 서버는 여전히 무상태다.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, verifyUid } from '../../../lib/apiAuth';
-import { getVerifyProviders } from '../../../lib/ai-provider';
+import { getVerifyProviders, type AIProvider } from '../../../lib/ai-provider';
 import {
   PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE,
   fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
@@ -55,14 +61,13 @@ const MAX_CANDIDATES = 12;
  *    시트의 STEP3 1차(`callGeminiForQualityOnce_`)는 maxOutputTokens를 아예 걸지 않는다.
  */
 const FIRST_MAX_TOKENS = 32_000;
-/** 시트 QCONFIG.CLAUDE_MAX_TOKENS — thinking + 응답 합산 하드캡 */
-const JUDGE_MAX_TOKENS = 16_000;
+/** 시트 QCONFIG.CLAUDE_MAX_TOKENS는 16k였지만, 단계를 쪼개 300초를 온전히 받으므로
+ *  판정에 여유를 준다. thinking + 응답 합산 하드캡이라 넉넉해야 판정이 잘리지 않는다. */
+const JUDGE_MAX_TOKENS = 32_000;
 
-/** 전체 시간 예산. maxDuration보다 넉넉히 앞에서 멈춰 Vercel의 강제 종료를 피한다. */
-const TOTAL_BUDGET_MS = 280_000;
-/** 2차 판정에 최소한 남겨 둬야 하는 시간. 이보다 적으면 호출하지 않고 실패한다
- *  (시트 QCONFIG.API_CALL_RESERVE_MS와 같은 취지). */
-const JUDGE_RESERVE_MS = 60_000;
+/** 단계별 시간 예산. maxDuration보다 앞에서 멈춰 Vercel의 강제 종료를 피한다.
+ *  단계를 쪼갠 뒤로는 한 단계가 이 예산을 통째로 쓴다. */
+const PHASE_BUDGET_MS = 280_000;
 
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status });
 
@@ -92,7 +97,13 @@ interface VerifyReport {
 }
 
 interface VerifyRequestBody {
+  /** 'first' = 후보 생성 / 'judge' = 엄격 판정. 미지정은 'first'(구버전 클라 호환) */
+  phase?: 'first' | 'judge';
   kind?: string;
+  /** phase='judge'에서 클라가 되돌려 보내는 1차 산출물 */
+  candidates?: RawFinding[];
+  derivedAnswer?: string;
+  answerCheck?: 'match' | 'mismatch' | 'no_answer';
   problemBlocks?: LabeledBlock[];
   solutionBlocks?: LabeledBlock[];
   answer?: string;
@@ -171,6 +182,20 @@ export async function POST(req: NextRequest) {
     const { first, judge } = getVerifyProviders({
       gemini: env.geminiModel, claude: env.claudeModel,
     });
+
+    /* ═══ phase = 'judge' — 2차만 수행하고 끝낸다 ═══ */
+    if (body.phase === 'judge') {
+      const given = Array.isArray(body.candidates) ? body.candidates : [];
+      if (given.length === 0) return fail(400, '판정할 후보가 없습니다');
+      return await runJudge({
+        kind, judge, env, problemBlocks, solutionBlocks, targetBlocks,
+        candidates: given,
+        derivedAnswer: body.derivedAnswer,
+        answerCheck: body.answerCheck,
+        carriedIn: 0, carriedOut: 0, carriedUsd: 0,
+        startedAt,
+      });
+    }
 
     /* ── ❶ 1차: 후보 생성 (recall) ──
        문제 검증은 한 패스, 풀이 검증은 **계산·표기 / 논리 두 패스**다(시트 STEP2·STEP3 구조).
@@ -257,16 +282,49 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    /* ── ❹ 앵커 확정: 모델의 [블록 n] 신고가 아니라 인용 실재성으로 정한다 (D10) ── */
-    const anchors = candidates.map((c) => anchorByQuote(c.quote, targetBlocks));
+    /* ── ❹ 1차 종료 — 후보를 돌려주고 여기서 요청을 끝낸다.
+           2차는 클라이언트가 이 후보를 들고 **새 요청**으로 부른다(각 단계가 300초를 온전히 받는다). ── */
+    return NextResponse.json({
+      phase: 'first',
+      candidates, derivedAnswer, answerCheck,
+      models: { first: env.geminiModel },
+      usage: { inputTokens, outputTokens, costUsd: round4(usdFirst) },
+    });
+  } catch (e) {
+    if (e instanceof ApiError) return fail(e.status, e.userMessage);
+    console.error('[verify] 예상치 못한 오류:', e);
+    return fail(500, '검증 중 오류가 발생했습니다');
+  }
+}
 
-    /* ── ❺ 예산 검사: 2차에 쓸 시간이 없으면 호출하지 않고 실패한다 (D13′) ── */
-    const remaining = TOTAL_BUDGET_MS - (Date.now() - startedAt);
-    if (remaining < JUDGE_RESERVE_MS) {
-      throw new ApiError(504, '시간이 부족해 판정을 마치지 못했습니다 — 다시 시도하세요');
-    }
+/* ═══ 2차: 엄격 판정 (precision) ═══ */
 
-    /* ── ❻ 2차: 엄격 판정 (precision) ── */
+async function runJudge(a: {
+  kind: VerifyKind;
+  judge: AIProvider;
+  env: ReturnType<typeof readEnv>;
+  problemBlocks: LabeledBlock[];
+  solutionBlocks: LabeledBlock[];
+  targetBlocks: LabeledBlock[];
+  candidates: RawFinding[];
+  derivedAnswer?: string;
+  answerCheck?: 'match' | 'mismatch' | 'no_answer';
+  carriedIn: number; carriedOut: number; carriedUsd: number;
+  startedAt: number;
+}) {
+  const { kind, judge, env, problemBlocks, solutionBlocks, targetBlocks, candidates } = a;
+  let inputTokens = a.carriedIn;
+  let outputTokens = a.carriedOut;
+
+  /* 앵커 확정: 모델의 [블록 n] 신고가 아니라 인용 실재성으로 정한다 (D10) */
+  const anchors = candidates.map((c) => anchorByQuote(c.quote, targetBlocks));
+
+  /* 예산 검사 — 이 단계가 시작도 못 할 만큼 늦었으면 부르지 않는다 (D13′) */
+  if (PHASE_BUDGET_MS - (Date.now() - a.startedAt) <= 0) {
+    throw new ApiError(504, '시간이 부족해 판정을 마치지 못했습니다 — 다시 시도하세요');
+  }
+
+  {
     const judgeUser = fillTemplate(PROMPT_JUDGE.user, {
       problem: labelBlocks(problemBlocks),
       solution: kind === 'problem' ? labelBlocks(problemBlocks) : labelBlocks(solutionBlocks),
@@ -322,14 +380,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       report: report(kind, synthesizeVerdict(findings), findings, {
         models: { first: env.geminiModel, judge: env.claudeModel },
-        derivedAnswer, answerCheck,
+        derivedAnswer: a.derivedAnswer, answerCheck: a.answerCheck,
       }),
-      usage: { inputTokens, outputTokens, costUsd: round4(usdFirst + usdJudge) },
+      usage: { inputTokens, outputTokens, costUsd: round4(a.carriedUsd + usdJudge) },
     });
-  } catch (e) {
-    if (e instanceof ApiError) return fail(e.status, e.userMessage);
-    console.error('[verify] 예상치 못한 오류:', e);
-    return fail(500, '검증 중 오류가 발생했습니다');
   }
 }
 
