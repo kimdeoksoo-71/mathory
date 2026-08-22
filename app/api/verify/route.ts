@@ -54,13 +54,15 @@ const MAX_CANDIDATES_PER_PASS = 8;
 const MAX_CANDIDATES = 12;
 
 /**
- * ⚠️ **thinking 토큰이 이 예산을 같이 먹는다.** thinkingLevel HIGH로 예산을 소진하면 남은
- *    자리에 JSON을 억지로 채우느라 `reason`이 같은 문장의 반복·영문 진행 메모로 퇴화한다
- *    (실측 2026-08-22: 1차 출력 10,713토큰을 쓴 행에서 후보 6건의 reason이 전부 쓰레기,
- *     그런데 `quote`는 정확했다 — 지점은 맞히고 설명만 무너진다).
- *    시트의 STEP3 1차(`callGeminiForQualityOnce_`)는 maxOutputTokens를 아예 걸지 않는다.
+ * ⚠️ **올리지 말 것. 실측으로 반증됐다.**
+ *
+ * "thinking이 예산을 먹어 reason이 필러로 퇴화한다"는 가설로 8k→32k를 시도했으나
+ * 두 번의 측정이 모두 나빠졌다(후보 2.50 → 1.70 → 1.40, 기각률 72% → 86%, 검출 4 → 1).
+ * 가설의 근거였던 "출력 10,713토큰"은 **1차 두 패스 + 2차 판정의 합계**를 개별 호출값으로
+ * 잘못 읽은 것이었다 — 예산에 닿았다는 증거가 애초에 없었다.
+ * thinking을 길게 준다고 후보가 좋아지지 않고, 오히려 후보를 덜 낸다.
  */
-const FIRST_MAX_TOKENS = 32_000;
+const FIRST_MAX_TOKENS = 8_000;
 /** 시트 QCONFIG.CLAUDE_MAX_TOKENS는 16k였지만, 단계를 쪼개 300초를 온전히 받으므로
  *  판정에 여유를 준다. thinking + 응답 합산 하드캡이라 넉넉해야 판정이 잘리지 않는다. */
 const JUDGE_MAX_TOKENS = 32_000;

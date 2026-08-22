@@ -670,6 +670,20 @@ export default function CommentPanel({
   /* ─── Phase 61b: 정밀 검증 실행 ───
      칩·팝오버는 여기, 실제 호출·저장은 EditorView(onRunVerify)가 한다.
      진행/오류 표시는 discuss의 PendingAIBubble을 그대로 재사용한다(합성 항목). */
+  /* 칩이 안 보일 때 원인을 알 수 있게 — 게이트 3개 중 무엇이 막았는지 개발 중에만 알린다.
+     (조용히 사라지는 UI는 "구현이 안 됐다"와 구별되지 않는다) */
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || isCommentsMode) return;
+    if (!onRunVerify) {
+      console.info('[Phase61b] 검증 칩 숨김: onRunVerify 미전달 (편집 화면 전용)');
+    } else if (currentUid !== ownerUid) {
+      console.info('[Phase61b] 검증 칩 숨김: 오너가 아님', { currentUid, ownerUid });
+    } else if (!isAISession) {
+      console.info('[Phase61b] 검증 칩 숨김: AI 세션이 아님 — agent 세션을 만들거나 선택하세요',
+        { activeSessionId, aiEnabled: activeSession?.aiEnabled });
+    }
+  }, [onRunVerify, currentUid, ownerUid, isAISession, isCommentsMode, activeSessionId, activeSession]);
+
   const runVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
     if (!onRunVerify) return;
     const modelId = `verify:${kind}`;
@@ -982,7 +996,9 @@ export default function CommentPanel({
             onSubmit={handleSendMessage}
             toolsAtBottom={isCommentsMode}
             headerLeft={isAISession ? (
-              <>
+              /* ⚠️ AIChipBar는 전폭 <div>다 — fragment로 나란히 두면 검증 칩이 아랫줄로 밀린다.
+                    한 줄에 흐르도록 flex 컨테이너로 감싼다. */
+              <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
                 <AIChipBar
                   models={aiModels}
                   selectedIds={selectedModelIds}
@@ -1002,7 +1018,7 @@ export default function CommentPanel({
                     onRun={(kind) => runVerify(kind, activeSessionId)}
                   />
                 )}
-              </>
+              </div>
             ) : undefined}
           />
         </div>

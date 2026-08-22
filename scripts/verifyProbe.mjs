@@ -180,7 +180,7 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
 
   const gs = await Promise.all(passes.map((pr) =>
     callGemini(pr.system, P.fillTemplate(pr.user, vars), opts.geminiModel,
-      V.buildGeminiConfig(32000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
+      V.buildGeminiConfig(8000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
   const gIn = gs.reduce((n, g) => n + g.inputTokens, 0);
   const gOut = gs.reduce((n, g) => n + g.outputTokens, 0);
 
