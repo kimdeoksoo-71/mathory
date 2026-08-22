@@ -153,6 +153,18 @@ test('anchorByQuote — 짧은 우연 일치는 앵커로 인정하지 않는다
   assert.deepEqual(V.anchorByQuote('조건에서 XYZ', BLOCKS), { blockKey: null, found: false });
 });
 
+test('anchorByQuote — 모델이 $ 를 떨어뜨려도 블록을 찾는다', () => {
+  // 못 찾으면 blockKey가 null이 되어 리포트 지적이 클릭조차 안 된다
+  assert.deepEqual(V.anchorByQuote('f(1)=0', BLOCKS), { blockKey: 'k1', found: true });
+});
+
+test('anchorByQuote와 findQuoteRange는 같은 기준으로 정규화한다', () => {
+  // 한쪽만 찾는 어긋난 상태가 실제로 있었다 (블록은 못 찾는데 글자는 찾음)
+  const q = 'f(1)=0';
+  assert.ok(V.anchorByQuote(q, BLOCKS).found);
+  assert.ok(V.findQuoteRange(BLOCKS[0].text, q));
+});
+
 test('anchorByQuote — 원문에 없으면 미매칭 (환각 신호)', () => {
   assert.deepEqual(V.anchorByQuote('$y = 99$ 라고 했다', BLOCKS), { blockKey: null, found: false });
   assert.deepEqual(V.anchorByQuote('', BLOCKS), { blockKey: null, found: false });

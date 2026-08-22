@@ -296,9 +296,18 @@ export function mergeCandidates(lists: RawFinding[][], cap: number): RawFinding[
 /* 4. 인용 실재성 → 블록 앵커 확정                            */
 /* ═══════════════════════════════════════════════════════ */
 
-/** 인용 대조용 정규화: 공백 전량 제거 (시트 `normalizeForQuoteCheck_`) */
+/**
+ * 인용 대조용 정규화 (시트 `normalizeForQuoteCheck_`에서 확장).
+ *
+ * 공백뿐 아니라 **`$`도 지운다.** 모델이 인용을 옮기며 `$` 구분자를 떨어뜨리는 일이
+ * 실제로 있고(실측 2026-08-22), 그러면 블록 앵커가 실패해 `blockKey`가 null이 되어
+ * 지적이 **클릭조차 안 되는** 상태가 된다.
+ *
+ * ⚠️ `findQuoteRange`(글자 앵커)와 **같은 기준이어야 한다.** 한쪽만 고치면
+ *    "블록은 못 찾는데 글자는 찾는" 어긋난 상태가 된다 — 실제로 그렇게 어긋나 있었다.
+ */
 export function normalizeForQuoteCheck(s: string): string {
-  return String(s ?? '').replace(/\s+/g, '');
+  return String(s ?? '').replace(/[\s$]/g, '');
 }
 
 /** 접두 폴백이 인정되는 **최소** 길이 (공백 제거 후 문자 수).

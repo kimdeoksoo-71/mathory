@@ -194,15 +194,29 @@ function FindingRow({
 }) {
   const isFail = finding.verdict === 'fail';
   const canJump = !!onJumpToBlock && !!finding.blockKey;
+  const [hover, setHover] = useState(false);
+
+  /* 클릭이 안 되는 이유를 알려 준다 — 이유 없이 반응만 없으면 고장으로 보인다 */
+  const why = canJump
+    ? '클릭하면 그 인용 자리로 이동합니다'
+    : !finding.quote
+      ? '이 지적은 특정 위치를 가리키지 않습니다'
+      : '인용을 원문에서 찾지 못해 이동할 수 없습니다';
 
   return (
     <div
       onClick={canJump ? () => onJumpToBlock!(finding.blockKey!, finding.quote) : undefined}
-      title={canJump ? '클릭하면 해당 블록으로 이동합니다' : undefined}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title={why}
       style={{
-        padding: '6px 0',
+        padding: '6px 4px',
+        margin: '0 -4px',
+        borderRadius: 4,
         borderTop: index === 1 ? 'none' : '1px solid var(--border-light)',
         cursor: canJump ? 'pointer' : 'default',
+        background: canJump && hover ? 'var(--bg-hover)' : 'transparent',
+        transition: 'background 0.12s',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -217,7 +231,7 @@ function FindingRow({
         {!isFail && (
           <span style={{ fontSize: 10.5, color: 'var(--text-muted)' }}>확인 필요</span>
         )}
-        {!finding.quoteFound && (
+        {!finding.quoteFound && !!finding.quote && (
           <span
             title="인용이 원문에서 확인되지 않았습니다 — 위치가 부정확할 수 있습니다"
             style={{ fontSize: 10.5, color: 'var(--text-faint)' }}
