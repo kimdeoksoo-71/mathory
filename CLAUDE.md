@@ -160,13 +160,13 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 현재 Phase: 진행 중인 Phase 없음 (61a·59a·60·45a 전건 검수 완료)
 
-- **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). 배포 대기(미푸시분 있음)
+- **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
 - **Phase 45a** — 구현·검수 완료(2026-08-20)
 - **Phase 28(Mathpix OCR)** — 2026-04-22 구현 완료, 2026-08-20 API 키 등록·실동작 확인으로 **완전 종료**
-- **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수 완료. 미푸시. 아래 절 참조
+- **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수·**배포·프로덕션 실동작 확인 완료**. 아래 절 참조
 
-### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현 완료 · 배포 대기)
+### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현·검수·배포 완료)
 
 문서: `docs/phasedocs/Phase59a Case 레이아웃·강조 체계 정비.md`
 (계보: v1 web 방향 → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 착수판** → 구현)
@@ -191,7 +191,7 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다
 - 로직 검증: `npm run test:case` (35개)
 
-### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 검수 통과 · 미푸시)
+### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 배포 · 프로덕션 확인)
 
 문서: `docs/phaseSketch/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md` (§10이 구현 기록)
 
@@ -221,7 +221,11 @@ gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore �
   되어 truthy 검사가 전부 참이 된다 → **원시값으로 판정할 것**
 - **GAS 코드 인용은 GitHub origin/main만을 원천으로 하고 커밋 해시를 남길 것** — `~/Documents`의
   로컬 사본이 stale해 같은 파일을 두고 숫자가 갈린 왕복이 있었다(2026-08-22 clone으로 교체 완료)
-- 로직 검증: `npm run test:sheet` (35개)
+- **환경변수 4종**(`GOOGLE_SA_EMAIL`·`GOOGLE_SA_PRIVATE_KEY`·`AUDITION_SPREADSHEET_ID`·`AUDITION_ALLOWED_UIDS`)은
+  `.env.local`과 **Vercel(Production·Preview)에 등록 완료**. ⚠️ Vercel에는 private key의 **바깥 따옴표를 빼고**
+  넣어야 한다 — 따옴표를 값의 일부로 저장하므로 PEM 파싱이 실패한다. 라우트는 `readEnv()`를 핸들러 안에서만
+  호출하므로 변수가 없어도 **빌드는 깨지지 않고** 호출 시 500으로 어떤 변수가 없는지 이름만 알린다
+- 로직 검증: `npm run test:sheet` (35개). 프로덕션 빌드 통과 확인(`/api/sheet-import`는 `ƒ` Dynamic)
 
 ### Phase 60 — list 로케일 블록 개편 (완료 · 검증 통과)
 
