@@ -160,11 +160,23 @@ async function callClaude(params) {
 
 /** 시트 answer_type(K열) → 형식 안내. Mathory의 deriveAnswerFormat과 같은 4갈래다
  *  (시트 `getFormatGuide`, Itemverification.gs:522-528). 프로브는 라벨이 있으니 그걸 쓴다. */
+/**
+ * 시트 answer_type(K열) → 제품의 `deriveAnswerFormat` 입력.
+ *
+ * ⚠️ **`mcq`를 먼저 본다.** 실측 유형은 `mcq_math`·`mcq_combo`처럼 접두가 붙는데,
+ *    `includes('math')`를 먼저 검사하면 선다형이 "값을 내라"로 새어 나간다.
+ *    그러면 D열(선택지 번호)과 AI 도출값(답의 값)을 비교하게 되어 **정상 문항이
+ *    전부 mismatch로 잡힌다**(실측 2026-08-23: 8건 전부 이 경로였다).
+ *    제품 코드는 K열이 아니라 `choices` 블록 유무로 판단하므로 이 함정이 없다 —
+ *    프로브만 시트 라벨을 읽기 때문에 생기는 문제다.
+ */
 function formatGuideFromType(t, answer, P) {
   const s = String(t || '').toLowerCase();
-  if (s.includes('combo')) return P.deriveAnswerFormat({ hasChoices: true, hasGanaOrRoman: true, answer });
-  if (s.includes('math'))  return P.deriveAnswerFormat({ hasChoices: false, hasGanaOrRoman: false, answer: '' });
-  if (s.includes('int'))   return P.deriveAnswerFormat({ hasChoices: false, hasGanaOrRoman: false, answer: '1' });
+  const combo = s.includes('combo');
+  const mcq = s.includes('mcq') || s.includes('choice');
+  if (mcq) return P.deriveAnswerFormat({ hasChoices: true, hasGanaOrRoman: combo, answer });
+  if (combo) return P.deriveAnswerFormat({ hasChoices: true, hasGanaOrRoman: true, answer });
+  if (s.includes('int')) return P.deriveAnswerFormat({ hasChoices: false, hasGanaOrRoman: false, answer: '1' });
   return P.deriveAnswerFormat({ hasChoices: false, hasGanaOrRoman: false, answer });
 }
 
