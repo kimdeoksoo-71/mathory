@@ -165,6 +165,26 @@ export function normalizeText(raw: string): { text: string; warnings: string[] }
   return { text: t, warnings };
 }
 
+/* ═══ 선택지 라벨 ═══ */
+
+/**
+ * 셀 앞머리의 원문자 라벨을 떼어낸다.
+ *
+ * 시트의 F~J는 **원문자를 포함한 셀과 포함하지 않은 셀이 섞여 있다**
+ * (실측 2026-08-22 Stack: 라벨 있음 502행 / 없음 2,238행 / 섞인 행 0).
+ * `ChoicesBlock`은 `raw_text` 맨 앞의 원문자를 라벨로 읽어 별도 span으로 그리므로,
+ * 라벨이 든 셀에 위치 라벨을 덧붙이면 화면에 **라벨이 두 번** 나온다(`① ① 39`).
+ *
+ * 실측에서 셀의 라벨이 열 위치와 어긋난 행은 **0건**이라 떼어내도 정보 손실이 없다.
+ * 라벨만 있고 내용이 없는 셀은 건드리지 않는다(빈 선택지로 떨어져 줄이 사라지는 것을 막는다).
+ *
+ * ⚠️ `[ \t]*`를 쓴다 — `\s*`는 개행을 포함해 여러 줄짜리 선택지의 다음 줄을 빨아들인다.
+ */
+export function stripChoiceLabel(text: string): string {
+  const m = /^[①②③④⑤][ \t]*([\s\S]*)$/.exec(text);
+  return m && m[1].trim() !== '' ? m[1] : text;
+}
+
 /* ═══ 본문 해시 ═══ */
 
 /**
@@ -209,7 +229,7 @@ export function rowToDraft(row: ImportRow): ProblemDraft | DraftError {
   if (!stem) warnings.push('E열(문제 본문)이 비어 있습니다');
   const questionBlocks: DraftBlock[] = [{ type: 'text', raw_text: stem }];
 
-  const choices = CHOICE_KEYS.map((k) => take(k));
+  const choices = CHOICE_KEYS.map((k) => stripChoiceLabel(take(k)));
   const filled = choices.map((c, i) => ({ label: CHOICE_LABELS[i], content: c, index: i }))
                         .filter((c) => c.content !== '');
   if (filled.length > 0) {

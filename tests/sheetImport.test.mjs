@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 
 import {
   SHEET_COL, SHEET_COL_COUNT, EXPECTED_HEADERS,
-  parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash,
+  parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash, stripChoiceLabel,
 } from '../.test-build/lib/sheetImport.js';
 
 /** 16칸 셀 배열을 만든다. `{ id: 'x', problem_stem: 'y' }` 형태로 지정. */
@@ -222,4 +222,42 @@ test('S6 answer는 D열만 쓴다 — O열이 있어도 채우지 않는다', ()
   const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', derived_answer: '7' });
   assert.equal(d.answer, '');
   assert.equal(d.blocksByTab.extra_0[0].raw_text, '**AI 정답:** 7');
+});
+
+/* ═══ L — 선택지 라벨 중복 (실측 발견) ═══ */
+
+test('L1 셀에 이미 원문자가 있으면 떼어낸다 — 라벨이 두 번 나오지 않게', () => {
+  assert.equal(stripChoiceLabel('① 39'), '39');
+  assert.equal(stripChoiceLabel('①39'), '39');
+  assert.equal(stripChoiceLabel('⑤\t47'), '47');
+});
+
+test('L2 원문자가 없는 셀은 그대로 둔다', () => {
+  assert.equal(stripChoiceLabel('$1$'), '$1$');
+  assert.equal(stripChoiceLabel('ㄱ, ㄴ'), 'ㄱ, ㄴ');
+});
+
+test('L3 라벨만 있고 내용이 없으면 건드리지 않는다 (줄이 사라지는 것 방지)', () => {
+  assert.equal(stripChoiceLabel('①'), '①');
+  assert.equal(stripChoiceLabel('①   '), '①   ');
+});
+
+test('L4 여러 줄 선택지의 다음 줄을 빨아들이지 않는다 (\\s* 금지)', () => {
+  assert.equal(stripChoiceLabel('① 첫줄\n둘째줄'), '첫줄\n둘째줄');
+});
+
+test('L5 라벨 든 셀도 안 든 셀도 결과는 라벨 하나뿐이다', () => {
+  const withLabel = draft({ id: 'X', problem_stem: 'q', given_solution: 's',
+    choice1: '① 39', choice2: '② 41', choice3: '③ 43', choice4: '④ 45', choice5: '⑤ 47' });
+  const without = draft({ id: 'X', problem_stem: 'q', given_solution: 's',
+    choice1: '39', choice2: '41', choice3: '43', choice4: '45', choice5: '47' });
+  const expected = '① 39\n② 41\n③ 43\n④ 45\n⑤ 47';
+  assert.equal(withLabel.blocksByTab.question[1].raw_text, expected);
+  assert.equal(without.blocksByTab.question[1].raw_text, expected);
+});
+
+test('L6 라벨을 뗀 뒤에도 건너뛴 라벨 경고는 위치 기준으로 정확하다', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', choice1: '① a', choice3: '③ c' });
+  assert.equal(d.blocksByTab.question[1].raw_text, '① a\n③ c');
+  assert.ok(d.warnings.some((w) => /건너뜁니다/.test(w)));
 });
