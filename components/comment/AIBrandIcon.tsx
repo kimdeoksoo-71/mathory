@@ -10,6 +10,22 @@
 
 import React from 'react';
 
+/**
+ * Phase 61b — API 모델명 → provider.
+ *
+ * 검증은 env로 고정한 모델을 쓰므로 Firestore `ai_models` 문서가 없다 → `AIModelConfig.provider`를
+ * 못 읽는다. 모델명 문자열에서 직접 유추해 토론 참여자(민·쳇·클)와 **같은 아이콘**을 쓴다.
+ */
+export function providerFromModelName(name: string | undefined | null): string | undefined {
+  const n = String(name ?? '').toLowerCase();
+  if (!n) return undefined;
+  if (n.includes('gemini') || n.includes('google')) return 'google';
+  if (n.includes('claude') || n.includes('anthropic') || n.includes('opus')
+      || n.includes('sonnet') || n.includes('haiku')) return 'anthropic';
+  if (n.includes('gpt') || n.includes('openai') || n.startsWith('o1') || n.startsWith('o3')) return 'openai';
+  return undefined;
+}
+
 function svgPathFor(provider: string | undefined): string | null {
   if (provider === 'google') return '/icons/ai/gemini.svg';
   if (provider === 'openai') return '/icons/ai/openai.svg';

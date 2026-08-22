@@ -20,7 +20,7 @@ import {
 import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
-import { AIBrandIcon } from './AIBrandIcon';
+import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
@@ -89,6 +89,8 @@ interface PendingAI {
   kind?: 'discuss' | 'verify';
   /** Phase 61b: 검증 재시도용 */
   verifyKind?: VerifyKind;
+  /** Phase 61b: 여러 모델이 함께 도는 작업의 아이콘들(검증 = 1차 Gemini → 2차 Claude) */
+  providers?: string[];
 }
 
 interface DiscussRequestContext {
@@ -342,6 +344,10 @@ export default function CommentPanel({
   const getDisplayInfo = useCallback(
     (c: ProblemComment): DisplayInfo => {
       if (c.authorType === 'ai' && c.modelId) {
+        // Phase 61b: 검증 리포트는 env 고정 모델이라 ai_models 문서가 없다 → 이름이 '?'가 된다
+        if (c.modelId === 'verify') {
+          return { name: '검증', emoji: '🔍', isAI: true, modelDisplayName: '정밀 검증' };
+        }
         const model = aiModels.find((m) => m.modelId === c.modelId);
         return {
           name: model?.nickname || '?',
@@ -692,9 +698,14 @@ export default function CommentPanel({
       {
         modelId, sessionId, kind: 'verify', verifyKind: kind,
         nickname: kind === 'problem' ? '문제 검증' : '풀이 검증',
-        emoji: '🔍', provider: 'anthropic',
+        emoji: '🔍',
+        // 1차 Gemini → 2차 Claude. 선택한 AI와 무관하게 env로 고정된 조합이다.
+        providers: ['google', 'anthropic'],
       },
     ]);
+    /* 검증은 선택한 AI와 **무관하다**(env 고정 모델로 돈다). 칩이 켜진 채로 두면
+       "고른 AI로 검증한다"는 오해를 주므로 실행과 함께 선택을 해제한다. */
+    setSelectedModelIds([]);
     try {
       await onRunVerify(kind, sessionId);
       await refreshComments();
@@ -1390,7 +1401,18 @@ function PendingAIBubble({
         fontSize: 12, color: pending.error ? '#c44' : 'var(--text-muted)',
       }}
     >
-      <AIBrandIcon provider={pending.provider} size={16} fallbackEmoji={pending.emoji} />
+      {pending.providers && pending.providers.length > 0 ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+          {pending.providers.map((pv, i) => (
+            <span key={pv} style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+              {i > 0 && <span style={{ color: 'var(--text-faint)', fontSize: 10 }}>→</span>}
+              <AIBrandIcon provider={pv} size={14} fallbackEmoji={pending.emoji} />
+            </span>
+          ))}
+        </span>
+      ) : (
+        <AIBrandIcon provider={pending.provider} size={16} fallbackEmoji={pending.emoji} />
+      )}
       <span style={{ fontWeight: 600 }}>{pending.nickname}</span>
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {pending.error ? `응답 실패: ${pending.error}` : '생각 중…'}

@@ -15,6 +15,7 @@
 
 import { useState } from 'react';
 import type { VerifyReport, VerifyFinding, VerifyVerdict } from '../../types/problem';
+import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 
 export const VERIFY_FENCE_RE = /```mathory-verify\s*([\s\S]*?)```/;
 
@@ -132,12 +133,32 @@ export default function VerifyReportCard({
         </div>
       )}
 
-      {/* 모델 각주 */}
-      <div style={{ marginTop: 6, fontSize: 10.5, color: 'var(--text-faint)' }}>
-        {report.models.first}
-        {report.models.judge ? ` → ${report.models.judge}` : ' (후보 없음 — 판정 생략)'}
+      {/* 모델 각주 — 아이콘은 토론 참여자(민·쳇·클)와 같은 브랜드 아이콘을 쓴다.
+           검증 모델은 env 고정이라 ai_models 문서가 없으므로 모델명에서 provider를 유추한다. */}
+      <div style={{
+        marginTop: 6, display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap',
+        fontSize: 10.5, color: 'var(--text-faint)',
+      }}>
+        <ModelChip name={report.models.first} />
+        {report.models.judge ? (
+          <>
+            <span>→</span>
+            <ModelChip name={report.models.judge} />
+          </>
+        ) : (
+          <span>(후보 없음 — 판정 생략)</span>
+        )}
       </div>
     </div>
+  );
+}
+
+function ModelChip({ name }: { name: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      <AIBrandIcon provider={providerFromModelName(name)} size={12} fallbackEmoji="🔍" />
+      <span>{name}</span>
+    </span>
   );
 }
 
