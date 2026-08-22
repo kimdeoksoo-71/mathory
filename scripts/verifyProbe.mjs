@@ -331,11 +331,20 @@ function printResult(label, r, sheetRef) {
     } else {
       let pool = rows;
       if (args.flagged) {
-        pool = rows.filter((r) => ['error', 'fail'].includes(r.sheet.p)
-                               || ['error', 'fail'].includes(r.sheet.s)
-                               || ['fail'].includes(r.sheet.q));
-        console.log(`시트가 결함으로 표시한 행: ${pool.length}개`);
+        /* ⚠ --kind를 무시하면 안 된다. 풀이 검증을 돌리면서 *문제* 결함 행을 섞으면
+           그 행의 해설 판정은 빈칸이라 우리 ok가 전부 "판정 없음"으로 빠지고,
+           누락 집계가 조용히 오염된다(실측에서 실제로 그랬다). */
+        const bad = (v) => ['error', 'fail'].includes(String(v).toLowerCase());
+        const want = args.kind === 'problem'
+          ? (r) => bad(r.sheet.p)
+          : args.kind === 'solution'
+            ? (r) => bad(r.sheet.s) || bad(r.sheet.q)
+            : (r) => bad(r.sheet.p) || bad(r.sheet.s) || bad(r.sheet.q);
+        pool = rows.filter(want);
+        console.log(`시트가 결함으로 표시한 행(${args.kind}): ${pool.length}개`);
       }
+      // 풀이 검증인데 풀이가 없는 행은 표본에서 뺀다 (그냥 건너뛰면 표본 수가 줄어든다)
+      if (args.kind === 'solution') pool = pool.filter((r) => r.solution);
       const n = args.sample || 3;
       // 균등 간격 표본 — 앞쪽만 쏠리지 않게
       const step = Math.max(1, Math.floor(pool.length / n));
@@ -383,8 +392,12 @@ function printResult(label, r, sheetRef) {
   const table = {};
   for (const o of out) {
     if (o.result.error) continue;
-    const ref = (o.kind === 'problem' ? o.sheet.p : o.sheet.s) || '';
-    const sheetBad = SHEET_BAD.includes(ref.toLowerCase());
+    /* ⚠ 풀이 검증의 대조군은 해설검증(Q열) **또는** STEP3(U열)다. Q열만 보면
+       "해설검증 ok · STEP3 error"인 행이 정상으로 잡혀 누락이 과소 집계된다. */
+    const refs = (o.kind === 'problem' ? [o.sheet.p] : [o.sheet.s, o.sheet.q])
+      .map((x) => String(x || '').toLowerCase()).filter(Boolean);
+    const ref = refs.join('/');
+    const sheetBad = refs.some((x) => SHEET_BAD.includes(x));
     const ourBad = o.result.verdict === 'fail';
     const ourSoft = o.result.verdict === 'check';
     const k = o.kind;
@@ -394,7 +407,7 @@ function printResult(label, r, sheetRef) {
       if (ourBad) table[k].일치_결함++;
       else if (ourSoft) table[k].약하게잡음++;
       else table[k].누락++;
-    } else if (ref.toLowerCase() === 'ok') {
+    } else if (refs.every((x) => x === 'ok')) {
       if (ourBad) table[k].과검출후보++;
       else if (ourSoft) table[k].애매++;
       else table[k].일치_정상++;
