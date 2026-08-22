@@ -13,11 +13,15 @@ import useAuth from '../../hooks/useAuth';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
+import { buildReportMarkdown } from '../comment/VerifyReportCard';
+import { runVerifyFlow, verifyBlocksOf } from '../../lib/verifyFlow';
+import { blockKeyOf } from '../../lib/caseBlock';
+import { fastScrollTo } from '../../lib/editorScroll';
 import { getUserProfile } from '../../lib/users';
 import { watchAllComments, countComments, countAgentSessions } from '../../lib/comments';
 import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
-import { UserProfile, ProblemComment, DiscussionSession } from '../../types/problem';
+import { UserProfile, ProblemComment, DiscussionSession, VerifyKind } from '../../types/problem';
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconDownload, IconShare,
   IconDocLines,
@@ -105,6 +109,8 @@ export default function ProblemView({
   const [loading, setLoading] = useState(true);
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [openTabs, setOpenTabs] = useState<Record<string, boolean>>({});
+  /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
   const [pdfOpen, setPdfOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -232,6 +238,62 @@ export default function ProblemView({
   const toggleTab = (tabId: string) => {
     setOpenTabs((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
   };
+
+  /* ═══ Phase 61b: 정밀 검증 (열람뷰) ═══
+     편집창과 같은 흐름(`lib/verifyFlow.ts`)을 쓴다. 여기서는 항상 저장본이므로
+     편집창에 있는 "dirty면 저장 먼저" 단계가 없다 — 그것이 유일한 차이다. */
+  const verifyCharCount = useCallback((kind: VerifyKind) => {
+    if (!problem) return 0;
+    const q = verifyBlocksOf(problem.tabBlocks['question'] || []);
+    const sol = kind === 'solution' ? verifyBlocksOf(problem.tabBlocks['solution'] || []) : [];
+    return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
+  }, [problem]);
+
+  const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
+    if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');
+    const { report, commentId } = await runVerifyFlow({
+      kind, problemId: problem.id, sessionId,
+      tabId: (problem.tabs || DEFAULT_TABS)[0]?.id || 'question',
+      idToken: await user.getIdToken(),
+      tabs: problem.tabs || DEFAULT_TABS,
+      blocksByTab: problem.tabBlocks,
+      title: problem.title, answer: problem.answer || '',
+      tabLoadErrors: problem.tabLoadErrors,
+      buildMarkdown: buildReportMarkdown,
+    });
+    setProblem((prev) => (prev ? {
+      ...prev,
+      verification: {
+        ...(prev.verification || {}),
+        [kind]: {
+          verdict: report.verdict, verifiedAt: report.verifiedAt,
+          contentHash: '', stale: false, reportCommentId: commentId,
+        },
+      },
+    } : prev));
+  }, [problem, user]);
+
+  /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다.
+   *  ⚠ 열람뷰는 탭이 접혀 있을 수 있다 → 먼저 펴고 렌더를 기다린 뒤 스크롤한다. */
+  const handleJumpToBlock = useCallback((blockKey: string) => {
+    if (!problem) return;
+    for (const tab of (problem.tabs || DEFAULT_TABS)) {
+      const blk = (problem.tabBlocks[tab.id] || []).find((b) => blockKeyOf(b) === blockKey);
+      if (!blk) continue;
+      if (!openTabs[tab.id]) setOpenTabs((prev) => ({ ...prev, [tab.id]: true }));
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          const container = contentScrollRef.current;
+          const el = container?.querySelector(`[data-block-id="${blk.id}"]`) as HTMLElement | null;
+          if (!container || !el) return;
+          const top = el.getBoundingClientRect().top - container.getBoundingClientRect().top
+                    + container.scrollTop - 80;
+          fastScrollTo(container, top, 300);
+        });
+      }, 60);
+      return;
+    }
+  }, [problem, openTabs]);
 
   /* ─── 탭 Markdown 복사 ─── */
   const handleCopyTabMarkdown = async (tabId: string) => {
@@ -576,7 +638,7 @@ export default function ProblemView({
         transition: 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
-        <div className="no-scrollbar" style={{
+        <div className="no-scrollbar" ref={contentScrollRef} style={{
           flex: 1, minWidth: 0,
           overflowY: 'auto',
           overflowX: 'hidden',
@@ -894,6 +956,9 @@ export default function ProblemView({
           bodyFontSize={contentFontSize}
           onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
+          onRunVerify={handleRunVerify}
+          onJumpToBlock={handleJumpToBlock}
+          verifyCharCount={verifyCharCount}
           width={panelWidth}
         />
       )}

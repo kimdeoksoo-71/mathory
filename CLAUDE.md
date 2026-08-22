@@ -234,8 +234,17 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
 - **`<details>`를 리포트에 쓰지 말 것** — `stripForHistory`가 `[검산 코드 첨부됨]`으로 치환해
   히스토리에 거짓 문구가 들어간다. 접기는 카드 자체 상태로
 - **검증 칩이 오너 전용인 것은 정책이 아니라 규칙 강제다** — AI 댓글 create는 오너만 허용이라
-  비오너는 비용만 쓰고 저장에서 실패한다. 게이트는 `onRunVerify` prop 주입(편집 화면 전용,
-  `onInsertGraphBlock` 선례) + `currentUid === ownerUid`
+  비오너는 비용만 쓰고 저장에서 실패한다. 게이트는 `onRunVerify` prop 주입 + `currentUid ===
+  ownerUid` + `isAISession`(세션 없으면 전송 자체가 막힌다). ⚠ **칩은 편집창·열람뷰 둘 다에 있다** —
+  처음엔 `onInsertGraphBlock` 선례를 따라 편집창 전용으로 뒀는데, 검증은 **문항을 보면서 하는 일**
+  이라 실사용에서 곧바로 어긋났다. 실행 흐름은 `lib/verifyFlow.ts`가 공유하고, 편집창만 "dirty면
+  저장 먼저"를 앞에 붙인다(열람뷰는 애초에 저장본만 보인다)
+- **⚠️ `lib/verifyFlow.ts`를 `lib/verify/`에 두지 말 것** — 그 폴더는 전부 import 0 순수 모듈이고
+  `npm run test:verify`가 tsc로 단독 컴파일한다. verifyFlow는 firestore·comments를 import한다
+- **`AIChipBar`는 전폭 `<div>`다** — 그 옆에 무언가를 fragment로 나란히 두면 아랫줄로 밀린다.
+  `headerLeft`에 두 개 이상을 놓으려면 flex 컨테이너로 감쌀 것
+- **게이트로 숨기는 UI는 이유를 남길 것**: 조용히 사라진 컨트롤은 "구현이 안 됐다"와 구별되지
+  않는다. 검증 칩은 게이트 3개 중 무엇이 막았는지 dev 콘솔에 `[Phase61b] 검증 칩 숨김: …`으로 남긴다
 - **클라이언트가 `lib/verify/prompts`를 import하면 프롬프트 전문이 클라 번들에 실린다** —
   답안 형식 산출은 서버가 하고 클라는 재료만 넘긴다
 - ⚠ 리포트 댓글은 **멤버가 전부 읽는다**(`firestore.rules:234-236`, 세션 구분 없음).

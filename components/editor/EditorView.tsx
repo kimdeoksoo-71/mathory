@@ -11,6 +11,7 @@ import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
+import { runVerifyFlow, computeVerifyHashes, verifyBlocksOf } from '../../lib/verifyFlow';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -959,35 +960,6 @@ interface EditorViewProps {
 }
 
 /* ═══ 메인 EditorView ═══ */
-
-/**
- * Phase 61b — 검증 대상 탭의 정규화 해시.
- *
- * 조합을 직접 만들지 않고 Phase 55 파이프라인을 재사용한다:
- *   `collectCurrentContent`(toPersistedBlock 통과본 + 탭 로드 실패 가드) → `hashPerTab`.
- *
- * ⚠️ problem 해시에는 **answer를 함께 넣는다.** `canonicalizeTab`은 제목·정답을 포함하지
- *    않는데(meta는 canonicalize에만 있다), 문제 검증의 `answerCheck`는 `Problem.answer`에
- *    의존하므로 정답만 고쳐도 그 리포트는 낡는다.
- * ⚠️ `snapshotCurrent`의 `last_version_tab_hashes`를 쓰면 안 된다 — 스냅샷은 `!silent`일
- *    때만 돌아 자동저장(탭 전환·이탈)에서 신호가 샌다.
- */
-async function computeVerifyHashes(args: {
-  tabs: TabMeta[];
-  blocksByTab: Record<string, Block[]>;
-  title: string;
-  answer: string;
-  tabLoadErrors?: Record<string, string>;
-}): Promise<Partial<Record<VerifyKind, string>>> {
-  const content = collectCurrentContent(args);
-  const per = await hashPerTab(content);
-  const out: Partial<Record<VerifyKind, string>> = {};
-  if (per['question'] !== undefined) {
-    out.problem = await sha256(`${per['question']}\n#answer:${args.answer || ''}`);
-  }
-  if (per['solution'] !== undefined) out.solution = per['solution'];
-  return out;
-}
 
 export default function EditorView({ problemId, folders, onBack }: EditorViewProps) {
   const { user } = useAuth();
@@ -2710,128 +2682,45 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ═══ Phase 61b: 정밀 검증 ═══ */
 
-  /** 검증에 넘길 블록. 미디어 블록은 텍스트가 없으므로 제외하고 hasImages로만 센다. */
-  const verifyBlocksOf = useCallback((tabId: string) => (
-    (allBlocks[tabId] || [])
-      .filter((b) => !['image', 'svg', 'ggb'].includes(b.type))
-      .map((b) => ({
-        blockKey: blockKeyOf(b),
-        type: b.type,
-        text: (b.title ? `### ${b.title}\n` : '') + (b.raw_text || ''),
-      }))
-      .filter((b) => b.text.trim())
-  ), [allBlocks]);
-
   /** 칩이 팝오버를 열기 **전에** 부른다 — 비용 0으로 막을 수 있는 것을 호출 뒤에 알리지 않는다 */
   const verifyCharCount = useCallback((kind: VerifyKind) => {
-    const q = verifyBlocksOf('question');
-    const sol = kind === 'solution' ? verifyBlocksOf('solution') : [];
+    const q = verifyBlocksOf(allBlocks['question'] || []);
+    const sol = kind === 'solution' ? verifyBlocksOf(allBlocks['solution'] || []) : [];
     return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
-  }, [verifyBlocksOf]);
+  }, [allBlocks]);
 
   const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
     if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');
 
     /* ⚠ 검증 대상은 **저장본**이다. 미저장 편집이 있으면 "지금 화면"을 검증했다고 믿는데
          서버본이 검증되고 지적 위치도 어긋난다. 저장이 실패하면 실행하지 않는다.
-         덤으로 toPersistedBlock이 block_key를 영속시켜 리포트 앵커가 안정된다. */
+         덤으로 toPersistedBlock이 block_key를 영속시켜 리포트 앵커가 안정된다.
+         (열람뷰에는 이 단계가 없다 — 거기서는 애초에 저장본만 보인다) */
     if (dirty) {
       await handleSave(true);
       if (!lastSaveOkRef.current) throw new Error('저장에 실패해 검증을 중단했습니다');
     }
 
-    const problemBlocks = verifyBlocksOf('question');
-    const solutionBlocks = kind === 'solution' ? verifyBlocksOf('solution') : [];
-    const targetTab = kind === 'solution' ? 'solution' : 'question';
-    const targetRaw = allBlocks[targetTab] || [];
-
-    const idToken = await user.getIdToken();
-    /* ⚠ 요청은 **두 번**이다 (1차 후보 생성 → 2차 판정). 한 요청에 다 넣으면 어려운 문항에서
-         Vercel maxDuration(300초)을 넘긴다 — 실측 228초. 쪼개면 각 단계가 300초를 온전히 받아
-         thinking을 낮춰 품질을 깎지 않아도 된다. 중간 상태(후보 배열)는 클라가 들고 다시 보낸다. */
-    const callVerify = async (payload: Record<string, unknown>) => {
-      const res = await fetch('/api/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.error) throw new Error(data.error || `검증 실패 (HTTP ${res.status})`);
-      return data;
-    };
-
-    const base = {
-      kind, problemBlocks, solutionBlocks,
-      answer: editAnswer || '',
-      // 답안 형식 문구는 서버가 만든다 — 클라가 lib/verify/prompts를 import하면
-      // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
-      hasChoices: (allBlocks['question'] || []).some((b) => b.type === 'choices'),
-      hasGanaOrRoman: (allBlocks['question'] || []).some((b) => b.type === 'gana' || b.type === 'roman'),
-      hasImages: targetRaw.some((b) => ['image', 'svg', 'ggb'].includes(b.type)),
-    };
-
-    const first = await callVerify({ ...base, phase: 'first' });
-
-    // 1차가 이미 결론을 낸 경우(그림 의존 skip · 후보 없음) — 2차를 부르지 않는다
-    let report: VerifyReport;
-    let usage = first.usage;
-    if (first.report) {
-      report = first.report as VerifyReport;
-    } else {
-      const second = await callVerify({
-        ...base, phase: 'judge',
-        candidates: first.candidates,
-        derivedAnswer: first.derivedAnswer,
-        answerCheck: first.answerCheck,
-      });
-      report = second.report as VerifyReport;
-      usage = {
-        inputTokens: (first.usage?.inputTokens || 0) + (second.usage?.inputTokens || 0),
-        outputTokens: (first.usage?.outputTokens || 0) + (second.usage?.outputTokens || 0),
-        costUsd: (first.usage?.costUsd || 0) + (second.usage?.costUsd || 0),
-      };
-    }
-    const data = { usage };
-
-    // 리포트는 일반 AI 메시지로 저장한다 → 후속 대화가 기존 discuss 파이프라인 무변경으로 된다
-    const commentId = await addComment({
-      problemId: problem.id,
-      tabId: activeTab,
-      authorUid: 'ai:verify',
-      content: buildReportMarkdown(report),
-      parentCommentId: null,
-      authorType: 'ai',
-      modelId: 'verify',
-      discussionSessionId: sessionId,
-      aiUsage: {
-        inputTokens: data.usage?.inputTokens || 0,
-        outputTokens: data.usage?.outputTokens || 0,
-        costUsd: data.usage?.costUsd || 0,
-      },
-    });
-
-    const hashes = await computeVerifyHashes({
-      tabs, blocksByTab: allBlocks, title: editTitle, answer: editAnswer || '',
+    const { report, commentId } = await runVerifyFlow({
+      kind, problemId: problem.id, sessionId, tabId: activeTab,
+      idToken: await user.getIdToken(),
+      tabs, blocksByTab: allBlocks,
+      title: editTitle, answer: editAnswer || '',
       tabLoadErrors: tabLoadErrorsRef.current,
+      buildMarkdown: buildReportMarkdown,
     });
-    await setVerification(problem.id, kind, {
-      verdict: report.verdict,
-      verifiedAt: report.verifiedAt,
-      contentHash: hashes[kind] || '',
-      stale: false,
-      reportCommentId: commentId,
-    });
+
     setProblem((prev) => (prev ? {
       ...prev,
       verification: {
         ...(prev.verification || {}),
         [kind]: {
           verdict: report.verdict, verifiedAt: report.verifiedAt,
-          contentHash: hashes[kind] || '', stale: false, reportCommentId: commentId,
+          contentHash: '', stale: false, reportCommentId: commentId,
         },
       },
     } : prev));
-  }, [problem, user, dirty, handleSave, verifyBlocksOf, allBlocks, editAnswer, editTitle, tabs, activeTab]);
+  }, [problem, user, dirty, handleSave, allBlocks, editAnswer, editTitle, tabs, activeTab]);
 
   /** 리포트 지적 → 해당 블록으로. 앵커는 block_key다 — doc id는 저장마다 갈린다. */
   const handleJumpToBlock = useCallback((blockKey: string) => {
