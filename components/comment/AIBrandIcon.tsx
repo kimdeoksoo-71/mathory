@@ -9,6 +9,7 @@
  */
 
 import React from 'react';
+import { IconSearchPlain } from '../ui/Icons';
 
 /**
  * Phase 61b — API 모델명 → provider.
@@ -42,6 +43,9 @@ export function AIBrandIcon({
   size?: number;
   fallbackEmoji?: string;
 }) {
+  // Phase 61b: 검증은 특정 벤더가 아니라 **기능**이다 — 브랜드 로고 대신 돋보기(툴바 찾기와 동일 계열)
+  if (provider === 'verify') return <IconSearchPlain size={size} />;
+
   const src = svgPathFor(provider);
   if (src) {
     // eslint-disable-next-line @next/next/no-img-element

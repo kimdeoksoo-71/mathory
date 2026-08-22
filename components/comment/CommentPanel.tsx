@@ -346,7 +346,7 @@ export default function CommentPanel({
       if (c.authorType === 'ai' && c.modelId) {
         // Phase 61b: 검증 리포트는 env 고정 모델이라 ai_models 문서가 없다 → 이름이 '?'가 된다
         if (c.modelId === 'verify') {
-          return { name: '검증', emoji: '🔍', isAI: true, modelDisplayName: '정밀 검증' };
+          return { name: '검증', provider: 'verify', isAI: true, modelDisplayName: '정밀 검증' };
         }
         const model = aiModels.find((m) => m.modelId === c.modelId);
         return {

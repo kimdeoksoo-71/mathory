@@ -17,6 +17,25 @@ export function IconSidebar({ size = 20, color = 'currentColor' }: IconProps) {
   );
 }
 
+/**
+ * 돋보기 — 툴바 '찾기/바꾸기'(`UnifiedToolbar`의 `SearchReplaceIcon`)에서 **코너 브라켓만 뺀** 것.
+ * 그쪽은 viewBox 64 · stroke 3.5에 브라켓이 상자를 채우므로, 단독으로 쓰려면 글리프를
+ * 24 상자에 맞춰 다시 그려야 한다(비율은 원 r : 손잡이 ≈ 1 : 0.9로 동일하게 유지).
+ * ⚠️ `.svg` 파일로 빼지 말 것 — `currentColor`가 끊긴다.
+ */
+export function IconSearchPlain({ size = 16, color = 'currentColor' }: IconProps) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="10.8" cy="10.8" r="6.4" />
+      <path d="M15.4 15.4 L20 20" />
+    </svg>
+  );
+}
+
 export function IconBlockchain({ size = 14, color = 'currentColor' }: IconProps) {
   // 2D 플랫 — 둥근 사각형 3개를 삼각형 배치로 연결
   return (
