@@ -37,6 +37,28 @@ export interface Problem {
   last_version_hash?: string | null;           // 직전 스냅샷 전체 해시 (dedup 캐시 초기화용)
   last_version_tab_hashes?: Record<string, string>; // 탭별 해시 (changed_tabs 계산용)
   last_editor_uid?: string;                    // 마지막 편집자 (협업 대비)
+  // Phase 61a: 시트 가져오기 출처. additive — 마이그레이션 0, Firestore 규칙 0.
+  import_source?: ImportSource;
+}
+
+/**
+ * Phase 61a — audition 스프레드시트에서 가져온 문항의 출처.
+ *
+ * ⚠️ **중복 판정은 `source_id` 하나로 하지 않는다.** 실측(2026-08-22) 결과 Stack 시트에
+ *    id가 같은데 문제 본문이 다른 그룹이 67개 있었다 — id만 보면 서로 다른 문항을
+ *    "이미 가져옴"으로 조용히 건너뛴다. `source_id`와 `stem_hash`가 **둘 다** 같을 때만 중복이다.
+ *    (Data_DS→Stack 이동은 행 번호만 바뀌고 본문은 같으므로 여전히 중복으로 잡힌다 — 원래 목적 유지)
+ *
+ * `row`는 가져온 시점의 행 번호일 뿐 식별자가 아니다(세트 이동 시 바뀐다).
+ */
+export interface ImportSource {
+  provider: 'audition-sheet';
+  sheet: 'Data_DS' | 'Stack';
+  row: number;
+  source_id: string;
+  /** 정규화된 문제 본문의 해시. `lib/sheetImport.ts`의 `stemHash`가 만든다 */
+  stem_hash: string;
+  imported_at: number;
 }
 
 export type MemberRole = 'viewer' | 'commenter';

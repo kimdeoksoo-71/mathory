@@ -8,7 +8,8 @@
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore.rules.test.mjs\"",
     "test:export": "tsc lib/version/exportMd.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportMd.test.mjs",
     "test:case": "tsc lib/solutionOutline.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/caseBlock.test.mjs",
-    "test:locale": "tsc lib/locale.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/locale.test.mjs"
+    "test:locale": "tsc lib/locale.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/locale.test.mjs",
+    "test:sheet": "tsc lib/sheetImport.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sheetImport.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",
@@ -28,6 +29,7 @@
     "dompurify": "^3.4.6",
     "emojibase-data": "^17.0.0",
     "firebase": "^12.9.0",
+    "google-auth-library": "^11.0.2",
     "katex": "^0.16.28",
     "nanoid": "^5.1.11",
     "next": "14.2.5",
