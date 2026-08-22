@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import type { VerifyReport, VerifyFinding, VerifyVerdict } from '../../types/problem';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
+import { renderInlineMathHtml } from '../../lib/katex-render';
 
 export const VERIFY_FENCE_RE = /```mathory-verify\s*([\s\S]*?)```/;
 
@@ -123,12 +124,14 @@ export default function VerifyReportCard({
             </button>
           )}
           {answerOpen && report.derivedAnswer && (
-            <code style={{
-              fontFamily: 'var(--font-mono)', fontSize: 11.5,
-              background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: 3,
-            }}>
-              {report.derivedAnswer}
-            </code>
+            <MathText
+              text={report.derivedAnswer}
+              autoMath
+              style={{
+                fontSize: 11.5, background: 'var(--bg-secondary)',
+                padding: '1px 5px', borderRadius: 3,
+              }}
+            />
           )}
         </div>
       )}
@@ -150,6 +153,26 @@ export default function VerifyReportCard({
         )}
       </div>
     </div>
+  );
+}
+
+/** 인용·이유에 섞인 `$...$`를 KaTeX로. 프롬프트가 수식을 `$...$`로 쓰게 하므로
+ *  평문으로 두면 카드 안이 전부 LaTeX 소스로 보인다. */
+function MathText({
+  text, style, className, autoMath,
+}: {
+  text: string;
+  style?: React.CSSProperties;
+  className?: string;
+  /** `$` 없이 온 순수 LaTeX도 수식으로 본다. 인용·도출답에만 켠다(산문은 금지) */
+  autoMath?: boolean;
+}) {
+  return (
+    <span
+      className={className}
+      style={style}
+      dangerouslySetInnerHTML={{ __html: renderInlineMathHtml(text, { autoMath }) }}
+    />
   );
 }
 
@@ -211,15 +234,18 @@ function FindingRow({
           fontSize: 11.5, color: 'var(--text-secondary)',
           whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         }}>
-          {finding.quote}
+          <MathText text={finding.quote} autoMath />
         </div>
       )}
 
-      <div style={{ marginTop: 3, lineHeight: 1.5 }}>{finding.reason}</div>
+      <MathText
+        text={finding.reason}
+        style={{ display: 'block', marginTop: 3, lineHeight: 1.5 }}
+      />
 
       {finding.suggestion && (
         <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--accent-success)' }}>
-          제안: {finding.suggestion}
+          제안: <MathText text={finding.suggestion} />
         </div>
       )}
     </div>

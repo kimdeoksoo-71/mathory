@@ -241,6 +241,13 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
   저장 먼저"를 앞에 붙인다(열람뷰는 애초에 저장본만 보인다)
 - **⚠️ `lib/verifyFlow.ts`를 `lib/verify/`에 두지 말 것** — 그 폴더는 전부 import 0 순수 모듈이고
   `npm run test:verify`가 tsc로 단독 컴파일한다. verifyFlow는 firestore·comments를 import한다
+- **리포트 카드의 수식은 `renderInlineMathHtml`(lib/katex-render.ts)로 그린다**: 프롬프트가
+  수식을 `$...$`로 쓰게 하므로 평문으로 두면 카드가 통째로 LaTeX 소스로 보인다. `EditorPreview`를
+  쓰지 않는 이유는 그쪽이 마크다운 **문서** 렌더러라 `.preview-content`의 글자 크기·문단 여백을
+  들여오기 때문이다(카드 안 11~12px 한두 줄에 과하고 지적당 3개씩 인스턴스가 생긴다).
+  ⚠ **모델이 인용에서 `$` 구분자를 떨어뜨린다** — 원문에는 있는데 옮겨 적으며 빠진다. 그래서
+  `autoMath` 옵션이 "`$`가 하나도 없고 TeX 제어열이 있으면 전체를 수식으로" 구제한다.
+  **인용·도출답에만 켤 것** — 산문(reason)에 켜면 통째로 수식화된다
 - **`AIChipBar`는 전폭 `<div>`다** — 그 옆에 무언가를 fragment로 나란히 두면 아랫줄로 밀린다.
   `headerLeft`에 두 개 이상을 놓으려면 flex 컨테이너로 감쌀 것
 - **게이트로 숨기는 UI는 이유를 남길 것**: 조용히 사라진 컨트롤은 "구현이 안 됐다"와 구별되지
