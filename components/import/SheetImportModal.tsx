@@ -14,6 +14,11 @@
  *
  * ⚠️ **중복 판정 키는 `source_id` 단독이 아니다(계획서 D11).** 실측에서 시트에 id가 같고
  *    본문이 다른 그룹이 67개 나왔다 — id만 보면 서로 다른 문항을 조용히 건너뛴다.
+ *
+ * ⚠️ **휴지통 문항은 중복이 아니다(D15).** Mathory의 '삭제'는 영구 삭제가 아니라 휴지통
+ *    이동(`folder_id = TRASH_FOLDER_ID`)이라 문서가 그대로 남는다. 이를 중복으로 세면
+ *    "지웠는데도 다시 가져올 수 없는" 상태가 된다 — 실제로 그렇게 막혔다.
+ *    또한 중복이어도 **체크를 막지는 않는다**. 기본만 해제하고 판단은 사용자에게 남긴다.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -24,7 +29,7 @@ import {
   type ImportRow, type ProblemDraft,
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
-import { createProblem, saveTabBlock, deleteProblem, createFolder, listProblems } from '../../lib/firestore';
+import { createProblem, saveTabBlock, deleteProblem, createFolder, listProblems, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { buildFolderTree, flattenVisible, getChildren } from '../../lib/folder-tree';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -44,8 +49,8 @@ interface PreviewItem {
   draft: ProblemDraft | null;
   error: string | null;
   persisted: Record<string, PersistedBlockData[]>;
-  /** 이미 가져온 문항 / 이 선택 안에서 앞선 행과 겹침 */
-  dupe: 'none' | 'existing' | 'inSelection';
+  /** none=새 문항 · existing=내 문항에 있음 · inSelection=이번 선택 안 중복 · trashed=휴지통에만 있음 */
+  dupe: 'none' | 'existing' | 'inSelection' | 'trashed';
 }
 
 interface SaveOutcome {
@@ -195,14 +200,17 @@ export default function SheetImportModal({
       const data = json as ApiResponse;
 
       // 이미 가져온 문항 집합. import_source는 listProblems의 `...data` 스프레드로 그대로 온다.
-      let existing = new Set<string>();
+      // D15: 휴지통 문항은 살아 있는 문항과 따로 센다 — 지운 것을 다시 가져올 수 있어야 한다.
+      const existing = new Set<string>();
+      const trashed = new Set<string>();
       try {
         const mine = await listProblems(user.uid);
-        existing = new Set(
-          mine.map((p) => p.import_source)
-              .filter((s): s is ImportSource => !!s?.source_id)
-              .map((s) => dupeKey(s.source_id, s.stem_hash ?? '')),
-        );
+        for (const p of mine) {
+          const src = p.import_source as ImportSource | undefined;
+          if (!src?.source_id) continue;
+          const key = dupeKey(src.source_id, src.stem_hash ?? '');
+          (p.folder_id === TRASH_FOLDER_ID ? trashed : existing).add(key);
+        }
       } catch {
         setError('기존 문항을 읽지 못해 중복 검사를 건너뜁니다 — 저장 전에 확인하세요');
       }
@@ -221,7 +229,10 @@ export default function SheetImportModal({
         }
         const key = dupeKey(d.sourceId, d.stemHash);
         const dupe: PreviewItem['dupe'] =
-          existing.has(key) ? 'existing' : seen.has(key) ? 'inSelection' : 'none';
+          existing.has(key) ? 'existing'
+          : seen.has(key) ? 'inSelection'
+          : trashed.has(key) ? 'trashed'          // 휴지통에만 있음 → 가져올 수 있다
+          : 'none';
         seen.add(key);
         return { rowIndex: row.rowIndex, draft: d, error: null, persisted, dupe };
       });
@@ -229,8 +240,11 @@ export default function SheetImportModal({
       setItems(next);
       setFetchedSheet(sheet);
       setHeaderWarnings(data.headerWarnings ?? []);
-      // D3: 중복은 기본 해제이자 선택 불가(skip 고정)
-      setChecked(new Set(next.filter((i) => i.draft && i.dupe === 'none').map((i) => i.rowIndex)));
+      // D3′(D15): 중복은 기본 해제. 다만 **막지는 않는다** — 배지로 알리고 선택은 사용자가 한다.
+      //   휴지통에만 있는 것은 사실상 지운 문항이므로 기본 선택에 포함한다.
+      setChecked(new Set(
+        next.filter((i) => i.draft && (i.dupe === 'none' || i.dupe === 'trashed')).map((i) => i.rowIndex),
+      ));
       setExpanded(null);
       setPhase('preview');
     } catch {
@@ -311,7 +325,8 @@ export default function SheetImportModal({
   });
 
   const failedRows = items.filter((i) => !i.draft).length;
-  const dupeRows = items.filter((i) => i.draft && i.dupe !== 'none').length;
+  const dupeRows = items.filter((i) => i.dupe === 'existing' || i.dupe === 'inSelection').length;
+  const trashedRows = items.filter((i) => i.dupe === 'trashed').length;
   const targetCount = items.filter((i) => i.draft && checked.has(i.rowIndex)).length;
 
   return (
@@ -393,6 +408,7 @@ export default function SheetImportModal({
               <>
                 선택 {checked.size}건
                 {dupeRows > 0 && ` · 이미 가져옴 ${dupeRows}건`}
+                {trashedRows > 0 && ` · 휴지통에 있음 ${trashedRows}건`}
                 {failedRows > 0 && ` · 오류 ${failedRows}건`}
               </>
             )}
@@ -535,7 +551,9 @@ function PreviewRow({
   onToggleExpand: () => void;
 }) {
   const { draft, error, persisted, dupe } = item;
-  const blocked = !draft || dupe !== 'none';
+  const warned = dupe === 'existing' || dupe === 'inSelection';
+  // D15: 중복이어도 체크는 막지 않는다. 막을 것은 초안이 아예 없는 오류 행뿐이다.
+  const blocked = !draft;
 
   const summary = useMemo(
     () => (draft ? draft.tabs.map((t) => `${t.label} ${persisted[t.id]?.length ?? 0}블록`).join(' · ') : ''),
@@ -545,18 +563,19 @@ function PreviewRow({
   return (
     <div style={{
       border: '1px solid var(--border-light, #eee)', borderRadius: 6,
-      marginBottom: 6, background: blocked ? 'var(--bg-hover, #f7f7f7)' : 'transparent',
+      marginBottom: 6, background: blocked || warned ? 'var(--bg-hover, #f7f7f7)' : 'transparent',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px' }}>
         <input
           type="checkbox" checked={checked} disabled={blocked} onChange={onToggleCheck}
-          title={dupe === 'existing' ? '이미 가져온 문항입니다'
-               : dupe === 'inSelection' ? '이 선택 안에서 앞선 행과 같은 문항입니다' : undefined}
+          title={dupe === 'existing' ? '이미 가져온 문항입니다 — 체크하면 한 벌 더 만듭니다'
+               : dupe === 'inSelection' ? '이 선택 안에서 앞선 행과 같은 문항입니다'
+               : dupe === 'trashed' ? '전에 가져왔지만 지금은 휴지통에 있습니다' : undefined}
         />
         <div onClick={draft ? onToggleExpand : undefined} style={{ flex: 1, cursor: draft ? 'pointer' : 'default', minWidth: 0 }}>
           <div style={{
             fontSize: 13, fontWeight: 600,
-            color: blocked ? 'var(--text-muted, #888)' : 'var(--text-primary, #222)',
+            color: blocked || warned ? 'var(--text-muted, #888)' : 'var(--text-primary, #222)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             <span style={{ ...badge('muted'), marginRight: 6 }}>{item.rowIndex}행</span>
@@ -569,6 +588,7 @@ function PreviewRow({
               {draft.warnings.length > 0 && <span style={badge('warn')}>경고 {draft.warnings.length}</span>}
               {dupe === 'existing' && <span style={badge('warn')}>이미 가져옴</span>}
               {dupe === 'inSelection' && <span style={badge('warn')}>선택 안 중복</span>}
+              {dupe === 'trashed' && <span style={badge('muted')}>휴지통에 있음</span>}
             </div>
           )}
         </div>
