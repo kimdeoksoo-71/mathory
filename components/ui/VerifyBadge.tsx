@@ -9,7 +9,9 @@
 
 import type { Problem, VerifyVerdict } from '../../types/problem';
 
-const META: Record<VerifyVerdict, { icon: string; color: string; label: string }> = {
+/** verdict 어휘의 유일 소유자 — 목록 배지와 일괄 검증 다이얼로그(Phase 61d)가 공유한다.
+ *  ⚠ 사본을 만들지 말 것: 색·라벨이 화면마다 갈린다(D61d-13). */
+export const VERIFY_VERDICT_META: Record<VerifyVerdict, { icon: string; color: string; label: string }> = {
   ok:    { icon: '✓', color: 'var(--accent-success)',    label: '이상 없음' },
   check: { icon: '⚠', color: 'var(--mathory-red-dark)',  label: '확인 필요' },
   fail:  { icon: '✕', color: 'var(--accent-danger)',     label: '결함 확인' },
@@ -30,7 +32,7 @@ export default function VerifyBadge({ problem, size = 11 }: { problem: Problem; 
   return (
     <>
       {entries.map(({ kind, state }) => {
-        const m = META[state.verdict] ?? META.check;
+        const m = VERIFY_VERDICT_META[state.verdict] ?? VERIFY_VERDICT_META.check;
         return (
           <span
             key={kind}

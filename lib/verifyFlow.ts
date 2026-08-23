@@ -33,6 +33,29 @@ export function hasMedia(blocks: Block[]): boolean {
   return blocks.some((b) => ['image', 'svg', 'ggb'].includes(b.type));
 }
 
+/** `/api/verify`가 돌려준 HTTP 상태를 실은 오류 (Phase 61d D5①) */
+export interface VerifyError extends Error { status?: number }
+
+/**
+ * 이 문항×종류를 검증할 때 서버가 세게 될 글자 수.
+ *
+ * ⚠️ **서버 셈법과 같아야 한다** — `route.ts`는 `totalChars(problemBlocks) + totalChars(solutionBlocks)`를
+ *    보고, 클라가 보내는 `solutionBlocks`는 `kind === 'solution'`일 때만 채워진다. 즉 문제 검증은
+ *    question만, 풀이 검증은 question+solution이다. 빈 텍스트 블록은 양쪽 모두 제외한다
+ *    (`verifyBlocksOf` ↔ 서버 `normalizeBlocks`).
+ *
+ * ⚠️ 사본을 만들지 말 것 — 셈법이 갈리면 "클라는 보내는데 서버가 400"이 된다.
+ *    소비처: 편집창 칩 · 열람뷰 칩 · 일괄 검증 프리플라이트(Phase 61d).
+ */
+export function verifyCharCountOf(
+  blocksByTab: Record<string, Block[]>,
+  kind: VerifyKind,
+): number {
+  const q = verifyBlocksOf(blocksByTab['question'] || []);
+  const sol = kind === 'solution' ? verifyBlocksOf(blocksByTab['solution'] || []) : [];
+  return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
+}
+
 /**
  * 검증 대상 탭의 정규화 해시 (stale 판정 기준).
  *
@@ -89,7 +112,14 @@ export async function runVerifyFlow(args: {
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.error) throw new Error(data.error || `검증 실패 (HTTP ${res.status})`);
+    if (!res.ok || data.error) {
+      // Phase 61d(D5①): 상태 코드를 실어 보낸다 — 배치가 401/403(토큰·허용목록)을 만나면
+      // 이후 전건이 반드시 실패하므로 즉시 전체를 멈춰야 한다. 기존 호출부는 `.message`만
+      // 읽으므로 영향 0이고, 던지는 값의 타입도 그대로 Error다.
+      const err = new Error(data.error || `검증 실패 (HTTP ${res.status})`) as VerifyError;
+      err.status = res.status;
+      throw err;
+    }
     return data;
   };
 

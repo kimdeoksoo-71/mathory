@@ -6,6 +6,7 @@ import {
   useDraggable, useDroppable, closestCenter,
   type DragStartEvent, type DragEndEvent,
 } from '@dnd-kit/core';
+import type { User } from 'firebase/auth';
 import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
@@ -25,6 +26,7 @@ import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
 import CoachLabel from '../ui/CoachLabel';
 import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
+import BatchVerifyDialog from './BatchVerifyDialog';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -70,6 +72,9 @@ interface FolderViewProps {
   onProblemAction: (action: string, problem: Problem) => void;
   onEmptyTrash?: () => void;
   onUpdated?: () => void;
+  /** Phase 61d: 일괄 검증 게이트·실행 주체. AppShell이 내린다(다이얼로그가 useAuth를 또 부르면
+   *  onAuthStateChanged 구독과 users 프로필 upsert가 한 번 더 돈다) */
+  user?: User | null;
   onSelectFolder?: (folder: Folder) => void;
   onMoveProblemToFolder?: (problem: Problem, folder: Folder) => void;
   // Phase 49: problems prop을 folder_id 필터 없이 그대로 사용(공유 보낸 뷰 등)
@@ -116,6 +121,7 @@ function formatDateTime(d?: Date): string {
 
 export default function FolderView({
   folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder, onMoveProblemToFolder,
+  user,
   passthrough = false, listContext,
 }: FolderViewProps) {
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
@@ -124,6 +130,8 @@ export default function FolderView({
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   // ⋮ 카드 메뉴
   const [cardMenu, setCardMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
+  // Phase 61d: 일괄 검증 다이얼로그
+  const [batchOpen, setBatchOpen] = useState(false);
 
   // Phase 49: 카드/리스트 보기 — 공유 뷰는 리스트 기본, 그 외 카드 기본. localStorage 영속.
   const VIEWMODE_KEY = `mathory.viewMode.${folder.id}`;
@@ -187,6 +195,25 @@ export default function FolderView({
       return p.folder_id === folder.id;
     })
     .sort((a, b) => compareBySort(a, b, sort));
+
+  /* ═══ Phase 61d: 일괄 검증 게이트 ═══
+     대상은 **폴더 직속 + 내 소유** 문항뿐이다. 휴지통·공유받음·공유보낸(passthrough·listContext)은
+     제외하고 미지정은 포함한다(그 문항도 내 소유고 folderProblems 필터가 이미 걸러 준다).
+     ⚠ 개별 항목 게이트는 다이얼로그가 다시 건다 — AI 댓글 create는 규칙상 오너만이다. */
+  const batchOwnedCount = user
+    ? folderProblems.filter((p) => !!p.authorUid && p.authorUid === user.uid).length
+    : 0;
+  const batchAllowed = !!user && !isTrash && !isSharedWithMe && !passthrough && !listContext
+    && batchOwnedCount > 0;
+
+  // 조용히 사라진 컨트롤은 "구현이 안 됐다"와 구별되지 않는다 — 개발 중에만 이유를 남긴다(61b 관례)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' || batchAllowed) return;
+    if (!user) console.info('[Phase61d] 일괄 검증 버튼 숨김: 로그인 정보 없음');
+    else if (isTrash || isSharedWithMe || passthrough || listContext) {
+      console.info('[Phase61d] 일괄 검증 버튼 숨김: 대상 아닌 폴더(휴지통·공유 계열)');
+    } else console.info('[Phase61d] 일괄 검증 버튼 숨김: 내 소유 직속 문항 0건');
+  }, [batchAllowed, user, isTrash, isSharedWithMe, passthrough, listContext]);
 
   useEffect(() => {
     const stored = localStorage.getItem(FONT_SIZE_KEY);
@@ -394,6 +421,19 @@ export default function FolderView({
           <div style={{ flex: 1 }} />
           {listAllowed && <ViewModeToggle mode={effectiveViewMode} onChange={changeViewMode} />}
           {effectiveViewMode === 'card' && <SortControls sort={sort} onChange={updateSort} />}
+          {batchAllowed && (
+            <button
+              onClick={() => setBatchOpen(true)}
+              title="이 폴더의 문항을 골라 AI 교차검증합니다 (API 비용 발생)"
+              style={{
+                border: 'none', background: 'none',
+                color: 'var(--text-secondary)', fontSize: 12, cursor: 'pointer',
+                fontFamily: 'var(--font-ui)', fontWeight: 500,
+              }}
+            >
+              일괄 검증
+            </button>
+          )}
           {isTrash && folderProblems.length > 0 && onEmptyTrash && (
             <button onClick={onEmptyTrash} style={{
               border: 'none', background: 'none',
@@ -623,6 +663,21 @@ export default function FolderView({
           items={cardMenuItems}
           onClose={() => setCardMenu(null)}
           onAction={handleCardMenuAction}
+        />
+      )}
+
+      {/* Phase 61d: 일괄 검증. ⚠ 전체 뷰포트 모달이라 이 위치에 두어도 사이드바까지 덮는다
+          (main은 z-index 없는 position:relative라 스태킹 컨텍스트를 만들지 않는다) */}
+      {batchOpen && user && (
+        <BatchVerifyDialog
+          folderName={folder.name}
+          problems={folderProblems}
+          user={user}
+          onClose={(didChange) => {
+            setBatchOpen(false);
+            // 배지 갱신은 종료 시 1회만 — 문항별 리프레시는 목록 전체 리로드를 n번 유발한다
+            if (didChange) onUpdated?.();
+          }}
         />
       )}
     </div>

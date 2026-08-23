@@ -715,6 +715,7 @@ export default function AppShell() {
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
             onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
             onSelectFolder={handleSelectFolder}
+            user={user}
             onMoveProblemToFolder={handleMoveProblemToFolder} />
         )}
         {view.type === 'share' && (() => {
@@ -764,6 +765,7 @@ export default function AppShell() {
               onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
               onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
               onSelectFolder={handleSelectFolder}
+              user={user}
               onMoveProblemToFolder={handleMoveProblemToFolder} />
           );
         })()}

@@ -11,7 +11,7 @@ import { listSessions } from '../../lib/discussion-sessions';
 import { canComment as canCommentOnProblem } from '../../lib/membership';
 import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
-import { runVerifyFlow, computeVerifyHashes, verifyBlocksOf } from '../../lib/verifyFlow';
+import { runVerifyFlow, computeVerifyHashes, verifyCharCountOf } from '../../lib/verifyFlow';
 import { findQuoteRange } from '../../lib/verify/parse';
 import { DEFAULT_DIFFICULTY } from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
@@ -2696,11 +2696,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   /* ═══ Phase 61b: 정밀 검증 ═══ */
 
   /** 칩이 팝오버를 열기 **전에** 부른다 — 비용 0으로 막을 수 있는 것을 호출 뒤에 알리지 않는다 */
-  const verifyCharCount = useCallback((kind: VerifyKind) => {
-    const q = verifyBlocksOf(allBlocks['question'] || []);
-    const sol = kind === 'solution' ? verifyBlocksOf(allBlocks['solution'] || []) : [];
-    return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
-  }, [allBlocks]);
+  const verifyCharCount = useCallback(
+    (kind: VerifyKind) => verifyCharCountOf(allBlocks, kind),
+    [allBlocks],
+  );
 
   const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
     if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');

@@ -14,7 +14,7 @@ import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
-import { runVerifyFlow, verifyBlocksOf } from '../../lib/verifyFlow';
+import { runVerifyFlow, verifyCharCountOf } from '../../lib/verifyFlow';
 import { blockKeyOf } from '../../lib/caseBlock';
 import { findQuoteRange } from '../../lib/verify/parse';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
@@ -244,12 +244,10 @@ export default function ProblemView({
   /* ═══ Phase 61b: 정밀 검증 (열람뷰) ═══
      편집창과 같은 흐름(`lib/verifyFlow.ts`)을 쓴다. 여기서는 항상 저장본이므로
      편집창에 있는 "dirty면 저장 먼저" 단계가 없다 — 그것이 유일한 차이다. */
-  const verifyCharCount = useCallback((kind: VerifyKind) => {
-    if (!problem) return 0;
-    const q = verifyBlocksOf(problem.tabBlocks['question'] || []);
-    const sol = kind === 'solution' ? verifyBlocksOf(problem.tabBlocks['solution'] || []) : [];
-    return [...q, ...sol].reduce((n, b) => n + b.text.length, 0);
-  }, [problem]);
+  const verifyCharCount = useCallback(
+    (kind: VerifyKind) => (problem ? verifyCharCountOf(problem.tabBlocks, kind) : 0),
+    [problem],
+  );
 
   const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
     if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');
