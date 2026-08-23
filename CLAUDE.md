@@ -167,7 +167,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61c(대화 → 편집창 삽입)** — 구현 완료, **실물 검수·배포 대기**
+## 현재 Phase: **Phase 61c(대화 → 편집창 삽입)** — 구현·검수 완료(2026-08-23), **미배포**(61b와 함께 push 대기)
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
@@ -307,7 +307,7 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
   판정열(Data_DS는 처리 후 비워져 빈칸이다)
 - 로직 검증: `npm run test:verify` (37개)
 
-### Phase 61c — 대화 → 편집창 삽입 (구현 완료 · 실물 검수 대기)
+### Phase 61c — 대화 → 편집창 삽입 (구현·검수 완료 · 미배포)
 
 문서: `docs/phaseSketch/Phase61c 대화 삽입 구현 계획서 v4 실행판.md` · roadmap의 Phase 61c 절
 
