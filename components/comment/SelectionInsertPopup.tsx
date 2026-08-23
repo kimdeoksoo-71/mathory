@@ -203,7 +203,7 @@ export default function SelectionInsertPopup({ scrollRef, getSource, onInsertToE
   const rafRef = useRef<number | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const hide = useCallback(() => { setAnchor(null); setNotice(null); }, []);
+  const hide = useCallback(() => { setAnchor(null); setNotice(null); setFlash(null); }, []);
 
   const evaluate = useCallback(() => {
     const sel = typeof window !== 'undefined' ? window.getSelection() : null;
@@ -220,7 +220,9 @@ export default function SelectionInsertPopup({ scrollRef, getSource, onInsertToE
     const left = Math.max(8, Math.min(last.right - POPUP_W / 2, window.innerWidth - POPUP_W - 8));
     const below = last.bottom + 6;
     const top = below + POPUP_H > window.innerHeight - 8 ? Math.max(8, last.top - POPUP_H - 6) : below;
-    setNotice(null);
+    /* ⚠️ 여기서 notice·flash를 지우지 말 것 — 이 함수는 rAF로 **지연 실행**되어
+       버튼 click **뒤에** 도는 일이 있다(실측). 그러면 방금 띄운 안내가 바로 지워진다.
+       새 상호작용의 시작(pointerdown)에서만 지운다. */
     setAnchor({ left, top, range: range.cloneRange() });   // D10′: 스냅샷으로 직렬화한다
   }, [hide]);
 
@@ -229,14 +231,19 @@ export default function SelectionInsertPopup({ scrollRef, getSource, onInsertToE
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
       rafRef.current = requestAnimationFrame(() => { rafRef.current = null; evaluate(); });
     };
+    /* 새 상호작용이 시작되면 지난 안내·플래시를 접는다. click보다 먼저 도는 유일한 지점이라
+       여기서만 지워야 "안내를 띄우자마자 evaluate가 지우는" 경합이 생기지 않는다. */
+    const onPointerDown = () => { setNotice(null); setFlash(null); };
     document.addEventListener('selectionchange', onSelectionChange);
     document.addEventListener('pointerup', onSelectionChange);
+    document.addEventListener('pointerdown', onPointerDown);
     window.addEventListener('resize', hide);
     const scroller = scrollRef.current;
     scroller?.addEventListener('scroll', hide);
     return () => {
       document.removeEventListener('selectionchange', onSelectionChange);
       document.removeEventListener('pointerup', onSelectionChange);
+      document.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('resize', hide);
       scroller?.removeEventListener('scroll', hide);
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
@@ -257,7 +264,8 @@ export default function SelectionInsertPopup({ scrollRef, getSource, onInsertToE
     if (!text) { setNotice('넣을 내용을 찾지 못했습니다'); return; }
     const result = onInsertToEditor(text);
     if (result === 'no-target') { setNotice('텍스트 블록을 먼저 선택하세요'); return; }
-    flashFor('삽입됨');
+    /* 성공 피드백은 편집창에 실제로 꽂힌 글자 자체다 — 삽입은 편집기로 포커스를 옮기므로
+       "삽입됨" 플래시를 띄워도 곧바로 selectionchange가 팝업을 접는다. 그냥 접는다. */
     window.getSelection()?.removeAllRanges();
     setAnchor(null);
   };

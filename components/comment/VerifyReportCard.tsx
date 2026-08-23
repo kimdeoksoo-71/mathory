@@ -13,7 +13,7 @@
  *    카드를 거치지 않고 그대로 보인다.
  */
 
-import { useState } from 'react';
+import { memo, useMemo, useRef, useState } from 'react';
 import type { VerifyReport, VerifyFinding, VerifyVerdict } from '../../types/problem';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 import { renderInlineMathHtml } from '../../lib/katex-render';
@@ -28,6 +28,13 @@ const VERDICT_META: Record<VerifyVerdict, { icon: string; label: string; color: 
   fail:  { icon: '✕', label: '결함 확인',   color: 'var(--accent-danger)' },
   skip:  { icon: '−', label: '검증 안 함',  color: 'var(--text-muted)' },
 };
+
+/* ⚠️ MathText에 넘기는 style은 **모듈 상수**여야 한다 — 인라인 객체 리터럴은 매 렌더
+   새 identity라 memo가 뚫리고, 그러면 innerHTML이 다시 쓰여 선택이 죽는다(위 MathText 주석) */
+const DERIVED_ANSWER_STYLE: React.CSSProperties = {
+  fontSize: 11.5, background: 'var(--bg-secondary)', padding: '1px 5px', borderRadius: 3,
+};
+const REASON_STYLE: React.CSSProperties = { display: 'block', marginTop: 3, lineHeight: 1.5 };
 
 const ANSWER_CHECK_LABEL: Record<string, string> = {
   match: '등록 정답과 일치',
@@ -127,10 +134,7 @@ export default function VerifyReportCard({
             <MathText
               text={report.derivedAnswer}
               autoMath
-              style={{
-                fontSize: 11.5, background: 'var(--bg-secondary)',
-                padding: '1px 5px', borderRadius: 3,
-              }}
+              style={DERIVED_ANSWER_STYLE}
             />
           )}
         </div>
@@ -157,8 +161,15 @@ export default function VerifyReportCard({
 }
 
 /** 인용·이유에 섞인 `$...$`를 KaTeX로. 프롬프트가 수식을 `$...$`로 쓰게 하므로
- *  평문으로 두면 카드 안이 전부 LaTeX 소스로 보인다. */
-function MathText({
+ *  평문으로 두면 카드 안이 전부 LaTeX 소스로 보인다.
+ *
+ *  ⚠️ **반드시 memo + useMemo로 감쌀 것 (Phase 61c)**: `dangerouslySetInnerHTML`에 매 렌더
+ *     새 객체를 주면 React가 그 span의 innerHTML을 **다시 쓴다** → 안의 텍스트 노드가 통째로
+ *     교체돼 **거기 걸린 사용자 선택이 즉시 죽는다**. 카드 안에서 인용을 드래그하는 것이
+ *     아예 불가능했던 원인이 이것이다(실측: 드래그 한 번에 innerHTML 재기록 12건).
+ *     같은 이유로 `style` prop은 **모듈 상수**여야 한다 — 인라인 리터럴은 매번 새 객체라
+ *     memo를 무력화한다. */
+const MathText = memo(function MathText({
   text, style, className, autoMath,
 }: {
   text: string;
@@ -167,14 +178,15 @@ function MathText({
   /** `$` 없이 온 순수 LaTeX도 수식으로 본다. 인용·도출답에만 켠다(산문은 금지) */
   autoMath?: boolean;
 }) {
+  const html = useMemo(() => renderInlineMathHtml(text, { autoMath }), [text, autoMath]);
   return (
     <span
       className={className}
       style={style}
-      dangerouslySetInnerHTML={{ __html: renderInlineMathHtml(text, { autoMath }) }}
+      dangerouslySetInnerHTML={{ __html: html }}
     />
   );
-}
+});
 
 function ModelChip({ name }: { name: string }) {
   return (
@@ -194,7 +206,10 @@ function FindingRow({
 }) {
   const isFail = finding.verdict === 'fail';
   const canJump = !!onJumpToBlock && !!finding.blockKey;
-  const [hover, setHover] = useState(false);
+  /* ⚠️ hover를 state로 들지 않는다 (Phase 61c) — mouseenter/leave가 카드 안에서 리렌더를
+     일으키고, 그 리렌더가 MathText의 innerHTML을 다시 써서 드래그 선택을 죽였다.
+     배경 강조는 `.verify-finding-row:hover`(globals.css)가 CSS로 처리한다. */
+  const downAt = useRef<{ x: number; y: number } | null>(null);
 
   /* 클릭이 안 되는 이유를 알려 준다 — 이유 없이 반응만 없으면 고장으로 보인다 */
   const why = canJump
@@ -205,17 +220,21 @@ function FindingRow({
 
   return (
     <div
-      onClick={canJump ? () => {
-        /* Phase 61c: 카드 안에서 드래그로 인용을 뽑는 중이면 점프하지 않는다.
-           행 전체에 onClick이 걸려 있어 mouseup이 곧 점프였고, 탭 전환·ref.focus()가
-           대화창 선택을 통째로 날렸다. 평범한 클릭은 mousedown이 선택을 먼저 접으므로
-           여기 도달할 때 isCollapsed가 참이다. */
+      className={canJump ? 'verify-finding-row' : undefined}
+      onMouseDown={canJump ? (e) => { downAt.current = { x: e.clientX, y: e.clientY }; } : undefined}
+      onClick={canJump ? (e) => {
+        /* Phase 61c: 카드 안에서 인용을 드래그로 뽑는 중이면 점프하지 않는다.
+           행 전체가 클릭 영역이라 mouseup이 곧 점프였고, 탭 전환·ref.focus()가
+           대화창 선택을 통째로 날렸다 — 인용을 뽑는 것 자체가 막혔다.
+           ① 포인터가 움직였으면 드래그다 ② 선택이 살아 있으면 드래그다.
+           ①이 필요한 이유: 선택이 어떤 이유로든 이미 죽은 뒤에는 ②가 통과해 버린다. */
+        const d = downAt.current;
+        downAt.current = null;
+        if (d && (Math.abs(e.clientX - d.x) > 4 || Math.abs(e.clientY - d.y) > 4)) return;
         const sel = typeof window !== 'undefined' ? window.getSelection() : null;
         if (sel && !sel.isCollapsed && sel.toString().trim()) return;
         onJumpToBlock!(finding.blockKey!, finding.quote);
       } : undefined}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
       title={why}
       style={{
         padding: '6px 4px',
@@ -223,8 +242,6 @@ function FindingRow({
         borderRadius: 4,
         borderTop: index === 1 ? 'none' : '1px solid var(--border-light)',
         cursor: canJump ? 'pointer' : 'default',
-        background: canJump && hover ? 'var(--bg-hover)' : 'transparent',
-        transition: 'background 0.12s',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -260,10 +277,7 @@ function FindingRow({
         </div>
       )}
 
-      <MathText
-        text={finding.reason}
-        style={{ display: 'block', marginTop: 3, lineHeight: 1.5 }}
-      />
+      <MathText text={finding.reason} style={REASON_STYLE} />
 
       {finding.suggestion && (
         <div style={{ marginTop: 3, fontSize: 11.5, color: 'var(--accent-success)' }}>

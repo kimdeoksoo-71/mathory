@@ -813,6 +813,12 @@ p:has(.marker-circled) {
 .case-head[aria-expanded="true"] .outline-chevron { transform: translateY(-50%) rotate(90deg); }
 .section-head:hover,
 .case-head:hover { background: var(--bg-hover); }
+
+/* Phase 61c — 검증 리포트 지적 행의 hover.
+   ⚠️ JS state로 하지 말 것: 카드 안 리렌더가 MathText의 innerHTML을 다시 쓰고,
+      그러면 거기 걸린 사용자 드래그 선택이 즉시 죽는다(인용을 못 뽑게 된다). */
+.verify-finding-row { transition: background 0.12s; }
+.verify-finding-row:hover { background: var(--bg-hover); }
 .section-head:focus-visible,
 .case-head:focus-visible { outline: 2px solid var(--accent-primary); outline-offset: 2px; }
 /* 여닫을 것이 없는 줄(레거시 Case 라벨)은 평범한 텍스트로 둔다 */

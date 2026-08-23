@@ -351,6 +351,22 @@ agent 대화창에서 드래그 → 미니 팝업([편집창에 삽입] · [복�
   게이트는 **`onInsertToEditor` prop 유무**이고 **팝업 자체는 열람뷰에도 마운트**된다(`[복사]`가 산다).
   ⚠ `onRunVerify`의 "편집 화면에서만 전달" 주석은 **낡았다**(ProblemView도 넘긴다) — 편집창 전용
   선례로 인용할 것은 `onInsertGraphBlock`·`onInsertToEditor`다
+- **⚠️ 카드 안 `dangerouslySetInnerHTML`은 리렌더마다 innerHTML을 다시 쓴다 → 사용자 선택이 죽는다
+  (Phase 61c 실측)**: `VerifyReportCard`의 `MathText`가 그랬다. `hover`를 state로 들고 있어
+  마우스가 들어올 때마다 리렌더 → span 안 텍스트 노드가 통째로 교체 → **거기 걸린 드래그 선택이
+  즉시 해제**되고 스냅샷 Range까지 고아가 된다(인용을 뽑는 것 자체가 불가능했다).
+  처방은 셋을 함께: ① `MathText`를 `memo` + `useMemo(html)` ② 넘기는 `style`을 **모듈 상수**로
+  (인라인 리터럴은 매 렌더 새 identity라 memo를 뚫는다) ③ hover를 state가 아니라 CSS
+  `.verify-finding-row:hover`(globals.css)로. **선택 위에 얹힌 UI가 있는 곳에서는 리렌더 자체가 버그다**
+- **⚠️ rAF로 지연 실행되는 핸들러는 click **뒤에** 돈다 (Phase 61c 실측)**: 팝업의 `evaluate()`가
+  `selectionchange`/`pointerup`을 rAF 디바운스하는데, 거기서 `setNotice(null)`을 하니 버튼 click이
+  방금 띄운 안내("텍스트 블록을 먼저 선택하세요")를 **자기가 지웠다**. 안내·플래시를 접는 것은
+  click보다 확실히 먼저 도는 `pointerdown`에서만 할 것
+- **점프 가드는 "선택이 살아 있는가"만으로 부족하다**: 선택이 이미 죽어 버린 뒤에는 그 조건이
+  통과한다. `onMouseDown` 좌표를 기록해 **4px 이상 움직였으면 드래그**로 보는 조건을 함께 걸 것
+- **계측 방법(재사용 가치 있음)**: 임시 라우트(`app/dev61c`) + **CDP로 몬 headless Chrome**
+  (`Input.dispatchMouseEvent`로 실제 드래그 재현 + `MutationObserver`로 DOM 교체 계측).
+  Node 22+의 내장 `WebSocket`이면 playwright 없이 된다. 조사 후 라우트·스크립트는 삭제했다
 - **⚠️ 왕복 테스트는 DOM 어댑터를 커버하지 못한다** — 테스트는 hast→미니트리로, 프로덕션은 DOM→미니트리로
   들어간다. 두 변환기는 **같은 규칙 한 벌**을 채워야 하고, 어댑터(Range 절단·`closest` 판정·스킵)의
   검증은 **실물 대화 검수**가 전담한다
