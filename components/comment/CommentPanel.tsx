@@ -22,6 +22,7 @@ import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
+import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 
@@ -56,11 +57,17 @@ interface CommentPanelProps {
   onInsertGraphBlock?: (save: GraphBlockSave) => Promise<string | void>;
   /** Phase 44: 드래그 리사이즈된 패널 폭 (px 숫자). 미전달 시 기본 35em */
   width?: number | string;
-  /** Phase 61b: 정밀 검증 실행. **편집 화면에서만 전달** — prop 유무가 곧 게이트다
-   *  (onInsertGraphBlock 선례). 열람뷰(ProblemView)에는 넘기지 않는다. */
+  /** Phase 61b: 정밀 검증 실행.
+   *  ⚠️ 착수 당시엔 "편집 화면 전용"이었으나 **후속에서 열람뷰(ProblemView)에도 넘긴다** —
+   *  검증은 문항을 보면서 하는 일이라 실사용에서 곧바로 어긋났다.
+   *  편집창 전용 게이트의 살아 있는 선례는 `onInsertGraphBlock`·`onInsertToEditor`다. */
   onRunVerify?: (kind: VerifyKind, sessionId: string) => Promise<void>;
-  /** Phase 61b: 리포트 지적 → 그 인용이 있는 자리로 이동. 〃 */
+  /** Phase 61b: 리포트 지적 → 그 인용이 있는 자리로 이동. 〃 (열람뷰는 오너일 때만 넘긴다) */
   onJumpToBlock?: (blockKey: string, quote: string) => void;
+  /** Phase 61c: 대화 선택 영역 → 활성 블록에 삽입. **편집 화면에서만 전달** —
+   *  prop 유무가 곧 [편집창에 삽입] 버튼의 게이트다(`onInsertGraphBlock` 선례).
+   *  팝업 자체는 열람뷰에도 마운트돼 [복사]는 어디서나 쓸 수 있다. */
+  onInsertToEditor?: (text: string) => 'inserted' | 'no-target';
   /** Phase 61b: 검증 대상 총 글자 수(사전 차단용). 편집 화면에서만 전달.
    *  kind별로 다르다 — 문제 검증은 문제 탭만, 풀이 검증은 문제+풀이를 함께 보낸다. */
   verifyCharCount?: (kind: VerifyKind) => number;
@@ -107,7 +114,7 @@ export default function CommentPanel({
   mode = 'agent',
   bodyFontSize = 15,
   onClose, onCommentsChange, onInsertGraphBlock,
-  onRunVerify, onJumpToBlock, verifyCharCount,
+  onRunVerify, onJumpToBlock, verifyCharCount, onInsertToEditor,
   width = '35em',
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
@@ -116,6 +123,16 @@ export default function CommentPanel({
 
   // ─── 데이터 ───
   const [comments, setComments] = useState<ProblemComment[]>([]);
+
+  /* Phase 61c: 댓글 id → **렌더에 쓰인 마크다운 소스**.
+     검증 리포트는 `CommentItem`이 펜스를 뺀 `verify.body`를 EditorPreview에 넘기므로
+     여기서도 같은 식을 써야 수식 순번이 맞는다(아래 CommentItem:content와 동일식). */
+  const commentSource = useCallback((commentId: string): string | null => {
+    const c = comments.find((x) => x.id === commentId);
+    if (!c) return null;
+    const v = extractVerifyReport(c.content);
+    return v ? v.body : c.content;
+  }, [comments]);
   const [loading, setLoading] = useState(true);
   const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
@@ -809,6 +826,15 @@ export default function CommentPanel({
         }
         .pending-ai { animation: pulse-pending 1.4s ease-in-out infinite; }
       `}</style>
+
+      {/* ═══ Phase 61c: 선택 → 삽입/복사 팝업 ═══
+           ⚠ 패널 루트의 **직계 자식**이어야 한다 — 메시지 리스트(overflowY:auto) 안에 두면 잘린다.
+           팝업 자체는 열람뷰에도 마운트된다([복사]). [편집창에 삽입]만 prop 게이트다. */}
+      <SelectionInsertPopup
+        scrollRef={messagesScrollRef}
+        getSource={commentSource}
+        onInsertToEditor={onInsertToEditor}
+      />
 
       {/* ═══ 헤더 ═══ 높이 57px (사이드바 헤더와 정렬) */}
       <div style={{
@@ -1680,7 +1706,7 @@ function CommentItem({
             onCancel={() => onSetEditing(false)}
           />
         ) : (
-          <div className={`comment-body ${info.isAI ? 'ai-body' : ''}`}>
+          <div className={`comment-body ${info.isAI ? 'ai-body' : ''}`} data-comment-id={comment.id}>
             <EditorPreview
               content={verify ? verify.body : comment.content}
               borderless autoHeight locale="ko"

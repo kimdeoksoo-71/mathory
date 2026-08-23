@@ -1807,6 +1807,51 @@ Mathory 서버 라우트로 이식했다. **Firestore 규칙 0 · 마이그레�
 
 ---
 
+## Phase 61c: 대화 → 편집창 삽입 🚧
+
+문서: `docs/phaseSketch/Phase61c 대화 삽입 구현 계획서 v4 실행판.md`
+(계보: v1 web → v2 CLI 확정판 → v3 web 재검증 → **v4 CLI 실행판** → 구현)
+
+agent 대화창(메시지 본문·검증 리포트 카드)에서 드래그하면 미니 팝업([편집창에 삽입] · [복사])이 뜨고,
+선택 영역을 **Mathory 표기 규약의 마크다운으로 직렬화**해 활성 블록의 커서 위치에 꽂는다.
+**서버 0 · Firestore 0 · 전처리 파이프라인 무변경 · ProblemView 무변경 · 신규 패키지 0.**
+
+### 구현 완료 (스텝 1~4)
+
+| 스텝 | 내용 |
+|------|------|
+| 1 | `lib/chatExtract.ts`(import 0 순수 코어) + `tests/chatExtract.test.mjs` 왕복 테스트 42개 |
+| 2 | `components/comment/SelectionInsertPopup.tsx` — 선택 감지·DOM 어댑터·팝업 |
+| 3 | `MarkdownEditorHandle.insertPlainText` + `EditorView.handleInsertFromChat` 배선 |
+| 4 | `VerifyReportCard` 점프 가드 · 표 직렬화 · `onRunVerify` JSDoc 정정 |
+
+### 핵심 규약
+
+- **수식 복원은 이중화 + 개수 게이트**: ① `.katex`/`.katex-error` 호스트 ↔ 원본 소스 슬라이스(구분자 포함 원문 그대로)
+  ② 게이트 실패 시 annotation·textContent 역변환. **게이트 실패면 그 댓글 전체를 ②로** — 조용한 오염 금지
+- **`.katex-error`도 인덱스 소비자다** — 파싱이 깨진 수식도 소스 인덱스를 한 칸 쓴다.
+  `.katex`만 세면 에러 하나에 순번이 통째로 밀린다. 그래서 `data-math-id`를 쓰지 않는다
+  (`EditorPreview`의 부여 effect는 `.katex`만 훑는다 — **그 속성은 Phase 56이 쓰니 지우지 말 것**)
+- **개수가 맞아도 대응이 틀릴 수 있다**: `lib/mathIndex.ts`는 수식 밖 `\$`를 여는 구분자로 보고 수식 안 `\$`를
+  건너뛰는데, remark-math는 정반대다(밖 = 마크다운 이스케이프 / 안 = 수식을 닫는다).
+  `scanRenderedMath`는 **사본이 아니라** remark 규칙을 모사한 별도 판본이다.
+  ⚠ `lib/mathIndex.ts`에도 같은 어긋남이 남아 있다(별건)
+- **`insertText`를 채팅 삽입에 쓰지 말 것** — 텍스트에 `{}`가 있으면 커서를 그 안으로 점프시키고 탭스톱을 무장한다
+  (툴바 템플릿 전용 규약). `insertPlainText`가 이 경로를 담당한다
+- **`FindingRow`는 행 전체가 클릭 영역이다** — 가드가 없으면 카드 안 드래그가 곧 점프(탭 전환·`ref.focus()`)라
+  인용을 뽑는 것 자체가 막힌다
+- **`Range.containsNode`는 존재하지 않는다**(그건 `Selection`의 메서드) → `comparePoint` 기반 헬퍼
+- **팝업은 항상 마운트, `[편집창에 삽입]`만 prop 게이트** — 열람뷰에서도 `[복사]`가 산다(ProblemView 변경 0)
+- **`br`은 hard break 두 칸만 낸다** — 개행은 hast가 `<br>` 뒤에 붙이는 `"\n"` 텍스트 노드가 공급한다
+- **마커 뒤 공백은 한 칸 복원** — 전처리 정규식(`[ \t]*`)이 흡수해 DOM에는 없다
+- **텍스트 노드에 남은 `$`는 리터럴이라 `\$`로 이스케이프**한다(수식은 전부 math 호스트로 빠진다)
+- **DOM 어댑터는 왕복 테스트가 닿지 않는다** — 실물 대화 검수가 유일한 관문(계획서 §4.6)
+
+**검증**: `npm run test:extract` 42개 · `tsc --noEmit` 통과 · 프로덕션 빌드 통과.
+**남은 것**: 덕수 실물 대화 검수(스텝 2 관문) · 배포.
+
+---
+
 ## UI 정리 (Phase 간 소규모)
 
 Phase 신설 대신 기록하는 규격 통일 작업.

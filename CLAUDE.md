@@ -46,6 +46,9 @@ lib/verify/               — 정밀 검증 (Phase 61b, 전부 import 0 순수 �
   providerParams.ts        — AI 요청 바디 조립 (회귀 스냅샷 대상)
 app/api/verify/            — 2단 교차검증 라우트 (Firestore 미접촉)
 lib/apiAuth.ts             — ID 토큰 검증 공용 (sheet-import · verify)
+lib/chatExtract.ts        — 대화 선택 → 마크다운 직렬화 (Phase 61c, import 0 순수 모듈)
+components/comment/
+  SelectionInsertPopup.tsx — 선택 감지·DOM 어댑터·팝업 (Phase 61c)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -164,13 +167,14 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61b(정밀 검증)** — 구현·검수 완료, **미배포**(push 대기)
+## 현재 Phase: **Phase 61c(대화 → 편집창 삽입)** — 구현 완료, **실물 검수·배포 대기**
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
 - **Phase 45a** — 구현·검수 완료(2026-08-20)
 - **Phase 28(Mathpix OCR)** — 2026-04-22 구현 완료, 2026-08-20 API 키 등록·실동작 확인으로 **완전 종료**
 - **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수·**배포·프로덕션 실동작 확인 완료**. 아래 절 참조
+- **Phase 61b(정밀 검증)** — 구현·검수 완료, **미배포**(push 대기). 아래 절 참조
 
 ### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현·검수·배포 완료)
 
@@ -302,6 +306,55 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
   라우트와 프롬프트·파서·바디 조립을 **공유**하고 HTTP·인증만 다르다. 대조군은 **Stack 시트**의
   판정열(Data_DS는 처리 후 비워져 빈칸이다)
 - 로직 검증: `npm run test:verify` (37개)
+
+### Phase 61c — 대화 → 편집창 삽입 (구현 완료 · 실물 검수 대기)
+
+문서: `docs/phaseSketch/Phase61c 대화 삽입 구현 계획서 v4 실행판.md` · roadmap의 Phase 61c 절
+
+agent 대화창에서 드래그 → 미니 팝업([편집창에 삽입] · [복사]) → 선택 영역을 **Mathory 표기 규약의
+마크다운으로 직렬화**해 활성 블록 커서 위치에 꽂는다. **서버 0 · Firestore 0 · 전처리 파이프라인 무변경.**
+
+- **수식은 원본 슬라이스로 복원한다 — annotation은 폴백이다**: `.katex`의 annotation에 든 것은 원본이
+  아니라 **전처리된 TeX**다(`$x$` → `\displaystyle x`, 다행 display → `\begin{array}{l}` 래핑). 1순위는
+  "렌더된 수식 호스트 i번 ↔ 소스 수식 i번" 슬라이스이고, 개수가 어긋나면 그 댓글 전체를 annotation
+  역변환으로 내린다(**조용한 오염 금지**)
+- **`.katex-error`도 수식 호스트다** — KaTeX 파싱이 깨지면 rehype-katex는 `.katex` 클래스가 **없는**
+  `<span class="katex-error">`를 낸다. 그래도 **소스 인덱스는 한 칸 소비한다** → `.katex`만 세면 에러
+  하나에 순번이 통째로 밀린다. ⚠ 그래서 `data-math-id`를 **쓰지 않는다**(`EditorPreview`의 부여
+  effect는 `.katex`만 훑는다). **그 속성을 지우지는 말 것 — Phase 56 하이라이트가 쓴다**
+- **⚠️ 개수 게이트는 필요조건이지 충분조건이 아니다**: `lib/mathIndex.ts`와 remark-math는 `\$`를
+  **정반대로** 본다 — 수식 **밖**의 `\$`를 mathIndex는 여는 구분자로 보지만 remark는 마크다운
+  이스케이프로 보고, 수식 **안**의 `\$`를 mathIndex는 건너뛰지만 remark는 **닫는다**(math-text는
+  코드 스팬 규칙이라 백슬래시를 안 본다). 그래서 개수만 맞고 짝이 뒤바뀌는 일이 실제로 있었다.
+  `lib/chatExtract.ts`의 `scanRenderedMath`는 **사본이 아니라** remark 규칙을 모사한 별도 판본이다.
+  ⚠ `lib/mathIndex.ts`에 같은 어긋남이 남아 있다(편집창 하이라이트가 `\$` 든 수식에서 밀린다 — 별건)
+- **순서 스큐는 상수다** — 코드펜스(검산 python·`mathory-graph`)·인라인 코드가 있으면 무보정 인덱스는
+  **100% 어긋난다**. ``` · `~~~` · 인라인 코드(**백틱 런 매칭**. `` `[^`\n]*` `` 근사는 다중 백틱에서 깨진다)를
+  **길이·개행을 보존하며** 마스킹한 뒤 인덱싱한다
+- **⚠️ `insertText`를 채팅 삽입에 쓰지 말 것** — 텍스트에 `{}`가 있으면 커서를 첫 `{}` 안으로 점프시키고
+  2개 이상이면 **탭스톱을 무장**한다(툴바 템플릿 전용 규약). AI 대화문에는 `x^{}`가 실제로 섞인다 →
+  `insertPlainText`(선택 대체 + 커서 + 포커스, 한 dispatch = undo 1스텝)가 이 경로를 담당한다
+- **⚠️ `FindingRow`는 행 전체가 클릭 영역이다** — 가드가 없으면 검증 카드 안 드래그가 곧 점프(탭 전환·
+  블록 펼침·`ref.focus()`)여서 **인용을 뽑는 것 자체가 막힌다**. `onClick` 진입부에서 살아 있는 선택을 보고 물러난다
+- **`Range.containsNode`는 존재하지 않는다** — 그건 `Selection`의 메서드다. 표 전체 포함 판정은
+  `range.comparePoint(node, 0) >= 0 && range.comparePoint(node, node.childNodes.length) <= 0`
+- **`selection.toString()` 금지** — 우리는 평문이 아니라 마크다운이 필요하다(마커·강조·수식 복원이 전부 죽는다)
+- **`<br>`은 hard break 두 칸만 낸다** — mdast→hast의 `break` 핸들러가 `<br>` **뒤에** `"\n"` 텍스트
+  노드를 함께 넣으므로 `\n`을 또 내면 빈 줄이 생긴다
+- **마커 뒤 공백은 한 칸 복원한다** — `GANA/GIYEOK/CIRCLED` 정규식의 `[ \t]*`가 흡수해 DOM에는 없다.
+  그대로 두면 `(가)첫 항목`이 되어 덕수가 쓰는 표기와 달라진다(렌더 결과는 같다)
+- **블록 경계는 `p`만이 아니다** — 검증 리포트 카드는 `<p>`가 **0건**이고 전부 `div`다.
+  `p`·`h1~h6`·`blockquote`·`ul`·`ol`·`table` → 빈 줄 / `div`·`tr`·`summary` → 줄바꿈
+- **텍스트 노드에 남은 `$`는 리터럴이라 `\$`로 이스케이프**한다(수식은 전부 math 호스트로 빠진다).
+  다른 활성 문자(`*`·`_`·`[`)는 건드리지 않는다 — 과잉 이스케이프가 평범한 문장을 더 망친다
+- **팝업은 패널 루트의 직계 자식**이어야 한다 — `messagesScrollRef`(`overflowY:auto`) 안에 두면 잘린다.
+  게이트는 **`onInsertToEditor` prop 유무**이고 **팝업 자체는 열람뷰에도 마운트**된다(`[복사]`가 산다).
+  ⚠ `onRunVerify`의 "편집 화면에서만 전달" 주석은 **낡았다**(ProblemView도 넘긴다) — 편집창 전용
+  선례로 인용할 것은 `onInsertGraphBlock`·`onInsertToEditor`다
+- **⚠️ 왕복 테스트는 DOM 어댑터를 커버하지 못한다** — 테스트는 hast→미니트리로, 프로덕션은 DOM→미니트리로
+  들어간다. 두 변환기는 **같은 규칙 한 벌**을 채워야 하고, 어댑터(Range 절단·`closest` 판정·스킵)의
+  검증은 **실물 대화 검수**가 전담한다
+- 로직 검증: `npm run test:extract` (42개, 실제 remark/rehype 파이프라인 왕복)
 
 ### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 배포 · 프로덕션 확인)
 

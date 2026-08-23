@@ -47,6 +47,8 @@ interface MarkdownEditorProps {
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
+  /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 탭스톱·커서 점프가 없다 */
+  insertPlainText: (text: string) => void;
   getCursorPosition: () => number;
   getContent: () => string;
   setContent: (text: string) => void;
@@ -342,6 +344,21 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           });
         }
 
+        view.focus();
+      },
+      /* ⚠️ Phase 61c: 위 `insertText`는 **툴바 템플릿 전용 규약**이다 —
+            텍스트에 `{}`가 있으면 커서를 그 안으로 점프시키고, 2개 이상이면 탭스톱을 무장해
+            이후 Tab 키 동작이 바뀐다. AI 대화문에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
+            채팅 삽입에는 쓰면 안 된다. 이쪽은 선택 대체 + 커서 이동 + 포커스만 한다. */
+      insertPlainText(text: string) {
+        const view = viewRef.current;
+        if (!view) return;
+        const { from, to } = view.state.selection.main;
+        // CM6은 selection을 changes 적용 **후** 문서 기준으로 해석한다 → 한 dispatch = undo 1스텝
+        view.dispatch({
+          changes: { from, to, insert: text },
+          selection: { anchor: from + text.length },
+        });
         view.focus();
       },
       getCursorPosition() {

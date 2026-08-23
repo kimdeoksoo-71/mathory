@@ -2125,6 +2125,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   };
 
+  /* ─── Phase 61c: agent 대화 선택 영역 → 활성 블록에 삽입 ─── */
+  const handleInsertFromChat = useCallback((text: string): 'inserted' | 'no-target' => {
+    const ref = activeBlockId ? editorRefs.current[activeBlockId] : null;
+    /* ref가 없는 경우 = 활성 블록 없음 · 접힌 블록(MarkdownEditor 언마운트) ·
+       미디어 블록(image·svg·ggb는 MediaBlockContent라 ref를 등록하지 않는다) */
+    if (!ref) return 'no-target';
+    /* ⚠ insertText가 아니라 insertPlainText다 — 그쪽은 `{}` 탭스톱을 무장하는 툴바 규약이고
+       AI 대화문에는 `x^{}`가 실제로 섞인다. 이후 경로(onChange → dirty → CM undo 1스텝)는 동일. */
+    ref.insertPlainText(text);
+    return 'inserted';
+  }, [activeBlockId]);
+
   /* ─── 수식 상용구 ─── */
   const handleSnippetInsert = (content: string) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
@@ -3659,6 +3671,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onClose={() => { setPanelMode(null); loadSessions(); }}
           onCommentsChange={setAllComments}
           onInsertGraphBlock={handleInsertGraphBlock}
+          onInsertToEditor={handleInsertFromChat}
           onRunVerify={handleRunVerify}
           onJumpToBlock={handleJumpToBlock}
           verifyCharCount={verifyCharCount}

@@ -205,7 +205,15 @@ function FindingRow({
 
   return (
     <div
-      onClick={canJump ? () => onJumpToBlock!(finding.blockKey!, finding.quote) : undefined}
+      onClick={canJump ? () => {
+        /* Phase 61c: 카드 안에서 드래그로 인용을 뽑는 중이면 점프하지 않는다.
+           행 전체에 onClick이 걸려 있어 mouseup이 곧 점프였고, 탭 전환·ref.focus()가
+           대화창 선택을 통째로 날렸다. 평범한 클릭은 mousedown이 선택을 먼저 접으므로
+           여기 도달할 때 isCollapsed가 참이다. */
+        const sel = typeof window !== 'undefined' ? window.getSelection() : null;
+        if (sel && !sel.isCollapsed && sel.toString().trim()) return;
+        onJumpToBlock!(finding.blockKey!, finding.quote);
+      } : undefined}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       title={why}
