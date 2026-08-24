@@ -49,6 +49,10 @@ lib/apiAuth.ts             — ID 토큰 검증 공용 (sheet-import · verify)
 lib/chatExtract.ts        — 대화 선택 → 마크다운 직렬화 (Phase 61c, import 0 순수 모듈)
 components/comment/
   SelectionInsertPopup.tsx — 선택 감지·DOM 어댑터·팝업 (Phase 61c)
+lib/verify/batchPlan.ts   — 일괄 검증 판정 (Phase 61d, import 0 순수 모듈)
+lib/batchVerify.ts        — 일괄 검증 오케스트레이터 (Phase 61d, firestore 접촉)
+components/problem/
+  BatchVerifyDialog.tsx    — 일괄 검증 선택→진행→요약 (Phase 61d)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -167,7 +171,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61c(대화 → 편집창 삽입)** — 구현·검수 완료(2026-08-23), **미배포**(61b와 함께 push 대기)
+## 현재 Phase: **Phase 61d(폴더 일괄 검증)** — 구현·검수 완료(2026-08-24), **미배포**(61b·61c와 함께 push 대기)
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
@@ -175,6 +179,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **Phase 28(Mathpix OCR)** — 2026-04-22 구현 완료, 2026-08-20 API 키 등록·실동작 확인으로 **완전 종료**
 - **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수·**배포·프로덕션 실동작 확인 완료**. 아래 절 참조
 - **Phase 61b(정밀 검증)** — 구현·검수 완료, **미배포**(push 대기). 아래 절 참조
+- **Phase 61c(대화 → 편집창 삽입)** — 구현·검수 완료(2026-08-23), **미배포**(push 대기). 아래 절 참조
 
 ### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현·검수·배포 완료)
 
@@ -306,6 +311,48 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
   라우트와 프롬프트·파서·바디 조립을 **공유**하고 HTTP·인증만 다르다. 대조군은 **Stack 시트**의
   판정열(Data_DS는 처리 후 비워져 빈칸이다)
 - 로직 검증: `npm run test:verify` (37개)
+
+### Phase 61d — 폴더 일괄 검증 (구현·검수 완료 · 미배포)
+
+문서: `docs/phaseSketch/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61d 절
+
+FolderView의 [일괄 검증] → 폴더 **직속** 문항을 체크박스로 고르면 61b의 `runVerifyFlow`를
+**문항×종류 단위로 순차 호출**하는 클라 루프가 돈다. **서버 0 · 규칙 0 · 스키마 0.**
+단건 검증과 결과물이 **비트 단위로 같은 것**이 적합성의 기준이다.
+
+- **⚠️ 검증 대상은 실행 시점 재로드본이다 — 프리플라이트 스냅샷으로 검증하지 말 것**: 배치는
+  수십 분~시간 단위인데 모달은 **같은 탭의 이동만** 막는다. 다른 탭에서 저장된 편집이 검증 쓰기보다
+  앞서면 `stale` 계산(`handleSave` 경로 전용)이 다시 돌 계기가 없어 **배지는 "최신 ✓"인데 내용은
+  다른** 상태가 남는다 → 문항 차례마다 `getProblemWithBlocks`를 다시 읽고 스킵을 재판정한다
+- **사전 차단 6종은 AI 호출 전에 판정**: `missing`·`not_owner`·`tab_load_error`·`empty_question`·
+  `no_solution`·`too_long`. ⚠ **`tab_load_error`가 가장 위험하다** — 그 예외(`VersionLoadError`)는
+  `runVerifyFlow` 안에서 **`addComment` 뒤**에 터져 "AI 비용은 다 쓰고 리포트는 저장됐는데
+  `verification`만 미갱신"인 반쪽 상태를 만든다. ⚠ **`empty_question`은 풀이 검증도 막는다**
+  (풀이 요청에도 `problemBlocks`가 실려 가고 서버가 검사한다)
+- **사전 차단·실패를 `skip` verdict로 기록하지 말 것**(61b D14′) — `skip`은 **AI가 판단한** 검증
+  불가 전용 어휘다. 사전 차단은 요약 화면에만 산다(Firestore 신규 스키마 0)
+- **기본 체크 = `!verification[kind] ∨ stale`** — `check`·`fail`은 기본 해제(수동 체크는 가능).
+  내용 불변 재검증은 같은 리포트를 한 번 더 쌓을 뿐이고 그 상태는 *사람이 볼 차례*다
+- **리포트 세션은 `type:'normal'`("일괄 검증")** — 댓글 세션에 넣으면 `commentStream=true`가 되어
+  **공개 문항에서 비로그인까지 읽는다**. ⚠ 세션은 **실제로 돌 종류가 1개 이상일 때만** 확보
+- **401/403은 즉시 전체 중단**(허용목록 미등록·토큰 만료 → 이후 전건 실패), **연속 3건 실패도 중단**.
+  카운터는 **AI 호출을 실제로 시도한 종류 단위**로 세고 건너뜀은 세지 않는다
+- **중단은 종류 경계에서만** — in-flight abort는 1차 비용을 쓰고 2차를 끊는 것이라 D13′에 의해
+  그 비용이 통째로 버려진다
+- **완전 직렬**(1문항×1종류). 동시 4건은 **프리플라이트 읽기에만**(`SheetImportModal.SAVE_CONCURRENCY` 전례)
+- **`idToken`은 문항마다 새로** — 토큰 수명 1시간 < 배치 시간
+- **전체 뷰포트 모달이 앱 내 이동을 막는다** — FolderView는 `view.type === 'folder'`일 때만 렌더돼
+  홈·편집·문항으로 나가면 언마운트되고 배치가 끊긴다. `fixed; inset:0; zIndex:9000`이면 사이드바까지
+  덮인다(`main`은 z-index 없는 `position:relative`라 스태킹 컨텍스트가 아니고 조상에 transform이 없다).
+  `beforeunload`는 **실행 중에만** 등록
+- **`onUpdated`는 종료 시 1회, 성공 1건 이상일 때만** — `setVerification`이 `updated_at`을 안 건드리므로
+  배치를 n건 돌려도 목록 순서는 그대로다
+- **⚠️ 글자 수를 `lib/verify/batchPlan.ts`에서 세지 말 것** — import 0이라 `verifyBlocksOf`를 못 쓰고,
+  직접 세면 서버 셈법의 **세 번째 사본**이 된다. 유일 구현은 `verifyCharCountOf`(verifyFlow)이고
+  판정 함수는 수치를 주입받는다. 같은 이유로 **`lib/batchVerify.ts`를 `lib/verify/`에 두지 말 것**
+- **verdict 어휘 = `VERIFY_VERDICT_META`, 스킵 문구 = `skipLabel`이 단독 소유** — `Record<SkipReason, string>`
+  이라 사유를 추가하면 라벨 누락이 **컴파일 오류**가 된다
+- 로직 검증: `npm run test:batch` (17개)
 
 ### Phase 61c — 대화 → 편집창 삽입 (구현·검수 완료 · 미배포)
 

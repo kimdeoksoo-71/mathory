@@ -1874,6 +1874,77 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 61d: 폴더 일괄 검증 ✅
+
+문서: `docs/phaseSketch/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md`
+(계보: v1 web → v2 CLI 실측 교차검증 → v3 web 재검증·덕수 재결 → **v4 CLI 실행판** → 구현)
+
+FolderView의 [일괄 검증] 버튼 → 폴더 **직속** 문항을 체크박스로 고르면, 61b의 `runVerifyFlow`를
+**문항×종류(문제/풀이) 단위로 순차 호출**하는 클라이언트 루프가 돈다.
+**서버 0 · Firestore 규칙 0 · 스키마 0 · 마이그레이션 0** — 61b A5("배치는 나중 Phase에서 클라
+루프로 얹는다")의 이행이다. 단건 검증과 결과물이 **비트 단위로 같은 것**이 적합성의 기준이라,
+`/api/verify`·프롬프트·파서·`runVerifyFlow`의 동작은 손대지 않았다.
+
+### 구현 (스텝 0~2)
+
+| 스텝 | 내용 |
+|------|------|
+| 0 | `lib/verify/batchPlan.ts`(import 0 순수 판정) + `tests/batchPlan.test.mjs` 17개 |
+| 1 | `verifyFlow` additive 2건(Error에 `status` · `verifyCharCountOf` 공용화) + 사본 2개 제거 + `VERIFY_VERDICT_META` export |
+| 2 | `lib/batchVerify.ts`(오케스트레이터) + `BatchVerifyDialog`(선택→진행→요약) + FolderView 버튼·게이트 + AppShell `user` 전달 |
+
+### 핵심 규약
+
+- **검증 대상은 실행 시점 재로드본이다** — 프리플라이트 스냅샷으로 검증하면 안 된다.
+  배치는 수십 분~시간 단위인데 모달은 **같은 탭의 이동만** 막는다. 다른 탭에서 저장된 편집(T1)이
+  검증 쓰기(T2)보다 앞서면, `stale` 계산은 `handleSave` 경로에만 있어서 다시 돌 계기가 없다 →
+  **배지는 "최신 ✓"인데 내용은 다른** 상태가 남는다. 그래서 문항 차례마다 `getProblemWithBlocks`를
+  다시 읽고 스킵 사유를 재판정한 뒤 그 본으로 검증한다(Firestore 읽기 2배는 AI 비용 대비 0)
+- **사전 차단 6종은 AI 호출 전에 판정한다**: `missing` · `not_owner` · `tab_load_error` ·
+  `empty_question` · `no_solution` · `too_long`. ⚠ **`tab_load_error`가 가장 위험하다** — 그 예외는
+  `runVerifyFlow` 안에서 **`addComment` 뒤**(해시 계산 시점)에 터져, AI 비용을 다 쓰고 리포트는
+  저장됐는데 `verification`만 미갱신인 반쪽 상태로 끝난다.
+  ⚠ **`empty_question`은 풀이 검증도 막는다** — 풀이 요청에도 `problemBlocks`가 실려 가고 서버가 검사한다
+- **사전 차단·실패를 `skip` verdict로 기록하지 말 것**(61b D14′) — `skip`은 **AI가 판단한** 검증 불가
+  (그림 의존) 전용 어휘다. 사전 차단은 요약 화면에만 존재한다(Firestore 신규 스키마 0)
+- **기본 체크 = `!verification[kind] ∨ stale`** — `check`·`fail`은 **기본 해제**다(수동 체크는 가능).
+  내용 불변 재검증은 같은 리포트를 한 번 더 쌓을 뿐이고, 그 상태는 *사람이 볼 차례*다.
+  내용을 고치면 `stale`이 되어 자동 복귀한다
+- **리포트 세션은 `type:'normal'`("일괄 검증")이어야 한다** — 댓글 세션에 넣으면
+  `resolveCommentStream`이 `commentStream=true`로 저장해 **공개 문항에서 비로그인 열람자까지 읽는다**.
+  ⚠ 세션은 **실제로 돌 종류가 1개 이상일 때만** 확보한다(전건 스킵 문항에 빈 세션 금지)
+- **실패는 두 종류다**: 문항 고유 실패(파싱·모델 오류·세션/저장 실패)는 기록하고 계속,
+  **401/403은 즉시 전체 중단**(`VERIFY_ALLOWED_UIDS` 미등록·토큰 만료 → 이후 전건이 반드시 실패),
+  **연속 3건 실패도 중단**. 카운터는 **AI 호출을 실제로 시도한 종류 단위**로 세고 건너뜀은 세지 않는다
+  ("건너뜀 3연속"이 장애로 오인되면 안 된다)
+- **중단은 종류 경계에서만** — 진행 중인 검증은 저장까지 마친 뒤 멈춘다. in-flight abort는
+  1차(first) 비용을 쓰고 2차(judge)를 끊는 것이라 61b D13′에 의해 그 비용이 통째로 버려진다
+- **완전 직렬** — 1문항×1종류씩. 병렬화는 Vercel 동시 실행·rate limit·비용 폭주를 한꺼번에 부른다.
+  동시 4건은 **프리플라이트 읽기에만** 쓴다(`SheetImportModal.SAVE_CONCURRENCY` 전례)
+- **`idToken`은 문항마다 새로 받는다** — 토큰 수명 1시간 < 배치 시간
+- **전체 뷰포트 모달이 앱 내 이동을 막는다** — FolderView는 `view.type === 'folder'`일 때만 렌더되므로
+  홈·편집·문항으로 나가면 언마운트되고 배치가 끊긴다. `fixed; inset:0; zIndex:9000`이면 사이드바
+  클릭 자체가 막힌다(`main`은 z-index 없는 `position:relative`라 스태킹 컨텍스트를 만들지 않고,
+  조상에 `transform`이 없어 fixed가 잘리지 않는다 — 실측). `beforeunload`는 **실행 중에만** 등록
+- **`onUpdated`는 종료 시 1회, 성공 1건 이상일 때만** — 문항별 호출은 목록 전체 리로드를 n번 유발한다.
+  `setVerification`이 `updated_at`을 안 건드리므로 배치 n건을 돌려도 목록 순서는 그대로다
+- **글자 수를 `batchPlan`에서 세지 말 것** — 그 파일은 import 0이라 `verifyBlocksOf`를 못 쓰고,
+  직접 세면 서버 셈법(`normalizeBlocks`+`totalChars`)의 **세 번째 사본**이 된다. 유일 구현은
+  `verifyCharCountOf`이고 판정 함수는 계산된 수치를 주입받는다
+- **verdict 어휘는 `VERIFY_VERDICT_META`, 스킵 문구는 `skipLabel`이 단독 소유** — 화면마다 색·문구가
+  갈리지 않도록. `skipLabel`을 `Record<SkipReason, string>`으로 둔 것은 의도적이다(사유 추가 시
+  라벨 누락이 컴파일 오류가 된다)
+
+**검증**: `npm run test:batch` 17개 · `npm run test:verify` 45개(61b 회귀) · `tsc --noEmit` 통과 ·
+프로덕션 빌드 통과(`/api/verify` 여전히 `ƒ` Dynamic).
+
+**덕수 검수 완료(2026-08-24)** — ① 버튼 노출(휴지통·공유 계열 부재, 미지정 존재) ② 기본 체크가
+카드 배지와 일치 ③ 모달이 사이드바까지 덮음 ④ 소배치 실동작(프리플라이트 스킵 조기 확정 ·
+중단이 종류 경계에서 멈춤) — 전항 정상.
+**남은 것**: 배포(Phase 61b·61c와 함께 push).
+
+---
+
 ## UI 정리 (Phase 간 소규모)
 
 Phase 신설 대신 기록하는 규격 통일 작업.
