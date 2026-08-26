@@ -9,7 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import {
-  MARKER_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
+  MARKER_LINE_RE, MATH_ONLY_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
 } from '../../lib/locale';
 import { convertCaseRefs } from '../../lib/caseBlock';
 import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
@@ -113,7 +113,9 @@ function preprocessLocale(text: string): string {
     const line = lines[i];
     const isMarkerLine = MARKER_LINE_RE.test(line);
     const prevLine = forced.length > 0 ? forced[forced.length - 1] : '';
-    if (isMarkerLine && prevLine.trim() !== '') {
+    // 개선묶음 M1 A — 수식만 있는 행이 연달아 오면 사이에 빈 줄 (lib/locale.ts와 동일 조건)
+    const splitMathRun = MATH_ONLY_LINE_RE.test(line) && MATH_ONLY_LINE_RE.test(prevLine);
+    if ((isMarkerLine && prevLine.trim() !== '') || splitMathRun) {
       forced.push('');
     }
     forced.push(line);
@@ -165,7 +167,8 @@ function preprocessLocale(text: string): string {
   t = t.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
 
   // 8. 텍스트 행 \tag{n} → inline span (block div 사용 금지 — 후속 수식 렌더링 보호)
-  t = t.replace(/\\tag\{(\d+)\}\s*$/gm, (_, num) =>
+  //    ⚠ `\s*$` 금지 — 개행을 삼켜 뒤 빈 줄을 먹는다(lib/locale.ts convertTextTags와 동일)
+  t = t.replace(/\\tag\{(\d+)\}[ \t]*$/gm, (_, num) =>
     `<span class="tag-marker">(${num})</span>`);
 
   // 8-1. 개선묶음 M1 G — 본문의 C1·C2a 참조를 굵게 (lib/caseBlock.ts가 소유·자기 보호)

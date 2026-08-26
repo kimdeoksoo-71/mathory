@@ -154,8 +154,13 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   둘인데 코드펜스 보호(`protectFences`)는 `EditorPreview` 쪽에만 있어 인쇄 경로가 무방비다.
   ⚠ `chatExtract.MARKER_LITERAL`에 `case-ref`를 넣지 말 것 — 그 목록은 "뒤 공백 한 칸 복원"이라
   `C1에서`가 `C1 에서`로 샌다
-- **수식행 분할(⌘⇧L)의 결과는 들여쓰기(callout) 블록이다 (M1 A)**: 행마다 `$…$` 한 줄 + 행 사이 빈 줄
-  (`remark-breaks`가 없어 빈 줄 없이는 한 문단으로 합쳐진다). `\tag{n}`은 `$…$` **밖**으로 뺀다 —
+- **수식행 분할(⌘⇧L)의 결과는 들여쓰기(callout) 블록이다 (M1 A)**: 행마다 `$…$` 한 줄이고
+  **소스에는 빈 줄이 없다**. 행 분리는 `insertMarkerLineBreaks`가 공급한다 — **연속된 수식 전용 행**
+  (`MATH_ONLY_LINE_RE`, 보호 후 `⟦MATH_n⟧` 모양을 본다) 사이에 렌더 시 빈 줄을 넣는다.
+  그 장치가 없으면 `remark-breaks` 부재로 세 행이 한 문단이 되고 `\tag` 꼬리표가 겹친다.
+  ⚠ `convertTextTags`가 `\s*$`를 쓰던 동안 그 빈 줄을 도로 먹었다 — **`\tag`로 끝난 문단이 다음
+  문단과 합쳐지던 잠복 버그**였고 M1에서 `[ \t]*$`로 고쳤다(Phase 57 규약의 재확인).
+  `\tag{n}`은 `$…$` **밖**으로 뺀다 —
   KaTeX는 인라인 모드 `\tag`를 거부한다. ⚠ **자기 타입 변경은 `text`·`callout`에만** — `case` 계열의
   타입이 사라지면 rail·자동 번호가 바뀐다
 

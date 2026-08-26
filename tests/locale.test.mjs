@@ -146,3 +146,32 @@ test('L14 마커 뒤 공백 흡수는 개행을 먹지 않는다 — 문단 경�
   assert.equal(P('① \n② '),
     '<span class="marker-circled">①</span>\n\n<span class="marker-circled">②</span>');
 });
+
+/* ═══ 개선묶음 M1 A — 연속된 수식 전용 행 사이에 빈 줄 ═══ */
+
+test('M1: 수식만 있는 행이 연달아 오면 렌더 시 빈 줄이 들어간다', () => {
+  // 소스는 붙여 쓴다(빈 줄 없음). 이 장치가 없으면 세 행이 한 문단으로 합쳐진다.
+  const out = P('$x = 1$\n$y = 2$\n$z = 3$');
+  assert.equal(out, '$x = 1$\n\n$y = 2$\n\n$z = 3$');
+});
+
+test('M1: 행 꼬리 \\tag 가 붙어도 수식 전용 행으로 본다', () => {
+  const out = P('$x = 1$ \\tag{1}\n$y = 2$');
+  assert.ok(out.includes('\n\n'), out);
+});
+
+test('M1: 산문 뒤에 오는 수식 행은 지금까지처럼 이어 붙는다', () => {
+  const src = '따라서 다음이 성립한다\n$x = 1$';
+  assert.equal(P(src), src);
+});
+
+test('M1: 수식 뒤 산문도 이어 붙는다 (한쪽만 수식이면 발동 안 함)', () => {
+  const src = '$x = 1$\n따라서 참이다';
+  assert.equal(P(src), src);
+});
+
+test('M1(정정): \\tag 로 끝난 문단이 다음 문단을 삼키지 않는다', () => {
+  // ⚠ 잠복 버그였다 — `\\s*$`가 개행까지 먹어 빈 줄이 사라지고 두 문단이 합쳐졌다.
+  const out = P('문장 하나 \\tag{1}\n\n다음 문단');
+  assert.ok(out.includes('</span>\n\n다음 문단'), JSON.stringify(out));
+});

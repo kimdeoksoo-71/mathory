@@ -1960,7 +1960,7 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 
 | 항목 | 속한 Phase | 한 일 |
 |---|---|---|
-| **A** 수식행 분할 개편 | 22-I · 57 | `$$…$$` 분할 결과를 **들여쓰기(callout) 블록 1개 + 행마다 `$…$`**로. `lib/mathSplit.ts`에 `splitDisplayMathToRows` 신설(블록 조립은 EditorView), `array` 환경 분할 허용(`\hline`은 차단), `pushUndo()` 추가. `npm run test:mathsplit` 16개 |
+| **A** 수식행 분할 개편 | 22-I · 57 | `$$…$$` 분할 결과를 **들여쓰기(callout) 블록 1개 + 행마다 `$…$`**로(소스에 빈 줄 없음 — 행 분리는 `insertMarkerLineBreaks`가 공급). `lib/mathSplit.ts`에 `splitDisplayMathToRows` 신설(블록 조립은 EditorView), `array` 환경 분할 허용(`\hline`은 차단), `pushUndo()` 추가. `npm run test:mathsplit` 16개 |
 | **B** 그림 조작 UI | 22-E · 46 | `.mathory-range` 신설 → `input[type=range]` **4곳** 공통 스킨(트랙 2px·노브 12px·로고 레드). 이미지 블록 버튼 2단 → **1열** |
 | **C** proofread 결정 규칙 2종 | 27 · 28 | `\begin{tabular}` → GFM 표 · `(ㄱ)` → `(1)`. `autoFixDeterministicIssues`의 step 0 뒤에 넣어 **교정 버튼·OCR 삽입 양쪽**에 적용. `npm run test:proofread` 16개 |
 | **D** `\tag` 세로 위치 | 57 P4 | **단일행 수식만** 번호가 9.84px 떠 있던 것을 `0.13em` 앵커로 보정(CDP 실측 → −0.06px). 판별자는 `.mtable` |
@@ -1975,6 +1975,9 @@ Phase 신설 대신 기록하는 규격 통일 작업.
   bare `|`는 셀을 쪼개고(표·수식 파괴), `\|`는 셀도 살고 **수식 노드가 `\|`를 그대로 받으며**(‖ 정상),
   `\\|`는 다시 셀을 쪼갠다. → 규칙: 기존 `\|`는 **그대로**, 수식 **안** bare `|`는 `\vert`,
   수식 **밖** bare `|`는 `\|`. `\\|`는 만들지 않는다.
+- **`\tag` 뒤 개행을 먹던 잠복 버그**: `convertTextTags`의 `\s*$`가 개행까지 삼켜 `\tag`로 끝난
+  문단이 뒤 빈 줄을 잃고 **다음 문단과 합쳐지고** 있었다(Phase 57 "행 단위 전처리에 `\s*` 금지"
+  규약 위반). `[ \t]*$`로 정정 — 두 사본 모두.
 - **`array`/`tabular` 열 지정**: `\{[^}]*\}` 정규식은 `{|p{2cm}|l|}`에서 `{|p{2cm}`까지만 먹고
   `|l|}`를 본문에 남긴다 — 게다가 `\begin{array`가 이미 사라져 "잔재 검사"도 발동하지 않는다.
   → `lib/latexScan.ts`(import 0)의 **중괄호 균형 스캔**으로만 떼고, 해석 실패면 변환하지 않는다.

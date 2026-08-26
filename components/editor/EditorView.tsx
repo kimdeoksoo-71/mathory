@@ -1519,7 +1519,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   /**
    * 개선묶음 M1 — 결과는 **들여쓰기(callout) 블록 1개**이고 행마다 `$…$` 한 줄, 행 사이는 빈 줄이다.
    *
-   * ⚠ 빈 줄이 없으면 한 문단으로 합쳐진다(렌더 파이프라인에 `remark-breaks`가 없다).
+   * ⚠ 소스에는 빈 줄을 넣지 않는다. 대신 `insertMarkerLineBreaks`가 **연속된 수식 전용 행** 사이에
+   *   렌더 시 빈 줄을 넣는다 — 그것이 없으면 `remark-breaks` 부재로 세 행이 한 문단으로 합쳐진다.
    *   들여쓰기 블록의 `p { margin: 0 }`이 그 문단들을 "행간만"으로 그려 주고,
    *   행 꼬리의 `\tag{n}`은 `.tag-marker`가 우단에 붙인다 — 이 블록이 원래 그 용도로 만들어졌다.
    *
@@ -1547,7 +1548,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
     pushUndo();
 
-    const rowsRaw = result.rows.join('\n\n');
+    // 소스는 붙여 쓴다(덕수 요청). 렌더의 행 분리는 insertMarkerLineBreaks가 공급한다
+    const rowsRaw = result.rows.join('\n');
     const beforeText = result.before.replace(/\s+$/, '');
     const afterText = result.after.replace(/^\s+/, '');
     const selfConvert = !beforeText && (target.type === 'text' || target.type === 'callout');

@@ -63,6 +63,14 @@ export const GIYEOK_LITERAL_RE = /^([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
  *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
 export const CIRCLED_NUM_LINE_RE = /^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
 
+/** 수식 하나만 있는 행 (뒤에 `\tag{n}` 꼬리표는 허용).
+ *
+ *  ⚠ **수식 보호가 끝난 뒤의 모양**을 본다 — 이 시점에 수식은 이미 `⟦MATH_n⟧`이다.
+ *    `$…$`로 적으면 영영 매칭되지 않는다.
+ *  ⚠ EditorPreview의 사본도 이 상수를 가져다 쓴다 — 사본을 만들지 말 것.
+ */
+export const MATH_ONLY_LINE_RE = /^⟦MATH_\d+⟧(?:[ \t]*\\tag\{\d+\})?[ \t]*$/;
+
 // ===== 수식 영역 보호 =====
 
 interface MathProtection {
@@ -104,7 +112,13 @@ function insertMarkerLineBreaks(text: string): string {
     const line = lines[i];
     const isMarkerLine = MARKER_LINE_RE.test(line);
     const prevLine = result.length > 0 ? result[result.length - 1] : '';
-    if (isMarkerLine && prevLine.trim() !== '') {
+    // 개선묶음 M1 A — 수식만 있는 행이 연달아 오면 사이에 빈 줄을 넣는다.
+    //   ⚠ 소스에는 빈 줄을 두지 않는다(덕수 요청)는 규약의 대가다. remark-breaks가 없어
+    //     빈 줄이 없으면 세 행이 **한 문단**으로 합쳐지고 `\tag` 꼬리표들이 같은 문단
+    //     오른쪽에 겹쳐 뜬다(실측). 행 분리는 예나 지금이나 여기가 담당한다.
+    //   ⚠ "앞 행도 수식만"일 때로 좁힌다 — 산문 뒤에 오는 수식 행은 지금까지처럼 이어 붙는다.
+    const splitMathRun = MATH_ONLY_LINE_RE.test(line) && MATH_ONLY_LINE_RE.test(prevLine);
+    if ((isMarkerLine && prevLine.trim() !== '') || splitMathRun) {
       result.push('');
     }
     result.push(line);
@@ -185,7 +199,10 @@ function convertRefReferences(text: string): string {
 
 /** \tag{n} (텍스트 행 끝) → tag-marker span, 참조 번호 (n) */
 function convertTextTags(text: string): string {
-  return text.replace(/\\tag\{(\d+)\}\s*$/gm, (_, num) =>
+  // ⚠ `\s*$`를 쓰면 안 된다 — `\s`는 개행을 삼켜 뒤따르는 **빈 줄을 먹는다**.
+  //   그러면 `\tag`로 끝난 문단이 다음 문단과 한 덩어리가 된다(M1에서 실측·정정).
+  //   행 단위 전처리는 `[ \t]*`만 쓴다(Phase 57 규약).
+  return text.replace(/\\tag\{(\d+)\}[ \t]*$/gm, (_, num) =>
     `<span class="tag-marker">(${num})</span>`);
 }
 
