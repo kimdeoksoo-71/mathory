@@ -104,10 +104,16 @@ test('보기 라벨 `ㄱ.` 은 건드리지 않는다', () => {
   assert.equal(P.convertJamoRefs(src).fixed, src);
 });
 
-test('수식·인라인 코드·코드펜스 안은 보호', () => {
-  for (const src of ['$(ㄱ)$ 은 수식', '`(ㄱ)` 은 코드', '```\n(ㄱ)\n```']) {
+test('코드·펜스·HTML 태그 안은 보호', () => {
+  for (const src of ['`(ㄱ)` 은 코드', '```\n(ㄱ)\n```', '<img alt="(ㄱ)">']) {
     assert.equal(P.convertJamoRefs(src).fixed, src, src);
   }
+});
+
+test('수식 안도 변환한다 (덕수 2026-08-26) — 자모는 수식 기호가 아니라 라벨이다', () => {
+  assert.equal(P.convertJamoRefs('$(ㄱ)$ 은 참').fixed, '$(1)$ 은 참');
+  assert.equal(P.convertJamoRefs('$$\\text{(ㄴ)} = 2$$').fixed, '$$\\text{(2)} = 2$$');
+  assert.equal(P.convertJamoRefs('보기 $(ㄱ), (ㄷ)$ 만').fixed, '보기 $(1), (3)$ 만');
 });
 
 test('count 는 치환 건수', () => {

@@ -567,12 +567,15 @@ const JAMO_REF_RE = /[(（]([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])[)）]/g;
  * 행머리·행중을 가리지 않는다 — 참조는 "(ㄱ)에서"처럼 문장 중간에 온다.
  * 합답형 보기 라벨인 `ㄱ.`(마침표·행머리)와는 문법이 달라 충돌하지 않는다.
  *
+ * ⚠ **수식 안도 대상이다**(덕수 2026-08-26). `$(ㄱ)$`·`\text{(ㄱ)}`처럼 수식 안에 들어간 참조도
+ *    같은 표기여야 한다 — 한글 자모는 수식 기호가 아니라 어차피 라벨이므로 오변환 여지가 없다.
+ *    보호하는 것은 **코드**뿐이다(펜스·인라인 코드·HTML 태그).
  * ⚠ 변환 결과 `(1)`은 `autoWrapBareNumbers`의 보호 대상이라 `$1$`로 오염되지 않는다.
  * ⚠ 보기 라벨을 `(ㄱ)`으로 적는 블록(`roman`·`choices`)에서는 호출부가 `skipJamoRefs`로 끈다.
  *    (OCR 경로는 블록 타입을 모르므로 기본 변환으로 돈다 — 알고 두는 한계다.)
  */
 export function convertJamoRefs(text: string): { fixed: string; count: number } {
-  const ranges = collectMathRanges(text);
+  const ranges: Array<[number, number]> = [];
   const addAll = (re: RegExp) => {
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {

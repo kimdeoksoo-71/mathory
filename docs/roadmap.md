@@ -1962,7 +1962,7 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 |---|---|---|
 | **A** 수식행 분할 개편 | 22-I · 57 | `$$…$$` 분할 결과를 **들여쓰기(callout) 블록 1개 + 행마다 `$…$`**로(소스에 빈 줄 없음 — 행 분리는 `insertMarkerLineBreaks`가 공급). `lib/mathSplit.ts`에 `splitDisplayMathToRows` 신설(블록 조립은 EditorView), `array` 환경 분할 허용(`\hline`은 차단), `pushUndo()` 추가. `npm run test:mathsplit` 16개 |
 | **B** 그림 조작 UI | 22-E · 46 | `.mathory-range` 신설 → `input[type=range]` **4곳** 공통 스킨(트랙 2px·노브 12px·로고 레드). 이미지 블록 버튼 2단 → **1열** |
-| **C** proofread 결정 규칙 2종 | 27 · 28 | `\begin{tabular}` → GFM 표 · `(ㄱ)` → `(1)`. `autoFixDeterministicIssues`의 step 0 뒤에 넣어 **교정 버튼·OCR 삽입 양쪽**에 적용. `npm run test:proofread` 16개 |
+| **C** proofread 결정 규칙 2종 | 27 · 28 | `\begin{tabular}` → GFM 표 · `(ㄱ)` → `(1)`(**수식 안 포함** — 코드 계열만 보호). `autoFixDeterministicIssues`의 step 0 뒤에 넣어 **교정 버튼·OCR 삽입 양쪽**에 적용. `npm run test:proofread` 16개 |
 | **D** `\tag` 세로 위치 | 57 P4 | **단일행 수식만** 번호가 9.84px 떠 있던 것을 `0.13em` 앵커로 보정(CDP 실측 → −0.06px). 판별자는 `.mtable` |
 | **E** 원문자 두께 | 57 P5 · 58 P5 | `.preview-content .marker-circled { font-weight: inherit }` — 화면만. **인쇄 600은 유지**(`(가)`·`ㄱ.`과 같은 의도된 예외) |
 | **G** 본문 `C1` 참조 강조 | 59 · 59a | `convertCaseRefs`(`lib/caseBlock.ts`)가 `C1`·`C2a`를 `.case-ref`로 감싼다(굵기만). `preprocessLocale` 두 사본에 배선, 보호는 함수가 자체 수행. `npm run test:case` 41개(+6) |
