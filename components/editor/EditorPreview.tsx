@@ -11,6 +11,7 @@ import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import {
   MARKER_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
 } from '../../lib/locale';
+import { convertCaseRefs } from '../../lib/caseBlock';
 import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
 import 'katex/dist/katex.min.css';
 
@@ -167,6 +168,9 @@ function preprocessLocale(text: string): string {
   t = t.replace(/\\tag\{(\d+)\}\s*$/gm, (_, num) =>
     `<span class="tag-marker">(${num})</span>`);
 
+  // 8-1. 개선묶음 M1 G — 본문의 C1·C2a 참조를 굵게 (lib/caseBlock.ts가 소유·자기 보호)
+  t = convertCaseRefs(t);
+
   // 9. 수식 영역 복원
   t = t.replace(/⟦MATH_(\d+)⟧/g, (_, idx) => mathRegions[parseInt(idx)]);
 
@@ -261,9 +265,9 @@ function ImageResizeOverlay({
       boxShadow: '0 2px 12px rgba(0,0,0,0.1)',
     }}>
       <span style={{ fontSize: 11, color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 36 }}>{widthPx}px</span>
-      <input type="range" min={50} max={800} step={10} value={widthPx}
+      <input type="range" className="mathory-range" min={50} max={800} step={10} value={widthPx}
         onChange={(e) => handleChange(Number(e.target.value))}
-        style={{ width: 120, accentColor: 'var(--accent-primary, #B8845C)', cursor: 'pointer' }} />
+        style={{ width: 120, ['--p' as string]: `${((widthPx - 50) / 750) * 100}%` } as React.CSSProperties} />
     </div>
   );
 }

@@ -1333,7 +1333,10 @@ function VerifyChips({
   };
 
   return (
-    <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+    /* ⚠ 여기에 position:relative를 두면 팝오버의 기준이 "칩 묶음"이 되어, 모델 칩 개수만큼
+          오른쪽에서 시작해 250px가 패널 밖으로 넘친다(M1 H). 기준을 컴포저 래퍼(패널 정폭)로
+          넘기려고 일부러 비워 둔다 — 그 사이에는 positioned 조상이 없다. */
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
       {(['problem', 'solution'] as VerifyKind[]).map((kind) => (
         <button
           key={kind}
@@ -1362,7 +1365,7 @@ function VerifyChips({
 
       {confirm && (
         <div style={{
-          position: 'absolute', bottom: 'calc(100% + 6px)', left: 0, zIndex: 20,
+          position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 20,
           width: 250, padding: 10, borderRadius: 6,
           border: '1px solid var(--border-primary)', background: 'var(--bg-card)',
           boxShadow: '0 4px 16px rgba(0,0,0,0.12)',

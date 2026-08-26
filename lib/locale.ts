@@ -12,7 +12,7 @@
  * 원본 데이터는 절대 수정하지 않음 — 표시 단계에서만 변환
  */
 
-import { LEGACY_CASE_RE } from './caseBlock';
+import { LEGACY_CASE_RE, convertCaseRefs } from './caseBlock';
 
 // ===== 매핑 테이블 =====
 
@@ -222,6 +222,9 @@ export function preprocessLocale(text: string, locale: Locale): string {
   processed = convertTextTags(processed);
   processed = convertFigureLabels(processed);
   processed = convertTableLabels(processed);
+  // 개선묶음 M1 G — 본문의 C1·C2a 참조를 굵게. 마지막 텍스트 단계다(수식은 아직 placeholder).
+  //   ⚠ 보호는 convertCaseRefs가 스스로 한다 — 이 사본에는 코드펜스 보호가 없다.
+  processed = convertCaseRefs(processed);
 
   // 4단계: 수식 복원
   return restoreMath(processed, placeholders);

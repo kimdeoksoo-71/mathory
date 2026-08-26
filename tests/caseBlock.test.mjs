@@ -7,7 +7,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildCaseLabels, buildCaseGapKeys, injectCaseLabel, splitCaseTitle, letters, caseClassName } from '../.test-build/lib/caseBlock.js';
+import { buildCaseLabels, buildCaseGapKeys, injectCaseLabel, splitCaseTitle, letters, caseClassName, convertCaseRefs } from '../.test-build/lib/caseBlock.js';
 import { buildOutline, hasOutlineContent } from '../.test-build/lib/solutionOutline.js';
 
 let seq = 0;
@@ -336,4 +336,40 @@ test('구역: 본문이 비어도 거느린 블록이 있으면 여닫이 대상
   const [sec] = buildOutline(blocks);
   assert.equal(sec.items[0].body, '');
   assert.equal(sec.items[0].segment.length, 1);
+});
+
+/* ═══ 개선묶음 M1 G — 본문 C1 참조 강조 ═══ */
+
+test('본문의 C1 · C2a 는 case-ref span으로 감싸진다 (조사가 붙어도)', () => {
+  assert.equal(convertCaseRefs('C1에서 보았듯'), '<span class="case-ref">C1</span>에서 보았듯');
+  assert.equal(convertCaseRefs('C2a 와 C10'),
+    '<span class="case-ref">C2a</span> 와 <span class="case-ref">C10</span>');
+});
+
+test('LaTeX 잔재·식별자는 건드리지 않는다', () => {
+  // ⚠ 'C12x'는 제외 — letters(24)='x'라 C12x는 **실제로 가능한 라벨**이다(하위 경우 24번째)
+  for (const src of ['\\mathrm{C}1', 'C_1', 'AC1', 'C123', 'C1x2']) {
+    assert.equal(convertCaseRefs(src), src, src);
+  }
+});
+
+test('수식 placeholder · 인라인 코드 · 코드펜스 안은 보호', () => {
+  assert.equal(convertCaseRefs('`C1` 은 코드'), '`C1` 은 코드');
+  assert.equal(convertCaseRefs('```\nC1\n```'), '```\nC1\n```');
+});
+
+test('제목행 라벨(case-label span) 안은 이중으로 감싸지 않는다', () => {
+  const src = '<span class="case-label">C1.</span> a>1인 경우';
+  assert.equal(convertCaseRefs(src), src);
+});
+
+test('라벨 span 뒤 본문의 참조는 그대로 잡힌다', () => {
+  const src = '<span class="case-label">C2.</span> C1과 같은 방식';
+  assert.equal(convertCaseRefs(src),
+    '<span class="case-label">C2.</span> <span class="case-ref">C1</span>과 같은 방식');
+});
+
+test('C+숫자가 없으면 원문 그대로 (빠른 통과)', () => {
+  const src = '경우를 나누어 생각하자';
+  assert.equal(convertCaseRefs(src), src);
 });

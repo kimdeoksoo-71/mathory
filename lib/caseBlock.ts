@@ -19,6 +19,47 @@
 export const LEGACY_CASE_RE = /^\*\*Case\s+\d+[a-z]?\.\*\*/;
 export const LEGACY_SUBCASE_RE = /^-[ \t]+\*\*Case\s+\d+[a-z]\.\*\*/;
 
+/**
+ * 본문에서 경우를 가리키는 참조 표기 — `C1` · `C2a` (개선묶음 M1 G).
+ *
+ * ⚠ 라벨 문법의 단일 원천이다(`buildCaseLabels`가 만드는 `C${n}${letters}`와 같은 모양).
+ *   사본을 만들지 말 것 — 표기가 갈리면 "본문의 C1만 강조가 빠지는" 조용한 결함이 된다.
+ * ⚠ `\b` 대신 lookaround인 이유: 한글 조사(`C1에서`)는 살리면서 `\mathrm{C}`·`C_1` 같은
+ *   LaTeX 잔재와 `AC1`·`C12x` 같은 식별자는 배제해야 한다.
+ */
+export const CASE_REF_RE = /(?<![A-Za-z0-9_\\])C(\d{1,2})([a-z]?)(?![A-Za-z0-9_])/g;
+
+/**
+ * 본문의 `C1`·`C2a`를 `<span class="case-ref">`로 감싼다. 굵기만 올리는 용도다(색·크기 불변).
+ *
+ * ⚠ **보호는 이 함수가 스스로 한다.** 호출부에 기대면 안 된다 —
+ *   `preprocessLocale`은 사본이 둘인데 코드펜스 보호(`protectFences`)는 EditorPreview 쪽에만
+ *   있어서, 인쇄 경로에서는 펜스 안의 `C1`이 그대로 바뀐다.
+ * ⚠ 순서가 중요하다: `<span class="case-label">C1.</span>`을 **요소 통째로** 먼저 빼야 한다.
+ *   단개 태그를 먼저 빼면 span 안의 텍스트 `C1.`이 노출돼 라벨 안에 라벨이 겹친다.
+ * ⚠ 수식은 호출 시점에 이미 `⟦MATH_n⟧`로 치환돼 있다(양쪽 사본 공통).
+ */
+export function convertCaseRefs(text: string): string {
+  if (!/C\d/.test(text)) return text;                 // 흔한 경우를 빨리 통과
+
+  const holds: string[] = [];
+  const keep = (m: string) => {
+    holds.push(m);
+    return `\u0000REF${holds.length - 1}\u0000`;      // 본문에 나타날 수 없는 표지
+  };
+
+  let out = text
+    .replace(/```[\s\S]*?```/g, keep)                  // 코드펜스
+    .replace(/~~~[\s\S]*?~~~/g, keep)
+    .replace(/<span class="case-label">[\s\S]*?<\/span>/g, keep)   // ← 요소 통째 (먼저)
+    .replace(/<[^>\n]+>/g, keep)                       // 남은 단개 태그
+    .replace(/(`+)[^`\n]*\1/g, keep);                  // 인라인 코드(백틱 런)
+
+  out = out.replace(CASE_REF_RE, (m) => `<span class="case-ref">${m}</span>`);
+
+  return out.replace(/\u0000REF(\d+)\u0000/g, (_, i) => holds[parseInt(i, 10)]);
+}
+
 export function isCaseBlock(type: string): boolean {
   return type === 'case' || type === 'subcase';
 }

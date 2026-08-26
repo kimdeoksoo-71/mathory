@@ -49,6 +49,7 @@ lib/apiAuth.ts             — ID 토큰 검증 공용 (sheet-import · verify)
 lib/chatExtract.ts        — 대화 선택 → 마크다운 직렬화 (Phase 61c, import 0 순수 모듈)
 components/comment/
   SelectionInsertPopup.tsx — 선택 감지·DOM 어댑터·팝업 (Phase 61c)
+lib/latexScan.ts          — LaTeX 중괄호 균형 스캔 (M1, import 0 · mathSplit·proofread 공용)
 lib/verify/batchPlan.ts   — 일괄 검증 판정 (Phase 61d, import 0 순수 모듈)
 lib/batchVerify.ts        — 일괄 검증 오케스트레이터 (Phase 61d, firestore 접촉)
 components/problem/
@@ -106,7 +107,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **shorthand 위에 조건부 longhand를 스프레드하지 말 것 — 사라질 때 구멍이 남는다 (Phase 45a)**: 위 항목의 *제거* 변종이자 훨씬 찾기 어렵다. `border` shorthand + `...(cond ? null : { borderTopColor })` 구조에서 `cond`가 바뀌어 longhand 키가 **없어지면**, React는 그 longhand만 `''`로 지우고 shorthand는 값이 그대로라 다시 쓰지 않는다 → 인라인 스타일에 `border-top-color`가 **빈 구멍**으로 남아 초기값 **`currentColor`(본문 검정)** 로 떨어진다. **첫 렌더는 멀쩡하고 조건이 한 번 바뀐 뒤부터** 나타나므로 코드를 아무리 읽어도 안 보인다. → **네 변을 항상 전부 적을 것**(`borderTop`/`Right`/`Bottom`/`Left`를 무조건 지정). 원인 규명은 `getComputedStyle`로 전폭 가로선을 훑는 콘솔 스니펫이 결정적이었다
 - **둥근 모서리에서 인접 두 변의 색이 다르면 코너가 흐려진다 (Phase 45a)**: 브라우저가 곡선 구간에서 두 색을 대각선으로 전환시킨다. 카드 한 변만 색을 낮추는 식의 보정을 하지 말 것 — 네 변을 함께 옮길 것
 - **인쇄 전 웹폰트 대기 필수 (Phase 60 후속)**: `--font-print`의 Noto Serif KR은 `display=swap`이라, 폰트가 오기 전에 `window.print()`가 스냅샷을 뜨면 **굵기 요청(600/700)이 폴백에 흡수돼 제목·경우 라벨이 본문 굵기로 인쇄된다**(글자 폭은 그대로고 획만 얇아진다 → 원인 짚기가 어렵다). `lib/pdfPrint.tsx`의 `waitForPrintFonts()`가 `document.fonts.load` + `fonts.ready`로 막는다. **타임아웃 필수** — CDN이 죽으면 폴백으로라도 인쇄돼야 한다. unicode-range 폰트(`MathoryCircled`)는 `load(font, '①')`처럼 **그 범위의 문자를 함께 넘겨야** 매칭된다
-- **`PrintStyles.css`는 화면에도 로드된다 (Phase 60)**: `EditorView.tsx:51`이 직접 import하고 AppShell이 EditorView를 정적 import한다 → **앱 전 페이지**. 따라서 **인쇄 전용 규칙에는 `.print-body` 접두가 필수**다(파일 118행 주석이 이미 못 박은 규약). 접두를 빠뜨리면 인쇄 값이 화면으로 새고, 동시에 이 파일을 안 부르는 곳만 규칙이 빠진다. 반대로 화면 규칙은 `globals.css`가 `.preview-content` 스코프로 소유한다 — 인쇄가 iframe이 아니라 같은 document라 **양방향 스코프**가 필요하다
+- **`PrintStyles.css`는 화면에도 로드된다 (Phase 60)**: `EditorView.tsx:56`이 직접 import하고 AppShell이 EditorView를 정적 import한다 → **앱 전 페이지**. 따라서 **인쇄 전용 규칙에는 `.print-body` 접두가 필수**다(파일 118행 주석이 이미 못 박은 규약). 접두를 빠뜨리면 인쇄 값이 화면으로 새고, 동시에 이 파일을 안 부르는 곳만 규칙이 빠진다. 반대로 화면 규칙은 `globals.css`가 `.preview-content` 스코프로 소유한다 — 인쇄가 iframe이 아니라 같은 document라 **양방향 스코프**가 필요하다
 - **공개 뷰어는 두 CSS 환경에서 렌더된다 (Phase 60)**: 앱 셸 임베드(`AppShell` 783·791, BazaarView '앱에서 열기')와 독립 라우트(`/p/[problemId]`·`/shared/[shareId]`, 새 탭). 전이적 import closure 실측 — AppShell(123파일)은 PrintStyles에 도달하고 `/p`(36)·`/shared`(29)는 도달하지 않는다. **공개 페이지 스타일은 라우트 2개 + 임베드를 다 확인할 것**
 - **행이 분리되는 이유는 `insertMarkerLineBreaks`뿐이다**: 렌더 파이프라인에 `remark-breaks`가 **없다**(`EditorPreview` 300 · `PrintableContent` 126 = `[remarkMath, remarkGfm]`) → CommonMark soft break가 공백이 되어 연속 행이 한 문단으로 합쳐진다. 마커 계열을 추가하면 반드시 `MARKER_LINE_RE`(lib/locale.ts)에도 넣을 것
 - **이 프로젝트에 다크 모드는 없다 (Phase 45a)**: `globals.css`에 `prefers-color-scheme`·`[data-theme]`·`.dark` 셀렉터가 **0건**이다. 계획서에 반복 등장하는 "다크 토큰도 함께 정의" 요구는 소비처 없는 허수다 — 새 색 토큰에 다크 정의를 붙이지 말 것
@@ -134,6 +135,29 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
 - **툴바 아이콘은 `UnifiedToolbar.tsx` 안의 인라인 SVG 컴포넌트 계열**: `SVG_PROPS`(viewBox 64, stroke 3.5) + `CORNER_BRACKETS` 공유, `stroke="currentColor"`. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다 (Phase 58 P3)
+- **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
+  같은 처방을 받았다 — `globals.css`의 `.preview-content .marker-*  { font-weight: inherit }`가
+  PrintStyles에서 새어 드는 600을 화면에서만 되돌린다. **인쇄가 굵은 것은 의도된 예외다.**
+  ⚠ `PrintStyles.css`는 인쇄 전용이 **아니다** — `EditorView.tsx:56`이 import해 앱 전 화면에 로드된다.
+  접두 없는 규칙은 곧 화면 규칙이므로, 이 파일에 규칙을 더할 때는 `.print-body` 접두가 필수다
+- **`\tag` 세로 앵커는 단일행/다행이 다르다 (M1 D16)**: `bottom: 0.79em`은 다행(array·aligned)에
+  맞춘 값이고 단일행에서는 번호가 9.8px 떠 있었다(CDP 실측). 단일행은 `0.13em`으로 따로 잡는다.
+  ⚠ 판별자는 **`.mtable`**이다 — `.vlist`로 가르면 `\frac` 하나만 있어도 단일행이 오판된다
+- **GFM 표 셀의 파이프는 실측으로만 규칙을 세울 것 (M1 W1)**: bare `|`는 셀을 쪼개 표·수식을 파괴하고,
+  `\|`는 셀을 살리면서 **수식 노드에 `\|` 그대로** 전달되며(‖), `\\|`는 다시 셀을 쪼갠다.
+  → 수식 **안** bare `|`는 `\vert`, **밖**은 `\|`, 기존 `\|`는 그대로. **`\\|`를 만들지 말 것**
+- **`array`·`tabular`의 열 지정은 정규식으로 자르지 말 것 (M1 W2)**: `\{[^}]*\}`는 `{|p{2cm}|l|}`에서
+  `{|p{2cm}`까지만 먹고 `|l|}`를 본문에 남긴다 — `\begin{array`가 이미 사라져 잔재 검사도 발동하지
+  않는다. `lib/latexScan.ts`의 `readGroup`·`skipEnvArgs`(중괄호 균형 스캔)를 쓰고, 실패하면 변환하지 말 것
+- **본문의 `C1`·`C2a`는 `convertCaseRefs`(`lib/caseBlock.ts`)가 `.case-ref`로 감싼다 (M1 G)**:
+  굵기만 올린다(색·크기 불변). ⚠ **보호는 그 함수가 자체 수행**한다 — `preprocessLocale`은 사본이
+  둘인데 코드펜스 보호(`protectFences`)는 `EditorPreview` 쪽에만 있어 인쇄 경로가 무방비다.
+  ⚠ `chatExtract.MARKER_LITERAL`에 `case-ref`를 넣지 말 것 — 그 목록은 "뒤 공백 한 칸 복원"이라
+  `C1에서`가 `C1 에서`로 샌다
+- **수식행 분할(⌘⇧L)의 결과는 들여쓰기(callout) 블록이다 (M1 A)**: 행마다 `$…$` 한 줄 + 행 사이 빈 줄
+  (`remark-breaks`가 없어 빈 줄 없이는 한 문단으로 합쳐진다). `\tag{n}`은 `$…$` **밖**으로 뺀다 —
+  KaTeX는 인라인 모드 `\tag`를 거부한다. ⚠ **자기 타입 변경은 `text`·`callout`에만** — `case` 계열의
+  타입이 사라지면 rail·자동 번호가 바뀐다
 
 ## 현재 PDF 규격
 

@@ -463,6 +463,13 @@ ol {
   font-weight: 600;
   text-indent: 0;
 }
+/* 개선묶음 M1 E — 원문자 마커도 본문과 같은 굵기로(화면만).
+   ⚠ `(가)`·`ㄱ.`(437-444)이 이미 받은 처방을 원문자만 못 받고 있었다. PrintStyles의 미접두
+     `.marker-circled{600}`이 화면까지 새어 들던 것을 특이도 (0,2,0)으로 되돌린다.
+   ⚠ **인쇄 600은 그대로 둔다** — 마커가 본문보다 굵은 것은 인쇄의 의도된 예외다.
+     인쇄 DOM은 `.print-body`만 쓰고 `.preview-content`를 쓰지 않으므로 여기 규칙이 닿지 않는다. */
+.preview-content .marker-circled { font-weight: inherit; }
+
 p:has(.marker-circled) {
   padding-left: 2em !important;
   text-indent: -2em !important;
@@ -493,6 +500,15 @@ p:has(.marker-circled) {
 }
 .katex-display > .katex > .katex-html > .tag > .strut {
   display: none;
+}
+/* 개선묶음 M1 D16 — **단일행** 수식은 앵커가 다르다.
+   ⚠ 0.79em은 다행(array/aligned)에 맞춘 값이다. 단일행에서는 번호가 9.8px 떠 있었다(CDP 실측).
+     다행은 `.katex-html` 바닥이 vlist 깊이를 품지만 단일행은 그 행 자체가 바닥이라 여백이 다르다.
+   ⚠ 판별자는 `.mtable`이다 — array·aligned·cases·matrix 계열이 만든다.
+     `.vlist`로 가르면 안 된다: `\frac` 하나만 있어도 단일행에 vlist가 생긴다.
+   실측(15px 본문): 보정 전 행바닥−번호바닥 = 9.84px → 보정 후 −0.06px. */
+.katex-display > .katex > .katex-html:not(:has(.mtable)) > .tag {
+  bottom: 0.13em;
 }
 /* Phase 57 P4/D6 — 수식 안 \tag 번호도 수식 밖(tag-marker)과 같은 모양으로 통일.
    ⚠ \tag{n}은 preprocessMath에서 \tag*{(n)}이 되어 "수학 모드"로 렌더된다
@@ -735,6 +751,14 @@ p:has(.marker-circled) {
   font-weight: var(--weight-semibold);
   font-variant-numeric: tabular-nums;
 }
+/* 개선묶음 M1 G — 본문에서 경우를 가리키는 참조(C1 · C2a). 굵기만 올린다.
+   ⚠ `.case-label`의 margin-right(0.4em)를 물려받지 않는다 — 저건 라벨과 제목행 사이 간격이고
+     이건 문장 한가운데다. 색·크기도 본문 그대로 둔다(덕수: 본문 스타일 중심, 두께만). */
+.case-ref {
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 제목행 텍스트는 500 — 600은 key(strong)의 신호라 겹치면 위계가 흐려진다.
    제목행 안에 **를 쓰면 그 부분만 600으로 올라가 구분이 살아난다. */
 .case-block p:has(> .case-label:first-child) { font-weight: var(--weight-medium); }
@@ -890,4 +914,51 @@ img.twemoji {
 @keyframes verify-jump-flash {
   0%, 40% { background-color: rgba(255, 224, 51, 0.28); }
   100%    { background-color: transparent; }
+}
+
+
+/* ═══ 개선묶음 M1 B — 공용 슬라이더 ═══
+   저장소의 `input[type=range]` 4곳(그림·SVG·GeoGebra 블록 + 미리보기 크기 오버레이)이 공유한다.
+   ⚠ `accent-color`로는 **트랙 두께를 못 바꾼다** → 벤더 의사요소를 직접 쓴다.
+   ⚠ 진행 구간은 인라인 `--p`(값 %)로 그린다 — `::-moz-range-progress`는 Firefox에만 있어
+     한 가지 방식으로 두 엔진을 덮으려면 그라디언트가 유일한 길이다.
+   ⚠ 색은 로고 레드(`--mathory-red`). 명시비 3:1 미달이지만 **상태 표시가 아니라 조작 대상**이고
+     노브가 12px 면적이라 인지에 문제가 없다고 판단했다(흐리면 --mathory-red-dark로). */
+.mathory-range {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 12px;                 /* 노브 지름 — 트랙보다 높아야 잘리지 않는다 */
+  background: transparent;
+  cursor: pointer;
+}
+.mathory-range:focus { outline: none; }
+
+.mathory-range::-webkit-slider-runnable-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right,
+    var(--mathory-red) 0 var(--p, 0%), var(--border-light) var(--p, 0%));
+}
+.mathory-range::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(to right,
+    var(--mathory-red) 0 var(--p, 0%), var(--border-light) var(--p, 0%));
+}
+.mathory-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--mathory-red);
+  margin-top: -5px;             /* (트랙 2px − 노브 12px) / 2 */
+}
+.mathory-range::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: none;
+  border-radius: 50%;
+  background: var(--mathory-red);
 }

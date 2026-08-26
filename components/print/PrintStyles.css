@@ -107,13 +107,19 @@
   font-size: inherit;
 }
 
-/* 독립행 수식 참조 번호(\tag) 마지막 행 정렬 — strut 무력화 후 bottom 앵커 */
-.katex-display > .katex > .katex-html > .tag {
+/* 독립행 수식 참조 번호(\tag) 마지막 행 정렬 — strut 무력화 후 bottom 앵커
+   ⚠ `.print-body` 접두 필수 — 이 파일은 편집 화면에도 로드된다(EditorView.tsx:56).
+     값은 화면 globals.css와 같아 결과는 불변이고, "새어 드는 규칙"만 없앤다(M1 D16). */
+.print-body .katex-display > .katex > .katex-html > .tag {
   top: auto;
   bottom: 0.79em;   /* Phase 57 P4: 글꼴·크기 변경에 맞춘 재보정 (화면 globals.css와 동일) */
   line-height: 1;
 }
-.katex-display > .katex > .katex-html > .tag > .strut {
+/* 단일행은 앵커가 다르다 (M1 D16 — 판별자는 .mtable) */
+.print-body .katex-display > .katex > .katex-html:not(:has(.mtable)) > .tag {
+  bottom: 0.13em;
+}
+.print-body .katex-display > .katex > .katex-html > .tag > .strut {
   display: none;
 }
 /* Phase 57 P4/D6 — 수식 안 참조번호도 본문(명조)과 같은 모양으로.
@@ -136,8 +142,10 @@
 .print-body .marker-gana, .print-body .marker-giyeok { display: inline-block; min-width: 2.5em; font-weight: 600; text-indent: 0; }
 .print-body p:has(> .marker-gana:first-child),
 .print-body p:has(> .marker-giyeok:first-child) { padding-left: 2.5em; text-indent: -2.5em; }
-.marker-circled { display: inline-block; min-width: 2em; font-weight: 600; text-indent: 0; }
-p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em; }
+/* ⚠ `.print-body` 접두 필수 — 이 파일은 편집 화면에도 로드된다(EditorView.tsx:56).
+     접두가 없던 동안 여기 `font-weight:600`이 화면까지 새어 원문자만 본문보다 굵었다(M1 E). */
+.print-body .marker-circled { display: inline-block; min-width: 2em; font-weight: 600; text-indent: 0; }
+.print-body p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em; }
 /* D1 (Phase 57) — 연속 ① 문단을 "리스트 한 덩어리"로: 밭 위/아래만 11pt, 항목 사이는 행간만.
    ⚠ longhand만 (위 규칙의 margin-left:1em 보존). 화면 globals.css 규칙과 1:1 대응. */
 .print-body p:has(.marker-circled) { margin-top: 11pt; margin-bottom: 0; }
@@ -253,3 +261,5 @@ p:has(.marker-circled) { padding-left: 2em; text-indent: -2em; margin-left: 1em;
 .print-choice-label { font-weight: 400; flex-shrink: 0; line-height: 1; }
 .print-choice-content { display: inline; }
 .print-choice-content p { margin: 0; display: inline; }
+/* 개선묶음 M1 G — 본문 경우 참조(C1 · C2a). 화면 globals.css와 같은 값. */
+.print-body .case-ref { font-weight: 600; font-variant-numeric: tabular-nums; }

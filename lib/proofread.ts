@@ -6,6 +6,8 @@
  * - 인라인 수식과 한글 조사 사이의 잘못된 공백 로컬 검출 (결정적, 토큰 절약)
  */
 
+import { skipEnvArgs } from './latexScan';
+
 export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'latex-comma' | 'other';
 
 export interface ProofreadIssue {
@@ -325,34 +327,8 @@ export function detectCommaSpacing(text: string): ProofreadIssue[] {
 export function autoWrapBareNumbers(text: string): { fixed: string; count: number } {
   // 보호 영역(이 안의 인덱스는 건드리지 않음) 수집
   const protectedRanges: Array<[number, number]> = [];
-
-  // 수식 영역 (구분자 포함)
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === '$' && text[i + 1] === '$') {
-      const close = text.indexOf('$$', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-      break;
-    }
-    if (text[i] === '$') {
-      let j = i + 1, found = -1;
-      while (j < text.length) {
-        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
-        if (text[j] === '\n' && text[j + 1] === '\n') break;
-        j++;
-      }
-      if (found !== -1) { protectedRanges.push([i, found + 1]); i = found + 1; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '[') {
-      const close = text.indexOf('\\]', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '(') {
-      const close = text.indexOf('\\)', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    i++;
-  }
+  // 수식 영역 (구분자 포함) — 공용 스캐너(사본 금지)
+  protectedRanges.push(...collectMathRanges(text));
 
   const addAll = (re: RegExp) => {
     let m: RegExpExecArray | null;
@@ -409,34 +385,8 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
  */
 export function autoWrapBareLetters(text: string): { fixed: string; count: number } {
   const protectedRanges: Array<[number, number]> = [];
-
-  // 수식 영역 (구분자 포함)
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === '$' && text[i + 1] === '$') {
-      const close = text.indexOf('$$', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-      break;
-    }
-    if (text[i] === '$') {
-      let j = i + 1, found = -1;
-      while (j < text.length) {
-        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
-        if (text[j] === '\n' && text[j + 1] === '\n') break;
-        j++;
-      }
-      if (found !== -1) { protectedRanges.push([i, found + 1]); i = found + 1; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '[') {
-      const close = text.indexOf('\\]', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '(') {
-      const close = text.indexOf('\\)', i + 2);
-      if (close !== -1) { protectedRanges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    i++;
-  }
+  // 수식 영역 (구분자 포함) — 공용 스캐너(사본 금지)
+  protectedRanges.push(...collectMathRanges(text));
 
   const addAll = (re: RegExp) => {
     let m: RegExpExecArray | null;
@@ -566,13 +516,226 @@ export function normalizeDisplayMathDelimiters(text: string): { fixed: string; c
  *
  * 반환값의 count는 실제 수정된 건수 (UI 알림용)
  */
-export function autoFixDeterministicIssues(text: string): { fixed: string; count: number } {
+/* ─── 개선묶음 M1: 수식/코드 보호 구간 (공용) ─── */
+
+/**
+ * 수식 영역(구분자 포함) 범위 수집.
+ *
+ * ⚠ 사본을 만들지 말 것 — `autoWrapBareNumbers`·`autoWrapBareLetters`·`convertJamoRefs`가
+ *   같은 판정을 써야 한다. 갈리면 "숫자는 보호되는데 자모는 아닌" 식으로 조용히 어긋난다.
+ */
+function collectMathRanges(text: string): Array<[number, number]> {
+  const ranges: Array<[number, number]> = [];
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '$' && text[i + 1] === '$') {
+      const close = text.indexOf('$$', i + 2);
+      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
+      break;
+    }
+    if (text[i] === '$') {
+      let j = i + 1, found = -1;
+      while (j < text.length) {
+        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
+        if (text[j] === '\n' && text[j + 1] === '\n') break;
+        j++;
+      }
+      if (found !== -1) { ranges.push([i, found + 1]); i = found + 1; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '[') {
+      const close = text.indexOf('\\]', i + 2);
+      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    if (text[i] === '\\' && text[i + 1] === '(') {
+      const close = text.indexOf('\\)', i + 2);
+      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
+    }
+    i++;
+  }
+  return ranges;
+}
+
+/* ─── 개선묶음 M1 D12′: (ㄱ) → (1) ─── */
+
+const JAMO_ORDER = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ';
+/** 반각·전각 괄호 모두. 출력은 항상 반각 `(1)` */
+const JAMO_REF_RE = /[(（]([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])[)）]/g;
+
+/**
+ * 참조용 괄호 자모를 숫자로: `(ㄱ)` → `(1)` … `(ㅊ)` → `(10)`.
+ *
+ * 행머리·행중을 가리지 않는다 — 참조는 "(ㄱ)에서"처럼 문장 중간에 온다.
+ * 합답형 보기 라벨인 `ㄱ.`(마침표·행머리)와는 문법이 달라 충돌하지 않는다.
+ *
+ * ⚠ 변환 결과 `(1)`은 `autoWrapBareNumbers`의 보호 대상이라 `$1$`로 오염되지 않는다.
+ * ⚠ 보기 라벨을 `(ㄱ)`으로 적는 블록(`roman`·`choices`)에서는 호출부가 `skipJamoRefs`로 끈다.
+ *    (OCR 경로는 블록 타입을 모르므로 기본 변환으로 돈다 — 알고 두는 한계다.)
+ */
+export function convertJamoRefs(text: string): { fixed: string; count: number } {
+  const ranges = collectMathRanges(text);
+  const addAll = (re: RegExp) => {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      ranges.push([m.index, m.index + m[0].length]);
+      if (m[0].length === 0) re.lastIndex++;
+    }
+  };
+  addAll(/```[\s\S]*?```/g);                     // 코드펜스
+  addAll(/`[^`\n]*`/g);                          // 인라인 코드
+  addAll(/<[^>\n]+>/g);                          // HTML 태그
+
+  const inProtected = (pos: number) => ranges.some(([s, e]) => pos >= s && pos < e);
+
+  const matches: Array<{ start: number; end: number; num: number }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = JAMO_REF_RE.exec(text)) !== null) {
+    if (inProtected(m.index)) continue;
+    matches.push({ start: m.index, end: m.index + m[0].length, num: JAMO_ORDER.indexOf(m[1]) + 1 });
+  }
+
+  let fixed = text;
+  for (const mt of matches.slice().reverse()) {
+    fixed = fixed.slice(0, mt.start) + `(${mt.num})` + fixed.slice(mt.end);
+  }
+  return { fixed, count: matches.length };
+}
+
+/* ─── 개선묶음 M1 D14⁗: \begin{tabular} → GFM 표 ─── */
+
+const BEGIN_TABULAR = '\\begin{tabular}';
+const END_TABULAR = '\\end{tabular}';
+/** 이 중 하나라도 있으면 우리가 모르는 형태다 → 손대지 않는다(조용한 오변환 금지) */
+const TABULAR_UNSUPPORTED = /\\multicolumn|\\multirow|\\cline|\\begin\{tabular\}/;
+
+/**
+ * 셀 안 파이프 처리 (실측 근거).
+ *
+ * 프로젝트 파이프라인(remark-gfm)으로 잰 결과:
+ *   `| $|x|$ |`   → 셀 4개로 쪼개짐 (표·수식 모두 파괴)
+ *   `| $\|x\|$ |` → 셀 2개 ✔ 그리고 **수식 노드가 `\|`를 그대로 받는다**(‖ 정상)
+ *   `| $\\|x\\|$ |` → 셀 4개로 쪼개짐 (이중 이스케이프는 표를 깬다)
+ *
+ * 그래서 규칙은 셋이다:
+ *   ① 이미 `\|`인 것은 그대로 둔다 ② 수식 **안**의 bare `|`는 `\vert`(글리프 동일, 짝 판별 불필요)
+ *   ③ 수식 **밖**의 bare `|`는 `\|`로 이스케이프 ④ `\\|`는 절대 만들지 않는다
+ */
+function guardCellPipes(cell: string): string {
+  let out = '';
+  let inMath = false;
+  for (let i = 0; i < cell.length; i++) {
+    const c = cell[i];
+    if (c === '\\') { out += c + (cell[i + 1] ?? ''); i++; continue; }   // \| \& \\ 는 그대로
+    if (c === '$') { inMath = !inMath; out += c; continue; }
+    if (c === '|') { out += inMath ? '\\vert ' : '\\|'; continue; }
+    out += c;
+  }
+  return out;
+}
+
+/** `\begin{tabular}` 블록 하나를 GFM 표 문자열로. 변환 불가면 null */
+function tabularBodyToMarkdown(body: string): string | null {
+  if (TABULAR_UNSUPPORTED.test(body)) return null;
+
+  const rows = body
+    .replace(/\\hline/g, '')
+    .split(/\\\\(?:\[[^\]]*\])?/)
+    .map((r) => r.trim())
+    .filter((r) => r.length > 0)
+    .map((r) => {
+      const ESC = ' ESC_AMP ';
+      return r
+        .replace(/\\&/g, ESC)
+        .split('&')
+        .map((cell) => guardCellPipes(cell.split(ESC).join('\\&').trim()));
+    });
+
+  if (rows.length < 2) return null;                       // 헤더 + 본문 최소 1행
+  const cols = rows[0].length;
+  if (cols < 2) return null;
+  if (rows.some((r) => r.length !== cols)) return null;   // 열 수 불일치 → 손대지 않는다
+
+  const line = (cells: string[]) => `| ${cells.join(' | ')} |`;
+  const align = `| ${rows[0].map(() => ':---:').join(' | ')} |`;
+  // GFM 표는 앞뒤 빈 줄이 필요하다(툴바 buildMarkdownTable과 같은 관례)
+  return `\n\n${line(rows[0])}\n${align}\n${rows.slice(1).map(line).join('\n')}\n\n`;
+}
+
+/**
+ * `\begin{tabular}…\end{tabular}`(및 바로 감싼 `$$`)를 GFM 표로 바꾼다.
+ *
+ * ⚠ 열 지정 `{spec}`은 **중괄호 균형 스캔**으로만 떼어낸다 — `{|p{2cm}|l|}`에서 정규식은
+ *   `{|p{2cm}`까지만 먹고 `|l|}`를 본문에 남긴다(W2).
+ * ⚠ `autoWrapBareNumbers`보다 **먼저** 돌아야 셀의 맨 숫자가 `$0$`이 된다.
+ */
+export function convertTabularToMarkdown(text: string): { fixed: string; count: number } {
+  if (!text.includes(BEGIN_TABULAR)) return { fixed: text, count: 0 };
+
+  let out = '';
+  let i = 0;
+  let count = 0;
+  while (i < text.length) {
+    const idx = text.indexOf(BEGIN_TABULAR, i);
+    if (idx === -1) { out += text.slice(i); break; }
+
+    const argEnd = skipEnvArgs(text, idx + BEGIN_TABULAR.length);
+    const endIdx = argEnd === -1 ? -1 : text.indexOf(END_TABULAR, argEnd);
+    if (argEnd === -1 || endIdx === -1) {
+      // 해석 실패 — 그대로 흘린다
+      out += text.slice(i, idx + BEGIN_TABULAR.length);
+      i = idx + BEGIN_TABULAR.length;
+      continue;
+    }
+
+    const md = tabularBodyToMarkdown(text.slice(argEnd, endIdx));
+    if (md === null) {
+      out += text.slice(i, endIdx + END_TABULAR.length);
+      i = endIdx + END_TABULAR.length;
+      continue;
+    }
+
+    // 바로 감싼 $$ 가 있으면 함께 걷어낸다 (Mathpix가 표를 수식 구분자 안에 넣는 경우)
+    let from = idx;
+    let to = endIdx + END_TABULAR.length;
+    const head = text.slice(0, from).match(/\$\$[ \t]*\n?[ \t]*$/);
+    const tail = text.slice(to).match(/^[ \t]*\n?[ \t]*\$\$/);
+    if (head && tail) {
+      from -= head[0].length;
+      to += tail[0].length;
+    }
+
+    out += text.slice(i, from) + md;
+    i = to;
+    count += 1;
+  }
+  return { fixed: out, count };
+}
+
+export function autoFixDeterministicIssues(
+  text: string,
+  opts?: { skipJamoRefs?: boolean },
+): { fixed: string; count: number } {
   let count = 0;
 
   // Step 0: display 수식 구분자 통일 (\[..\] → $$..$$)
   // 이후 단계의 수식 영역 인식($ 기반)이 새 $$ 블록에도 동일하게 작용하도록 가장 먼저 처리.
   {
     const r = normalizeDisplayMathDelimiters(text);
+    text = r.fixed;
+    count += r.count;
+  }
+
+  // Step 0-1 (개선묶음 M1): \begin{tabular} → GFM 표.
+  // ⚠ 순서가 규칙이다 — step 0 뒤라 `\[..\]` 래퍼는 이미 `$$`이고(분기 하나가 준다),
+  //   step 0a 앞이라 셀의 맨 숫자·영문자가 그 다음에 수식화된다(메모의 목표 형태).
+  {
+    const r = convertTabularToMarkdown(text);
+    text = r.fixed;
+    count += r.count;
+  }
+
+  // Step 0-2 (개선묶음 M1): (ㄱ) → (1). 보기 라벨을 (ㄱ)로 쓰는 블록에서는 호출부가 끈다.
+  if (!opts?.skipJamoRefs) {
+    const r = convertJamoRefs(text);
     text = r.fixed;
     count += r.count;
   }

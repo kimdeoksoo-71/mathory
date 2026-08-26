@@ -1954,6 +1954,31 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 | 버전 기록 버튼 아이콘을 사이드바 '최근 문항'과 통일 | 2026-08-14 | `IconRecent` 계열로 통일 (커밋 c921b71) |
 | 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)`. **⚠️ 이때의 도안(플로피/셔터+라벨)은 Phase 55c에서 클라우드+체크로 교체됨 — 규격만 유효하고 도안은 낡은 기록이다** |
 | 저장·버전 기록 아이콘 정비 | 2026-08-15 | **Phase 55c** — 저장을 플로피 → 클라우드+체크(`checked` prop), 버전 기록 버튼을 `IconRecent` → `IconRestore`. 상세는 아래 Phase 55c 절 |
+| **개선묶음 M1 — 기존 Phase 보강 7건** | 2026-08-26 | 계획서: `docs/phaseSketch/개선묶음 M1 구현 계획서 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web → v4 실행판). **서버·Firestore·규칙·블록 타입 union 변경 0.** 아래 표 참조 |
+
+### 개선묶음 M1 상세 (2026-08-26)
+
+| 항목 | 속한 Phase | 한 일 |
+|---|---|---|
+| **A** 수식행 분할 개편 | 22-I · 57 | `$$…$$` 분할 결과를 **들여쓰기(callout) 블록 1개 + 행마다 `$…$`**로. `lib/mathSplit.ts`에 `splitDisplayMathToRows` 신설(블록 조립은 EditorView), `array` 환경 분할 허용(`\hline`은 차단), `pushUndo()` 추가. `npm run test:mathsplit` 16개 |
+| **B** 그림 조작 UI | 22-E · 46 | `.mathory-range` 신설 → `input[type=range]` **4곳** 공통 스킨(트랙 2px·노브 12px·로고 레드). 이미지 블록 버튼 2단 → **1열** |
+| **C** proofread 결정 규칙 2종 | 27 · 28 | `\begin{tabular}` → GFM 표 · `(ㄱ)` → `(1)`. `autoFixDeterministicIssues`의 step 0 뒤에 넣어 **교정 버튼·OCR 삽입 양쪽**에 적용. `npm run test:proofread` 16개 |
+| **D** `\tag` 세로 위치 | 57 P4 | **단일행 수식만** 번호가 9.84px 떠 있던 것을 `0.13em` 앵커로 보정(CDP 실측 → −0.06px). 판별자는 `.mtable` |
+| **E** 원문자 두께 | 57 P5 · 58 P5 | `.preview-content .marker-circled { font-weight: inherit }` — 화면만. **인쇄 600은 유지**(`(가)`·`ㄱ.`과 같은 의도된 예외) |
+| **G** 본문 `C1` 참조 강조 | 59 · 59a | `convertCaseRefs`(`lib/caseBlock.ts`)가 `C1`·`C2a`를 `.case-ref`로 감싼다(굵기만). `preprocessLocale` 두 사본에 배선, 보호는 함수가 자체 수행. `npm run test:case` 41개(+6) |
+| **H** 검증 팝오버 위치 | 61b | `VerifyChips` 래퍼의 `position:relative`를 걷어내 컴포저(패널 정폭)를 기준으로 → **패널 가로 중앙** |
+| ~~F 표 블록 신설~~ | — | **철회** — 툴바에 표 삽입 다이얼로그가 이미 있다(`UnifiedToolbar.tsx:846`). 되살리지 말 것 |
+
+**실측으로 뒤집힌 것 2건** (계획 단계의 처방이 틀렸다):
+
+- **표 셀 파이프**: v3의 "`\|` → `\\|`" 처방은 **표를 깬다**. 프로젝트 파이프라인으로 잰 결과 —
+  bare `|`는 셀을 쪼개고(표·수식 파괴), `\|`는 셀도 살고 **수식 노드가 `\|`를 그대로 받으며**(‖ 정상),
+  `\\|`는 다시 셀을 쪼갠다. → 규칙: 기존 `\|`는 **그대로**, 수식 **안** bare `|`는 `\vert`,
+  수식 **밖** bare `|`는 `\|`. `\\|`는 만들지 않는다.
+- **`array`/`tabular` 열 지정**: `\{[^}]*\}` 정규식은 `{|p{2cm}|l|}`에서 `{|p{2cm}`까지만 먹고
+  `|l|}`를 본문에 남긴다 — 게다가 `\begin{array`가 이미 사라져 "잔재 검사"도 발동하지 않는다.
+  → `lib/latexScan.ts`(import 0)의 **중괄호 균형 스캔**으로만 떼고, 해석 실패면 변환하지 않는다.
+
 
 ---
 

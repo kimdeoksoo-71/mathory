@@ -62,7 +62,7 @@ import {
   IconRename, IconLoader,
   IconRestore, IconSave, IconUndo, IconRedo,
 } from '../ui/Icons';
-import { splitDisplayMathAtCursor } from '../../lib/mathSplit';
+import { splitDisplayMathToRows } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -80,6 +80,12 @@ interface LocalBlock extends Block {
   isNew?: boolean;
   imageWidth?: number;
 }
+
+/** 개선묶음 M1 B — `.mathory-range`의 진행 구간 비율.
+ *  ⚠ `::-moz-range-progress`는 Firefox에만 있어, 두 엔진을 한 규칙으로 덮으려면
+ *    그라디언트 정지점을 CSS 변수로 넘기는 방식뿐이다. */
+const rangeFill = (value: number, min: number, max: number): React.CSSProperties =>
+  ({ ['--p' as string]: `${((value - min) / (max - min)) * 100}%` } as React.CSSProperties);
 
 const SVG_BLOCK_HEIGHT = 300;
 const GGB_BLOCK_HEIGHT = 350;
@@ -311,13 +317,14 @@ function MediaBlockContent({
           <span>높이</span>
           <input
             type="range"
+            className="mathory-range"
             min={150}
             max={800}
             step={20}
             value={svgHeight}
             onChange={(e) => onSvgHeightChange(block.id, Number(e.target.value))}
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ width: 140, cursor: 'pointer' }}
+            style={{ width: 140, ...rangeFill(svgHeight, 150, 800) }}
           />
           <span>{svgHeight}px</span>
           <button
@@ -366,13 +373,14 @@ function MediaBlockContent({
           <span>높이</span>
           <input
             type="range"
+            className="mathory-range"
             min={200}
             max={800}
             step={20}
             value={ggbHeight}
             onChange={(e) => onGgbHeightChange(block.id, Number(e.target.value))}
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ width: 140, cursor: 'pointer' }}
+            style={{ width: 140, ...rangeFill(ggbHeight, 200, 800) }}
           />
           <span>{ggbHeight}px</span>
           <button
@@ -418,13 +426,14 @@ function MediaBlockContent({
           <span>크기</span>
           <input
             type="range"
+            className="mathory-range"
             min={80}
             max={800}
             step={10}
             value={imgWidth}
             onChange={(e) => onImageWidthChange(block.id, Number(e.target.value))}
             onPointerDown={(e) => e.stopPropagation()}
-            style={{ width: 140, cursor: 'pointer' }}
+            style={{ width: 140, ...rangeFill(imgWidth, 80, 800) }}
           />
           <span>{imgWidth}px</span>
         </div>
@@ -455,20 +464,20 @@ function MediaBlockContent({
           >
             컬러 유지
           </button>
-        </div>
-        <div style={{ marginTop: 6 }}>
+          {/* 개선묶음 M1 B — 토글 2개와 한 줄에. 토글이 아니므로 배경을 한 단계 어둡게 해 구별한다 */}
           <button
             onClick={openTypeModal}
             onPointerDown={(e) => e.stopPropagation()}
             style={{
               padding: '4px 12px', fontSize: 12,
-              background: 'var(--bg-hover)', border: '1px solid var(--border-light)',
-              borderRadius: 6, cursor: 'pointer',
+              background: 'var(--bg-active)', color: 'var(--text-primary)',
+              border: '1px solid var(--border-light)', borderRadius: 6, cursor: 'pointer',
             }}
           >
             그림 변경
           </button>
         </div>
+
         {error && <div style={{ color: 'var(--accent-danger)', fontSize: 12, marginTop: 4 }}>{error}</div>}
         <input
           ref={fileInputRef}
@@ -1326,12 +1335,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* 결정적 규칙(josa-space, latex-brace) 자동 적용 후, 수정된 rawText 배열 반환 */
   const applyDeterministicAutoFix = useCallback((
-    blocks: { id: string; raw_text: string }[],
+    blocks: { id: string; raw_text: string; type: string }[],
   ): { targets: { id: string; rawText: string }[]; autoFixCount: number } => {
     let autoFixCount = 0;
     const targets: { id: string; rawText: string }[] = [];
     for (const b of blocks) {
-      const { fixed, count } = autoFixDeterministicIssues(b.raw_text);
+      /* 개선묶음 M1 D12′: `(ㄱ)`→`(1)`는 보기 라벨을 그렇게 적는 블록에서만 끈다.
+         ⚠ OCR 삽입 경로(lib/ocr.ts)는 블록 타입을 모르므로 기본(변환)으로 돈다 — 알고 두는 한계다. */
+      const { fixed, count } = autoFixDeterministicIssues(b.raw_text, {
+        skipJamoRefs: b.type === 'roman' || b.type === 'choices',
+      });
       if (count > 0) {
         autoFixCount += count;
         const editor = editorRefs.current[b.id];
@@ -1401,7 +1414,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (!block) return;
     const tabIdAtStart = activeTab;
 
-    const { targets, autoFixCount } = applyDeterministicAutoFix([{ id: block.id, raw_text: block.raw_text }]);
+    const { targets, autoFixCount } = applyDeterministicAutoFix([
+      { id: block.id, raw_text: block.raw_text, type: block.type },
+    ]);
 
     setProofreadResults((prev) => ({
       ...prev,
@@ -1501,24 +1516,89 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [activeTab]);
 
   /* ─── 수식행 분할 ($$..$$ 를 \\ 단위로 분리) ─── */
+  /**
+   * 개선묶음 M1 — 결과는 **들여쓰기(callout) 블록 1개**이고 행마다 `$…$` 한 줄, 행 사이는 빈 줄이다.
+   *
+   * ⚠ 빈 줄이 없으면 한 문단으로 합쳐진다(렌더 파이프라인에 `remark-breaks`가 없다).
+   *   들여쓰기 블록의 `p { margin: 0 }`이 그 문단들을 "행간만"으로 그려 주고,
+   *   행 꼬리의 `\tag{n}`은 `.tag-marker`가 우단에 붙인다 — 이 블록이 원래 그 용도로 만들어졌다.
+   *
+   * ⚠ **자기 타입 변경(`before`가 비었을 때 X를 callout으로)은 `text`·`callout`에만** 한다(D3‴).
+   *   `case`/`subcase`의 타입이 사라지면 rail·자동 번호(`buildCaseLabels`)가 바뀐다.
+   *
+   * ⚠ 블록 구조를 바꾸므로 `pushUndo()`가 필요하다 — 예전 판은 이것이 없어 Undo로 되돌릴 수 없었다.
+   */
   const handleSplitMathLines = useCallback((blockId?: string) => {
     const targetId = blockId || activeBlockId;
     if (!targetId) return;
     const editor = editorRefs.current[targetId];
     if (!editor) return;
+    const target = currentBlocks.find((b) => b.id === targetId);
+    if (!target) return;
 
     const content = editor.getContent();
     const cursor = editor.getCursorPosition();
-    const result = splitDisplayMathAtCursor(content, cursor);
+    const result = splitDisplayMathToRows(content, cursor);
     if (result.ok !== true) {
       setStatus(result.reason);
+      setTimeout(() => setStatus(''), 2000);   // 다른 호출부와 같은 리셋
       return;
     }
-    editor.setContent(result.newContent);
-    setCurrentBlocks((prev) =>
-      prev.map((b) => (b.id === targetId ? { ...b, raw_text: result.newContent } : b))
-    );
-  }, [activeBlockId, setCurrentBlocks]);
+
+    pushUndo();
+
+    const rowsRaw = result.rows.join('\n\n');
+    const beforeText = result.before.replace(/\s+$/, '');
+    const afterText = result.after.replace(/^\s+/, '');
+    const selfConvert = !beforeText && (target.type === 'text' || target.type === 'callout');
+
+    const calloutId = `new-${Date.now()}`;
+    const tailId = `new-${Date.now() + 1}`;
+
+    setCurrentBlocks((prev) => {
+      const idx = prev.findIndex((b) => b.id === targetId);
+      if (idx === -1) return prev;
+      const updated = [...prev];
+      const inserted: LocalBlock[] = [];
+
+      if (selfConvert) {
+        updated[idx] = { ...updated[idx], type: 'callout', raw_text: rowsRaw };
+      } else {
+        updated[idx] = { ...updated[idx], raw_text: beforeText };
+        inserted.push({
+          id: calloutId,
+          block_key: nanoid(),               // 파생 블록은 새 키 (원본은 키 유지) — Phase55 F9
+          order: target.order + 1,
+          type: 'callout',
+          raw_text: rowsRaw,
+          title: '',
+          collapsed: false,
+          isNew: true,
+        });
+      }
+      if (afterText) {
+        inserted.push({
+          id: tailId,
+          block_key: nanoid(),
+          order: target.order + 2,
+          type: 'text',
+          raw_text: afterText,
+          title: '',
+          collapsed: false,
+          isNew: true,
+        });
+      }
+      if (inserted.length > 0) updated.splice(idx + 1, 0, ...inserted);
+      return updated;
+    });
+
+    // X가 그대로 남는 경우에만 CodeMirror 내용을 갱신한다(새 블록은 새로 마운트된다)
+    editor.setContent(selfConvert ? rowsRaw : beforeText);
+
+    const focusId = selfConvert ? targetId : calloutId;
+    setActiveBlockId(focusId);
+    setTimeout(() => { editorRefs.current[focusId]?.focus(); }, 50);
+  }, [activeBlockId, currentBlocks, setCurrentBlocks, pushUndo]);
 
   /* ─── 블록 조작 핸들러 ─── */
   const handleBlockChange = useCallback((blockId: string, value: string) => {
