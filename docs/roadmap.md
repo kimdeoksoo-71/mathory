@@ -1181,7 +1181,7 @@ FolderView에서 문항 카드를 끌어 하위 폴더 카드에 떨어뜨려 �
 
 ## Phase 45: 블록 전체 접기 + 블록 하단 툴바 ✅
 
-블록 순서 재조정 시 세로 이동폭을 줄이기 위해 본문을 숨기고 상단바만 남기는 **전체 접기 모드**를 신설. 통합툴바의 블록 편집 버튼을 각 블록 하단 툴바로 내려 동작 위치와 대상 블록을 일치시킴. 상세: `docs/phasedocs/Phase45 블록 전체 접기.md` (스케치: `docs/phaseSketch/블록편집기능 개선.md`)
+블록 순서 재조정 시 세로 이동폭을 줄이기 위해 본문을 숨기고 상단바만 남기는 **전체 접기 모드**를 신설. 통합툴바의 블록 편집 버튼을 각 블록 하단 툴바로 내려 동작 위치와 대상 블록을 일치시킴. 상세: `docs/phasedocs/Phase45 블록 전체 접기.md` (스케치는 2026-08-27 정리 때 삭제 — git 히스토리에만 있다)
 
 | 영역 | 변경 |
 |------|------|
@@ -1395,7 +1395,7 @@ Phase 55 자체 VCS의 직접 확장. 블록 구조 조작(추가·삭제·이�
 
 부수 교훈: 조건부 `style` 객체에 longhand를 병합할 때 shorthand(`padding`)가 뒤에 오면 조용히 덮어쓴다 → 스프레드 순서를 신뢰하지 말고 스페이서처럼 충돌 불가능한 구조를 택할 것.
 
-**검증 워크플로우 기록**: v1(web Claude 초안) → v2(CLI Claude, 실코드 전수 대조 + Playwright 격리 하니스로 D0 실측) → v3(web Claude 교차 검토) → v4(CLI Claude 확정). **세 라운드 모두에서 새 결함이 나왔다** — v1은 원인 오진, v2는 `scrollToPos` 오인·D8' 가드 누락, v3는 shorthand 순서 무효화·찾기/바꾸기 경로 누락·stale mathId. 이 규모의 변경에는 교차 검토가 필요하다는 근거로 남긴다. 계획서 v1~v4: `docs/phaseSketch/`, 확정본: `docs/phasedocs/Phase56 … v4.md`
+**검증 워크플로우 기록**: v1(web Claude 초안) → v2(CLI Claude, 실코드 전수 대조 + Playwright 격리 하니스로 D0 실측) → v3(web Claude 교차 검토) → v4(CLI Claude 확정). **세 라운드 모두에서 새 결함이 나왔다** — v1은 원인 오진, v2는 `scrollToPos` 오인·D8' 가드 누락, v3는 shorthand 순서 무효화·찾기/바꾸기 경로 누락·stale mathId. 이 규모의 변경에는 교차 검토가 필요하다는 근거로 남긴다. 계획서 v1~v4: `docs/phaseSketch/`, 확정본: `docs/phasedocs/Phase56 편집창·미리보기 수식 세로 중앙 정렬 통일 + 상단 밀림 근본 대책 v4.md`
 
 > Phase 15(에디터 기능 안정화)의 "미리보기 클릭 → 편집창 이동" 연동을 Phase 56에서 세로 정렬 정책까지 통일했다.
 
@@ -1561,7 +1561,7 @@ FolderView 페이드 그라데이션의 하드코딩 색 불일치를 함께 정
 
 ## Phase 60: list 로케일 블록 개편 ✅
 
-문서: `docs/phaseSketch/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
+문서: `docs/phasedocs/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
 커밋 `73fe9f7` … `49e2a06` · 덕수 검증 완료 2026-08-20
 
 **저장 철학을 뒤집었다.** Phase 60 이전의 원칙은 "저장은 국제 표준(`(a)`·`(i)`), 표시만 로케일"이었다.
@@ -1605,7 +1605,7 @@ closure 실측: 123 / 36 / 29 파일). **공개 페이지 스타일은 라우트
 
 ## Phase 61a: 스프레드시트 문항 가져오기 ✅
 
-**기간**: 2026-08-22 · **문서**: `docs/phaseSketch/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md`
+**기간**: 2026-08-22 · **문서**: `docs/phasedocs/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md`
 (계보: v1 CLI 초안 → v2 CLI 실측 → v3 web 교차검토 → v4 CLI 실행판 → v5 web 재검증 → v6 확정판 + §10 구현 기록)
 
 gas-project-audition 스프레드시트(`Data_DS`/`Stack`)의 검증 완료 문항을 Mathory로 옮긴다.
@@ -1657,7 +1657,7 @@ id만 썼으면 **68문항을 조용히 잃었다**.
 
 ## Phase 61b: 정밀 검증 (agent 대화창 통합) 🚧
 
-문서: `docs/phaseSketch/Phase61b 정밀 검증 구현 계획서 v4 실행판.md`
+문서: `docs/phasedocs/Phase61b 정밀 검증 구현 계획서 v4 실행판.md`
 (계보: v1 web → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 실행판** → 구현)
 
 시트 시스템 STEP3의 **비대칭 교차검증**(1차 Gemini 후보 생성 → 2차 Claude 엄격 판정)을
@@ -1809,7 +1809,7 @@ Mathory 서버 라우트로 이식했다. **Firestore 규칙 0 · 마이그레�
 
 ## Phase 61c: 대화 → 편집창 삽입 ✅
 
-문서: `docs/phaseSketch/Phase61c 대화 삽입 구현 계획서 v4 실행판.md`
+문서: `docs/phasedocs/Phase61c 대화 삽입 구현 계획서 v4 실행판.md`
 (계보: v1 web → v2 CLI 확정판 → v3 web 재검증 → **v4 CLI 실행판** → 구현)
 
 agent 대화창(메시지 본문·검증 리포트 카드)에서 드래그하면 미니 팝업([편집창에 삽입] · [복사])이 뜨고,
@@ -1876,7 +1876,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ## Phase 62: 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 ✅ (구현·검수·배포 완료 2026-08-27)
 
-계획서: `docs/phaseSketch/Phase62 … v6 최종판.md` (v1 web → v6 CLI, 판본마다 정정)
+계획서: `docs/phasedocs/Phase62 폴더뷰 구조 변경·좌우 사이드바 UI 통일 v6 최종판.md` (v1 web → v6 CLI, 판본마다 정정)
 
 **A축 — FolderView 구조 변경**
 - U자 클레이 프레임 철거 → 바탕 아이보리. 클레이 = "문항 하나를 보는 중", 아이보리 = "문항 밖"
@@ -1900,7 +1900,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ## Phase 61d: 폴더 일괄 검증 ✅
 
-문서: `docs/phaseSketch/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md`
+문서: `docs/phasedocs/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md`
 (계보: v1 web → v2 CLI 실측 교차검증 → v3 web 재검증·덕수 재결 → **v4 CLI 실행판** → 구현)
 
 FolderView의 [일괄 검증] 버튼 → 폴더 **직속** 문항을 체크박스로 고르면, 61b의 `runVerifyFlow`를
@@ -1978,7 +1978,7 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 | 버전 기록 버튼 아이콘을 사이드바 '최근 문항'과 통일 | 2026-08-14 | `IconRecent` 계열로 통일 (커밋 c921b71) |
 | 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)`. **⚠️ 이때의 도안(플로피/셔터+라벨)은 Phase 55c에서 클라우드+체크로 교체됨 — 규격만 유효하고 도안은 낡은 기록이다** |
 | 저장·버전 기록 아이콘 정비 | 2026-08-15 | **Phase 55c** — 저장을 플로피 → 클라우드+체크(`checked` prop), 버전 기록 버튼을 `IconRecent` → `IconRestore`. 상세는 아래 Phase 55c 절 |
-| **개선묶음 M1 — 기존 Phase 보강 7건** | 2026-08-26 | 계획서: `docs/phaseSketch/개선묶음 M1 구현 계획서 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web → v4 실행판). **서버·Firestore·규칙·블록 타입 union 변경 0.** 아래 표 참조 |
+| **개선묶음 M1 — 기존 Phase 보강 7건** | 2026-08-26 | 계획서: `docs/phasedocs/개선묶음 M1 기존 Phase 보강 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web → v4 실행판). **서버·Firestore·규칙·블록 타입 union 변경 0.** 아래 표 참조 |
 
 ### 개선묶음 M1 상세 (2026-08-26)
 

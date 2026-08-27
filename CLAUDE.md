@@ -97,6 +97,12 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 4. **Vercel 배포 후 Cmd+Shift+R로 하드 리프레시** — CDN 캐시 제거
 5. **`.next` 캐시 삭제**: 빌드 문제 시 `rm -rf .next` 후 재빌드
 6. **roadmap.md 업데이트**: 각 Phase 완료 시
+7. **Phase 완료 시 최종 계획서를 `docs/phasedocs/`에 등록할 것** — 폴더 둘의 역할이 다르다.
+   `docs/phaseSketch/`는 **작업물**(구상 · 계획 v1~vN)이라 정리 대상이고,
+   `docs/phasedocs/`는 **확정본 보관소**이며 CLAUDE.md·roadmap이 가리키는 유일한 경로다.
+   ⚠ 옮기지 않으면 phaseSketch 정리 때 **그 Phase의 유일한 사양이 사라진다** —
+   2026-08-27에 Phase 60·61a~61d가 실제로 그랬고(포인터 5개가 끊겼다) 복구했다.
+   중간 판본(v1~vN-1)은 phaseSketch에 두거나 지운다. **확정본만 phasedocs로.**
 
 ## 핵심 패턴 & 주의사항
 
@@ -216,7 +222,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ### Phase 62 — 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 (구현·검수·배포 완료)
 
-문서: `docs/phaseSketch/Phase62 폴더뷰 구조 변경·좌우 사이드바 UI 통일 구현 계획서 v6 최종판.md`
+문서: `docs/phasedocs/Phase62 폴더뷰 구조 변경·좌우 사이드바 UI 통일 v6 최종판.md`
 (계보: v1 web → v2 CLI → v3 web → v4 CLI → v5 web → **v6 CLI 최종**. 판본마다 정정이 나왔으니 v6만 볼 것)
 
 **서버 0 · Firestore 0 · 전처리 파이프라인 0.** 전부 클라이언트 UI.
@@ -268,7 +274,7 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 
 ### Phase 61b — 정밀 검증 (구현·검수·배포 완료)
 
-문서: `docs/phaseSketch/Phase61b 정밀 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61b 절
+문서: `docs/phasedocs/Phase61b 정밀 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61b 절
 
 시트 STEP3의 **비대칭 교차검증**(1차 Gemini 후보 생성 → 2차 Claude 엄격 판정)을 이식.
 **Firestore 규칙 0 · 마이그레이션 0.** agent 대화창의 칩 2개로 실행하고, 리포트는 일반
@@ -374,7 +380,7 @@ AI 메시지로 저장돼 후속 대화가 기존 discuss 파이프라인 **무�
 
 ### Phase 61d — 폴더 일괄 검증 (구현·검수·배포 완료)
 
-문서: `docs/phaseSketch/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61d 절
+문서: `docs/phasedocs/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md` · roadmap의 Phase 61d 절
 
 FolderView의 [일괄 검증] → 폴더 **직속** 문항을 체크박스로 고르면 61b의 `runVerifyFlow`를
 **문항×종류 단위로 순차 호출**하는 클라 루프가 돈다. **서버 0 · 규칙 0 · 스키마 0.**
@@ -416,7 +422,7 @@ FolderView의 [일괄 검증] → 폴더 **직속** 문항을 체크박스로 �
 
 ### Phase 61c — 대화 → 편집창 삽입 (구현·검수·배포 완료)
 
-문서: `docs/phaseSketch/Phase61c 대화 삽입 구현 계획서 v4 실행판.md` · roadmap의 Phase 61c 절
+문서: `docs/phasedocs/Phase61c 대화 삽입 구현 계획서 v4 실행판.md` · roadmap의 Phase 61c 절
 
 agent 대화창에서 드래그 → 미니 팝업([편집창에 삽입] · [복사]) → 선택 영역을 **Mathory 표기 규약의
 마크다운으로 직렬화**해 활성 블록 커서 위치에 꽂는다. **서버 0 · Firestore 0 · 전처리 파이프라인 무변경.**
@@ -481,7 +487,7 @@ agent 대화창에서 드래그 → 미니 팝업([편집창에 삽입] · [복�
 
 ### Phase 61a — 스프레드시트 문항 가져오기 (완료 · 배포 · 프로덕션 확인)
 
-문서: `docs/phaseSketch/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md` (§10이 구현 기록)
+문서: `docs/phasedocs/Phase61a 시트 가져오기 구현 계획서 v6 확정판.md` (§10이 구현 기록)
 
 gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore 규칙 0 · 마이그레이션 0.**
 사이드바 '시트 가져오기' → 모달(시트 → 행 → 폴더 → 미리보기 → 저장).
@@ -517,7 +523,7 @@ gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore �
 
 ### Phase 60 — list 로케일 블록 개편 (완료 · 검증 통과)
 
-문서: `docs/phaseSketch/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
+문서: `docs/phasedocs/Phase60 list 로케일 블록 개편 v4 실행판.md` (v1 web → v2 CLI → v3 web → v4 CLI)
 
 - **저장 철학이 바뀌었다**: "저장은 국제 표준, 표시만 로케일"을 버리고 **로케일 블록** — 한국 문항은 `(가)`·`ㄱ.`을 그대로 입력·저장한다. 레거시 `(a)`/`(i)` 변환은 옛 문항 호환용으로 유지
 - 로직 검증: `npm run test:locale` (15개)
