@@ -1874,7 +1874,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## Phase 62: 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 ✅ (구현 완료 · 검수 대기 · 미배포)
+## Phase 62: 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 ✅ (구현·검수 완료 · 미배포)
 
 계획서: `docs/phaseSketch/Phase62 … v6 최종판.md` (v1 web → v6 CLI, 판본마다 정정)
 
@@ -1894,6 +1894,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 - `--sidebar-expanded`·`--sidebar-collapsed` 토큰 삭제 → `Sidebar.tsx` 상수 export
 
 **서버 0 · Firestore 0 · 전처리 0.** 프로덕션 빌드 통과.
+**덕수 검수 완료(2026-08-27)** — T1~T11 전항 통과. 지적 1건(버전 드로어 활성선 offset `-5`→`-13`) 즉시 반영.
 
 ---
 

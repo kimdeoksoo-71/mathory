@@ -215,7 +215,7 @@ ProblemView의 `hidden`은 가로 스크롤바를 막으려는 의도적 선택�
 - 훅의 **`anchor`** = 패널이 **뷰포트의 어느 변에 고정**되어 있는가 → 드래그 방향 계산.
 - 핸들의 **`side`** = strip을 **positioned 부모의 어느 변**에서 offset할 것인가 → 렌더 위치.
 
-버전 드로어가 둘이 갈리는 유일한 사례다: 뷰포트 우측 고정(`anchor:'right'`)인데 핸들은 드로어의 **왼쪽 변**(`side:'left', offset:-5`). 한 이름으로 합치면 반드시 틀린다.
+버전 드로어가 둘이 갈리는 유일한 사례다: 뷰포트 우측 고정(`anchor:'right'`)인데 핸들은 드로어의 **왼쪽 변**(`side:'left', offset:-13` — L1). 한 이름으로 합치면 반드시 틀린다.
 
 ### ⚠ 함정 2 — 핸들을 `overflow`가 걸린 상자 안에 넣지 말 것
 
@@ -258,7 +258,7 @@ ProblemView의 `hidden`은 가로 스크롤바를 막으려는 의도적 선택�
 | **D11** | **`useDrawerResize` 신설**(전체 코드 §7.1). 핵심은 **`gap` 폐지**: pointerdown 시 커서↔패널 변 offset을 캡처해 유지 → 12·24 상수 소멸, 시작 스냅 제거, left/right 대칭. 부수 5건: ① 언마운트 시 `body.cursor/userSelect` 복원 ② `window.resize` 재클램프 ③ `max`는 **이벤트 시점에만** 평가(F6) ④ 소비처가 `dragging`을 받아 **밀어내기 transition을 드래그 중 `'none'`**으로(F4) ⑤ **`onUp`에서 릴리즈 지점의 rect 판정으로 `hover` 확정**(J4). **폭 영속 없음** | E5 · B-1~B-3 · B-5′ · I3·J4 |
 | **D12** | **`DrawerResizeHandle` 신설**(전체 코드 §7.2). props `{ side, offset, active, zIndex = 100, ...handleProps }` + `data-resize-handle` + **`touchAction:'none'`** | B-4 · H6 |
 | **D13** | **폭 수치는 패널별 · 문법만 공유**: 댓글·agent `360 ~ innerWidth*0.9 / 420` · 버전 드로어 `360 ~ innerWidth*0.9 / 460` · ProblemView 우측 단 `150 ~ 360 / 220` · 좌측 사이드바 `200 ~ min(480, innerWidth*0.33) / 260` | P4·P5·E8 |
-| **D14** | **버전 드로어 핸들은 드로어 안쪽 좌변**(`side:'left', offset:-5`, `anchor:'right'`). 드로어 루트에 overflow가 없어 안전하고(B-6), 스태킹 컨텍스트(110) **안**이라 `RestoreConfirm(1400)`이 핸들 위를 덮는다. **루트에 zIndex>110 금지**(B-7). 드로어가 닫히면 `display:none`이라 핸들도 함께 사라진다 | B-6·B-7 |
+| **D14** | **버전 드로어 핸들은 드로어 안쪽 좌변**(`side:'left', offset:-13`(L1), `anchor:'right'`). 드로어 루트에 overflow가 없어 안전하고(B-6), 스태킹 컨텍스트(110) **안**이라 `RestoreConfirm(1400)`이 핸들 위를 덮는다. **루트에 zIndex>110 금지**(B-7). 드로어가 닫히면 `display:none`이라 핸들도 함께 사라진다 | B-6·B-7 |
 | **D15** | **EditorView는 핸들을 하나만 렌더**한다 — `rightPanelWidth`를 소유한(더 넓은) 쪽. 동률이면 드로어 | B-5·B-7 |
 | **D16** | **ProblemView: 패널이 열리면 우측 단·핸들·토글 버튼을 전부 렌더하지 않는다**(`rightOpen && !panelMode` — 결정 2). 좌표 연쇄 정리: `:732`·`:782`의 `right` → `16 + (panelMode ? comment.width + 8 : (rightOpen ? rightCol.width : 0))` | E2·E3·F5 |
 | **D17** | **우측 단 핸들은 ProblemView 루트에**(`anchor:'right', side:'right', offset: rightWidth - 5`). 우측 단 자신은 `overflowY:auto`(E1′), **컨텐츠 행 우회 금지**(함정 3). offset이 댓글 패널(`+3`)과 다른 것은 경계선 위치가 다르기 때문. 우측 단 자체는 `width: rightCol.width, flexShrink: 0` | E1′·B-9·B-11 |
@@ -438,10 +438,16 @@ anchor 'left':   delta = e.clientX - width
 | 소비처 | anchor | side | offset | 마운트 상자 |
 |---|---|---|---|---|
 | EditorView 댓글·agent | right | right | `comment.width + 3` | EditorView 루트(현행) |
-| EditorView 버전 드로어 | right | left | `-5` | **VersionDrawer 루트 안쪽** |
+| EditorView 버전 드로어 | right | left | **`-13`** (L1) | **VersionDrawer 루트 안쪽** |
 | ProblemView 댓글·agent | right | right | `comment.width + 3` | ProblemView 루트(현행) |
 | ProblemView 우측 단 | right | right | `rightCol.width - 5` | **ProblemView 루트** (컨텐츠 행 금지 — 함정 3) |
 | 좌측 사이드바 | left | left | `sidebar.width - 5` | **AppShell 루트** (`:674`↔`:676` 사이) |
+
+**L1 — 버전 드로어만 `-13`인 이유 (T7 검수에서 발견, 2026-08-27)**
+`-5`(드로어 좌변 중앙)로 두면 활성선이 댓글·agent보다 **8px 오른쪽**에 뜬다. 클레이 우측 경계선은
+드로어 좌변이 아니라 **`rightPanelWidth + 8`**(Row3의 `paddingRight`)이기 때문이다. 즉 나머지 셋과 달리
+드로어만 **자기 변 ≠ 경계선**이다(사이드바·우측 단은 자기 변이 곧 경계선이라 `-5`가 맞다).
+드로어 안쪽 좌표계로 옮기면 `X + 5 = -8` → **`X = -13`**. 댓글 핸들의 `width + 3`(가운데 `width + 8`)과 같은 지점을 가리킨다.
 
 ---
 

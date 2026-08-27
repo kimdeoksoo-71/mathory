@@ -200,7 +200,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 62(폴더뷰 구조 변경 · 좌우 사이드바 UI 통일)** — 구현 완료(2026-08-27), **덕수 검수 대기 · 미배포**
+## 현재 Phase: **Phase 62(폴더뷰 구조 변경 · 좌우 사이드바 UI 통일)** — 구현·**덕수 검수 완료**(2026-08-27, T1~T11 전항 통과), **미배포**(61b·61c·61d와 함께 push 대기)
 
 - **Phase 61d(폴더 일괄 검증)** — 구현·검수 완료(2026-08-24), **미배포**(61b·61c와 함께 push 대기)
 
@@ -232,6 +232,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   — `--bg-hover`는 **클레이보다 어둡고** hover 전용 토큰이라 의미가 꼬인다. 단조 순서(아이보리 < 행 < 제목행 < hover)가 성립하는 유일한 기존 토큰이 `--block-bg`다
 - **B축**: 리사이즈는 `useDrawerResize` + `DrawerResizeHandle` 한 벌(위 우측 패널 절 참조). 구 코드의 고정 갭 12·24는
   실제 경계선(`panelWidth+8`)과 어긋나 **드래그 시작에 4px·16px 튀었다** → pointerdown에서 커서↔패널변 offset을 캡처해 유지한다(스냅 0)
+- **덕수 검수 완료(2026-08-27)**: T1~T11 전항 통과. 지적 1건 = **버전 드로어 활성선 위치**(offset `-5` → `-13`, 위 규약 참조) — 즉시 반영. 실물 판정 2건은 현행 값 채택(테두리 `--border-content` · 제목행 `--block-bg`). T8″는 **정상 동작 판정**(창 폭을 줄이면 본문 좌·우가 같은 비율로 잘린다 = `justifyContent:center`의 의도된 결과).
 - 검증 문서의 T1~T11이 검수 항목이다. **실물 판정 2건**(테두리를 `--block-hairline`으로 한 단 올릴지 · 제목행 톤이 무거운지)과
   **관측 1건**(T8″ — 사이드바 최대 + 우측 단 최대에서 ProblemView 본문 좌측이 잘리는지. **기존 한계라 이번엔 안 고친다**)이 남아 있다
 
@@ -255,7 +256,7 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
 - **우측 패널 3종은 한 규약이다 (2026-08-18)**: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
-- **패널 폭 조절은 `useDrawerResize` + `DrawerResizeHandle` 한 벌이 전부다 (Phase 62)**: 소비처 5곳(EditorView 댓글·버전 드로어 / ProblemView 댓글·우측 단 / AppShell 사이드바). **폭 수치만 패널별**이고 문법은 공유한다. ⚠ **훅의 `anchor`(패널이 뷰포트의 어느 변에 고정됐나)와 핸들의 `side`(strip을 부모의 어느 변에서 offset하나)는 다른 개념**이다 — 버전 드로어가 유일하게 갈린다(`anchor:'right'` + `side:'left'`). ⚠ **핸들을 `overflow`가 걸린 상자 안에 두지 말 것** — `overflow-y: auto`는 **가로도 함께 잘린다**(Sidebar `<aside>`는 `overflow:hidden`, ProblemView 우측 단은 `overflowY:auto`라 둘 다 화면 루트에 마운트한다). ⚠ 폭은 **세션 내 상태**이고 새로고침하면 기본값으로 돌아간다(localStorage 금지, 덕수 확정). ⚠ 드래그 중에는 **밀어내기 transition도 함께 꺼야** 본문이 0.2s 뒤처지지 않는다
+- **패널 폭 조절은 `useDrawerResize` + `DrawerResizeHandle` 한 벌이 전부다 (Phase 62)**: 소비처 5곳(EditorView 댓글·버전 드로어 / ProblemView 댓글·우측 단 / AppShell 사이드바). **폭 수치만 패널별**이고 문법은 공유한다. ⚠ **훅의 `anchor`(패널이 뷰포트의 어느 변에 고정됐나)와 핸들의 `side`(strip을 부모의 어느 변에서 offset하나)는 다른 개념**이다 — 버전 드로어가 유일하게 갈린다(`anchor:'right'` + `side:'left'`). ⚠ **핸들을 `overflow`가 걸린 상자 안에 두지 말 것** — `overflow-y: auto`는 **가로도 함께 잘린다**(Sidebar `<aside>`는 `overflow:hidden`, ProblemView 우측 단은 `overflowY:auto`라 둘 다 화면 루트에 마운트한다). ⚠ 폭은 **세션 내 상태**이고 새로고침하면 기본값으로 돌아간다(localStorage 금지, 덕수 확정). ⚠ 드래그 중에는 **밀어내기 transition도 함께 꺼야** 본문이 0.2s 뒤처지지 않는다. ⚠ **활성선은 패널 변이 아니라 클레이 우측 경계선(`rightPanelWidth + 8`)에 맞춘다** — 사이드바·ProblemView 우측 단은 자기 변이 곧 경계선이라 `offset: width - 5`지만 **버전 드로어만 자기 변이 경계선이 아니라 `offset: -13`이다**(`-5`로 두면 활성선이 댓글·agent보다 8px 오른쪽에 뜬다 — Phase 62 T7 검수에서 잡힌 유일한 결함)
 - **ProblemView는 댓글·agent 패널이 열리면 우측 단이 존재하지 않는다 (Phase 62)**: 열·리사이즈 핸들·토글 버튼이 함께 사라진다. 패널(min 360)이 우측 단(max 360)을 **완전히 덮는** 구조라(zIndex 50 vs flex 형제) 남겨 두면 보이지 않는 열과 그 위에 뜨는 핸들(zIndex 100 > 50)·무의미한 토글이 생기고, 본문이 `paddingRight`와 우측 단에 **이중으로** 밀려 228~368px 死공간이 남는다. **둘을 공존시키려면 `CommentPanel`에 `rightOffset`을 넣어 패널을 우측 단 왼쪽에 붙이는 별도 작업이 필요하다 — 그것 없이 한쪽만 되살리지 말 것**
 - **ProblemView 컨텐츠 행(`:672`)에 `position:relative`를 주지 말 것 (Phase 62)**: 글자크기 컨트롤(`:730`)과 우측 단 토글(`:777`)이 그 행 **안**에 있으면서 **루트 기준** `top:16`/`top:52`로 배치돼 있다 → 행이 positioned가 되는 순간 둘이 제목바 높이(98px)만큼 내려간다. 우측 단 핸들을 "제목바를 안 가리게" 두려는 우회가 정확히 이 함정이다
 - **`position: absolute`로 바꾸면 그 안의 `fixed` 모달이 갇힌다 (2026-08-18)**: 포지션+zIndex를 가진 요소는 **스태킹 컨텍스트**를 만든다 → `VersionDrawer`(absolute·110) 안의 `RestoreConfirm`(fixed·1400)에서 1400은 드로어 내부에서만 유효하다. 모달이 바깥을 덮으려면 **드로어 자신이** 그 화면의 최대 zIndex(EditorView는 리사이즈 핸들 100)보다 위여야 한다

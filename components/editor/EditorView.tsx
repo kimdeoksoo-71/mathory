@@ -3111,9 +3111,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         onExport={handleExport}
         width={version.width}
         resizeHandle={activeResizeHandle === 'version' ? (
+          /* Phase 62 D14 — 드로어 **안쪽** 좌변. 핸들 좌표계가 드로어 기준이라 offset이 음수다.
+             ⚠ -5(드로어 좌변 중앙)가 아니라 **-13**이다: 밀어내기 때문에 클레이 우측 경계선은
+                드로어 좌변보다 8px 왼쪽(rightPanelWidth + 8)에 있다. strip 가운데를 거기 맞춰야
+                댓글·agent 핸들(offset = width + 3 → 가운데 width + 8)과 활성선 위치가 통일된다.
+             ⚠ zIndex는 기본값(100)을 유지할 것 — 드로어의 스태킹 컨텍스트(110) 안이라
+                RestoreConfirm(fixed·1400)이 핸들 위를 덮는다. */
           <DrawerResizeHandle
             side="left"
-            offset={-5}
+            offset={-13}
             active={version.dragging || version.hover}
             {...version.handleProps}
           />
