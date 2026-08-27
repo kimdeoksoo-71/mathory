@@ -56,6 +56,8 @@ import { computeContentHash } from '../../lib/copyright';
 import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
+import { useDrawerResize } from '../../hooks/useDrawerResize';
+import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
@@ -997,11 +999,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [saveError, setSaveError] = useState(false);
   const [recoverableDraft, setRecoverableDraft] = useState<VersionContent | null>(null);
   const [versionDrawerOpen, setVersionDrawerOpen] = useState(false);  // Stage 4
-  // Phase 44 Step D: 토론 패널 드래그 리사이즈 상태 (조기 return보다 위에 선언 — 훅 규칙)
-  // 폭은 세션 내 useState로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
-  const [panelWidth, setPanelWidth] = useState(420);
-  const [resizeHover, setResizeHover] = useState(false);   // hover 시 핸들 라인 강조
-  const [resizeDragging, setResizeDragging] = useState(false);
+  // Phase 44 Step D → Phase 62 D11: 토론 패널 드래그 리사이즈 (조기 return보다 위에 선언 — 훅 규칙)
+  // 폭은 세션 내 상태로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
+  const comment = useDrawerResize({
+    defaultWidth: 420, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+  });
+  // Phase 62 D13 — 버전 드로어도 같은 문법으로 조절한다(폭 수치만 별도).
+  const version = useDrawerResize({
+    defaultWidth: VERSION_DRAWER_WIDTH, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+  });
   // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
   const skipDirtyRef = useRef(true);
   const [status, setStatus] = useState('');
@@ -1024,12 +1030,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const discussionOpen = panelMode !== null;
   /* 우측 패널이 차지하는 폭 — 댓글·agent와 버전 기록 드로어가 같은 규약을 쓴다.
      둘 다 덮지 않고 편집·미리보기를 왼쪽으로 밀어낸다(기타 개선 3-2).
-     동시에 열리면 넓은 쪽 기준(드로어가 zIndex 60으로 앞에 온다). */
+     동시에 열리면 넓은 쪽 기준(드로어가 zIndex 110으로 앞에 온다). */
   const rightPanelWidth = Math.max(
-    discussionOpen ? panelWidth : 0,
-    versionDrawerOpen ? VERSION_DRAWER_WIDTH : 0,
+    discussionOpen ? comment.width : 0,
+    versionDrawerOpen ? version.width : 0,
   );
   const rightPanelOpen = rightPanelWidth > 0;
+  /* Phase 62 D15 — 핸들은 하나만 그린다: rightPanelWidth를 소유한(더 넓은) 쪽.
+     동률이면 드로어(zIndex 110으로 위에 있다). 좁은 쪽 핸들은 어차피 넓은 패널에
+     가려지거나 패널 한복판에 떠서 혼란만 준다. */
+  const activeResizeHandle: 'comment' | 'version' | null =
+    rightPanelWidth === 0 ? null
+      : (versionDrawerOpen && version.width >= (discussionOpen ? comment.width : 0))
+        ? 'version' : 'comment';
+  const rightPanelDragging = comment.dragging || version.dragging;
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const commentSessionId = useMemo(
@@ -2973,37 +2987,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     e.target.style.background = 'transparent';
   };
 
-  // ─── Phase 44 Step D: 토론 패널 드래그 리사이즈 핸들러 (상태는 컴포넌트 상단에 선언됨) ───
-  const PANEL_MIN = 360;
-
-  const handleResizeStart = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation(); // dnd-kit 블록 드래그와 충돌 방지
-    const el = e.currentTarget as HTMLElement;
-    const pid = e.pointerId;
-    try { el.setPointerCapture(pid); } catch {} // 드래그 중 이벤트를 핸들에 고정 (오버레이 무관)
-    setResizeDragging(true);
-    const onMove = (ev: PointerEvent) => {
-      // 핸들 = U자 컨텐츠 우측 경계선(콘텐츠 우측 끝 = panelWidth + 12px 갭). 경계선을 커서에 맞춤.
-      const next = window.innerWidth - ev.clientX - 12;
-      setPanelWidth(Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.9, next)));
-    };
-    const onUp = () => {
-      el.removeEventListener('pointermove', onMove);
-      el.removeEventListener('pointerup', onUp);
-      try { el.releasePointerCapture(pid); } catch {}
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setResizeDragging(false);
-    };
-    el.addEventListener('pointermove', onMove);
-    el.addEventListener('pointerup', onUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-  const handleResizeEnter = () => setResizeHover(true);
-  const handleResizeLeave = () => setResizeHover(false);
-  const resizeActive = resizeHover || resizeDragging;
 
   // Phase 55: 버전 콘텐츠를 작업본에 적용 (드래프트 복구·복원 공용). block_key 유지 → diff 연속성.
   // Phase 55a(C1+F1): 세대 id로 매 apply 전면 리마운트(비제어 CM 갱신) + activeBlockId 항상 재설정
@@ -3126,6 +3109,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         onRestore={handleRestore}
         onNamedSave={(name) => snapshotCurrent('named', { name })}
         onExport={handleExport}
+        width={version.width}
+        resizeHandle={activeResizeHandle === 'version' ? (
+          <DrawerResizeHandle
+            side="left"
+            offset={-5}
+            active={version.dragging || version.hover}
+            {...version.handleProps}
+          />
+        ) : undefined}
       />
 
       {/* ═══ Row 1: 메타 정보 ═══
@@ -3136,7 +3128,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         minHeight: 57, boxSizing: 'border-box',
         // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
         paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
-        transition: 'padding-right 0.2s',
+        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-functional)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
@@ -3281,7 +3273,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
         paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
-        transition: 'padding-right 0.2s',
+        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
         background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
       }}>
@@ -3477,7 +3469,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       <div style={{
         flex: 1, display: 'flex', minHeight: 0,
         paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 8px)` : 0, // 우측 패널 + 8px 여백
-        transition: 'padding-right 0.2s',
+        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
       }}>
 
         {/* ─── U자 컨텐츠 프레임: 클레이 + 3면 경계(상·좌·우) + 상단 14px 라운드, 하단 열림 ─── */}
@@ -3756,31 +3748,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onRunVerify={handleRunVerify}
           onJumpToBlock={handleJumpToBlock}
           verifyCharCount={verifyCharCount}
-          width={panelWidth}
+          width={comment.width}
         />
       )}
 
-      {/* ─── Step D: 토론 패널 좌측변 드래그 리사이즈 핸들 (200ms dwell 후 활성) ─── */}
-      {discussionOpen && (
-        <div
-          onPointerEnter={handleResizeEnter}
-          onPointerLeave={handleResizeLeave}
-          onPointerDown={handleResizeStart}
-          style={{
-            position: 'absolute', top: 0, bottom: 0,
-            right: `calc(${panelWidth}px + 3px)`, // U자 컨텐츠 우측 경계선(panelWidth+8) 위에 strip 걸침
-            width: 10, zIndex: 100,
-            cursor: 'col-resize',
-            display: 'flex', justifyContent: 'center',
-          }}
-        >
-          <div style={{
-            width: resizeActive ? 1.5 : 0,
-            height: '100%',
-            background: 'var(--border-content-active)',
-            transition: 'width 0.1s',
-          }} />
-        </div>
+      {/* ─── Phase 62 D12: 토론 패널 좌측변 드래그 리사이즈 핸들 ───
+          offset = panelWidth + 3 → 10px strip의 가운데가 U자 컨텐츠 우측 경계선(panelWidth+8)에 온다 */}
+      {activeResizeHandle === 'comment' && (
+        <DrawerResizeHandle
+          side="right"
+          offset={comment.width + 3}
+          active={comment.dragging || comment.hover}
+          {...comment.handleProps}
+        />
       )}
     </div>
   );

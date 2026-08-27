@@ -624,9 +624,18 @@ function DraggableProblemItem({
 }
 
 // ─── Main Sidebar ───
+/* Phase 62 D20 — 폭 토큰(--sidebar-expanded/--sidebar-collapsed)을 삭제하고 상수로 옮겼다.
+   펼침 폭이 AppShell의 상태가 된 이상 토큰을 남기면 진실이 두 곳이 된다. */
+export const SIDEBAR_WIDTH_DEFAULT = 260;
+export const SIDEBAR_COLLAPSED_WIDTH = 56;
+
 export interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
+  /** Phase 62 D19 — 펼침 폭. AppShell의 useDrawerResize가 소유한다. */
+  width: number;
+  /** Phase 62 D19 — 드래그 중에는 width transition을 꺼야 핸들이 커서를 따라온다(0.2s 지연 제거). */
+  dragging: boolean;
   folders: Folder[];
   folderCounts: Record<string, number>;
   recentProblems: Problem[];
@@ -666,6 +675,8 @@ export interface SidebarProps {
 export default function Sidebar({
   collapsed,
   onToggle,
+  width,
+  dragging,
   folders,
   folderCounts,
   recentProblems,
@@ -806,12 +817,12 @@ export default function Sidebar({
   return (
     <aside
       style={{
-        width: collapsed ? 'var(--sidebar-collapsed)' : 'var(--sidebar-expanded)',
+        width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : width,
         flexShrink: 0,
         background: 'var(--bg-functional)',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'width var(--transition-normal)',
+        transition: dragging ? 'none' : 'width var(--transition-normal)',
         overflow: 'hidden',
       }}
     >

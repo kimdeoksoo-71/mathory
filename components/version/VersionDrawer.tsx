@@ -21,7 +21,8 @@ import RestoreConfirm from './RestoreConfirm';
  *   조작 버튼을 타임라인 항목 안에 두지 않는 이유: 항목 자체가 <button>이라 중첩이 무효 HTML이고
  *   클릭이 버블링돼 버전 선택이 함께 발동한다. 타임라인은 표시 전용으로 유지한다.
  */
-/** 드로어 폭. EditorView의 밀어내기 계산(rightPanelWidth)이 같은 값을 써야 하므로 공유한다. */
+/** 드로어 **기본** 폭. Phase 62부터 폭은 EditorView가 useDrawerResize로 들고 width prop으로 내려준다.
+ *  이 상수는 그 훅의 defaultWidth이자 prop 미전달 시의 폴백이다. */
 export const VERSION_DRAWER_WIDTH = 460;
 
 export default function VersionDrawer({
@@ -32,6 +33,8 @@ export default function VersionDrawer({
   onRestore,
   onNamedSave,
   onExport,
+  width,
+  resizeHandle,
 }: {
   problemId: string;
   open: boolean;
@@ -40,6 +43,12 @@ export default function VersionDrawer({
   onRestore: (target: ProblemVersion, content: VersionContent) => Promise<void>;
   onNamedSave: (name: string) => Promise<SnapshotResult>;
   onExport: (versionId: string, content: VersionContent) => Promise<ExportOutcome>;
+  /** Phase 62 D14 — 폭은 EditorView의 useDrawerResize가 소유한다. 미전달 시 기본값. */
+  width?: number;
+  /** Phase 62 D14 — 드로어 **안쪽** 좌변에 붙는 리사이즈 핸들.
+   *  ⚠ 루트(zIndex>110)에 두지 말 것 — 드로어의 스태킹 컨텍스트(110) 안이어야
+   *    RestoreConfirm(fixed·1400)이 핸들 위를 덮는다. */
+  resizeHandle?: React.ReactNode;
 }) {
   const { versions, loading, hasMore, loadFirst, loadMore, patchVersion } = useVersionHistory(problemId);
   const [selected, setSelected] = useState<ProblemVersion | null>(null);
@@ -278,11 +287,13 @@ export default function VersionDrawer({
        바깥 요소를 덮으려면 드로어 자신이 위에 있어야 한다. */
     <div style={{
       position: 'absolute', top: 0, right: 0, bottom: 0,
-      width: VERSION_DRAWER_WIDTH, maxWidth: '90vw',
+      width: width ?? VERSION_DRAWER_WIDTH, maxWidth: '90vw',
       background: 'var(--bg-panel-agent)',
       display: open ? 'flex' : 'none', flexDirection: 'column', zIndex: 110,
       fontFamily: 'var(--font-ui)',
     }}>
+      {/* Phase 62 D14 — 드로어가 닫히면 루트가 display:none이라 핸들도 함께 사라진다(추가 게이트 불필요) */}
+      {resizeHandle}
       {/* ═══ 1행: 제목 + 닫기 ═══ agent 패널 헤더와 같은 규격(높이 57 = 사이드바 헤더 정렬) */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,

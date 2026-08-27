@@ -114,7 +114,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **활성 블록을 바꾸는 모든 경로는 `skipNextBlockScrollRef` 계약을 맺을 것 (Phase 45a)**: 플래그는 자동 스크롤 effect **맨 앞**에서 소비한다. `collapseMode` 가드 뒤에 두면 전체접기 중엔 소비되지 않고 남아 나중 전환 하나를 삼킨다. 반대로 **직접 스크롤을 호출하는 핸들러**(`handleSelectBlockBar`)는 effect의 게이트를 우회하므로 같은 조건을 자기 안에 다시 적어야 한다 — Phase 56이 이걸 빠뜨려 Phase 45의 접기 모드 가드가 무력화됐다
 - **click의 `stopPropagation`은 `dblclick`을 막지 않는다 (Phase 45a)**: 별개 이벤트 타입이다. 더블클릭 핸들러가 달린 컨테이너 안의 버튼·스위치에는 `onDoubleClick` 차단을 **따로** 달 것
 - **편집창 블록 인셋은 E형 (Phase 45a)**: 비활성 = 전폭·직각·간격 0 / 활성·선택 = radius 8 + `--block-border-active`. 선은 전부 **0.5px**(레티나 1물리픽셀)이고 **그림자는 쓰지 않는다**. **블록 사이 구분선은 하나뿐** — 그래서 가로선은 **위쪽만** 그린다(아래까지 그리면 인접 두 블록이 각자 내어 2줄). 덕분에 첫 블록은 상단 선이 없고 마지막 블록 아래는 열린다. 직전이 활성 카드면 그 카드의 아래 테두리가 선을 담당하므로 생략(`hideTopLine` — **CSS 형제 선택자로는 불가**, `<div key>` 래퍼가 형제 관계를 끊는다). **비활성의 네 변 0.5px은 `transparent`로 자리를 잡아 둔다** — 아예 빼면 활성 전환 순간 내용물이 밀린다. 편집 패널이 좌우 패딩 0이라 **좌측 기준선 16px**(`.cm-content` 패딩)에 바·하단툴바·미디어 블록·교정 박스를 모두 맞춘다. 열람·공유·인쇄에는 적용하지 않는다
-- **U자 프레임(상·좌·우 0.5px, 상단 직각)은 3곳 공유**: `EditorView` · `ProblemView` · `FolderView`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸하므로 **셋을 항상 함께** 손댈 것. Phase 45a는 테두리 선은 **그대로 두고**(블록 좌우 선을 없애는 것만으로 이중 외곽이 풀린다) 상단 라운드 10만 3곳 동시에 직각으로 바꿨다
+- **U자 프레임(상·좌·우 0.5px, 상단 직각)은 문항 단위 화면 2곳이 공유한다**: `EditorView` · `ProblemView`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸하므로 **둘을 항상 함께** 손댈 것. Phase 45a는 테두리 선은 **그대로 두고**(블록 좌우 선을 없애는 것만으로 이중 외곽이 풀린다) 상단 라운드 10만 직각으로 바꿨다. ⚠ **`FolderView`는 Phase 62부터 의도적으로 프레임이 없다** — 클레이 = "문항 하나를 보는 중", 아이보리 = "문항 밖"이고 클레이는 카드·리스트 행이 담당한다. **FolderView에 프레임을 되살리지 말 것**(그 점멸이 곧 의도된 상황 변화 신호다)
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
@@ -129,7 +129,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **제목 스타일은 `EditorPreview.tsx` 인라인 style이 유일한 진실**: globals.css의 heading 절은 규칙 없는 주석이고, 인라인 style은 `!important` 없는 모든 시트 규칙을 이긴다 → **CSS로는 못 바꾼다.** h1/h2/h3는 한 벌이므로 하나만 고치면 위계가 역전한다 (Phase 58 D1')
 - **`--katex-scale`은 `em` 단위 포함 값**(현재 `1.08em`): 무단위로 바꾸면 `font-size`에 invalid라 declaration이 통째로 폐기되고 `.katex`가 katex.min.css의 `font: normal 1.21em`으로 되돌아가 **오히려 커진다**. 소비처는 `.preview-content .katex` 한 곳뿐 (Phase 58 P4)
 - **원문자(①~⑳) 크기 레버는 `@font-face`의 `size-adjust` 하나뿐**(현재 88%): 합성을 안 쓰므로 전용 CSS 클래스가 없다. `--font-print`도 같은 family를 공유해 화면·인쇄가 함께 줄어든다. Safari 17 미만은 디스크립터를 무시할 뿐이라 안전 (Phase 58 P5)
-- **명암비 계산은 `((c+0.055)/1.055)^2.4`** — `/1.055`를 빠뜨리면 판정이 뒤집힌다. 실배경은 흰색이 아니라 클레이 3종(`--bg-content #F4EFE7` / FolderView 카드 `--block-bg-active` / 공유뷰 `--bg-card #FEFDFB`)이고, **구속 조건은 가장 어두운 카드 배경** 하나다 (Phase 58 D3). ⚠ **그 값은 `#E8DFCE`다 — `#EDE6DA`가 아니다**(커밋 `78a780f`이 토큰만 옮기고 문서를 안 고쳐 Phase 58·59 문서가 한동안 stale했다. Phase 59a C1에서 전량 정정). 재계산값: `--case-dot` 3.28 / `--tone-dim` 4.76 — 둘 다 통과하지만 dot의 여유는 0.28뿐이다
+- **명암비 계산은 `((c+0.055)/1.055)^2.4`** — `/1.055`를 빠뜨리면 판정이 뒤집힌다. 실배경은 흰색이 아니라 클레이 3종(`--bg-content #F4EFE7` / FolderView 카드 `--block-bg-active` / 공유뷰 `--bg-card #FEFDFB`)이고, **구속 조건은 가장 어두운 카드 배경** 하나다 (Phase 58 D3). ⚠ **Phase 62부터 `#E8DFCE`는 FolderView 카드의 *hover* 배경이다**(정지 상태 카드는 `#F4EFE7`로 밝아졌다) — 최악값이 그대로라 아래 재계산값은 전부 유효하지만, **hover를 `#E8DFCE`보다 어둡게 내리면 계산이 통째로 무너진다.** ⚠ **그 값은 `#E8DFCE`다 — `#EDE6DA`가 아니다**(커밋 `78a780f`이 토큰만 옮기고 문서를 안 고쳐 Phase 58·59 문서가 한동안 stale했다. Phase 59a C1에서 전량 정정). 재계산값: `--case-dot` 3.28 / `--tone-dim` 4.76 — 둘 다 통과하지만 dot의 여유는 0.28뿐이다
 - **수식 색은 `.tone-baseline :where(.katex)`가 소유한다**: 조상에 `color`를 줘도 수식엔 닿지 않으므로 `.katex`를 **직접 겨냥**해야 한다 (Phase 58 D3'). ⚠ `.problem-content-toned .katex`는 `font-size`만 준다 — 색은 Phase 58에서 `.tone-baseline`으로 분리됐다(오래 stale했던 기술, Phase 59a G9에서 정정)
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
@@ -200,7 +200,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61d(폴더 일괄 검증)** — 구현·검수 완료(2026-08-24), **미배포**(61b·61c와 함께 push 대기)
+## 현재 Phase: **Phase 62(폴더뷰 구조 변경 · 좌우 사이드바 UI 통일)** — 구현 완료(2026-08-27), **덕수 검수 대기 · 미배포**
+
+- **Phase 61d(폴더 일괄 검증)** — 구현·검수 완료(2026-08-24), **미배포**(61b·61c와 함께 push 대기)
 
 - **Phase 59a** — 구현·검수 완료(인쇄 실물 포함). **배포 완료(2026-08-22)**
 - **Phase 60** — 구현·검증 완료(2026-08-20). 아래 절 참조
@@ -209,6 +211,29 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **Phase 61a(시트 가져오기)** — 2026-08-22 구현·검수·**배포·프로덕션 실동작 확인 완료**. 아래 절 참조
 - **Phase 61b(정밀 검증)** — 구현·검수 완료, **미배포**(push 대기). 아래 절 참조
 - **Phase 61c(대화 → 편집창 삽입)** — 구현·검수 완료(2026-08-23), **미배포**(push 대기). 아래 절 참조
+
+### Phase 62 — 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 (구현 완료 · 검수 대기 · 미배포)
+
+문서: `docs/phaseSketch/Phase62 폴더뷰 구조 변경·좌우 사이드바 UI 통일 구현 계획서 v6 최종판.md`
+(계보: v1 web → v2 CLI → v3 web → v4 CLI → v5 web → **v6 CLI 최종**. 판본마다 정정이 나왔으니 v6만 볼 것)
+
+**서버 0 · Firestore 0 · 전처리 파이프라인 0.** 전부 클라이언트 UI.
+신규 2(`hooks/useDrawerResize.ts` · `components/ui/DrawerResizeHandle.tsx`) + 수정 7 + globals.css.
+**신규 색 토큰 0**, 신규 CSS 변수 1(`--card-surface` — `:root` 미등록, 컴포넌트 지역), **삭제 토큰 2**(`--sidebar-expanded`·`--sidebar-collapsed`).
+
+- **A축**: FolderView U자 프레임 철거 → 바탕 아이보리 / 카드·리스트 행이 클레이 카드(§위 U자 프레임 항목·명암비 항목 개정 참조).
+  리스트 행은 `folder-row`(⚠ `problem-card`를 붙이면 Phase 59a Q5 예외가 딸려온다), 제목행은 **sticky 래퍼 안의 카드**다
+  — 래퍼 없이 루트 상단 패딩을 제목행 밖에 두면 스크롤된 행이 그 틈을 통과해 보인다
+- **`--card-surface` 하나가 카드 배경·hover·페이드를 함께 움직인다**: 인라인 `background`가 `var(--card-surface, var(--bg-content))`를
+  참조하므로 CSS `:hover`는 **변수만** 갈아끼우면 되고 `!important`가 **0건**이다(인라인을 리터럴 색으로 되돌리는 순간 hover가 죽는다).
+  페이드도 같은 변수를 읽어 **hover용 페이드 규칙 자체가 사라졌다** — 하드코딩 rgba가 토큰과 어긋났던 `78a780f` 사고의 구조적 차단.
+  ⚠ **`--card-surface`(클레이)와 기존 `--bg-card`(#FEFDFB, 아이보리)는 이름이 뒤집힌 쌍**이고 같은 파일 `FolderView:469·476`이 후자를 쓴다
+- **제목행 배경은 `--bg-hover`가 아니라 `--block-bg`다**: 휘도 실측 아이보리 0.9829 > 클레이 0.8674 > **`--bg-hover` 0.8349** > `--block-bg` 0.8276 > `--block-bg-active` 0.7439
+  — `--bg-hover`는 **클레이보다 어둡고** hover 전용 토큰이라 의미가 꼬인다. 단조 순서(아이보리 < 행 < 제목행 < hover)가 성립하는 유일한 기존 토큰이 `--block-bg`다
+- **B축**: 리사이즈는 `useDrawerResize` + `DrawerResizeHandle` 한 벌(위 우측 패널 절 참조). 구 코드의 고정 갭 12·24는
+  실제 경계선(`panelWidth+8`)과 어긋나 **드래그 시작에 4px·16px 튀었다** → pointerdown에서 커서↔패널변 offset을 캡처해 유지한다(스냅 0)
+- 검증 문서의 T1~T11이 검수 항목이다. **실물 판정 2건**(테두리를 `--block-hairline`으로 한 단 올릴지 · 제목행 톤이 무거운지)과
+  **관측 1건**(T8″ — 사이드바 최대 + 우측 단 최대에서 ProblemView 본문 좌측이 잘리는지. **기존 한계라 이번엔 안 고친다**)이 남아 있다
 
 ### Phase 59a — Case 레이아웃 거터 이주 · 강조 체계 정비 (구현·검수·배포 완료)
 
@@ -230,6 +255,9 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
 - **우측 패널 3종은 한 규약이다 (2026-08-18)**: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
+- **패널 폭 조절은 `useDrawerResize` + `DrawerResizeHandle` 한 벌이 전부다 (Phase 62)**: 소비처 5곳(EditorView 댓글·버전 드로어 / ProblemView 댓글·우측 단 / AppShell 사이드바). **폭 수치만 패널별**이고 문법은 공유한다. ⚠ **훅의 `anchor`(패널이 뷰포트의 어느 변에 고정됐나)와 핸들의 `side`(strip을 부모의 어느 변에서 offset하나)는 다른 개념**이다 — 버전 드로어가 유일하게 갈린다(`anchor:'right'` + `side:'left'`). ⚠ **핸들을 `overflow`가 걸린 상자 안에 두지 말 것** — `overflow-y: auto`는 **가로도 함께 잘린다**(Sidebar `<aside>`는 `overflow:hidden`, ProblemView 우측 단은 `overflowY:auto`라 둘 다 화면 루트에 마운트한다). ⚠ 폭은 **세션 내 상태**이고 새로고침하면 기본값으로 돌아간다(localStorage 금지, 덕수 확정). ⚠ 드래그 중에는 **밀어내기 transition도 함께 꺼야** 본문이 0.2s 뒤처지지 않는다
+- **ProblemView는 댓글·agent 패널이 열리면 우측 단이 존재하지 않는다 (Phase 62)**: 열·리사이즈 핸들·토글 버튼이 함께 사라진다. 패널(min 360)이 우측 단(max 360)을 **완전히 덮는** 구조라(zIndex 50 vs flex 형제) 남겨 두면 보이지 않는 열과 그 위에 뜨는 핸들(zIndex 100 > 50)·무의미한 토글이 생기고, 본문이 `paddingRight`와 우측 단에 **이중으로** 밀려 228~368px 死공간이 남는다. **둘을 공존시키려면 `CommentPanel`에 `rightOffset`을 넣어 패널을 우측 단 왼쪽에 붙이는 별도 작업이 필요하다 — 그것 없이 한쪽만 되살리지 말 것**
+- **ProblemView 컨텐츠 행(`:672`)에 `position:relative`를 주지 말 것 (Phase 62)**: 글자크기 컨트롤(`:730`)과 우측 단 토글(`:777`)이 그 행 **안**에 있으면서 **루트 기준** `top:16`/`top:52`로 배치돼 있다 → 행이 positioned가 되는 순간 둘이 제목바 높이(98px)만큼 내려간다. 우측 단 핸들을 "제목바를 안 가리게" 두려는 우회가 정확히 이 함정이다
 - **`position: absolute`로 바꾸면 그 안의 `fixed` 모달이 갇힌다 (2026-08-18)**: 포지션+zIndex를 가진 요소는 **스태킹 컨텍스트**를 만든다 → `VersionDrawer`(absolute·110) 안의 `RestoreConfirm`(fixed·1400)에서 1400은 드로어 내부에서만 유효하다. 모달이 바깥을 덮으려면 **드로어 자신이** 그 화면의 최대 zIndex(EditorView는 리사이즈 핸들 100)보다 위여야 한다
 - **요약 보기**: 열람 2뷰 전용, 비영속. **기본값은 앱 열람뷰 outline / 공개 뷰어 full**이며, 요약할 뼈대가 없으면(제목·경우 전무) 훅이 full로 강제 해제한다 — 안 그러면 빈 화면이 된다. ⚠ Phase 59a로 발췌가 사라지면서 **이 게이트가 닫히는 문항이 늘었다**(제목도 경우도 없이 `**`만 있던 풀이가 전부 해당) → `OutlineToggle`의 disabled 툴팁도 함께 고쳤다. Phase 54 레거시 `**Case n.**`은 **행 단위 스캔**으로 항목 승격(이것만 남았다)
 - **`caseGapClassName`은 타입을 가리지 않는다 (Phase 59a)**: rail이 거터로 나가 개재 블록이 걸릴 것이 없어졌다 → 항상 `'case-gap'`. 인자는 호출 5곳을 건드리지 않으려고 남겨 둔 것이다

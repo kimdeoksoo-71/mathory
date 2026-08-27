@@ -1874,6 +1874,29 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 62: 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 ✅ (구현 완료 · 검수 대기 · 미배포)
+
+계획서: `docs/phaseSketch/Phase62 … v6 최종판.md` (v1 web → v6 CLI, 판본마다 정정)
+
+**A축 — FolderView 구조 변경**
+- U자 클레이 프레임 철거 → 바탕 아이보리. 클레이 = "문항 하나를 보는 중", 아이보리 = "문항 밖"
+- 카드: 클레이 배경 + 0.5px `--border-content` 테두리 / hover만 `#E8DFCE`(화면 최악 배경 불변 → 기존 명암비 판정 전부 유효)
+- 리스트 행: 가로로 긴 클레이 카드(radius 8 · 간격 4px) · `folder-row` 클래스 · hover는 globals.css
+- 제목행: sticky 래퍼 안의 `--block-bg` 카드 / 가로 구분선 2개 제거 / 행 폭 1136px로 제목바와 정렬
+- `--card-surface` 변수 하나가 배경·hover·페이드를 함께 움직여 하드코딩 rgba 2곳 소멸(`!important` 0건)
+
+**B축 — 폭 조절 통일**
+- `hooks/useDrawerResize.ts` + `components/ui/DrawerResizeHandle.tsx` 신설, 소비처 5곳
+- EditorView 댓글·agent(360~90vw/420) · 버전 드로어(360~90vw/460) · ProblemView 댓글(동일) ·
+  ProblemView 우측 단(150~360/220) · 좌측 사이드바(200~min(480, 33vw)/260)
+- 드래그 시작 스냅(4px·16px) 제거 · 드래그 중 밀어내기 transition 정지 · 폭은 세션 내 상태(영속 없음)
+- ProblemView는 패널 열림 중 우측 단·핸들·토글 전부 미렌더(死공간 228~368px 제거)
+- `--sidebar-expanded`·`--sidebar-collapsed` 토큰 삭제 → `Sidebar.tsx` 상수 export
+
+**서버 0 · Firestore 0 · 전처리 0.** 프로덕션 빌드 통과.
+
+---
+
 ## Phase 61d: 폴더 일괄 검증 ✅
 
 문서: `docs/phaseSketch/Phase61d 폴더 일괄 검증 구현 계획서 v4 실행판.md`

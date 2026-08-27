@@ -94,18 +94,31 @@ export default function ListView({
   const showPerm = mode === 'sent';
 
   return (
-    <div style={{ padding: '8px 16px 32px', fontFamily: 'var(--font-ui)' }}>
-      {/* 헤더 */}
+    /* Phase 62 D8 — 좌우 인셋 0. 행 폭 = 1136px = 제목바·하위폴더 행과 같은 컨테이너 폭이라
+       문항 제목이 폴더 제목과 세로로 정렬된다. 상단 8px은 아래 sticky 래퍼가 갖는다. */
+    <div style={{ padding: '0 0 32px', fontFamily: 'var(--font-ui)' }}>
+      {/* 제목행 — sticky (Phase 62 D7).
+          ⚠ 래퍼가 필요하다: 루트 상단 패딩을 제목행 '바깥'에 두면 스크롤된 행이 그 띠를 통과하며 보인다.
+             래퍼가 아이보리를 칠해 위 8px과 라운드 모서리 바깥까지 덮는다.
+          ⚠ 배경색은 --bg-hover가 아니라 --block-bg다 — --bg-hover(0.8349)는 클레이(0.8674)보다
+             오히려 어둡고 hover 전용 토큰이라 의미가 꼬인다. 휘도 순서는
+             아이보리 0.9829 > 행(클레이) 0.8674 > 제목행 0.8276 > hover 0.7439로 단조롭다. */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '6px 10px',
+        position: 'sticky', top: 0, zIndex: 2,
+        background: 'var(--bg-functional)',
+        padding: '8px 0 4px',
+      }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px',
         fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
-        borderBottom: '1px solid var(--border-light, #e5e5e5)',
+        background: 'var(--block-bg)', borderRadius: 8,
       }}>
         <HeaderCell label="제목" active={sort.key === 'title'} dir={sort.dir} onClick={() => toggleSort('title')} style={{ flex: 1, minWidth: 0 }} />
         {showOwner && <div style={{ width: 120, flexShrink: 0 }}>소유자</div>}
         {showPerm && <div style={{ width: 64, flexShrink: 0 }}>권한</div>}
         <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => toggleSort('updated')} style={{ width: 72, flexShrink: 0 }} />
         <div style={{ width: 28, flexShrink: 0 }} />
+      </div>
       </div>
 
       {/* 행 */}
@@ -119,16 +132,22 @@ export default function ListView({
         const cc = commentCounts[p.id] ?? 0;
         const ac = agentCounts[p.id] ?? 0;
         return (
+          /* Phase 62 D6 — 행 = 가로로 긴 클레이 카드. 세로 두께는 현행 유지(라운드 때문에 좌우만 +4).
+             hover는 globals.css `.folder-row:hover`가 담당한다(인라인 핸들러 제거).
+             ⚠ `problem-card` 클래스를 붙이지 말 것 — Phase 59a Q5 예외(content:none)가 딸려온다. */
           <div
             key={p.id}
+            className="folder-row"
             onClick={() => onView(p)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '9px 10px',
-              borderBottom: '1px solid var(--border-light, #efefef)', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
+              background: 'var(--card-surface, var(--bg-content))',
+              border: '0.5px solid var(--border-content)',
+              borderRadius: 8, marginBottom: 4,
+              cursor: 'pointer',
               opacity: busyId === p.id ? 0.5 : 1,
+              transition: 'background .15s, box-shadow .15s',
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--bg-hover)'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
             {/* 제목 + 배지 */}
             <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>

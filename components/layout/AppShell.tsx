@@ -28,7 +28,9 @@ import SheetImportModal from '../import/SheetImportModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
 
-import Sidebar from '../layout/Sidebar';
+import Sidebar, { SIDEBAR_WIDTH_DEFAULT } from '../layout/Sidebar';
+import { useDrawerResize } from '../../hooks/useDrawerResize';
+import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import SearchOverlay from '../layout/SearchOverlay';
 import FolderView from '../problem/FolderView';
 import ProblemView from '../problem/ProblemView';
@@ -85,6 +87,14 @@ export default function AppShell() {
   const { user, loading: authLoading } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
+  /* Phase 62 D13·D18 — 좌측 사이드바 폭. 상한을 창 비례로 묶는 것은 편집창 최소 폭(≈1054px@15px)
+     때문이다: 사이드바를 무한정 넓히면 content-frame이 가로 스크롤로 떨어진다. */
+  const sidebar = useDrawerResize({
+    defaultWidth: SIDEBAR_WIDTH_DEFAULT,
+    min: 200,
+    max: () => Math.min(480, Math.round(window.innerWidth * 0.33)),
+    anchor: 'left',
+  });
   const [showSearch, setShowSearch] = useState(false);
 
   const [folders, setFolders] = useState<Folder[]>([]);
@@ -632,9 +642,13 @@ export default function AppShell() {
   const isProblemMode = view.type === 'problem';
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    /* Phase 62 D18 — 사이드바 리사이즈 핸들의 기준 상자. AppShell 안에는 절대배치 요소가 없어
+       position:relative를 줘도 파급이 없다. ⚠ 핸들을 <aside> 안에 두면 overflow:hidden에 잘린다. */
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
       <Sidebar
         collapsed={collapsed}
+        width={sidebar.width}
+        dragging={sidebar.dragging}
         onToggle={() => setCollapsed(!collapsed)}
         folders={folders}
         folderCounts={folderCounts}
@@ -672,6 +686,17 @@ export default function AppShell() {
         activeShareScopeKey={activeShareScopeKey}
         onSelectShareScope={handleSelectShareScope}
       />
+
+      {/* Phase 62 D18 — 사이드바 우변 리사이즈 핸들. aside·main의 형제로 루트에 둔다
+          (aside 안은 overflow:hidden이라 잘린다). 접힘 상태에서는 폭이 고정이라 미렌더. */}
+      {!collapsed && (
+        <DrawerResizeHandle
+          side="left"
+          offset={sidebar.width - 5}
+          active={sidebar.dragging || sidebar.hover}
+          {...sidebar.handleProps}
+        />
+      )}
 
       <main style={{
         flex: 1,

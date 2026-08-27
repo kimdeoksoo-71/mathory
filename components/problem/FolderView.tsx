@@ -451,7 +451,7 @@ export default function FolderView({
             padding: '0',
             minHeight: 41, boxSizing: 'border-box',
             alignItems: 'center',
-            borderBottom: '1px solid var(--border-light)',
+            // Phase 62 D5 — 클레이 상단 가로 구분선 제거(덕수). 리스트 행 폭(1136px)의 기준선이었다.
             overflowX: 'auto', overflowY: 'hidden',
           }}>
             {childFolders.map((cf) => {
@@ -490,16 +490,15 @@ export default function FolderView({
         </div>
       </div>
 
-      {/* ─── U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 폴더 리스트 아래에서 시작 ─── */}
+      {/* ─── 스크롤 컨테이너 (Phase 62: 프레임 없음. 바탕은 루트의 아이보리) ───
+          Phase 62 P1 — U자 클레이 프레임을 걷어냈다. 클레이 = "문항 하나를 보는 중",
+          아이보리 = "문항 밖". 이제 클레이는 카드·리스트 행이 담당한다.
+          ⚠ U자 프레임은 EditorView·ProblemView 2곳이 공유한다 — FolderView에 되살리지 말 것.
+          overflow/position/fontSize는 유지한다(스크롤·sticky·DnD의 기준). */}
       <div style={{
         flex: 1, minHeight: 0, width: '100%',
-        background: 'var(--bg-content)',
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
-        borderTop: '0.5px solid var(--border-content)',
-        borderLeft: '0.5px solid var(--border-content)',
-        borderRight: '0.5px solid var(--border-content)',
-        // Phase 45a — U자 프레임 상단 직각(EditorView·ProblemView·FolderView 3곳 동일)
       }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
 
@@ -537,11 +536,8 @@ export default function FolderView({
             paddingTop: 28, // 경계선↔카드 상단 여백 (스크롤 영역 안이라 스크롤 시 사라짐)
             paddingBottom: '20vh',
           }}>
-            {/* 카드 hover 강조: 배경 한 톤 진하게(#E4DBCB) + 그림자 강화. 페이드도 같은 색으로 동조 */}
-            <style>{`
-              .problem-card:hover { background: #E4DBCB !important; box-shadow: 0 4px 14px rgba(0,0,0,0.08) !important; }
-              .problem-card:hover .problem-card-fade { background: linear-gradient(180deg, rgba(228,219,203,0) 0%, #E4DBCB 100%) !important; }
-            `}</style>
+            {/* Phase 62 D9 — hover 규칙은 globals.css `.problem-card:hover` 한 곳이 소유한다.
+                (--card-surface 하나가 배경과 페이드를 함께 움직이므로 !important도 필요 없다) */}
             {folderProblems.map((problem) => {
               const blocks = questionBlocksMap[problem.id] || [];
               return (
@@ -554,8 +550,10 @@ export default function FolderView({
                   onClick={() => onView(problem)}
                   className="problem-card"
                   style={{
-                    background: 'var(--block-bg-active)',
-                    border: '1px solid var(--border-light)',
+                    // Phase 62 D2 — 클레이 카드. 인라인이 --card-surface를 참조하므로
+                    // globals.css의 :hover가 변수만 갈아끼우면 배경·페이드가 함께 따라온다.
+                    background: 'var(--card-surface, var(--bg-content))',
+                    border: '0.5px solid var(--border-content)',
                     borderRadius: 12,
                     padding: '18px 22px',
                     height: 320,
@@ -639,10 +637,11 @@ export default function FolderView({
                     {/* 하단 fade out 그라데이션으로 잘린 부분 자연스럽게 */}
                     <div className="problem-card-fade" style={{
                       position: 'absolute', bottom: 0, left: 0, right: 0, height: 36,
-                      // 카드 배경(--block-bg-active #E8DFCE)으로 페이드 — 시작색도 같은 RGB의 투명값(회색 끼임 방지)
-                      // ⚠ 하드코딩이라 토큰이 바뀌면 따라오지 않는다. 커밋 78a780f이 토큰만
-                      //   #EDE6DA → #E8DFCE로 옮기면서 여기가 어긋나 있었다(Phase 59a에서 정정).
-                      background: 'linear-gradient(180deg, rgba(232,223,206,0) 0%, var(--block-bg-active) 100%)',
+                      // Phase 62 D4 — 카드 배경(--card-surface)으로 페이드. 변수 하나가 카드·hover·페이드를
+                      // 함께 움직이므로 hover용 페이드 규칙이 따로 없고, 하드코딩 rgba도 사라졌다
+                      // (토큰만 옮겨 여기가 어긋났던 78a780f 사고의 구조적 차단).
+                      // `transparent`는 현대 브라우저가 premultiplied alpha로 보간해 회색이 끼지 않는다.
+                      background: 'linear-gradient(180deg, transparent 0%, var(--card-surface, var(--bg-content)) 100%)',
                       pointerEvents: 'none',
                     }} />
                   </div>

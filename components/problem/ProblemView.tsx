@@ -10,6 +10,8 @@ import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
+import { useDrawerResize } from '../../hooks/useDrawerResize';
+import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
@@ -152,10 +154,13 @@ export default function ProblemView({
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
   const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
-  // Phase 44: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
-  const [panelWidth, setPanelWidth] = useState(420);
-  const [resizeHover, setResizeHover] = useState(false);
-  const [resizeDragging, setResizeDragging] = useState(false);
+  // Phase 44 → Phase 62 D11: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
+  const comment = useDrawerResize({
+    defaultWidth: 420, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+  });
+  // Phase 62 D13 — 우측 단(탭·메뉴·메타)도 같은 문법으로 조절한다. 메뉴 열이라 폭 수치는 별도.
+  const rightCol = useDrawerResize({ defaultWidth: 220, min: 150, max: 360, anchor: 'right' });
+  const panelDragging = comment.dragging || rightCol.dragging;
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const commentSessionId = useMemo(
@@ -169,6 +174,10 @@ export default function ProblemView({
   const agentCount = useMemo(() => countAgentSessions(sessions), [sessions]);
   const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+  /* Phase 62 D16(결정 2) — 댓글·agent 패널이 열려 있는 동안 우측 단은 존재하지 않는다.
+     패널(min 360)이 단(max 360)을 완전히 덮어, 남겨 두면 보이지 않는 열과 그 위에 뜨는
+     핸들(zIndex 100 > 패널 50)·무의미한 토글 버튼이 생긴다. */
+  const rightColShown = rightOpen && !panelMode;
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
@@ -493,30 +502,6 @@ export default function ProblemView({
     { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
   ];
 
-  // ─── Phase 44: 댓글 패널 드래그 리사이즈 핸들러 (우측 패널만) ───
-  const PANEL_MIN = 360;
-  const handleResizeStart = (e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setResizeDragging(true);
-    const onMove = (ev: PointerEvent) => {
-      // 핸들 = U자 컨텐츠 우측 경계선(콘텐츠 우측 끝 = panelWidth + 24px 갭). 경계선을 커서에 맞춤.
-      const next = window.innerWidth - ev.clientX - 24;
-      setPanelWidth(Math.max(PANEL_MIN, Math.min(window.innerWidth * 0.9, next)));
-    };
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove);
-      window.removeEventListener('pointerup', onUp);
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      setResizeDragging(false);
-    };
-    window.addEventListener('pointermove', onMove);
-    window.addEventListener('pointerup', onUp);
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-  };
-  const resizeActive = resizeHover || resizeDragging;
 
   // ─── 제목바용 계산값 (IIFE에서 컴포넌트 스코프로 호이스팅) ───
   const fid = problem.folder_id || '';
@@ -546,8 +531,8 @@ export default function ProblemView({
       <div style={{
         flexShrink: 0, background: 'var(--bg-functional)',
         minHeight: 98, // EditorView(제목 57 + 탭 41)와 가로 경계선 Y 일치
-        paddingRight: panelMode ? `calc(${panelWidth}px + 8px)` : 0,
-        transition: 'padding-right 0.18s ease',
+        paddingRight: panelMode ? `calc(${comment.width}px + 8px)` : 0,
+        transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
         display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
       }}>
         <div style={{
@@ -674,8 +659,8 @@ export default function ProblemView({
       {/* 외부 래퍼: 패널 자리 확보(아이보리 백드롭), 경계선 없음 — 패널과 컨텐츠가 절대 겹치지 않음 */}
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', minHeight: 0,
-        paddingRight: panelMode ? `calc(${panelWidth}px + 8px)` : 0,
-        transition: 'padding-right 0.18s ease',
+        paddingRight: panelMode ? `calc(${comment.width}px + 8px)` : 0,
+        transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
         <div className="no-scrollbar" ref={contentScrollRef} style={{
@@ -729,9 +714,9 @@ export default function ProblemView({
       {/* ═══ 글자크기 조절 (콘텐츠 우상단, 패널 열려도 콘텐츠 옆에 유지) ═══ */}
       <div style={{
         position: 'absolute', top: 16,
-        right: 16 + (panelMode ? panelWidth + 8 : 0) + (rightOpen ? 220 : 0),
+        right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
         zIndex: 10, display: 'flex', alignItems: 'center', gap: 4,
-        transition: 'right 0.18s ease',
+        transition: panelDragging ? 'none' : 'right 0.18s ease',
       }}>
         <span style={{
           fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
@@ -773,25 +758,27 @@ export default function ProblemView({
         </div>
       </div>
 
-      {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══ */}
-      <button
+      {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══
+          Phase 62 F5 — 패널 열림 중에는 우측 단이 없으므로 이 버튼도 렌더하지 않는다
+          (보이지 않는 것을 켜고 끄는 버튼을 남기지 않는다). */}
+      {!panelMode && <button
         onClick={() => setRightOpen((o) => !o)}
         title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
         style={{
           position: 'absolute', top: 52,
-          right: 16 + (panelMode ? panelWidth + 8 : 0) + (rightOpen ? 220 : 0),
+          right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
           zIndex: 11, width: 26, height: 26,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: 'none', background: 'transparent', cursor: 'pointer',
-          color: 'var(--text-muted)', transition: 'right 0.18s ease',
+          color: 'var(--text-muted)', transition: panelDragging ? 'none' : 'right 0.18s ease',
         }}
       >
         {rightOpen ? <IconChevron size={16} /> : <IconChevronLeft size={16} />}
-      </button>
+      </button>}
 
       {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
-      {rightOpen && <div style={{
-        flex: 1, minWidth: 150, maxWidth: 220,
+      {rightColShown && <div style={{
+        width: rightCol.width, flexShrink: 0,
         padding: '32px 16px',
         overflowY: 'auto',
         fontSize: 13,
@@ -999,28 +986,33 @@ export default function ProblemView({
           onRunVerify={handleRunVerify}
           onJumpToBlock={isVerifyOwner ? handleJumpToBlock : undefined}
           verifyCharCount={verifyCharCount}
-          width={panelWidth}
+          width={comment.width}
         />
       )}
 
-      {/* 댓글 패널 좌측변 드래그 리사이즈 핸들 (우측 패널만) */}
+      {/* Phase 62 D12: 댓글 패널 좌측변 드래그 리사이즈 핸들 (우측 패널만) ───
+          offset = panelWidth + 3 → 10px strip의 가운데가 U자 컨텐츠 우측 경계선(panelWidth+8)에 온다 */}
       {panelMode && (
-        <div
-          onPointerEnter={() => setResizeHover(true)}
-          onPointerLeave={() => setResizeHover(false)}
-          onPointerDown={handleResizeStart}
-          style={{
-            position: 'absolute', top: 0, bottom: 0,
-            right: `calc(${panelWidth}px + 3px)`, // U자 컨텐츠 우측 경계선(panelWidth+8) 위에 strip(10px) 걸침
-            width: 10, zIndex: 100, cursor: 'col-resize',
-            display: 'flex', justifyContent: 'center',
-          }}
-        >
-          <div style={{
-            width: resizeActive ? 1.5 : 0, height: '100%',
-            background: 'var(--border-content-active)', transition: 'width 0.1s',
-          }} />
-        </div>
+        <DrawerResizeHandle
+          side="right"
+          offset={comment.width + 3}
+          active={comment.dragging || comment.hover}
+          {...comment.handleProps}
+        />
+      )}
+
+      {/* Phase 62 D17: 우측 단 좌변 리사이즈 핸들 ───
+          ⚠ 우측 단 안쪽에 두면 그 열의 overflowY:auto가 가로까지 잘라내므로 루트에 둔다.
+          ⚠ 컨텐츠 행에 position:relative를 주는 우회도 금지 — 글자크기·토글이 98px 내려간다.
+          offset = rightWidth - 5 → 10px strip의 가운데가 우측 단 좌변(= 경계선)에 온다.
+          (댓글 패널은 8px 갭 뒤에 경계가 있어 +3, 여기는 자기 좌변이 곧 경계라 -5) */}
+      {rightColShown && (
+        <DrawerResizeHandle
+          side="right"
+          offset={rightCol.width - 5}
+          active={rightCol.dragging || rightCol.hover}
+          {...rightCol.handleProps}
+        />
       )}
     </div>
   );

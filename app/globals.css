@@ -52,7 +52,7 @@
   --bg-sidebar: #F0EDE8;
   --bg-hover: #F0EBE3;
   --bg-active: #E8E2D9;
-  --bg-card: #FEFDFB;
+  --bg-card: #FEFDFB;            /* ⚠ 클레이 카드 '표면'은 --card-surface다(Phase 62). 이름이 뒤집힌 쌍이니 혼동 주의 */
   --bg-input: #FFFFFF;
 
   /* Border */
@@ -71,7 +71,7 @@
   --bg-panel-agent:   var(--bg-functional);  /* agent 패널 = 기존 아이보리 키 유지 */
   --bg-panel-comment: #F6F3EE;               /* 댓글 패널 전용 틴트 — 클레이와 구별이 흐려 폐기(덕수). 현재 소비처 없음 */
   /* 블록 */
-  --block-bg:        #F0EAE0;            /* 비활성 블록: 컨텐츠(#F4EFE7)와 활성(#EDE6DA) 사이 중간 톤 → 3단계 구별 */
+  --block-bg:        #F0EAE0;            /* Phase 62부터 폴더뷰 리스트 제목행 배경도 이 토큰. 비활성 블록: 컨텐츠(#F4EFE7)와 활성(#EDE6DA) 사이 중간 톤 → 3단계 구별 */
   --block-bg-active: #E8DFCE;            /* 활성: 비활성보다 두 단계 진하게 (3단계 구분 강조) */
   --block-shadow-active: 0 4px 16px rgba(0, 0, 0, 0.14); /* 활성 떠오름 그림자 — Phase 45a에서 편집창은 사용 중지(덕수: 구분선이 2줄로 보임). 현재 소비처 없음 */
   /* Phase 45a E형 — 편집창 블록 인셋 전용. 활성 블록만 닫힌 윤곽(카드)을 갖고
@@ -188,8 +188,9 @@
   --coach-caution:   #a40e26;
 
   /* Sizing */
-  --sidebar-expanded: 260px;
-  --sidebar-collapsed: 56px;
+  /* Phase 62 D20 — --sidebar-expanded / --sidebar-collapsed 삭제.
+     폭이 AppShell 상태(useDrawerResize)가 되어 Sidebar.tsx의 SIDEBAR_WIDTH_DEFAULT /
+     SIDEBAR_COLLAPSED_WIDTH 상수가 유일한 진실이다. 토큰을 되살리지 말 것. */
 
   /* Transitions */
   --transition-fast: 0.15s ease;
@@ -741,6 +742,18 @@ p:has(.marker-circled) {
    카드는 question 블록만 담는 축약 미리보기라 경우 블록이 올 일이 사실상 없다 →
    잘린 rail보다 없는 rail이 낫다. 라벨(C1.)은 텍스트라 그대로 남는다.
    ⚠ 5개 렌더 사이트 중 여기 하나만의 예외다. 확대 적용하지 말 것. */
+/* ═══ Phase 62 — 폴더뷰 카드·리스트 행 ═══
+   인라인 background가 var(--card-surface, …)를 참조하므로 :hover는 변수만 갈아끼우면 된다
+   → 특이도 경쟁이 없어 !important가 필요 없고, --card-surface 하나가 배경·페이드를 함께 움직인다
+     (하드코딩 rgba가 토큰과 어긋났던 78a780f 사고의 구조적 차단).
+   ⚠ 기존 --bg-card(#FEFDFB, 아이보리)와 이름이 뒤집힌 쌍이다. 여기 --card-surface는 클레이다.
+   ⚠ hover 배경을 #E8DFCE보다 어둡게 내리지 말 것 — 화면 최악 배경이 바뀌어
+     Phase 58·59·59a의 명암비 계산(--case-dot 3.28 / --tone-dim 4.76)이 전부 무너진다. */
+.problem-card,
+.folder-row         { --card-surface: var(--bg-content); }
+.problem-card:hover { --card-surface: var(--block-bg-active); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
+.folder-row:hover   { --card-surface: var(--block-bg-active); box-shadow: 0 2px 8px  rgba(0, 0, 0, 0.06); }
+
 .problem-card .case-block::before,
 .problem-card .case-gap::before,
 .problem-card .case-block::after { content: none; }
