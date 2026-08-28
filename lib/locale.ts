@@ -192,9 +192,104 @@ function convertCircledList(text: string): string {
     (_, ch) => `<span class="marker-circled">${ch}</span>`);
 }
 
-/** \ref{n} → (n) (텍스트 영역, 참조 번호) */
+/* ═══ 개선묶음 M2 C — 참조 인용(hover 말풍선)용 마크업 ═══
+   정의부(원본)는 이미 전부 span으로 감싸져 있다(marker-gana·marker-giyeok·
+   marker-circled·tag-marker·case-label + KaTeX .tag). 없던 것은 **재인용부**뿐이라
+   여기서 그것만 만든다. 시각 표시는 주지 않는다 — cursor:help만(D18′).
+
+   ⚠ 이 마크업은 5개 렌더 사이트 전부에 생긴다(preprocessLocale이 공용이므로).
+     말풍선 리스너는 `[data-ref-tooltip]` 조상이 있는 곳에서만 붙는다(D16′) —
+     그래서 편집 미리보기·인쇄·폴더뷰에서는 마크업이 있어도 아무 일도 없다.
+   ⚠ 수식 안은 애초에 대상이 아니다: 이 시점에 수식은 이미 `⟦MATH_n⟧`다(protectMath). */
+
+/** 행 중간 `(가)~(차)` 재인용 */
+export const REF_GANA_RE = /\((가|나|다|라|마|바|사|아|자|차)\)/;
+
+/** 행 중간 `①~⑮` 재인용 */
+export const REF_CIRCLED_RE = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/;
+
+/** 행 중간 낱자 `ㄱ~ㅊ` 재인용 (뒤따르는 `.` 포함).
+ *
+ *  ⚠ **범위 표기 `[ㄱ-ㅊ]`를 쓰지 말 것** — 호환 자모 순서상 ㄲ·ㄸ·ㅃ·ㅆ·ㅉ이 그 안에
+ *    들어온다. `GIYEOK_LITERAL_RE`가 명시 10자 클래스를 쓰는 이유와 같다.
+ *  ⚠ **뒤쪽 lookahead에서 한글 음절을 배제하지 말 것** — 자모 참조 뒤에는 조사가
+ *    붙는 것이 정상 표기라(`ㄱ이`·`ㄱ은`·`ㄷ에서`·`ㄴ의`) 배제하면 실사용 표본
+ *    7개 중 4개를 놓친다(v2 C-16 실측). 앞쪽만 막으면 오탐 0으로 충분하다.
+ *    잔여 오탐 후보는 `ㄱ자 모양` 정도인데, 정의부가 없으면 말풍선이 뜨지 않고
+ *    시각 표시도 없어 사용자에게 드러나지 않는다. */
+export const REF_GIYEOK_RE =
+  /(?<![가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9])([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])(\.?)(?![ㄱ-ㅎㅏ-ㅣA-Za-z0-9])/;
+
+/** 행 선두의 "정의부 자리" — 여기 있는 마커는 참조가 아니다.
+ *  (변환된 정의부는 이미 span이라 보호되지만, 들여쓴 `  (가)`처럼 변환을 못 받은
+ *   것이 남을 수 있어 한 겹 더 막는다.) */
+const REF_LEAD_RE = /^(?:\([가나다라마바사아자차]\)|[ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ]\.|[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])/;
+
+/**
+ * 정의부·참조부 텍스트 비교용 정규화 (D15″).
+ *
+ * ⚠ 꼬리 `.`을 떼는 것이 핵심이다 — 정의부는 `ㄱ.`·`C1.`인데 참조는 `ㄱ`·`C1`이라
+ *   그대로 비교하면 두 유형이 **영원히 매칭되지 않는다**. 나머지(`(3)`·`①`·`(가)`)는
+ *   원래 일치한다.
+ * ⚠ `$`도 함께 지운다 — 모델·사용자가 인용을 옮기며 구분자를 떨어뜨리는 일이 있다
+ *   (Phase 61b에서 같은 처방을 썼다).
+ */
+export function normalizeRefText(s: string): string {
+  return s.trim().replace(/[\s$]/g, '').replace(/\.$/, '');
+}
+
+/** 마크업 보호 후 fn을 돌리고 되돌린다 (D12″).
+ *
+ *  순서가 규약이다: 코드펜스 → **요소 통째** → 남은 낱개 태그 → 인라인 코드.
+ *  ⚠ 요소 통째 목록에 `ref-marker` **자신**이 들어 있어야 한다 — 없으면 2회째
+ *    실행에서 여닫는 태그만 낱개로 빠지고 내부 `①`이 노출돼 재감쌈된다(멱등성 파괴).
+ *  ⚠ 목록에서 marker 계열을 빠뜨리면 `<span class="marker-gana">(가)</span>` 안의
+ *    `(가)`가 다시 감싸져 **정의부가 참조로 둔갑한다**(프로토타입 실측 5건).
+ *  ⚠ `convertCaseRefs`도 같은 일을 자체 수행하지만 목록이 다르다(그쪽은 `case-label`
+ *    하나뿐이고 M1에서 고정됐다). 합치지 말 것 — 보호 범위가 서로 다른 이유가 있다. */
+const PROTECTED_ELEMENT_RE =
+  /<span class="(?:ref-marker|marker-gana|marker-giyeok|marker-circled|marker-case-sub|tag-marker|case-label)"[^>]*>[\s\S]*?<\/span>/g;
+
+function protectMarkup(text: string, fn: (t: string) => string): string {
+  const holds: string[] = [];
+  const keep = (m: string) => {
+    holds.push(m);
+    return `\u0000M2R${holds.length - 1}\u0000`;       // 본문에 나타날 수 없는 표지
+  };
+  let out = text
+    .replace(/```[\s\S]*?```/g, keep)
+    .replace(/~~~[\s\S]*?~~~/g, keep)
+    .replace(PROTECTED_ELEMENT_RE, keep)                // ← 요소 통째 (반드시 낱개 태그보다 먼저)
+    .replace(/<[^>\n]+>/g, keep)
+    .replace(/(`+)[^`\n]*\1/g, keep);
+  out = fn(out);
+  return out.replace(/\u0000M2R(\d+)\u0000/g, (_, i) => holds[parseInt(i, 10)]);
+}
+
+const refSpan = (type: string, ref: string, inner: string) =>
+  `<span class="ref-marker" data-reftype="${type}" data-ref="${ref}">${inner}</span>`;
+
+/** 본문 중간의 `(가)`·`①`·`ㄱ` 재인용을 ref-marker로 감싼다 (D11′②③④).
+ *  `\ref{n}`(①)은 convertRefReferences가, `C1`(⑤)은 convertCaseRefs가 담당한다. */
+export function convertRefMarkers(text: string): string {
+  return protectMarkup(text, (t) =>
+    t.split('\n').map((line) => {
+      const ind = line.match(/^[ \t]*/)![0];
+      const body = line.slice(ind.length);
+      const lead = body.match(REF_LEAD_RE)?.[0] ?? '';   // 행 선두 정의부 자리는 건너뛴다
+      /* ⚠ 상수는 이 파일 규약대로 /g 없이 정의하고 여기서 인스턴스를 만든다
+           — lastIndex 오염과, 나중에 누가 `.test()`로 쓰다 당하는 것을 함께 막는다. */
+      const rest = body.slice(lead.length)
+        .replace(new RegExp(REF_GANA_RE.source, 'g'), (m, ch) => refSpan('gana', ch, m))
+        .replace(new RegExp(REF_CIRCLED_RE.source, 'g'), (m) => refSpan('circled', m, m))
+        .replace(new RegExp(REF_GIYEOK_RE.source, 'g'), (m, ch) => refSpan('giyeok', ch, m));
+      return ind + lead + rest;
+    }).join('\n'));
+}
+
+/** \ref{n} → 참조 번호 (n). 개선묶음 M2 C에서 평문이 아니라 ref-marker span이 됐다. */
 function convertRefReferences(text: string): string {
-  return text.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
+  return text.replace(/\\ref\{(\d+)\}/g, (_, num) => refSpan('tag', num, `(${num})`));
 }
 
 /** \tag{n} (텍스트 행 끝) → tag-marker span, 참조 번호 (n) */
@@ -239,6 +334,9 @@ export function preprocessLocale(text: string, locale: Locale): string {
   processed = convertTextTags(processed);
   processed = convertFigureLabels(processed);
   processed = convertTableLabels(processed);
+  // 개선묶음 M2 C — 본문 중간의 (가)·①·ㄱ 재인용을 ref-marker로. 마커 변환이 전부
+  //   끝난 뒤여야 한다: 정의부가 이미 span이어야 protectMarkup이 그것을 보호한다.
+  processed = convertRefMarkers(processed);
   // 개선묶음 M1 G — 본문의 C1·C2a 참조를 굵게. 마지막 텍스트 단계다(수식은 아직 placeholder).
   //   ⚠ 보호는 convertCaseRefs가 스스로 한다 — 이 사본에는 코드펜스 보호가 없다.
   processed = convertCaseRefs(processed);

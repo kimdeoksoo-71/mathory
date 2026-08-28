@@ -1,5 +1,6 @@
 import './globals.css';
 import DialogHost from '../components/ui/DialogHost';
+import RefTooltip from '../components/ui/RefTooltip';
 
 export const metadata = {
   title: 'Mathory — Write the logic. Preserve the insight.',
@@ -30,6 +31,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             여기(루트 레이아웃)에 두어야 admin 라우트·공개 뷰어까지 전부 커버된다.
             layout은 서버 컴포넌트지만 DialogHost가 'use client'라 그대로 중첩된다. */}
         <DialogHost />
+        {/* 개선묶음 M2 C — 참조 인용 말풍선. document 위임 1개 + body 포탈 1개.
+            `[data-ref-tooltip]` 조상이 있는 화면에서만 반응한다(열람뷰·공개 뷰어). */}
+        <RefTooltip />
       </body>
     </html>
   );

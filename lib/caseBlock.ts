@@ -55,7 +55,9 @@ export function convertCaseRefs(text: string): string {
     .replace(/<[^>\n]+>/g, keep)                       // 남은 단개 태그
     .replace(/(`+)[^`\n]*\1/g, keep);                  // 인라인 코드(백틱 런)
 
-  out = out.replace(CASE_REF_RE, (m) => `<span class="case-ref">${m}</span>`);
+  /* 개선묶음 M2 C — data-reftype을 병기한다. 말풍선이 `[data-reftype]` 하나로
+     4종 참조를 모두 잡게 하려는 것이고, 클래스(.case-ref)와 굵기 규칙은 불변이다. */
+  out = out.replace(CASE_REF_RE, (m) => `<span class="case-ref" data-reftype="case">${m}</span>`);
 
   return out.replace(/\u0000REF(\d+)\u0000/g, (_, i) => holds[parseInt(i, 10)]);
 }

@@ -67,7 +67,10 @@ export default function PublicViewerShell({
       </header>
 
       {/* ── 본문(분리 스크롤) ── */}
-      <main style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+      {/* 개선묶음 M2 C — 참조 hover 말풍선 게이트(D16′).
+          ContentCard가 아니라 main에 붙인다: 2단 배치에서 문제·풀이가 별도 카드로
+          갈리므로, 카드마다 붙이면 탭을 가로지르는 인용이 안 잡힌다. */}
+      <main data-ref-tooltip style={{ flex: 1, minHeight: 0, display: 'flex' }}>
         {tabs.length === 0 ? (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted, #888)', fontSize: 14 }}>
             공개된 탭이 없습니다.

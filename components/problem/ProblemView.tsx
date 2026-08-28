@@ -678,7 +678,11 @@ export default function ProblemView({
           justifyContent: panelMode ? 'unsafe flex-end' : 'center',
         }}>
         {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
-        <div style={{
+        {/* 개선묶음 M2 C — 참조 hover 말풍선 게이트(D16′).
+            ⚠ **탭 전체를 감싸는 여기**에 붙여야 한다. 정의부 탐색이 이 서브트리
+              안에서만 일어나므로, TabBody(탭 한 행)에 붙이면 "문제 탭에서 정의하고
+              풀이 탭에서 인용"이라는 지배적 사용 형태가 통째로 안 잡힌다. */}
+        <div data-ref-tooltip style={{
           display: 'table',
           padding: '0 32px', // 좌우 32px 유지 — 우측 경계선과 컨텐츠 사이 여백 보존
           boxSizing: 'border-box',

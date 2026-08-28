@@ -13,6 +13,9 @@ import {
 
 const P = (t) => preprocessLocale(t, 'ko');
 const gana = (ch) => `<span class="marker-gana">(${ch})</span>`;
+/* 개선묶음 M2 C — 재인용부 래퍼 */
+const ref = (type, r, inner) =>
+  `<span class="ref-marker" data-reftype="${type}" data-ref="${r}">${inner}</span>`;
 const giyeok = (ch) => `<span class="marker-giyeok">${ch}.</span>`;
 
 /* ═══ L1·L2 — 리터럴 인식 + 공백 무관 ═══ */
@@ -45,11 +48,16 @@ test('L4 범위 밖 (카) · ㅋ. 은 무변환 — 경계가 조용히 넓어�
   assert.equal(P('ㅋ. x'), 'ㅋ. x');
 });
 
-/* ═══ L5 — 행 중간은 건드리지 않는다 ═══ */
+/* ═══ L5 — 행 중간 (개선묶음 M2 C에서 계약이 바뀌었다) ═══
+   Phase 60의 L5는 "행 중간 리터럴은 무변환"이었다. M2 C가 그 자리를 **재인용부**로
+   보고 ref-marker를 씌운다(hover 말풍선의 앵커). 텍스트 내용·렌더 결과는 그대로이고
+   래핑만 는다 — 시각 표시는 주지 않는다(cursor:help만). */
 
-test('L5 행 중간 리터럴은 무변환 (문장 속 인용)', () => {
-  assert.equal(P('조건 (가)에 의해 성립'), '조건 (가)에 의해 성립');
-  assert.equal(P('앞의 ㄱ. 항목을 보면'), '앞의 ㄱ. 항목을 보면');
+test('L5 행 중간 리터럴은 ref-marker로 감싸진다 (M2 C — 구 "무변환" 대체)', () => {
+  assert.equal(P('조건 (가)에 의해 성립'),
+    '조건 ' + ref('gana', '가', '(가)') + '에 의해 성립');
+  assert.equal(P('앞의 ㄱ. 항목을 보면'),
+    '앞의 ' + ref('giyeok', 'ㄱ', 'ㄱ.') + ' 항목을 보면');
 });
 
 /* ═══ L6·L7 — 레거시 (a)/(i)는 변환하지 않는다 (Phase 60 후속) ═══ */
@@ -113,7 +121,7 @@ test('L11 원문자·tag·ref·Fig/Table 무회귀', () => {
     '<span class="marker-circled">①</span>가\n\n<span class="marker-circled">②</span>나');
   assert.equal(P('①가'), P('① 가'));                       // 원문자도 공백 무관
   assert.equal(P('문장 \\tag{3}'), '문장 <span class="tag-marker">(3)</span>');
-  assert.equal(P('\\ref{2}에서'), '(2)에서');
+  assert.equal(P('\\ref{2}에서'), ref('tag', '2', '(2)') + '에서');
   assert.equal(P('Fig. 1 참조'), '[그림1] 참조');
   assert.equal(P('Table 2 참조'), '[표2] 참조');
 });
@@ -174,4 +182,55 @@ test('M1(정정): \\tag 로 끝난 문단이 다음 문단을 삼키지 않는�
   // ⚠ 잠복 버그였다 — `\\s*$`가 개행까지 먹어 빈 줄이 사라지고 두 문단이 합쳐졌다.
   const out = P('문장 하나 \\tag{1}\n\n다음 문단');
   assert.ok(out.includes('</span>\n\n다음 문단'), JSON.stringify(out));
+});
+
+/* ═══════════════════════════════════════════════════════════════
+   개선묶음 M2 C — 참조 인용 마크업 (D19′ 6항목)
+   ⚠ ①·②는 실측으로 결함이 확인된 자리다. 프로토타입에서
+     보호 목록이 좁으면 정의부가 5회 재감쌈됐고(참조 9개 중 5개가 가짜),
+     자모 lookahead가 넓으면 실사용 표기 7개 중 4개를 놓쳤다.
+   ═══════════════════════════════════════════════════════════════ */
+
+test('M2-C1 정의부는 재감쌈되지 않는다 (행 시작 (가)·ㄱ.·① 5사례)', () => {
+  const out = P('(가) 첫째\n(나) 둘째\n\nㄱ. 명제1\nㄴ. 명제2\n\n① 보기');
+  assert.equal(out.match(/marker-\w+"><span class="ref-marker"/g), null,
+    '정의부 span 안에 ref-marker가 박히면 정의부가 참조로 둔갑한다');
+  assert.equal((out.match(/class="ref-marker"/g) || []).length, 0,
+    '정의부만 있는 본문에는 참조가 하나도 없어야 한다');
+});
+
+test('M2-C2 자모 경계: 조사가 붙어도 인식하고, 겹자모·ㅋㅋ·모음은 아니다', () => {
+  for (const [text, want] of [
+    ['보기 ㄱ이 성립한다', true],
+    ['따라서 ㄱ은 참이고 ㄴ은 거짓', true],
+    ['ㄷ에서 얻은 식', true],
+    ['ㄴ의 역은 참이 아니다', true],
+    ['꾸민 자모 ㄲ, ㄸ, ㅃ, ㅆ, ㅉ', false],
+    ['ㅋㅋ 같은 표기', false],
+    ['모음 ㅏ ㅑ ㅓ', false],
+  ]) {
+    const has = /data-reftype="giyeok"/.test(P(text));
+    assert.equal(has, want, `${text} → ${has}`);
+  }
+});
+
+test('M2-C3 수식 안은 건드리지 않는다', () => {
+  assert.equal(P('값 $x_{(가)} + ①$ 는 그대로'), '값 $x_{(가)} + ①$ 는 그대로');
+  assert.equal(P('$$\\frac{(가)}{①}$$'), '$$\\frac{(가)}{①}$$');
+});
+
+test('M2-C4 코드펜스·인라인 코드는 보호된다', () => {
+  assert.match(P('코드 `(가)` 와 `①`'), /`\(가\)`/);
+  assert.equal(/ref-marker/.test(P('```\n(가) ①\n```')), false);
+});
+
+test('M2-C5 \\ref{n}은 reftype=tag span이 된다', () => {
+  assert.equal(P('식 \\ref{3} 에서'), '식 ' + ref('tag', '3', '(3)') + ' 에서');
+});
+
+test('M2-C6 멱등: 두 번 돌려도 ref-marker가 중첩되지 않는다', () => {
+  const once = P('조건 (가)와 ① 그리고 ㄱ이');
+  const twice = preprocessLocale(once, 'ko');
+  assert.equal(twice, once, '보호 목록에 ref-marker 자신이 없으면 여기서 깨진다(W3)');
+  assert.equal(once.match(/ref-marker[^>]*><span class="ref-marker"/g), null);
 });

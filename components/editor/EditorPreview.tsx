@@ -10,6 +10,8 @@ import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import {
   MARKER_LINE_RE, MATH_ONLY_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
+  // 개선묶음 M2 C — 참조 마크업은 사본을 만들지 않고 공용 함수를 그대로 쓴다
+  convertRefMarkers, convertRefReferences,
 } from '../../lib/locale';
 import { convertCaseRefs } from '../../lib/caseBlock';
 import GgbGraphView, { GraphExportHandle } from '../viewer/GgbGraphView';
@@ -163,13 +165,20 @@ function preprocessLocale(text: string): string {
   // 6. Table N → [표N]
   t = t.replace(/\bTable\s+(\d+)/g, '[표$1]');
 
-  // 7. \ref{n} → (n) (참조 번호 인용)
-  t = t.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
+  // 7. \ref{n} → 참조 번호 (n)
+  //    개선묶음 M2 C: 평문이 아니라 ref-marker span이 된다(lib/locale.ts와 동일 함수 공유)
+  t = convertRefReferences(t);
 
   // 8. 텍스트 행 \tag{n} → inline span (block div 사용 금지 — 후속 수식 렌더링 보호)
   //    ⚠ `\s*$` 금지 — 개행을 삼켜 뒤 빈 줄을 먹는다(lib/locale.ts convertTextTags와 동일)
   t = t.replace(/\\tag\{(\d+)\}[ \t]*$/gm, (_, num) =>
     `<span class="tag-marker">(${num})</span>`);
+
+  // 8-2. 개선묶음 M2 C — 본문 중간의 (가)·①·ㄱ 재인용 → ref-marker
+  //      ⚠ 마커 변환(3·4-1)이 전부 끝난 뒤여야 한다: 정의부가 이미 span이어야
+  //        보호(protectMarkup)가 그것을 통째로 빼내 재감쌈을 막는다.
+  //      (lib/locale.ts와 **같은 함수**를 쓴다 — 사본 금지)
+  t = convertRefMarkers(t);
 
   // 8-1. 개선묶음 M1 G — 본문의 C1·C2a 참조를 굵게 (lib/caseBlock.ts가 소유·자기 보호)
   t = convertCaseRefs(t);

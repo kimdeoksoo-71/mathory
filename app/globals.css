@@ -671,6 +671,54 @@ p:has(.marker-circled) {
 /* 마지막 문단의 꼬리 마진(0.6em)은 패딩 안에 갇혀 바가 아래로 삐져나온 것처럼 보인다 */
 .coach-block .preview-content > p:last-child { margin-bottom: 0; }
 
+/* ═══ 개선묶음 M2 C — 참조 인용 hover 말풍선 ═══
+   ⚠ 시각 표시는 **커서뿐이다**(D18′). 밑줄·색·배경을 주지 말 것 —
+     .ref-marker 마크업은 5개 렌더 사이트 전부에 생기고, 인쇄는 iframe이 아니라 같은
+     document라 여기 준 스타일이 지면에도 그대로 나간다. 메모 사양도 "아이콘이 ?로
+     바뀐다"까지다.
+   ⚠ .case-ref의 굵기(M1 G)는 건드리지 않는다 — 여기서는 커서만 얹는다. */
+.preview-content .ref-marker,
+.preview-content .case-ref { cursor: help; }
+
+/* 말풍선 본체 — document.body 직속(포탈). RefTooltip이 인라인으로 좌표만 준다.
+   ⚠ 안쪽은 .preview-content tone-baseline으로 감싸고 --content-font-size를 복사한다
+     (RefTooltip이 함). 그래야 복제한 수식의 크기·색·\tag 세로 앵커가 원본과 같아진다 —
+     스코프 없이 붙이면 번호가 폴백 15px로 떨어진다(v2 C-14 실측). */
+.ref-tooltip {
+  position: fixed;
+  max-width: min(35em, 80vw);
+  max-height: 40vh;
+  overflow: auto;
+  padding: 10px 14px;
+  background: var(--bg-card, #fff);
+  border: 0.5px solid var(--border-light);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+}
+/* 원문 한 덩어리를 통째로 복제하므로 바깥 마진은 지운다(말풍선 패딩이 담당) */
+.ref-tooltip .preview-content > :first-child { margin-top: 0; }
+.ref-tooltip .preview-content > :last-child { margin-bottom: 0; }
+/* 복제본 안의 커서는 되돌린다 — 말풍선 안에서 또 hover할 일은 없다 */
+.ref-tooltip .ref-marker,
+.ref-tooltip .case-ref { cursor: default; }
+
+/* ⚠ 말풍선 안에서는 `\tag` 번호를 **흐름에 넣는다**(본문의 절대배치와 다른 유일한 지점).
+     KaTeX의 .tag는 `position:absolute; right:0`이고 기준은 `.katex-html`인데, 말풍선은
+     내용에 맞춰 줄어드는 상자라 `.katex-html`의 우단 = 수식의 우단이 된다
+     → 번호가 수식 위에 겹친다(실측: 기본 상태에서 가로 −19.5px 침범).
+     `min-width`로 넓히는 처방은 **수식이 그 폭보다 길면 다시 겹친다** — 이 앱에서
+     긴 수식에 번호를 다는 것이 지배적 사용이므로 폭 처방은 답이 아니다.
+     크기·색은 D42′대로 원본과 같고(이쪽이 C-14가 잡은 결함), 번호 위치만 바뀐다. */
+.ref-tooltip .katex-display > .katex > .katex-html > .tag {
+  position: static;
+  display: block;
+  text-align: right;
+  bottom: auto;
+  margin-top: 0.35em;
+}
+/* 짧은 원문이 지나치게 좁아 보이지 않게 하한만 준다(겹침 방지용이 아니다) */
+.ref-tooltip .preview-content { min-width: 9em; }
+
 /* ═══ Phase 59 — 경우(case) 블록 · Phase 59a 개편 ═══
    rail·dot은 --case-rail-x(-1.8em)를 중심선으로 공유한다 — 본문 영역 **바깥**이다.
    하위경우도 같은 rail을 쓴다(inner rail 없음, D12′).
