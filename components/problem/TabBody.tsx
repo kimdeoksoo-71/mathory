@@ -288,18 +288,33 @@ export default function TabBody({
             borderRadius: CARD_RADIUS,
             transition: 'background 0.15s, height 0.18s ease',
             ['--case-dot-fill' as any]: 'var(--card-surface, var(--bg-content))',
-            /* 접힘(문제 탭 전용): 내용을 **아예 그리지 않고** 리스트 행 두께의 막대만 남긴다.
-               ⚠ 첫 줄을 남기면 "잘렸다"로 읽혀 오히려 시선을 끈다 — 접힘은 조용해야 한다. */
+            /* 접힘(문제 탭 전용): 리스트 행 두께의 막대만 남긴다.
+               ⚠ 첫 줄을 남기면 "잘렸다"로 읽혀 오히려 시선을 끈다 — 접힘은 조용해야 한다.
+               ⚠ **내용을 DOM에서 지우지는 않는다**(아래 참조) — 보기(ㄱ.·(가)·①)의
+                 정의부가 문제 탭에 있어서, 지우면 풀이의 참조 말풍선이 통째로 죽는다. */
             ...(collapsedPreview
-              ? { height: COLLAPSED_CARD_H, padding: 0, overflow: 'hidden' }
+              ? { height: COLLAPSED_CARD_H, padding: 0, overflow: 'hidden', position: 'relative' as const }
               : { padding: `20px ${CARD_PAD_R}px 20px ${CARD_PAD_L}px` }),
             /* 카드 전체가 접힘/펼침 영역이다(덕수 보완 2) — 라벨만으로는 과녁이 너무 작다. */
             ...(isQuestion ? { cursor: 'pointer' as const } : null),
           }}>
-          {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
-          {!collapsedPreview && <div
+          {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프.
+              ⚠ 접힘일 때도 **DOM에는 남긴다**(visibility:hidden + absolute).
+                문제 탭이 보기의 정의부(ㄱ.·(가)·①·\tag)를 들고 있어서, 언마운트하면
+                풀이에서 그 번호를 hover해도 원문을 찾지 못한다(덕수 신고 2026-08-28).
+                visibility:hidden은 노드를 남기므로 textContent 매칭·cloneNode가 그대로 된다
+                (display:none과 달리 레이아웃 박스도 유지된다).
+              ⚠ absolute라 카드의 35px 높이에 영향을 주지 않는다. */}
+          <div
             className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id)}`}
-            style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
+            aria-hidden={collapsedPreview || undefined}
+            style={{
+              ['--content-font-size' as any]: `${contentFontSize}px`,
+              ...(collapsedPreview ? {
+                position: 'absolute' as const, top: 0, left: 0, width: '100%',
+                visibility: 'hidden' as const, pointerEvents: 'none' as const,
+              } : null),
+            }}
           >
             {scoped && outline.mode === 'outline' ? (
               <OutlineSections
@@ -313,7 +328,7 @@ export default function TabBody({
             ) : (
               blocks.map(renderBlock)
             )}
-          </div>}
+          </div>
         </div>
       )}
     </div>
