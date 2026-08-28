@@ -15,7 +15,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
-import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H, PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
@@ -1088,7 +1088,7 @@ export default function ProblemView({
             왼쪽 = 접는 버튼(패널 밖에 떠 있던 것을 안으로), 오른쪽 = 보기 컨트롤.
             ⚠ 규격을 바꿀 때는 CommentPanel·VersionDrawer의 1행도 함께 볼 것. */}
         <div style={{
-          minHeight: 57, flexShrink: 0, padding: '0 16px',
+          minHeight: DRAWER_ROW1_H, flexShrink: 0, padding: '0 16px',
           display: 'flex', alignItems: 'center', gap: 12,
           borderBottom: '1px solid var(--border-light)',
         }}>

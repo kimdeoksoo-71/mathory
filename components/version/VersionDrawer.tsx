@@ -10,7 +10,7 @@ import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
-import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, PANEL_WIDTH_DEFAULT } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H, PANEL_WIDTH_DEFAULT } from '../ui/dialogStyles';
 
 /**
  * Phase 55 Stage 5 — 우측 버전 기록 드로어.
@@ -309,7 +309,7 @@ export default function VersionDrawer({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '0 16px',
-        minHeight: 57, boxSizing: 'border-box',
+        minHeight: DRAWER_ROW1_H, boxSizing: 'border-box',   // 중앙 컨텐츠의 첫 가로선(y=57)과 정렬
         borderBottom: '1px solid var(--border-light, #eee)',
         flexShrink: 0,
       }}>

@@ -26,7 +26,7 @@ import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
-import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H } from '../ui/dialogStyles';
 
 const HISTORY_LIMIT = 5;
 
@@ -857,7 +857,7 @@ export default function CommentPanel({
       <div style={{
         display: 'flex', alignItems: 'center', gap: 12,
         padding: '0 16px',
-        minHeight: 57, boxSizing: 'border-box',
+        minHeight: DRAWER_ROW1_H, boxSizing: 'border-box',   // 중앙 컨텐츠의 첫 가로선(y=57)과 정렬
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>

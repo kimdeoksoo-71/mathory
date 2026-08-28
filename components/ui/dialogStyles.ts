@@ -101,6 +101,19 @@ export const DRAWER_RADIUS = 10;
  *    약해 보이지 않았다(덕수) → 1px + --border-content(#D2C8B8, 앱에서 가장 뚜렷한 선).
  *    더 세게 가려면 --border-content-active(#B89B78)가 다음 단계다. */
 export const DRAWER_BORDER = '1px solid var(--border-content)';
+/** 드로어 테두리 두께(px). 아래 행 높이 계산이 이 값을 쓴다. */
+export const DRAWER_BORDER_W = 1;
+
+/** 드로어 1행 높이.
+ *
+ *  중앙 컨텐츠(EditorView Row1)의 첫 가로선은 화면 y = 57이고 둘째는 y = 98이다.
+ *  드로어는 카드가 되면서 위로 **inset(8) + 테두리(1) = 9px** 안쪽에서 시작하므로,
+ *  1행을 57 그대로 두면 두 가로선이 나란히 9px씩 내려가 중앙과 어긋난다(덕수 지적).
+ *  → 1행에서 그 9px을 빼면 두 선의 Y가 정확히 일치한다:
+ *       드로어 첫 선  = 8 + 1 + 48 = 57
+ *       드로어 둘째 선 = 57 + 41(2행) = 98
+ *  ⚠ DRAWER_INSET·테두리 두께를 바꾸면 이 값이 자동으로 따라온다. 숫자를 굳히지 말 것. */
+export const DRAWER_ROW1_H = 57 - DRAWER_INSET - DRAWER_BORDER_W;
 
 /* ═══ 우측 패널 폭 (덕수 요청 2026-08-28) ═══
    우측 패널 4종(우측 단 · 댓글 · agent · 버전 드로어)의 펼침 폭을 agent 패널 값으로 통일한다.
