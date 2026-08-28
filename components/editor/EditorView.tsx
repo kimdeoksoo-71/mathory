@@ -196,6 +196,9 @@ const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
 
+/** 탭 이름 변경·삭제 버튼이 hover 후 나타나기까지의 지연. */
+const TAB_BTN_DELAY_MS = 2000;
+
 /* 수식 인덱싱(buildMathIndex·findMathIdAtCursor)은 Phase 58에서 lib/mathIndex.ts로
    옮겼다 — P3의 "핵심문장" 토글이 같은 수식 경계를 봐야 하기 때문이다. */
 
@@ -1043,6 +1046,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
      hover 0.5초 뒤에 나타낸다. 두 버튼이 상시 보이면 탭 줄이 시끄럽고, 삭제가
      늘 노출돼 있는 것도 좋지 않다.
      ⚠ 지연이 없으면 탭 사이를 지나가는 마우스마다 버튼이 번쩍인다.
+       참조 말풍선(500ms)보다 **길게** 잡는다(2초) — 말풍선은 "읽는 중에 확인하는 것"이라
+       빨라야 하지만, 이 둘은 이름 변경·삭제라 실수로 열리면 안 되는 쪽이다(덕수).
      ⚠ 여기서 React 상태를 쓰는 것은 안전하다 — `.preview-content`의 hover를 상태로
        만들지 말라는 규약(globals.css:857)은 리렌더가 innerHTML을 다시 쓰는 프리뷰
        한정이다. 탭 줄은 평범한 UI다. */
@@ -1050,7 +1055,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const tabHoverTimerRef = useRef<number | null>(null);
   const enterTab = (id: string) => {
     if (tabHoverTimerRef.current) window.clearTimeout(tabHoverTimerRef.current);
-    tabHoverTimerRef.current = window.setTimeout(() => setTabHoverId(id), 500);
+    tabHoverTimerRef.current = window.setTimeout(() => setTabHoverId(id), TAB_BTN_DELAY_MS);
   };
   const leaveTab = () => {
     if (tabHoverTimerRef.current) { window.clearTimeout(tabHoverTimerRef.current); tabHoverTimerRef.current = null; }
