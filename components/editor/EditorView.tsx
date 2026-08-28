@@ -3156,9 +3156,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '0 16px',
         minHeight: 57, boxSizing: 'border-box',
-        // 토론 패널이 열리면 우측 여백 확보 (저장/글꼴크기 버튼이 패널 왼쪽으로 밀려나도록)
-        paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
-        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
+        /* 덕수 요청(2026-08-28) — Row1·Row2는 **밀려나지 않는다**. 우측 패널이 그 위를
+           덮는다(CLAUDE.md의 "우측 패널 3종은 덮지 않고 밀어낸다" 규약을 이 두 행에
+           한해 의도적으로 깬 자리다).
+           이유: 패널을 여닫을 때마다 제목·탭이 줄었다 늘었다 하며 자리를 옮겨,
+           "패널을 열었을 뿐인데 편집 대상이 바뀐 것처럼" 보였다.
+           ⚠ Row3(content-frame)의 밀어내기는 그대로다 — 본문까지 덮으면 편집이 막힌다. */
+        paddingRight: 16,
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-functional)',
         flexShrink: 0, flexWrap: 'wrap',
       }}>
@@ -3302,8 +3306,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center',
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
-        paddingRight: rightPanelOpen ? `calc(${rightPanelWidth}px + 40px)` : 16,
-        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
+        paddingRight: 16,           // Row1과 같은 이유로 밀려나지 않는다(위 주석 참조)
         background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
       }}>
