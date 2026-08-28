@@ -3258,6 +3258,51 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               color: 'var(--text-faint)',
             }}
           ><IconRestore size={17} /></button>
+
+          {/* Phase 47 → 개선묶음 M2(덕수 요청): 댓글·agent 버튼.
+              Row2 탭 줄 오른쪽 끝(marginLeft:auto)에 있던 것을 **Row1의 버전 기록 오른쪽**으로 옮겼다.
+              ⚠ 같은 묶음(gap 3) 안에 둔다 — 저장·버전과 함께 "문항 단위 동작"이고,
+                flexWrap 시 갈라지지 않아야 한다.
+              ⚠ 우측 패널이 열리면 Row1 우측 끝이 패널에 덮이는 규약은 그대로다(R6) —
+                이 두 버튼은 묶음 안쪽(왼쪽)이라 가려지지 않는다. */}
+          {user && problem && (
+            <>
+              <button
+                onClick={() => setPanelMode((m) => m === 'comments' ? null : 'comments')}
+                title="댓글 열기"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  padding: '2px 4px', borderRadius: 4, fontSize: 11,
+                  color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-faint)',
+                  fontFamily: 'var(--font-ui)', transition: 'color 0.15s',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => {
+                  if (panelMode !== 'comments') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+                }}
+              >
+                💬{commentCount ? ` ${commentCount}` : ''}
+              </button>
+              <button
+                onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
+                title="agent 열기"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 2,
+                  border: 'none', background: 'none', cursor: 'pointer',
+                  padding: '2px 4px', borderRadius: 4, fontSize: 11,
+                  color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-faint)',
+                  fontFamily: 'var(--font-ui)', transition: 'color 0.15s',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
+                onMouseLeave={(e) => {
+                  if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
+                }}
+              >
+                <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>{agentCount ? ` ${agentCount}` : ''}
+              </button>
+            </>
+          )}
         </div>
 
         {/* ─── 가로폭 조절(em): 숫자 + 위/아래 꺾쇠 (덕수 요청) ───
@@ -3520,50 +3565,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <IconPlus size={14} />
         </button>
 
-        {/* Phase 47: 댓글 버튼 + agent 버튼 (편집 화면은 오너 전용이라 둘 다 노출) */}
-        {user && problem && (
-          <>
-            <button
-              onClick={() => setPanelMode((m) => m === 'comments' ? null : 'comments')}
-              title="댓글 열기"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 2,
-                border: 'none', background: 'none', cursor: 'pointer',
-                padding: '2px 4px', borderRadius: 4,
-                fontSize: 11,
-                color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-faint)',
-                fontFamily: 'var(--font-ui)',
-                transition: 'color 0.15s',
-                marginLeft: 'auto',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-              onMouseLeave={(e) => {
-                if (panelMode !== 'comments') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
-              }}
-            >
-              💬{commentCount ? ` ${commentCount}` : ''}
-            </button>
-            <button
-              onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
-              title="agent 열기"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 2,
-                border: 'none', background: 'none', cursor: 'pointer',
-                padding: '2px 4px', borderRadius: 4,
-                fontSize: 11,
-                color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-faint)',
-                fontFamily: 'var(--font-ui)',
-                transition: 'color 0.15s',
-              }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-              onMouseLeave={(e) => {
-                if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
-              }}
-            >
-              <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>{agentCount ? ` ${agentCount}` : ''}
-            </button>
-          </>
-        )}
       </div>
 
       {/* ═══ Row 3: Split View — 외부 래퍼(아이보리 백드롭, 토론 패널 자리 확보) ═══ */}
