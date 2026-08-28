@@ -13,7 +13,10 @@ import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
 import { runVerifyFlow, computeVerifyHashes, verifyCharCountOf } from '../../lib/verifyFlow';
 import { findQuoteRange } from '../../lib/verify/parse';
-import { DEFAULT_DIFFICULTY } from '../../lib/constants';
+import {
+  DEFAULT_DIFFICULTY,
+  WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
+} from '../../lib/constants';
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
@@ -1036,6 +1039,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 글꼴 크기
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
+  /* 덕수 요청(2026-08-28) — 미리보기 본문 가로폭. ProblemView 열람뷰와 **같은 키**를 쓴다:
+     두 화면을 오갈 때 폭이 달라지면 같은 문항인데 조판이 바뀐 것처럼 보인다. */
+  const [widthEm, setWidthEm] = useState(WIDTH_EM_DEFAULT);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(WIDTH_EM_KEY));
+      if (v >= WIDTH_EM_MIN && v <= WIDTH_EM_MAX) setWidthEm(v);
+    } catch {}
+  }, []);
+  const handleWidthChange = (delta: number) => {
+    setWidthEm((prev) => {
+      const next = Math.min(WIDTH_EM_MAX, Math.max(WIDTH_EM_MIN, prev + delta));
+      try { localStorage.setItem(WIDTH_EM_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
 
   // 토론 패널 (편집 중에도 AI 토론·댓글 참조 가능)
   // 활성 탭과 동기 — 사용자가 편집 탭을 바꾸면 토론 탭도 따라감
@@ -3241,6 +3260,55 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           ><IconRestore size={17} /></button>
         </div>
 
+        {/* ─── 가로폭 조절(em): 숫자 + 위/아래 꺾쇠 (덕수 요청) ───
+            ⚠ 우측 패널이 열리면 Row1 우측 끝이 패널에 덮인다 — 그 설정은 그대로 둔다.
+              (Row1·Row2는 패널 유무와 무관하게 같은 자리를 유지하는 것이 이 행의 규약) */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4,
+          marginLeft: 4,
+          borderLeft: '1px solid var(--border-light, #ddd)',
+          paddingLeft: 8,
+        }}>
+          <span style={{
+            fontSize: 13.5, fontFamily: 'var(--font-ui)', fontWeight: 500,
+            color: 'var(--text-secondary)', minWidth: 30, textAlign: 'right', userSelect: 'none',
+          }} title="본문 가로폭(em)">{widthEm}em</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <button
+              onClick={() => handleWidthChange(1)}
+              disabled={widthEm >= WIDTH_EM_MAX}
+              title="본문 넓히기"
+              style={{
+                border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: widthEm >= WIDTH_EM_MAX ? 'not-allowed' : 'pointer',
+                color: 'var(--text-muted)', opacity: widthEm >= WIDTH_EM_MAX ? 0.3 : 1,
+              }}
+            >
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1 5 L5 1 L9 5" />
+              </svg>
+            </button>
+            <button
+              onClick={() => handleWidthChange(-1)}
+              disabled={widthEm <= WIDTH_EM_MIN}
+              title="본문 좁히기"
+              style={{
+                border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                cursor: widthEm <= WIDTH_EM_MIN ? 'not-allowed' : 'pointer',
+                color: 'var(--text-muted)', opacity: widthEm <= WIDTH_EM_MIN ? 0.3 : 1,
+              }}
+            >
+              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M1 1 L5 5 L9 1" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         {/* ─── 글꼴 크기 조절: 숫자 + 위/아래 꺾쇠 ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
@@ -3610,7 +3678,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           </div>
         </div>
 
-        {/* ─── Right: Preview (고정 폭 35em + 좌 3.5em / 우 32px) ───
+        {/* ─── Right: Preview (본문 widthEm + 좌 3.5em / 우 32px) ───
+              ⚠ 개선묶음 M2 — 폭이 고정 35em이 아니라 Row1 스테퍼가 조절하는 widthEm이다.
+                ProblemView 열람뷰와 같은 localStorage 키를 공유한다.
               marginLeft = 편집창 블록 띠와의 채널. Phase 45a에서 편집 패널의 우측
               패딩 16px이 사라져(전폭) 띠 우측 끝 → 미리보기 첫 글자가 48px → 32px로
               좁아졌고, 기타 개선 4(83c8f47)에서 56px로 되돌렸다.
@@ -3624,7 +3694,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 width의 em과 paddingLeft의 em은 이 열의 fontSize(contentFontSize)를
                 같은 base로 쓰므로 글꼴을 바꿔도 35em이 보존된다. */}
         <div data-noscroll="preview-column" style={{
-          width: `calc(38.5em + 32px)`, flexShrink: 0, marginLeft: 24,
+          /* ⚠ 3.5em은 경우 rail 거터용 좌측 패딩이다 — 본문 측정폭이 widthEm으로
+               유지되려면 width도 그만큼 함께 커져야 한다(기존 35 + 3.5 = 38.5 구조). */
+          width: `calc(${widthEm + 3.5}em + 32px)`, flexShrink: 0, marginLeft: 24,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>

@@ -4,7 +4,10 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
-import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
+import {
+  DIFFICULTIES, CATEGORY_OPTIONS,
+  WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
+} from '../../lib/constants';
 import TabBody, { LABEL_GAP_EM, CARD_PAD_L, CARD_PAD_R, COLLAPSED_CARD_H } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
@@ -40,13 +43,6 @@ const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
 
-/* ═══ 개선묶음 M2 D — 본문 가로폭 조절 (D24′) ═══
-   기본 35em은 현행 폭 그대로다. 최소도 35 — "현재 폭을 최소 한계로" 라는 요구(메모).
-   최대 45em: 50em이면 댓글 패널(기본 420)과 동시 사용 시 1725px가 필요해 실사용 창을 넘는다. */
-const WIDTH_EM_KEY = 'mathory-problem-width-em';
-const WIDTH_EM_DEFAULT = 35;
-const WIDTH_EM_MIN = 35;
-const WIDTH_EM_MAX = 45;
 
 /* ═══ 스크롤 자동접힘 (D52 · v3 W9) ═══
    순방향 T1을 넘으면 제목행을 슬림 바로 접고, DELAY_MS 뒤에 문제 카드를 접는다.
