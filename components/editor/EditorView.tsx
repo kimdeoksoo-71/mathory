@@ -3273,7 +3273,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 style={{
                   display: 'flex', alignItems: 'center', gap: 2,
                   border: 'none', background: 'none', cursor: 'pointer',
-                  padding: '2px 4px', borderRadius: 4, fontSize: 11,
+                  /* Row2(41px) → Row1(57px)로 옮기면서 한 단 키웠다(덕수).
+                     11px은 탭 줄 기준이라 저장(18)·버전(17) 아이콘 옆에서 작아 보였다. */
+                  padding: '3px 6px', borderRadius: 4, fontSize: 13,
                   color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-faint)',
                   fontFamily: 'var(--font-ui)', transition: 'color 0.15s',
                 }}
@@ -3290,7 +3292,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 style={{
                   display: 'flex', alignItems: 'center', gap: 2,
                   border: 'none', background: 'none', cursor: 'pointer',
-                  padding: '2px 4px', borderRadius: 4, fontSize: 11,
+                  padding: '3px 6px', borderRadius: 4, fontSize: 13,
                   color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-faint)',
                   fontFamily: 'var(--font-ui)', transition: 'color 0.15s',
                 }}
