@@ -1979,7 +1979,7 @@ Phase 신설 대신 기록하는 규격 통일 작업.
 | 저장 아이콘을 아이콘 시스템 규격으로 재설계 | 2026-08-14 | 편집창 저장 버튼의 인라인 SVG(viewBox 64/stroke 3.5)를 `IconSave`(viewBox 24/stroke 1.8/round)로 교체. dirty 색 분기는 버튼 `color`(currentColor)에 위임해 아이콘 이중 분기 제거, 하드코딩 `#e53935`→`var(--accent-danger)`. **⚠️ 이때의 도안(플로피/셔터+라벨)은 Phase 55c에서 클라우드+체크로 교체됨 — 규격만 유효하고 도안은 낡은 기록이다** |
 | 저장·버전 기록 아이콘 정비 | 2026-08-15 | **Phase 55c** — 저장을 플로피 → 클라우드+체크(`checked` prop), 버전 기록 버튼을 `IconRecent` → `IconRestore`. 상세는 아래 Phase 55c 절 |
 | **개선묶음 M1 — 기존 Phase 보강 7건** | 2026-08-26 | 계획서: `docs/phasedocs/개선묶음 M1 기존 Phase 보강 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web → v4 실행판). **서버·Firestore·규칙·블록 타입 union 변경 0.** 아래 표 참조 |
-| **개선묶음 M2 — 기능 개편 7건** | 2026-08-28 | 계획서: `docs/phasedocs/개선묶음 M2 기능 개편 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web 재검증 → v4 실행판). **서버·Firestore·규칙·스키마·블록 타입 union 변경 0.** 커밋 20개·45파일. ⚠ 계획을 뒤집은 것 7건(R1~R7)이 v4 §3에 있다. 아래 표 참조 |
+| **개선묶음 M2 — 기능 개편 7건** | 2026-08-28 | 계획서: `docs/phasedocs/개선묶음 M2 기능 개편 v4 실행판.md` (v1 web → v2 CLI 실측 → v3 web 재검증 → v4 실행판). **서버·Firestore·규칙·스키마·블록 타입 union 변경 0.** 커밋 23개·45파일. **배포·실물 확인 완료.** ⚠ 계획을 뒤집은 것 7건(R1~R7)이 v4 §3에 있다. 아래 표 참조 |
 
 ### 개선묶음 M2 상세 (2026-08-28)
 
