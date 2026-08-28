@@ -10,7 +10,7 @@ import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
-import { DRAWER_INSET, DRAWER_RADIUS } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
 
 /**
  * Phase 55 Stage 5 — 우측 버전 기록 드로어.
@@ -296,6 +296,7 @@ export default function VersionDrawer({
       width: width ?? VERSION_DRAWER_WIDTH, maxWidth: '90vw',
       background: 'var(--bg-drawer)',
       borderRadius: DRAWER_RADIUS,
+      border: DRAWER_BORDER,
       boxShadow: 'var(--drawer-shadow)',
       overflow: 'hidden',
       display: open ? 'flex' : 'none', flexDirection: 'column', zIndex: 110,

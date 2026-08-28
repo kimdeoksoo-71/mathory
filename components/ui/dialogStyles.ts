@@ -94,3 +94,7 @@ export function dialogBtn(
    3단 구분(사이드바 < 중앙 < 드로어)의 인상이 무너진다. */
 export const DRAWER_INSET = 8;
 export const DRAWER_RADIUS = 10;
+/** 떠 있는 카드의 윤곽. 그림자만으로는 밝은 아이보리 위에서 경계가 흐릿하다(덕수 요청).
+ *  ⚠ 전역 리셋이 `* { box-sizing: border-box }`라 테두리를 넣어도 드로어 **좌변 위치가
+ *    바뀌지 않는다** — 리사이즈 핸들 offset(-5 / width+3)을 다시 손댈 필요가 없다. */
+export const DRAWER_BORDER = '0.5px solid var(--border-light)';

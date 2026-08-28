@@ -26,7 +26,7 @@ import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
-import { DRAWER_INSET, DRAWER_RADIUS } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
 
 const HISTORY_LIMIT = 5;
 
@@ -812,6 +812,7 @@ export default function CommentPanel({
       width: width, maxWidth: '90vw',
       background: 'var(--bg-drawer)',
       borderRadius: DRAWER_RADIUS,
+      border: DRAWER_BORDER,
       boxShadow: 'var(--drawer-shadow)',
       overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
