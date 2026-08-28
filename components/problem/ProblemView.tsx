@@ -12,6 +12,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
@@ -1037,13 +1038,22 @@ export default function ProblemView({
       </button>}
 
       {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
+      {/* 덕수 요청(2026-08-28) — 우측 단도 드로어 3종과 같은 **떠 있는 카드**로 통일.
+          ⚠ 바깥 자리(flex item 차지 폭)는 `rightCol.width` 그대로 유지한다:
+            margin(8×2) + width(w−16) = w. 이 등식이 깨지면 글자크기 컨트롤·우측 단
+            토글의 `right` 계산(전부 rightCol.width 기준)이 한꺼번에 어긋난다.
+          ⚠ 리사이즈 활성선은 이제 **카드 좌변**이다 → 핸들 offset도 함께 −8 했다. */}
       {rightColShown && <div style={{
-        width: rightCol.width, flexShrink: 0,
+        width: rightCol.width - DRAWER_INSET * 2, flexShrink: 0,
+        margin: DRAWER_INSET,
         padding: '32px 16px',
         overflowY: 'auto',
         fontSize: 13,
         fontFamily: 'var(--font-ui)',
-        background: 'var(--bg-functional)',
+        background: 'var(--bg-drawer)',
+        borderRadius: DRAWER_RADIUS,
+        border: DRAWER_BORDER,
+        boxShadow: 'var(--drawer-shadow)',
         position: 'relative',
         display: 'flex', flexDirection: 'column',
       }}>
@@ -1264,12 +1274,14 @@ export default function ProblemView({
       {/* Phase 62 D17: 우측 단 좌변 리사이즈 핸들 ───
           ⚠ 우측 단 안쪽에 두면 그 열의 overflowY:auto가 가로까지 잘라내므로 루트에 둔다.
           ⚠ 컨텐츠 행에 position:relative를 주는 우회도 금지 — 글자크기·토글이 98px 내려간다.
-          offset = rightWidth - 5 → 10px strip의 가운데가 우측 단 좌변(= 경계선)에 온다.
-          (댓글 패널은 8px 갭 뒤에 경계가 있어 +3, 여기는 자기 좌변이 곧 경계라 -5) */}
+          ⚠ 덕수 요청으로 우측 단이 **떠 있는 카드**가 되면서(사면 8px 여백) 활성선 기준이
+            자기 열의 좌변이 아니라 **카드 좌변**으로 바뀌었다:
+            strip 가운데 = offset + 5 = 카드 좌변 = w − 8  →  offset = w − 13.
+            (댓글 패널은 8px 갭 뒤에 경계가 있어 +3 — 결국 세 곳의 활성선이 같은 문법이다) */}
       {rightColShown && (
         <DrawerResizeHandle
           side="right"
-          offset={rightCol.width - 5}
+          offset={rightCol.width - 13}
           active={rightCol.dragging || rightCol.hover}
           {...rightCol.handleProps}
         />
