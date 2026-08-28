@@ -12,7 +12,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
-import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
@@ -159,11 +159,6 @@ export default function ProblemView({
   const manualQuestionRef = useRef(false);
   /* sticky 문제 행의 실측 높이 → 풀이 라벨 열의 sticky top (D51 · v3 W7) */
   const questionRowRef = useRef<HTMLDivElement>(null);
-  /* 덕수 보완 1 — 슬림 바에서는 글자크기·가로폭 컨트롤을 **1행 안**으로 올린다.
-     그 아래 띠에 컨트롤만 떠 있으면 정보가 없는 공간이 남는다.
-     우측 단 토글은 같은 줄 왼쪽에 두어야 하므로 컨트롤 묶음의 실폭이 필요하다. */
-  const ctrlRef = useRef<HTMLDivElement>(null);
-  const [ctrlW, setCtrlW] = useState(0);
   const [qStickyH, setQStickyH] = useState(0);
   /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
   const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -208,10 +203,14 @@ export default function ProblemView({
   const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
   // Phase 44 → Phase 62 D11: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
   const comment = useDrawerResize({
-    defaultWidth: 420, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+    defaultWidth: PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
   });
-  // Phase 62 D13 — 우측 단(탭·메뉴·메타)도 같은 문법으로 조절한다. 메뉴 열이라 폭 수치는 별도.
-  const rightCol = useDrawerResize({ defaultWidth: 220, min: 150, max: 360, anchor: 'right' });
+  /* Phase 62 D13 — 우측 단도 같은 문법으로 조절한다.
+     ⚠ 덕수 요청(2026-08-28)으로 **폭 수치까지** 다른 패널과 통일했다(구 220/150/360).
+        패널을 오갈 때 본문 폭이 계단처럼 튀지 않게 하려는 것이다. */
+  const rightCol = useDrawerResize({
+    defaultWidth: PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
+  });
   const panelDragging = comment.dragging || rightCol.dragging;
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
@@ -230,6 +229,11 @@ export default function ProblemView({
      패널(min 360)이 단(max 360)을 완전히 덮어, 남겨 두면 보이지 않는 열과 그 위에 뜨는
      핸들(zIndex 100 > 패널 50)·무의미한 토글 버튼이 생긴다. */
   const rightColShown = rightOpen && !panelMode;
+  /* 덕수 요청(2026-08-28) — 우측 단도 다른 패널처럼 **화면 위쪽 끝까지** 올린다.
+     그러려면 컨텐츠 행의 flex 형제가 아니라 루트 기준 absolute여야 한다(제목행 위로 올라가야 하므로).
+     ⚠ 자리를 flex가 잡아 주지 않게 되므로 제목행·본문이 **직접 paddingRight로 비켜야** 한다.
+       이 값 하나가 그 셋(제목행·본문·토글 좌표)의 유일한 원천이다. */
+  const rightReserve = panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0);
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
@@ -421,8 +425,6 @@ export default function ProblemView({
        useOutlineState의 keepAnchor와 같은 처방 — 델타만큼 scrollTop을 되돌린다.
        ⚠ 다만 T1 아래로는 내리지 않는다. 그대로 보정하면 접힘 직후 scrollTop이
          임계값 밑으로 떨어져 자동으로 다시 펼쳐지고, 그 진동이 반복된다. */
-    setCtrlW(ctrlRef.current?.offsetWidth ?? 0);
-
     const prev = lastQHRef.current;
     lastQHRef.current = h;
     const el = contentScrollRef.current;
@@ -652,6 +654,94 @@ export default function ProblemView({
     width: widthEm * contentFontSize, flexShrink: 0,
   };
 
+  /* 덕수 요청(2026-08-28) — 글자크기·가로폭 스테퍼를 **우측 패널 상단**으로 옮겼다.
+     본문 위에 떠 있던 절대배치를 걷어내 댓글·agent 패널과 머리 모양이 통일된다.
+     ⚠ 대가: 우측 패널이 닫혀 있거나 댓글·agent 패널이 열린 동안에는 이 컨트롤에
+       닿을 수 없다(그때는 우측 단이 아예 존재하지 않는다 — Phase 62 D16).
+       글꼴·폭을 바꾸려면 우측 패널을 먼저 열어야 한다. */
+  const viewControls = (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+        {/* D24′ — 가로폭 스테퍼(em). 글자크기 옆에 같은 문법으로 둔다.
+            ⚠ 최소는 기본값과 같은 35em이다 — "현재 폭을 최소 한계로, 그 미만 축소 불가"(메모). */}
+        <span style={{
+          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
+          minWidth: 26, textAlign: 'right', userSelect: 'none',
+        }} title="본문 가로폭(em)">{widthEm}em</span>
+        <div style={{ display: 'flex', flexDirection: 'column', marginRight: 6 }}>
+          <button
+            onClick={() => handleWidthChange(1)}
+            disabled={widthEm >= WIDTH_EM_MAX}
+            title="본문 넓히기"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: widthEm >= WIDTH_EM_MAX ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: widthEm >= WIDTH_EM_MAX ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 5 L5 1 L9 5" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleWidthChange(-1)}
+            disabled={widthEm <= WIDTH_EM_MIN}
+            title="본문 좁히기"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: widthEm <= WIDTH_EM_MIN ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: widthEm <= WIDTH_EM_MIN ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 1 L5 5 L9 1" />
+            </svg>
+          </button>
+        </div>
+        <span style={{
+          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
+          minWidth: 18, textAlign: 'right', userSelect: 'none',
+        }} title="본문 글자 크기(px)">{contentFontSize}</span>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <button
+            onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
+            disabled={contentFontSize >= FONT_SIZE_MAX}
+            title="글꼴 확대"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 5 L5 1 L9 5" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
+            disabled={contentFontSize <= FONT_SIZE_MIN}
+            title="글꼴 축소"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 1 L5 5 L9 1" />
+            </svg>
+          </button>
+        </div>
+    </div>
+  );
+
   return (
     <div style={{
       display: 'flex', flexDirection: 'column',
@@ -668,7 +758,7 @@ export default function ProblemView({
         flexShrink: 0, background: 'var(--bg-functional)',
         height: headerSlim ? HEADER_H.slim : HEADER_H.open,
         overflow: 'hidden',
-        paddingRight: panelMode ? `calc(${comment.width}px + 8px)` : 0,
+        paddingRight: rightReserve,
         transition: panelDragging ? 'none' : 'padding-right 0.18s ease, height 0.2s ease',
         display: 'flex', justifyContent: 'center',
         alignItems: headerSlim ? 'center' : 'flex-start',
@@ -822,7 +912,7 @@ export default function ProblemView({
       {/* 외부 래퍼: 패널 자리 확보(아이보리 백드롭), 경계선 없음 — 패널과 컨텐츠가 절대 겹치지 않음 */}
       <div style={{
         flex: 1, minWidth: 0, display: 'flex', minHeight: 0,
-        paddingRight: panelMode ? `calc(${comment.width}px + 8px)` : 0,
+        paddingRight: rightReserve,
         transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
@@ -911,6 +1001,18 @@ export default function ProblemView({
                         borderBottom: '0.5px solid var(--border-light)',
                         pointerEvents: 'none',
                       }} />
+                      {/* 덕수 요청 — 선 바로 아래에서 내용이 흐려지며 사라진다.
+                          선만 있으면 글자가 선에서 **딱 잘려** 밀려 들어가는 느낌이 없다.
+                          ⚠ 그라디언트 색은 토큰을 그대로 쓴다(하드코딩 rgba 금지) —
+                            바탕색을 바꿨을 때 페이드만 옛 색으로 남던 사고가 있었다(커밋 78a780f).
+                          ⚠ 스티키 래퍼(zIndex 3) 안이라 스크롤되는 카드 위에 그려진다.
+                            래퍼에 overflow를 주면 이 띠가 잘려 효과가 사라진다. */}
+                      <div aria-hidden style={{
+                        position: 'absolute', left: lineLeft, width: cardW + 20,
+                        top: '100%', height: 26,
+                        background: 'linear-gradient(to bottom, var(--bg-functional), transparent)',
+                        pointerEvents: 'none',
+                      }} />
                     </div>
                   );
                 })}
@@ -924,97 +1026,6 @@ export default function ProblemView({
         </div>
       </div>
 
-      {/* ═══ 글자크기·가로폭 조절 (콘텐츠 우상단, 패널 열려도 콘텐츠 옆에 유지) ═══
-          ⚠ D49 — 이 컨트롤은 **루트 기준** absolute다(컨텐츠 행 기준이 아니다).
-            제목행이 98→36으로 접히면 좌표를 함께 내려야 콘텐츠 카드 위로 겹치지 않는다.
-          ⚠ 컨텐츠 행(:793)에 position:relative를 주지 말 것 — 그 순간 이 컨트롤과
-            우측 단 토글이 제목바 높이만큼 통째로 내려간다(Phase 62 규약). */}
-      <div ref={ctrlRef} style={{
-        /* 슬림: 36px 바의 세로 중앙(컨트롤 높이 ≈22) — 아래 띠를 만들지 않는다 */
-        position: 'absolute', top: headerSlim ? 7 : 16,
-        right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
-        zIndex: 12, display: 'flex', alignItems: 'center', gap: 4,
-        transition: panelDragging ? 'none' : 'right 0.18s ease, top 0.2s ease',
-      }}>
-        {/* D24′ — 가로폭 스테퍼(em). 글자크기 옆에 같은 문법으로 둔다.
-            ⚠ 최소는 기본값과 같은 35em이다 — "현재 폭을 최소 한계로, 그 미만 축소 불가"(메모). */}
-        <span style={{
-          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
-          minWidth: 26, textAlign: 'right', userSelect: 'none',
-        }} title="본문 가로폭(em)">{widthEm}em</span>
-        <div style={{ display: 'flex', flexDirection: 'column', marginRight: 6 }}>
-          <button
-            onClick={() => handleWidthChange(1)}
-            disabled={widthEm >= WIDTH_EM_MAX}
-            title="본문 넓히기"
-            style={{
-              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: widthEm >= WIDTH_EM_MAX ? 'not-allowed' : 'pointer',
-              color: 'var(--text-muted)', opacity: widthEm >= WIDTH_EM_MAX ? 0.3 : 1,
-            }}
-          >
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M1 5 L5 1 L9 5" />
-            </svg>
-          </button>
-          <button
-            onClick={() => handleWidthChange(-1)}
-            disabled={widthEm <= WIDTH_EM_MIN}
-            title="본문 좁히기"
-            style={{
-              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: widthEm <= WIDTH_EM_MIN ? 'not-allowed' : 'pointer',
-              color: 'var(--text-muted)', opacity: widthEm <= WIDTH_EM_MIN ? 0.3 : 1,
-            }}
-          >
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M1 1 L5 5 L9 1" />
-            </svg>
-          </button>
-        </div>
-        <span style={{
-          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
-          minWidth: 18, textAlign: 'right', userSelect: 'none',
-        }} title="본문 글자 크기(px)">{contentFontSize}</span>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <button
-            onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
-            disabled={contentFontSize >= FONT_SIZE_MAX}
-            title="글꼴 확대"
-            style={{
-              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
-              color: 'var(--text-muted)', opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
-            }}
-          >
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M1 5 L5 1 L9 5" />
-            </svg>
-          </button>
-          <button
-            onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
-            disabled={contentFontSize <= FONT_SIZE_MIN}
-            title="글꼴 축소"
-            style={{
-              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
-              color: 'var(--text-muted)', opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
-            }}
-          >
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-              <path d="M1 1 L5 5 L9 1" />
-            </svg>
-          </button>
-        </div>
-      </div>
 
       {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══
           Phase 62 F5 — 패널 열림 중에는 우측 단이 없으므로 이 버튼도 렌더하지 않는다
@@ -1023,11 +1034,10 @@ export default function ProblemView({
         onClick={() => setRightOpen((o) => !o)}
         title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
         style={{
-          /* D49 + 덕수 보완 1 — 펼침: 컨트롤 바로 아래 / 슬림: 컨트롤 **왼쪽 같은 줄**.
-             슬림에서 아래로 내려가면 정보 없는 띠가 한 줄 더 생긴다. */
-          position: 'absolute', top: headerSlim ? 5 : 52,
-          right: 16 + (headerSlim ? ctrlW + 10 : 0)
-               + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
+          /* D49 — 제목행 접힘에 연동. 스테퍼가 우측 패널로 들어가면서 이 버튼이
+             콘텐츠 우상단의 유일한 떠 있는 컨트롤이 됐다(ctrlW 보정 불필요). */
+          position: 'absolute', top: headerSlim ? 5 : 16,
+          right: 16 + rightReserve,
           zIndex: 11, width: 26, height: 26,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: 'none', background: 'transparent', cursor: 'pointer',
@@ -1044,19 +1054,36 @@ export default function ProblemView({
             토글의 `right` 계산(전부 rightCol.width 기준)이 한꺼번에 어긋난다.
           ⚠ 리사이즈 활성선은 이제 **카드 좌변**이다 → 핸들 offset도 함께 −8 했다. */}
       {rightColShown && <div style={{
-        width: rightCol.width - DRAWER_INSET * 2, flexShrink: 0,
-        margin: DRAWER_INSET,
-        padding: '32px 16px',
-        overflowY: 'auto',
+        /* 루트 기준 absolute — 제목행 위까지 올라가 댓글·agent·버전 드로어와 같은 높이가 된다.
+           ⚠ 바깥 자리는 flex가 아니라 rightReserve(= rightCol.width)가 잡는다.
+              width(w−16) + 좌우 inset(8×2) = w 라는 등식이 그 전제다. */
+        position: 'absolute', top: DRAWER_INSET, right: DRAWER_INSET, bottom: DRAWER_INSET,
+        width: rightCol.width - DRAWER_INSET * 2,
+        zIndex: 40,                 // 댓글·agent 패널(50)보다 아래
+        padding: 0,                 // 헤더 행은 전폭 — 패딩은 아래 본문 div가 갖는다
+        overflow: 'hidden',
         fontSize: 13,
         fontFamily: 'var(--font-ui)',
         background: 'var(--bg-drawer)',
         borderRadius: DRAWER_RADIUS,
         border: DRAWER_BORDER,
         boxShadow: 'var(--drawer-shadow)',
-        position: 'relative',
         display: 'flex', flexDirection: 'column',
       }}>
+        {/* 덕수 요청 — 머리 행(보기 컨트롤) + 구분선. 댓글·agent 패널의 2행 규격
+            (minHeight 41 · padding '0 12px' · gap 6)을 그대로 따라 모양이 통일된다.
+            ⚠ 규격을 바꿀 때는 CommentPanel·VersionDrawer의 같은 행도 함께 볼 것. */}
+        <div style={{
+          minHeight: 41, flexShrink: 0, padding: '0 12px',
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6,
+          borderBottom: '1px solid var(--border-light)',
+        }}>
+          {viewControls}
+        </div>
+        <div style={{
+          flex: 1, minHeight: 0, overflowY: 'auto',
+          padding: '20px 16px', display: 'flex', flexDirection: 'column',
+        }}>
         {/* 닫기 버튼은 상단 토글 버튼으로 통합됨 (글자크기 버튼 아래 행) */}
         {/* ───── 메뉴 모음 (편집/사본/PDF/MD/휴지통 → spacer → 공유) ───── */}
         <div style={{ marginBottom: 18 }}>
@@ -1228,6 +1255,7 @@ export default function ProblemView({
             currentUserUid={user?.uid}
             onUpdated={load}
           />
+        </div>
         </div>
       </div>}
       </div>

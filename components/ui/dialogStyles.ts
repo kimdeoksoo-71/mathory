@@ -101,3 +101,10 @@ export const DRAWER_RADIUS = 10;
  *    약해 보이지 않았다(덕수) → 1px + --border-content(#D2C8B8, 앱에서 가장 뚜렷한 선).
  *    더 세게 가려면 --border-content-active(#B89B78)가 다음 단계다. */
 export const DRAWER_BORDER = '1px solid var(--border-content)';
+
+/* ═══ 우측 패널 폭 (덕수 요청 2026-08-28) ═══
+   우측 패널 4종(우측 단 · 댓글 · agent · 버전 드로어)의 펼침 폭을 agent 패널 값으로 통일한다.
+   ⚠ 값이 갈리면 패널을 오갈 때 본문 폭이 계단처럼 튄다 — 4곳이 이 상수를 함께 쓴다.
+      (버전 드로어는 460, 우측 단은 220이었다) */
+export const PANEL_WIDTH_DEFAULT = 420;
+export const PANEL_WIDTH_MIN = 360;

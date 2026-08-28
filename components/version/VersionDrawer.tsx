@@ -10,7 +10,7 @@ import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
-import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
+import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, PANEL_WIDTH_DEFAULT } from '../ui/dialogStyles';
 
 /**
  * Phase 55 Stage 5 — 우측 버전 기록 드로어.
@@ -24,7 +24,8 @@ import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER } from '../ui/dialogStyles';
  */
 /** 드로어 **기본** 폭. Phase 62부터 폭은 EditorView가 useDrawerResize로 들고 width prop으로 내려준다.
  *  이 상수는 그 훅의 defaultWidth이자 prop 미전달 시의 폴백이다. */
-export const VERSION_DRAWER_WIDTH = 460;
+/** ⚠ 우측 패널 4종이 같은 폭을 쓴다(덕수 요청) — 값은 dialogStyles가 소유한다. */
+export const VERSION_DRAWER_WIDTH = PANEL_WIDTH_DEFAULT;
 
 export default function VersionDrawer({
   problemId,

@@ -75,6 +75,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
+import { PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
 
 /* ═══ 타입 & 상수 ═══ */
 
@@ -1015,11 +1016,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // Phase 44 Step D → Phase 62 D11: 토론 패널 드래그 리사이즈 (조기 return보다 위에 선언 — 훅 규칙)
   // 폭은 세션 내 상태로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
   const comment = useDrawerResize({
-    defaultWidth: 420, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+    defaultWidth: PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
   });
   // Phase 62 D13 — 버전 드로어도 같은 문법으로 조절한다(폭 수치만 별도).
   const version = useDrawerResize({
-    defaultWidth: VERSION_DRAWER_WIDTH, min: 360, max: () => window.innerWidth * 0.9, anchor: 'right',
+    defaultWidth: VERSION_DRAWER_WIDTH, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
   });
   // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
   const skipDirtyRef = useRef(true);
