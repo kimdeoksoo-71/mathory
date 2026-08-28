@@ -33,10 +33,21 @@ const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
    2.8em = dot 좌단 2.06em + 라벨과의 여유 0.74em.
    ⚠ 고정 px으로 되돌리지 말 것: 28px은 24px 글꼴에서 1.17em이라 dot이 라벨을 파고들고,
      11px에서는 2.55em이라 rail이 본문에서 멀어진다(em/px 혼합 함정). */
-const LABEL_GAP_EM = 2.8;
+export const LABEL_GAP_EM = 2.8;
+
+/* 개선묶음 M2 D — 카드 좌우 안쪽 여백. 좌 40px은 경우 rail·dot이 사는 거터(2.06em@15,
+   실사용 2.2em)를 카드 **안쪽**에 확보하기 위한 값이다 — 공개 뷰어 ContentCard가 쓰는
+   `32px 36px 32px 40px`의 좌우와 같다.
+   ⚠ 카드에 overflow:hidden을 주지 말 것 — 거터에 그린 rail이 통째로 잘린다(Phase 59a Q5). */
+export const CARD_PAD_L = 40;
+export const CARD_PAD_R = 36;
 
 interface Props {
   tab: TabMeta;
+  /** 본문 폭(em). 기본 35 — 사용자가 우측 상단 스테퍼로 넓힐 수 있다(M2 D24′). */
+  widthEm: number;
+  /** 문제 탭 접힘(첫 줄만 보이기). 문제 탭에만 전달된다(M2 D25′). */
+  collapsedPreview?: boolean;
   blocks: Block[];
   tabIdx: number;
   isOpen: boolean;
@@ -47,7 +58,7 @@ interface Props {
 }
 
 export default function TabBody({
-  tab, blocks, tabIdx, isOpen, copied, contentFontSize, onToggleTab, onCopy,
+  tab, blocks, tabIdx, isOpen, copied, contentFontSize, widthEm, collapsedPreview, onToggleTab, onCopy,
 }: Props) {
   const caseLabels = useMemo(() => buildCaseLabels(blocks), [blocks]);
   const caseGaps = useMemo(() => buildCaseGapKeys(blocks), [blocks]);
@@ -61,8 +72,10 @@ export default function TabBody({
     width: 7 * contentFontSize, flexShrink: 0,
     textAlign: 'left', fontFamily: 'var(--font-ui)',
   };
+  /* ⚠ 이 폭은 제목행의 <h1>이 쓰는 사본과 **같은 값**이어야 한다(M2 D24″) —
+       제목과 카드 우단이 함께 움직이지 않으면 D40″의 좌단 정렬이 폭마다 깨진다. */
   const mainColStyle: React.CSSProperties = {
-    width: 35 * contentFontSize, flexShrink: 0,
+    width: widthEm * contentFontSize, flexShrink: 0,
   };
 
   /* 경우 사이에 낀 블록은 rail이 관통하도록 .case-gap 한 겹을 두른다.
@@ -177,19 +190,30 @@ export default function TabBody({
   };
 
   return (
+    /* 개선묶음 M2 D — 탭 한 행 = [라벨 열 | 카드]. 카드 사이 세로 여백은 2em(접힘 1em).
+       ⚠ align-items는 flex-start를 유지한다 — stretch면 카드가 행 높이로 늘어나
+         sticky가 움직일 여지를 잃는다(v2 D-19 실측: 300px 스크롤 후 −220px로 흘러감). */
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP_EM * contentFontSize,
       marginTop: tabIdx === 0 ? 24 : 0,
-      marginBottom: isOpen ? '5em' : '1.5em',
+      marginBottom: isOpen ? '2em' : '1em',
     }}>
       {/* 라벨 열 — 라벨 · 복사 · 요약 보기.
           ⚠ flexWrap 필수: 탭 이름은 3번째 탭부터 사용자가 자유롭게 짓고 길이 제한이
             없다. 폭(7em)을 넘으면 토글이 다음 행으로 내려가야 레이아웃이 버틴다. */}
+      {/* 개선묶음 M2 D51 — 라벨 열은 카드가 스크롤돼도 제자리에 남는다.
+          top은 sticky 문제 카드의 접힘 높이를 담은 CSS 변수다(ProblemView가 세운다) —
+          0으로 두면 문제 행(z 상위)에 상시 가려진다(v3 W7). */}
       <div style={{
         ...labelColStyle,
         display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4,
         flexWrap: 'wrap', rowGap: 2,
         paddingTop: isOpen ? 14 : 0,
+        ...(isQuestion ? null : {
+          position: 'sticky' as const,
+          top: 'calc(var(--m2-q-sticky-h, 0px) + 12px)',
+          alignSelf: 'flex-start' as const,
+        }),
       }}>
         <span
           onClick={onToggleTab}
@@ -228,14 +252,30 @@ export default function TabBody({
       </div>
 
       {isOpen && (
+        /* 개선묶음 M2 D20′·D21′ — 탭 본문 열이 **클레이 카드**가 된다(바탕은 아이보리).
+           폴더뷰 카드와 같은 문법이되 --card-surface는 쓰지 않는다 — 그 변수는 폴더뷰
+           카드·행의 hover 계약이라 여기 끌어오면 의미가 꼬인다(D20′).
+           ⚠ overflow:hidden 금지 — 경우 rail·dot이 좌측 거터(−1.8em)에 그려진다.
+           ⚠ --case-dot-fill을 카드 배경으로 재정의한다. 접힘 dot의 속이 배경색이라
+             재정의하지 않으면 rail이 dot을 관통한다(globals.css:157 전례).
+           ⚠ question 탭의 옛 `marginLeft:-24` 분기는 제거했다 — 이제 모든 탭이 카드다. */
         <div style={{
           ...mainColStyle,
-          ...(isQuestion ? {
-            background: 'var(--bg-content)',
-            padding: '20px 24px',
-            borderRadius: 8,
-            marginLeft: -24,
-          } : {}),
+          width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
+          boxSizing: 'border-box',
+          background: collapsedPreview ? 'var(--block-bg-active)' : 'var(--bg-content)',
+          border: '0.5px solid var(--border-content)',
+          borderRadius: 12,
+          padding: `20px ${CARD_PAD_R}px 20px ${CARD_PAD_L}px`,
+          transition: 'background 0.15s',
+          ['--case-dot-fill' as any]:
+            collapsedPreview ? 'var(--block-bg-active)' : 'var(--bg-content)',
+          /* 접힘(문제 탭 전용): 첫 줄만 남기고 하단 페이드 */
+          ...(collapsedPreview ? {
+            maxHeight: `calc(1.8em + 40px)`,
+            overflow: 'hidden',
+            position: 'relative',
+          } : null),
         }}>
           {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
           <div
@@ -255,6 +295,15 @@ export default function TabBody({
               blocks.map(renderBlock)
             )}
           </div>
+          {collapsedPreview && (
+            /* 하단 페이드 — 잘린 자리가 "여기서 끝"이 아니라 "더 있다"로 읽히게 한다.
+               색은 카드 접힘 배경과 같아야 이음매가 보이지 않는다. */
+            <div aria-hidden style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0, height: 22,
+              background: 'linear-gradient(to bottom, rgba(232,223,206,0), var(--block-bg-active))',
+              pointerEvents: 'none',
+            }} />
+          )}
         </div>
       )}
     </div>

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
-import TabBody from './TabBody';
+import TabBody, { LABEL_GAP_EM, CARD_PAD_L, CARD_PAD_R } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -38,6 +38,27 @@ const FONT_SIZE_DEFAULT = 15;
 const FONT_SIZE_MIN = 11;
 const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
+
+/* ═══ 개선묶음 M2 D — 본문 가로폭 조절 (D24′) ═══
+   기본 35em은 현행 폭 그대로다. 최소도 35 — "현재 폭을 최소 한계로" 라는 요구(메모).
+   최대 45em: 50em이면 댓글 패널(기본 420)과 동시 사용 시 1725px가 필요해 실사용 창을 넘는다. */
+const WIDTH_EM_KEY = 'mathory-problem-width-em';
+const WIDTH_EM_DEFAULT = 35;
+const WIDTH_EM_MIN = 35;
+const WIDTH_EM_MAX = 45;
+
+/* ═══ 스크롤 자동접힘 (D52 · v3 W9) ═══
+   순방향 T1을 넘으면 제목행을 슬림 바로 접고, DELAY_MS 뒤에 문제 카드를 접는다.
+   역방향은 T2(최상단)에서 역순 복원. T1 ≠ T2가 히스테리시스다.
+   튜닝 허용 범위: T1 60~120 · DELAY 200~500 · COOLDOWN 300~600. 밖으로 나가면 문서도 갱신할 것. */
+const M2_COLLAPSE = { T1: 80, T2: 8, DELAY_MS: 300, COOLDOWN_MS: 400 };
+
+/** 제목행 높이 — 펼침(현행 98) / 접힘(슬림 바). D50: height 애니메이션이라 둘 다 px 확정값이어야 한다. */
+const HEADER_H = { open: 98, slim: 36 };
+
+/** 가운데 영역의 좌우 바깥 여백. D22′ — 카드가 좌우 76px을 더하므로 32 → 16으로 낮춰
+ *  순증을 +44px로 억제한다. 바탕이 아이보리라 여백이 줄어도 답답해지지 않는다. */
+const OUTER_PAD = 16;
 
 interface ProblemViewProps {
   problemId: string;
@@ -114,6 +135,30 @@ export default function ProblemView({
   const [loading, setLoading] = useState(true);
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
   const [openTabs, setOpenTabs] = useState<Record<string, boolean>>({});
+  /* D24′ — 본문 가로폭(em). 전역 영속(문항별 아님). 키 관례는 하이픈이다(FONT_SIZE_KEY와 동일). */
+  const [widthEm, setWidthEm] = useState(WIDTH_EM_DEFAULT);
+  useEffect(() => {
+    try {
+      const v = Number(localStorage.getItem(WIDTH_EM_KEY));
+      if (v >= WIDTH_EM_MIN && v <= WIDTH_EM_MAX) setWidthEm(v);
+    } catch {}
+  }, []);
+  const handleWidthChange = (delta: number) => {
+    setWidthEm((prev) => {
+      const next = Math.min(WIDTH_EM_MAX, Math.max(WIDTH_EM_MIN, prev + delta));
+      try { localStorage.setItem(WIDTH_EM_KEY, String(next)); } catch {}
+      return next;
+    });
+  };
+
+  /* D25′·D27′ — 제목행 슬림 여부 · 문제 카드 접힘. 둘 다 비영속(세션 내 상태). */
+  const [headerSlim, setHeaderSlim] = useState(false);
+  const [questionCollapsed, setQuestionCollapsed] = useState(false);
+  /* 사용자가 직접 토글했으면 최상단 복귀까지 자동접힘을 보류한다(D27′). */
+  const manualQuestionRef = useRef(false);
+  /* sticky 문제 행의 실측 높이 → 풀이 라벨 열의 sticky top (D51 · v3 W7) */
+  const questionRowRef = useRef<HTMLDivElement>(null);
+  const [qStickyH, setQStickyH] = useState(0);
   /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
@@ -248,6 +293,13 @@ export default function ProblemView({
 
   /* ─── 탭 토글 ─── */
   const toggleTab = (tabId: string) => {
+    /* D25′ — 문제 탭 라벨 클릭은 "탭 열고 닫기"가 아니라 **접힘 미리보기 토글**이다.
+       (수동 조작은 최상단으로 돌아갈 때까지 자동접힘을 이긴다) */
+    if (tabId === 'question') {
+      manualQuestionRef.current = true;
+      setQuestionCollapsed((v) => !v);
+      return;
+    }
     setOpenTabs((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
   };
 
@@ -327,12 +379,16 @@ export default function ProblemView({
           const target = mathEl ?? el;
           (mathEl ?? el).classList.add(mathEl ? 'math-highlight-active' : 'verify-jump-flash');
 
-          // 강조 대상을 화면 세로 중앙에 (화면보다 크면 상단 기준)
+          /* 강조 대상을 화면 세로 중앙에 (화면보다 크면 상단 기준).
+             ⚠ D29′ — sticky 문제 행이 상단을 덮으므로 그만큼 더 올려야 대상이 그 뒤로
+               숨지 않는다. 중앙 정렬이라 대개는 안전하지만, 화면보다 큰 블록은 상단
+               기준(−80)이라 정확히 그 자리에서 가려진다. */
+          const stickyH = questionRowRef.current?.offsetHeight ?? 0;
           const r = target.getBoundingClientRect();
           const cr = container.getBoundingClientRect();
-          const top = r.height < cr.height
-            ? r.top - cr.top + container.scrollTop + r.height / 2 - cr.height / 2
-            : r.top - cr.top + container.scrollTop - 80;
+          const top = r.height < cr.height - stickyH
+            ? r.top - cr.top + container.scrollTop + r.height / 2 - (cr.height + stickyH) / 2
+            : r.top - cr.top + container.scrollTop - 80 - stickyH;
           fastScrollTo(container, Math.max(0, top), 300);
 
           // 수식 강조는 잠깐만 — 남아 있으면 "지금 여기"라는 신호가 죽는다
@@ -344,6 +400,68 @@ export default function ProblemView({
       return;
     }
   }, [problem, openTabs]);
+
+  /* ═══ D51 — sticky 문제 행의 높이를 CSS 변수로 (풀이 라벨 열의 sticky top) ═══
+     ResizeObserver를 상시 돌리지 않는다(Q10 우려). 값이 달라질 수 있는 계기에만 1회 잰다:
+     문제 카드 접힘 토글 · 글꼴 크기 · 본문 폭 · 문항 로드. */
+  const lastQHRef = useRef(0);
+  useLayoutEffect(() => {
+    const h = questionRowRef.current?.offsetHeight ?? 0;
+    setQStickyH(h);
+
+    /* D27′ — 문제 카드 높이가 급변하면 아래 내용이 그만큼 위로 올라와 화면이 튄다.
+       (sticky라 화면 위쪽에 고정돼 있어도 **흐름상의 자리**는 문서 최상단이므로
+        그 높이가 줄면 아래가 전부 당겨 올라온다.)
+       useOutlineState의 keepAnchor와 같은 처방 — 델타만큼 scrollTop을 되돌린다.
+       ⚠ 다만 T1 아래로는 내리지 않는다. 그대로 보정하면 접힘 직후 scrollTop이
+         임계값 밑으로 떨어져 자동으로 다시 펼쳐지고, 그 진동이 반복된다. */
+    const prev = lastQHRef.current;
+    lastQHRef.current = h;
+    const el = contentScrollRef.current;
+    if (el && prev && h && prev !== h && el.scrollTop > 0) {
+      const delta = prev - h;
+      el.scrollTop = Math.max(M2_COLLAPSE.T1 + 1, el.scrollTop - delta);
+    }
+  }, [questionCollapsed, contentFontSize, widthEm, problem, openTabs]);
+
+  /* ═══ D27′ — 스크롤 자동접힘 (문제 탭만) ═══
+     순방향: T1 초과 → 제목행 슬림 → DELAY_MS 뒤 문제 카드 접힘.
+     역방향: T2 이하(최상단) → 문제 펼침 → 제목행 복원.
+     ⚠ 히스테리시스: T1 ≠ T2 + 쿨다운. 없으면 경계 스크롤에서 진동한다.
+     ⚠ 제목행 접힘은 scrollTop을 바꾸지 않고 컨테이너 clientHeight만 키운다 →
+       스크롤 여유가 없으면 브라우저가 scrollTop을 클램프해 다시 T1 아래로 떨어뜨린다.
+       하단 스페이서(70vh)가 그것을 막는다 — **스페이서를 줄이거나 없애지 말 것**(D28′).
+     ⚠ 사용자가 라벨을 눌러 직접 토글했으면 최상단 복귀까지 자동접힘을 보류한다. */
+  const collapseTimerRef = useRef<number | null>(null);
+  const lastFlipRef = useRef(0);
+  const handleContentScroll = useCallback(() => {
+    const el = contentScrollRef.current;
+    if (!el) return;
+    const y = el.scrollTop;
+    const now = performance.now();
+
+    if (y > M2_COLLAPSE.T1) {
+      if (!headerSlim && now - lastFlipRef.current > M2_COLLAPSE.COOLDOWN_MS) {
+        lastFlipRef.current = now;
+        setHeaderSlim(true);
+        if (collapseTimerRef.current) window.clearTimeout(collapseTimerRef.current);
+        collapseTimerRef.current = window.setTimeout(() => {
+          if (!manualQuestionRef.current) setQuestionCollapsed(true);
+        }, M2_COLLAPSE.DELAY_MS);
+      }
+    } else if (y <= M2_COLLAPSE.T2) {
+      if (collapseTimerRef.current) { window.clearTimeout(collapseTimerRef.current); collapseTimerRef.current = null; }
+      manualQuestionRef.current = false;            // 최상단 복귀 = 수동 조작 해제
+      if (questionCollapsed) setQuestionCollapsed(false);
+      if (headerSlim && now - lastFlipRef.current > M2_COLLAPSE.COOLDOWN_MS) {
+        lastFlipRef.current = now;
+        setHeaderSlim(false);
+      }
+    }
+  }, [headerSlim, questionCollapsed]);
+  useEffect(() => () => {
+    if (collapseTimerRef.current) window.clearTimeout(collapseTimerRef.current);
+  }, []);
 
   /* ─── 탭 Markdown 복사 ─── */
   const handleCopyTabMarkdown = async (tabId: string) => {
@@ -512,13 +630,18 @@ export default function ProblemView({
   const folderPath = (!isTrash && fid) ? getFolderPath(folders, fid) : [];
   const hasAncestors = folderPath.length > 1;
   const expanded = folderPathHover && hasAncestors;
-  const LABEL_GAP = 28; // 라벨↔본문 간격
+  /* D40″ — 제목행 gap을 TabBody와 **같은 식**으로 통일한다.
+     Phase 59a가 TabBody만 2.8em으로 비례화하고 제목행은 28px 고정으로 남겨 둬,
+     제목 좌단(165@15)과 탭 본문 좌단(179@15)이 이미 14px 어긋나 있었다(fs24에서 39px).
+     여기서 잠복 비정합까지 함께 해소한다. */
+  const LABEL_GAP = LABEL_GAP_EM * contentFontSize;
   const labelColStyle: React.CSSProperties = {
     width: 7 * contentFontSize, flexShrink: 0,
     textAlign: 'left', fontFamily: 'var(--font-ui)',
   };
+  /* ⚠ TabBody의 사본과 **같은 값**이어야 한다(D24″) — 제목과 카드 우단이 함께 움직인다. */
   const mainColStyle: React.CSSProperties = {
-    width: 35 * contentFontSize, flexShrink: 0,
+    width: widthEm * contentFontSize, flexShrink: 0,
   };
 
   return (
@@ -529,23 +652,36 @@ export default function ProblemView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 제목바: U자 밖 아이보리 chrome — [폴더경로 | 제목]. 아래 빈 공간은 추후 메타데이터 ═══ */}
+      {/* D50 — 접힘은 **height 애니메이션**이다(transform 금지: 공간을 회수하지 못한다).
+          제목행은 스크롤 컨테이너의 형제라 높이가 바뀌어도 sticky top 계산에 영향이 없다.
+          ⚠ 접힘 상태에서는 EditorView와의 가로 경계선 Y 정렬(98)이 의도적으로 깨진다
+            — 배경 차이를 감수한 E-M2-2와 같은 범위의 수용이다(v3 W10). */}
       <div style={{
         flexShrink: 0, background: 'var(--bg-functional)',
-        minHeight: 98, // EditorView(제목 57 + 탭 41)와 가로 경계선 Y 일치
+        height: headerSlim ? HEADER_H.slim : HEADER_H.open,
+        overflow: 'hidden',
         paddingRight: panelMode ? `calc(${comment.width}px + 8px)` : 0,
-        transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+        transition: panelDragging ? 'none' : 'padding-right 0.18s ease, height 0.2s ease',
+        display: 'flex', justifyContent: 'center',
+        alignItems: headerSlim ? 'center' : 'flex-start',
+        borderBottom: headerSlim ? '0.5px solid var(--border-light)' : 'none',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: LABEL_GAP,
-          padding: '22px 32px 0', boxSizing: 'border-box', // 제목을 위에서 내림(#7), 아래 빈 공간은 추후 메타데이터
+          padding: headerSlim ? `0 ${OUTER_PAD}px` : `22px ${OUTER_PAD}px 0`,
+          boxSizing: 'border-box',
         }}>
           {/* 헤더 라벨 박스 — 폭 7em 고정. 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
+          {/* ⚠ 슬림에서도 이 박스는 **자리를 지킨다**(opacity만 0) — 폭이 사라지면
+              제목 좌단이 좌측으로 튀어 접힘/펼침에서 제목이 가로로 움직인다(D40″). */}
           <div
             ref={labelBoxRef}
-            onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
+            onMouseEnter={() => { if (hasAncestors && !headerSlim) setFolderPathHover(true); }}
             onMouseLeave={() => setFolderPathHover(false)}
             style={{
+              opacity: headerSlim ? 0 : 1,
+              pointerEvents: headerSlim ? 'none' : 'auto',
+              transition: 'opacity 0.15s',
               ...labelColStyle,
               position: 'relative', height: '1.5em',
               display: 'flex', alignItems: 'center',
@@ -602,24 +738,40 @@ export default function ProblemView({
               </div>
             )}
           </div>
+          {/* D39′ — 슬림 바는 **축약 제목 + 버튼**이다(A안=버튼만은 폐기).
+              버튼만 남기면 그 버튼이 무엇에 속한 것인지 읽히지 않고, 스크롤 중에
+              지금 보는 문항이 무엇인지도 알 수 없다(v2 D-16 실물 스케치).
+              ⚠ 구현 함정 2건(v2 D-17): ① text-overflow는 flex 컨테이너가 아니라
+                **텍스트를 담은 자식**에 걸어야 말줄임이 나온다 ② 긴 제목이 폭을 다 먹으면
+                버튼이 밀려나 사라진다 → .btns에 flexShrink:0, 컨테이너에 minWidth:0.
+              ⚠ 폭·좌단은 펼침과 같다(D40″) — 접힘/펼침에서 제목이 가로로 움직이면 안 된다. */}
           <h1
-            onClick={() => { if (isOwnerView) onEdit?.(problem); }}
+            onClick={() => { if (isOwnerView && !headerSlim) onEdit?.(problem); }}
             style={{
               ...mainColStyle,
-              fontSize: 22, fontWeight: 600, color: 'var(--text-primary)',
-              margin: 0, lineHeight: 1.2,
+              width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
+              paddingLeft: CARD_PAD_L, boxSizing: 'border-box',
+              minWidth: 0,
+              fontSize: headerSlim ? 12.5 : 22, fontWeight: 600,
+              color: headerSlim ? 'var(--text-secondary)' : 'var(--text-primary)',
+              margin: 0, lineHeight: headerSlim ? 1 : 1.2,
               fontFamily: 'var(--font-ui)',
-              cursor: isOwnerView ? 'pointer' : 'default',
+              cursor: isOwnerView && !headerSlim ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center',
-              transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
-              transition: 'color 0.15s, transform 0.25s ease',
+              transform: expanded && !headerSlim ? `translateX(${titleSlide}px)` : 'translateX(0)',
+              transition: 'color 0.15s, transform 0.25s ease, font-size 0.2s ease',
             }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLElement).style.color =
+                headerSlim ? 'var(--text-secondary)' : 'var(--text-primary)';
+            }}
             title="클릭하여 편집"
           >
-            <span>{problem.title}</span>
-            <BlockchainBadge problem={problem} size={16} />
+            <span style={{
+              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+            }}>{problem.title}</span>
+            {!headerSlim && <BlockchainBadge problem={problem} size={16} />}
             {/* Phase 47: 댓글 버튼 — 오너 OR (멤버 && 댓글 보임) */}
             {user && (isOwnerView || (isMemberView && problem.commentsVisible !== false)) && (
               <button
@@ -627,6 +779,7 @@ export default function ProblemView({
                 title="댓글 열기"
                 style={{
                   marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 3,
+                  flexShrink: 0,   // ⚠ 긴 제목이 폭을 다 먹어도 버튼은 살아남아야 한다(D-17)
                   border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
                   borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
                   color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -642,6 +795,7 @@ export default function ProblemView({
                 title="agent 열기"
                 style={{
                   marginLeft: 2, display: 'inline-flex', alignItems: 'center', gap: 3,
+                  flexShrink: 0,
                   border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
                   borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
                   color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
@@ -664,48 +818,80 @@ export default function ProblemView({
         transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
       }}>
         {/* 내부 U-프레임: 클레이 + 3면 경계 + 상단 14px 라운드 (스크롤). 패널 열려도 경계선 유지 */}
-        <div className="no-scrollbar" ref={contentScrollRef} style={{
-          flex: 1, minWidth: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          background: 'var(--bg-content)',
-          borderTop: '0.5px solid var(--border-content)',
-          borderLeft: '0.5px solid var(--border-content)',
-          borderRight: '0.5px solid var(--border-content)',
-          // Phase 45a — U자 프레임 상단 직각(EditorView·ProblemView·FolderView 3곳 동일)
-          display: 'flex',
-          // 패널 열림: 우측 정렬 → 컨텐츠 우측 끝이 경계선에 붙어 함께 왼쪽으로 이동(가려지지 않음)
-          justifyContent: panelMode ? 'unsafe flex-end' : 'center',
-        }}>
-        {/* ─── 가운데 영역: 각 행이 [라벨 | 본문] 구조 ─── */}
+        {/* ═══ 개선묶음 M2 D20′·D23′ — U자 클레이 프레임을 걷어내고 바탕을 아이보리로.
+             클레이는 이제 탭 카드가 담당한다(FolderView가 Phase 62에서 한 것과 같은 이동).
+             ⚠ EditorView는 U-프레임을 유지한다(E-M2-2) — CLAUDE.md의 "둘을 항상 함께"
+               규약을 **의도적으로 깬 자리**다.
+             ⚠ display:flex → block. 이유가 둘이다:
+               ① flex + justify-content:center는 좌측 넘침이 **스크롤 영역에 포함되지 않아**
+                  overflow-x를 auto로 바꿔도 닿을 수 없다(실측: 자식 780인데 scrollWidth 690).
+                  block + margin:auto는 scrollWidth 780·좌단 0으로 양끝에 닿는다(Phase 62 K1 해소).
+               ② flex 기본 align-items:stretch가 자식 높이를 컨테이너 높이로 눌러
+                  **sticky가 죽는다**(실측: 300px 스크롤 후 −220px로 흘러감). D25′의 전제다. */}
+        <div className="no-scrollbar" ref={contentScrollRef}
+          onScroll={handleContentScroll}
+          style={{
+            flex: 1, minWidth: 0,
+            overflowY: 'auto',
+            overflowX: 'auto',
+            background: 'var(--bg-functional)',
+            display: 'block',
+          }}>
+        {/* ─── 가운데 영역: 각 행이 [라벨 | 카드] 구조 ─── */}
         {/* 개선묶음 M2 C — 참조 hover 말풍선 게이트(D16′).
             ⚠ **탭 전체를 감싸는 여기**에 붙여야 한다. 정의부 탐색이 이 서브트리
               안에서만 일어나므로, TabBody(탭 한 행)에 붙이면 "문제 탭에서 정의하고
-              풀이 탭에서 인용"이라는 지배적 사용 형태가 통째로 안 잡힌다. */}
+              풀이 탭에서 인용"이라는 지배적 사용 형태가 통째로 안 잡힌다.
+            ⚠ D45′ — 폭은 `fit-content`가 아니라 `max-content`다. 둘 다 지금은 통과하지만
+              fit-content는 정의상 가용폭으로 **클램프**해서, 나중에 카드 폭이 유동이 되면
+              조용히 잘리기 시작한다. 의미가 곧 의도인 쪽을 쓴다.
+            ⚠ 패널 열림 시의 우측 정렬은 `margin-left:auto`로 등가 이전(구 unsafe flex-end).
+            ⚠ --m2-q-sticky-h: 풀이 라벨 열의 sticky top (D51). */}
         <div data-ref-tooltip style={{
-          display: 'table',
-          padding: '0 32px', // 좌우 32px 유지 — 우측 경계선과 컨텐츠 사이 여백 보존
+          width: 'max-content',
+          margin: panelMode ? '0 0 0 auto' : '0 auto',
+          padding: `0 ${OUTER_PAD}px`,
           boxSizing: 'border-box',
-          flexShrink: 0,
+          ['--m2-q-sticky-h' as any]: `${qStickyH}px`,
         }}>
           {(() => {
             return (
               <>
                 {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글.
                     Phase 59: 탭별 요약 보기 상태를 들어야 해서 TabBody로 분리했다. */}
-                {tabs.map((tab, tabIdx) => (
-                  <TabBody
-                    key={tab.id}
-                    tab={tab}
-                    blocks={problem.tabBlocks[tab.id] || []}
-                    tabIdx={tabIdx}
-                    isOpen={!!openTabs[tab.id]}
-                    copied={copiedTab === tab.id}
-                    contentFontSize={contentFontSize}
-                    onToggleTab={() => toggleTab(tab.id)}
-                    onCopy={() => handleCopyTabMarkdown(tab.id)}
-                  />
-                ))}
+                {tabs.map((tab, tabIdx) => {
+                  const isQ = tab.id === 'question';
+                  const body = (
+                    <TabBody
+                      key={tab.id}
+                      tab={tab}
+                      blocks={problem.tabBlocks[tab.id] || []}
+                      tabIdx={tabIdx}
+                      isOpen={!!openTabs[tab.id]}
+                      copied={copiedTab === tab.id}
+                      contentFontSize={contentFontSize}
+                      widthEm={widthEm}
+                      collapsedPreview={isQ && questionCollapsed}
+                      onToggleTab={() => toggleTab(tab.id)}
+                      onCopy={() => handleCopyTabMarkdown(tab.id)}
+                    />
+                  );
+                  if (!isQ) return body;
+                  /* D25′ — 문제 카드는 스크롤 컨테이너 안에서 상단에 고정된다.
+                     ⚠ 래퍼가 아이보리를 칠해야 한다. 안 칠하면 스크롤된 풀이 카드가
+                       고정된 문제 행의 위·아래 여백을 **통과하며 비친다**
+                       (ListView.tsx:100-107이 같은 함정에 대해 남긴 주석과 같은 처방).
+                     ⚠ sticky는 스크롤 컨테이너가 block이어야 동작한다(D46′). */
+                  return (
+                    <div key={tab.id} ref={questionRowRef} style={{
+                      position: 'sticky', top: 0, zIndex: 3,
+                      background: 'var(--bg-functional)',
+                      paddingTop: 12, marginTop: -12,
+                    }}>
+                      {body}
+                    </div>
+                  );
+                })}
 
                 {/* 하단 여백 — width:0으로 fit-content 부모의 폭 계산에 영향 안 주도록 */}
                 <div style={{ height: '70vh', width: 0 }} />
@@ -716,17 +902,61 @@ export default function ProblemView({
         </div>
       </div>
 
-      {/* ═══ 글자크기 조절 (콘텐츠 우상단, 패널 열려도 콘텐츠 옆에 유지) ═══ */}
+      {/* ═══ 글자크기·가로폭 조절 (콘텐츠 우상단, 패널 열려도 콘텐츠 옆에 유지) ═══
+          ⚠ D49 — 이 컨트롤은 **루트 기준** absolute다(컨텐츠 행 기준이 아니다).
+            제목행이 98→36으로 접히면 좌표를 함께 내려야 콘텐츠 카드 위로 겹치지 않는다.
+          ⚠ 컨텐츠 행(:793)에 position:relative를 주지 말 것 — 그 순간 이 컨트롤과
+            우측 단 토글이 제목바 높이만큼 통째로 내려간다(Phase 62 규약). */}
       <div style={{
-        position: 'absolute', top: 16,
+        position: 'absolute', top: headerSlim ? HEADER_H.slim + 8 : 16,
         right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
         zIndex: 10, display: 'flex', alignItems: 'center', gap: 4,
         transition: panelDragging ? 'none' : 'right 0.18s ease',
       }}>
+        {/* D24′ — 가로폭 스테퍼(em). 글자크기 옆에 같은 문법으로 둔다.
+            ⚠ 최소는 기본값과 같은 35em이다 — "현재 폭을 최소 한계로, 그 미만 축소 불가"(메모). */}
+        <span style={{
+          fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
+          minWidth: 26, textAlign: 'right', userSelect: 'none',
+        }} title="본문 가로폭(em)">{widthEm}em</span>
+        <div style={{ display: 'flex', flexDirection: 'column', marginRight: 6 }}>
+          <button
+            onClick={() => handleWidthChange(1)}
+            disabled={widthEm >= WIDTH_EM_MAX}
+            title="본문 넓히기"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: widthEm >= WIDTH_EM_MAX ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: widthEm >= WIDTH_EM_MAX ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 5 L5 1 L9 5" />
+            </svg>
+          </button>
+          <button
+            onClick={() => handleWidthChange(-1)}
+            disabled={widthEm <= WIDTH_EM_MIN}
+            title="본문 좁히기"
+            style={{
+              border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: widthEm <= WIDTH_EM_MIN ? 'not-allowed' : 'pointer',
+              color: 'var(--text-muted)', opacity: widthEm <= WIDTH_EM_MIN ? 0.3 : 1,
+            }}
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
+              strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M1 1 L5 5 L9 1" />
+            </svg>
+          </button>
+        </div>
         <span style={{
           fontSize: 13, fontWeight: 500, color: 'var(--text-secondary)',
           minWidth: 18, textAlign: 'right', userSelect: 'none',
-        }}>{contentFontSize}</span>
+        }} title="본문 글자 크기(px)">{contentFontSize}</span>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <button
             onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
@@ -770,7 +1000,8 @@ export default function ProblemView({
         onClick={() => setRightOpen((o) => !o)}
         title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
         style={{
-          position: 'absolute', top: 52,
+          // D49 — 제목행 접힘에 연동(글자크기 컨트롤 바로 아래 유지)
+          position: 'absolute', top: headerSlim ? HEADER_H.slim + 44 : 52,
           right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
           zIndex: 11, width: 26, height: 26,
           display: 'flex', alignItems: 'center', justifyContent: 'center',

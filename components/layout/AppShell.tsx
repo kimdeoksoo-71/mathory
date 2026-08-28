@@ -350,7 +350,6 @@ export default function AppShell() {
       await saveSolutionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
       await loadData();
       setView({ type: 'editor', problemId: newProblemId });
-      setCollapsed(true);
     } catch (error) {
       console.error('새 문제 생성 에러:', error);
       await alertDialog('문제 생성에 실패했습니다.');
@@ -369,15 +368,14 @@ export default function AppShell() {
   };
   const handleSelectShareScope = (scope: ShareScope) => {
     setView({ type: 'share', scope });
-    setCollapsed(false);
   };
-  const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); setCollapsed(true); };
-  const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); setCollapsed(true); };
+  const handleViewProblem = (problem: Problem) => { setView({ type: 'problem', problemId: problem.id }); };
+  const handleEditProblem = (problem: Problem) => { setView({ type: 'editor', problemId: problem.id }); };
   const handleNavigateFolder = (folderId: string) => {
     if (folderId === TRASH_FOLDER_ID) { handleSelectTrash(); return; }
     if (folderId === UNASSIGNED_FOLDER_ID || !folderId) { handleSelectUnassigned(); return; }
     const folder = folders.find((f) => f.id === folderId);
-    if (folder) { setView({ type: 'folder', folder }); setCollapsed(false); }
+    if (folder) { setView({ type: 'folder', folder }); }
   };
 
   const handleNewFolder = async () => {
@@ -636,16 +634,15 @@ export default function AppShell() {
     } else {
       setView({ type: 'home' });
     }
-    setCollapsed(false);
     loadData();
   };
 
-  // ProblemView / EditorView 진입 시 사이드바 자동 접기
-  useEffect(() => {
-    if (view.type === 'problem' || view.type === 'editor') {
-      setCollapsed(true);
-    }
-  }, [view]);
+  /* 개선묶음 M2 F(D32′) — ProblemView/EditorView 진입 시 자동 접기를 **제거**했다.
+     의지와 무관하게 접혀서 실사용에 불편했다(덕수). 접힘 상태는 이제 사용자 토글만이 바꾼다.
+     ⚠ 강제 펼침(setCollapsed(false))도 함께 걷어냈다 — 한쪽만 남기면 "내가 접어 둔 것이
+       이동할 때마다 풀리는" 반대 방향의 같은 불편이 된다.
+     ⚠ 좁은 창에서 본문 좌측이 잘리던 문제(Phase 62 K1)는 D의 컨테이너 개편이 담당한다.
+       그래서 F는 D와 같은 스텝이다 — F만 먼저 나가면 K1 잘림이 실결함으로 승격된다(D33′). */
 
   const activeFolderId = view.type === 'folder' ? view.folder.id : null;
   const activeShareScopeKey = view.type === 'share' ? shareScopeKey(view.scope) : null;
@@ -851,7 +848,7 @@ export default function AppShell() {
           </div>
         )}
         {view.type === 'new' && (
-          <NewProblemCreating onBack={() => { setView({ type: 'home' }); setCollapsed(false); }} />
+          <NewProblemCreating onBack={() => { setView({ type: 'home' }); }} />
         )}
       </main>
 
