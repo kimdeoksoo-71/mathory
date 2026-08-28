@@ -1039,6 +1039,26 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 글꼴 크기
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
+  /* 덕수 요청(2026-08-28) — 3번째 이후 탭의 이름 변경·삭제 버튼은 평소에 숨기고
+     hover 0.5초 뒤에 나타낸다. 두 버튼이 상시 보이면 탭 줄이 시끄럽고, 삭제가
+     늘 노출돼 있는 것도 좋지 않다.
+     ⚠ 지연이 없으면 탭 사이를 지나가는 마우스마다 버튼이 번쩍인다.
+     ⚠ 여기서 React 상태를 쓰는 것은 안전하다 — `.preview-content`의 hover를 상태로
+       만들지 말라는 규약(globals.css:857)은 리렌더가 innerHTML을 다시 쓰는 프리뷰
+       한정이다. 탭 줄은 평범한 UI다. */
+  const [tabHoverId, setTabHoverId] = useState<string | null>(null);
+  const tabHoverTimerRef = useRef<number | null>(null);
+  const enterTab = (id: string) => {
+    if (tabHoverTimerRef.current) window.clearTimeout(tabHoverTimerRef.current);
+    tabHoverTimerRef.current = window.setTimeout(() => setTabHoverId(id), 500);
+  };
+  const leaveTab = () => {
+    if (tabHoverTimerRef.current) { window.clearTimeout(tabHoverTimerRef.current); tabHoverTimerRef.current = null; }
+    setTabHoverId(null);
+  };
+  useEffect(() => () => {
+    if (tabHoverTimerRef.current) window.clearTimeout(tabHoverTimerRef.current);
+  }, []);
   /* 덕수 요청(2026-08-28) — 미리보기 본문 가로폭. ProblemView 열람뷰와 **같은 키**를 쓴다:
      두 화면을 오갈 때 폭이 달라지면 같은 문항인데 조판이 바뀐 것처럼 보인다. */
   const [widthEm, setWidthEm] = useState(WIDTH_EM_DEFAULT);
@@ -3471,12 +3491,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         />
 
         {tabs.map((tab, tabIdx) => (
-          <div key={tab.id} style={{
-            display: 'flex', alignItems: 'center', gap: 2,
-            borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
-            transition: 'all var(--transition-fast)',
-            position: 'relative',
-          }}>
+          <div key={tab.id}
+            onMouseEnter={tabIdx >= 2 ? () => enterTab(tab.id) : undefined}
+            onMouseLeave={tabIdx >= 2 ? leaveTab : undefined}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 2,
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
+              transition: 'all var(--transition-fast)',
+              position: 'relative',
+            }}>
             {/* 탭 이름 편집 모드 */}
             {editingTabId === tab.id ? (
               <input
@@ -3511,7 +3534,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             )}
 
             {/* 탭 이름 변경 (3번째 이후만) */}
-            {tabIdx >= 2 && editingTabId !== tab.id && (
+            {tabIdx >= 2 && editingTabId !== tab.id && tabHoverId === tab.id && (
               <button
                 onClick={(e) => { e.stopPropagation(); startEditTabLabel(tab.id); }}
                 title="탭 이름 변경"
@@ -3529,8 +3552,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               </button>
             )}
 
-            {/* 탭 삭제 (3번째 이후만) */}
-            {tabIdx >= 2 && (
+            {/* 탭 삭제 (3번째 이후만) — 이름 변경과 같은 hover 게이트 */}
+            {tabIdx >= 2 && tabHoverId === tab.id && (
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteTab(tab.id); }}
                 title="탭 삭제"
