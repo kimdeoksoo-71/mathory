@@ -208,7 +208,11 @@ export default function TabBody({
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP_EM * contentFontSize,
       marginTop: tabIdx === 0 ? (compactTop ? 6 : 24) : 0,
-      marginBottom: isOpen ? '2em' : '1em',
+      /* 덕수 요청(2026-08-28) — 문제↔풀이 간격을 절반으로.
+         그 간격은 **두 값의 합**이다: 이 marginBottom + sticky 래퍼의 paddingBottom.
+         문제 행만 1em으로 낮추고 래퍼도 8 → 4로 함께 줄인다(fs15에서 38 → 19px).
+         ⚠ 풀이↔풀이2는 2em 그대로다 — 거기까지 좁히면 탭 경계가 흐려진다. */
+      marginBottom: isOpen ? (isQuestion ? '1em' : '2em') : '1em',
     }}>
       {/* 라벨 열 — 라벨 · 복사 · 요약 보기.
           ⚠ flexWrap 필수: 탭 이름은 3번째 탭부터 사용자가 자유롭게 짓고 길이 제한이

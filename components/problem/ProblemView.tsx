@@ -902,7 +902,7 @@ export default function ProblemView({
                       background: 'var(--bg-functional)',
                       paddingTop: headerSlim ? 6 : 12,
                       marginTop: headerSlim ? -6 : -12,
-                      paddingBottom: 8,
+                      paddingBottom: 4,   // 덕수 요청 — 문제↔풀이 간격 절반(TabBody 1em과 합)
                     }}>
                       {body}
                       <div aria-hidden style={{
