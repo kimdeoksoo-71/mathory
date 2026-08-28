@@ -228,8 +228,17 @@ export default function ProblemView({
   /* 덕수 요청(2026-08-28) — 우측 단도 다른 패널처럼 **화면 위쪽 끝까지** 올린다.
      그러려면 컨텐츠 행의 flex 형제가 아니라 루트 기준 absolute여야 한다(제목행 위로 올라가야 하므로).
      ⚠ 자리를 flex가 잡아 주지 않게 되므로 제목행·본문이 **직접 paddingRight로 비켜야** 한다.
-       이 값 하나가 그 셋(제목행·본문·토글 좌표)의 유일한 원천이다. */
-  const rightReserve = panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0);
+       이 값 하나가 그 셋(제목행·본문·토글 좌표)의 유일한 원천이다.
+
+     ⚠ 값의 정의는 "**드로어 카드의 좌측 경계선까지**"다 — 그보다 크면 그 차이만큼
+       빈 띠가 생겨 컨텐츠가 잘려 나간 것처럼 보인다(덕수 지적).
+       두 경우의 좌변 위치가 다르므로 식도 다르다:
+         댓글·agent : right = 8(inset) + width        → 예약 = width + 8
+         우측 단     : right = 8(inset) + (width−16)   → 예약 = width − 8
+       (우측 단만 바깥 자리를 width로 잡고 카드를 그 안에 8px씩 넣기 때문이다) */
+  const rightReserve = panelMode
+    ? comment.width + DRAWER_INSET
+    : (rightColShown ? rightCol.width - DRAWER_INSET : 0);
 
   /* ─── 데이터 로드 ─── */
   const load = useCallback(async () => {
