@@ -993,12 +993,14 @@ export default function ProblemView({
                       background: 'var(--bg-functional)',
                       paddingTop: headerSlim ? 6 : 12,
                       marginTop: headerSlim ? -6 : -12,
-                      paddingBottom: 4,   // 덕수 요청 — 문제↔풀이 간격 절반(TabBody 1em과 합)
+                      paddingBottom: 8,   // 덕수 요청 — 풀이 카드 위 여백 2배(4 → 8)
                     }}>
                       {body}
+                      {/* 풀이 영역 상단 가로선 — 카드가 이 선 밑으로 밀려 들어가며 사라진다.
+                          덕수 요청으로 0.5px --border-light → 1px --border-content(가장 뚜렷한 선). */}
                       <div aria-hidden style={{
                         position: 'absolute', left: lineLeft, width: cardW + 20, bottom: 0,
-                        borderBottom: '0.5px solid var(--border-light)',
+                        borderBottom: '1px solid var(--border-content)',
                         pointerEvents: 'none',
                       }} />
                       {/* 덕수 요청 — 선 바로 아래에서 내용이 흐려지며 사라진다.
@@ -1009,7 +1011,9 @@ export default function ProblemView({
                             래퍼에 overflow를 주면 이 띠가 잘려 효과가 사라진다. */}
                       <div aria-hidden style={{
                         position: 'absolute', left: lineLeft, width: cardW + 20,
-                        top: '100%', height: 26,
+                        /* ⚠ 선 **아래**에서 시작한다(+1px = 선 두께) — 그라디언트가 선 위에
+                           얹히면 선 자체가 흐려져 "밀려 들어가는 경계"가 뭉개진다. */
+                        top: 'calc(100% + 1px)', height: 14,
                         background: 'linear-gradient(to bottom, var(--bg-functional), transparent)',
                         pointerEvents: 'none',
                       }} />
