@@ -14,6 +14,7 @@ import {
   createShare, getShareByProblem, revokeShare, isShareExpired,
   ShareWithSnapshot, EXPIRY_PRESET_DAYS, DEFAULT_EXPIRY_DAYS,
 } from '../../lib/shares';
+import { confirmDialog } from '../../lib/dialogs';
 
 interface ShareSettingsPanelProps {
   problemId: string;
@@ -151,7 +152,9 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
     const msg = liveBPost
       ? '실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단되고 Bazaar 게시도 함께 내려갑니다.'
       : '실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단됩니다.';
-    if (!confirm(msg)) return;
+    if (!await confirmDialog({
+      title: '실시간 공개 중단', message: msg, danger: true, confirmLabel: '중단',
+    })) return;
     setLiveBusy(true); setError(null);
     try {
       await setProblemPublic(problemId, false);
@@ -192,7 +195,9 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
     const msg = snapBPost
       ? '스냅샷 공개를 중단하시겠습니까? 링크가 즉시 무효화되고 Bazaar 게시도 함께 내려갑니다.'
       : '스냅샷 공개를 중단하시겠습니까? 링크가 즉시 무효화됩니다.';
-    if (!confirm(msg)) return;
+    if (!await confirmDialog({
+      title: '스냅샷 공개 중단', message: msg, danger: true, confirmLabel: '중단',
+    })) return;
     setWebBusy(true); setError(null);
     try {
       const sid = webShare.id;
@@ -229,7 +234,11 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
   };
 
   const handleUnregisterBazaar = async (postId: string) => {
-    if (!confirm('Bazaar 게시를 내리시겠습니까? (공개 자체는 유지됩니다)')) return;
+    if (!await confirmDialog({
+      title: 'Bazaar 게시 내리기',
+      message: 'Bazaar 게시를 내리시겠습니까? (공개 자체는 유지됩니다)',
+      danger: true, confirmLabel: '내리기',
+    })) return;
     setBazaarBusy(true); setError(null);
     try { await deleteBazaarPost(postId); await reloadBazaar(); }
     catch (e) { setError(e instanceof Error ? e.message : '게시 내리기 실패'); }

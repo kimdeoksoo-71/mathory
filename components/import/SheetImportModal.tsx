@@ -34,6 +34,7 @@ import { buildFolderTree, flattenVisible, getChildren } from '../../lib/folder-t
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import { IconClose, IconChevron, IconChevronDown, IconFolder, IconPlus } from '../ui/Icons';
+import { promptDialog } from '../../lib/dialogs';
 
 type SheetName = 'Data_DS' | 'Stack';
 
@@ -167,8 +168,11 @@ export default function SheetImportModal({
   /* ── 폴더 새로 만들기 (AppShell 관례와 동일: prompt + order = 형제 수) ── */
   const handleNewFolder = async () => {
     const parent = folderId ?? null;
-    const label = parent ? `"${folders.find((f) => f.id === parent)?.name}" 안에 만들 하위 폴더 이름:` : '새 폴더 이름:';
-    const name = prompt(label);
+    const name = await promptDialog({
+      title: parent ? '하위 폴더 만들기' : '새 폴더',
+      message: parent ? `"${folders.find((f) => f.id === parent)?.name}" 안에 만듭니다.` : undefined,
+      placeholder: '폴더 이름',
+    });
     if (!name?.trim()) return;
     try {
       const id = await createFolder({

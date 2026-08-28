@@ -31,6 +31,7 @@ import {
   IconDocLines,
   IconChevron, IconChevronLeft,
 } from '../ui/Icons';
+import { alertDialog } from '../../lib/dialogs';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -419,7 +420,7 @@ export default function ProblemView({
       await printProblemPdf({ title: problem.title, tabs: printTabs });
     } catch (e) {
       console.error('PDF 생성 오류:', e);
-      alert('PDF 생성 중 오류가 발생했습니다.');
+      await alertDialog('PDF 생성 중 오류가 발생했습니다.');
     } finally {
       setTimeout(() => setIsPrinting(false), 1200);
       setPdfOpen(false);

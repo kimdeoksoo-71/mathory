@@ -8,6 +8,7 @@ import {
   OCR_ACCEPT, OCR_LANGUAGES, validateOcrFile, toDataUrl, normalizeAndFix,
 } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
+import { alertDialog } from '../../lib/dialogs';
 
 export interface CommentEditorHandle {
   focus(): void;
@@ -81,7 +82,7 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
       editorRef.current?.insertAtCursor(payload, payload.length);
       setShowPreview(false);
     } catch (err) {
-      alert(`이미지 업로드 중 오류: ${err instanceof Error ? err.message : String(err)}`);
+      await alertDialog(`이미지 업로드 중 오류: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setImageUploading(false);
     }
@@ -97,7 +98,7 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
     e.target.value = ''; // 같은 파일 재선택 허용
     if (!file) return;
     const err = validateOcrFile(file);
-    if (err) { alert(err); return; }
+    if (err) { await alertDialog(err); return; }
     setOcrLoading(true);
     try {
       const src = await toDataUrl(file);
@@ -108,7 +109,7 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
       });
       const data = await resp.json();
       if (!resp.ok) {
-        alert(data.error || 'OCR 실패');
+        await alertDialog(data.error || 'OCR 실패');
         return;
       }
       const normalized = normalizeAndFix(data.text as string);
@@ -117,7 +118,7 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
       // 미리보기 모드였다면 편집 모드로 전환 (insert 결과 보기 위해)
       setShowPreview(false);
     } catch (err) {
-      alert(`OCR 처리 중 오류: ${err instanceof Error ? err.message : String(err)}`);
+      await alertDialog(`OCR 처리 중 오류: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setOcrLoading(false);
     }

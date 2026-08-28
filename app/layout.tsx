@@ -1,4 +1,5 @@
 import './globals.css';
+import DialogHost from '../components/ui/DialogHost';
 
 export const metadata = {
   title: 'Mathory — Write the logic. Preserve the insight.',
@@ -23,7 +24,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           crossOrigin="anonymous"
         />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* 개선묶음 M2 A — 자체 다이얼로그(alert/confirm/prompt 대체)의 유일한 호스트.
+            여기(루트 레이아웃)에 두어야 admin 라우트·공개 뷰어까지 전부 커버된다.
+            layout은 서버 컴포넌트지만 DialogHost가 'use client'라 그대로 중첩된다. */}
+        <DialogHost />
+      </body>
     </html>
   );
 }

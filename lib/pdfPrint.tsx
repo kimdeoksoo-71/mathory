@@ -1,6 +1,7 @@
 import { Block } from '../types/problem';
 import PrintableContent, { PrintTab } from '../components/print/PrintableContent';
 import '../components/print/PrintStyles.css';
+import { alertDialog } from './dialogs';
 
 export interface PdfPrintTab {
   /** 탭 id (question / solution / extra_N). Phase 58 P2 — 인쇄에서도 톤 스코프를
@@ -61,7 +62,7 @@ export async function printProblemPdf(params: {
   const { title, tabs } = params;
 
   if (tabs.length === 0) {
-    alert('출력할 탭을 하나 이상 선택해주세요.');
+    await alertDialog('출력할 탭을 하나 이상 선택해주세요.');
     return;
   }
 

@@ -74,6 +74,7 @@ import {
   arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
 /* ═══ 타입 & 상수 ═══ */
 
@@ -2273,10 +2274,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (!file) return;
 
     const err = validateOcrFile(file);
-    if (err) { alert(err); return; }
+    if (err) { await alertDialog(err); return; }
 
     if (!activeBlockId || !editorRefs.current[activeBlockId]) {
-      alert('먼저 편집할 블록을 선택해 주세요.');
+      await alertDialog('먼저 편집할 블록을 선택해 주세요.');
       return;
     }
 
@@ -2290,7 +2291,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       });
       const data = await resp.json();
       if (!resp.ok) {
-        alert(data.error || 'OCR 실패');
+        await alertDialog(data.error || 'OCR 실패');
         return;
       }
       const normalized = normalizeAndFix(data.text as string);
@@ -2298,7 +2299,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const payload = `\n${normalized}\n`;
       editorRefs.current[activeBlockId]?.insertText(payload, payload.length);
     } catch (e: any) {
-      alert(`OCR 처리 중 오류: ${e?.message || e}`);
+      await alertDialog(`OCR 처리 중 오류: ${e?.message || e}`);
     } finally {
       setOcrLoading(false);
     }
@@ -2566,12 +2567,19 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   };
 
   /* ═══ 탭 삭제 (3번째 이후만) ═══ */
-  const handleDeleteTab = (tabId: string) => {
+  /* ⚠ 개선묶음 M2 A — 여기가 57곳 중 sync였던 두 곳 중 하나다(A-7′).
+       async 전환은 안전하다: 유일한 호출자(:3393 onClick)의 `stopPropagation`은
+       await 이전에 동기적으로 끝나고, 이 함수는 반환값을 쓰지 않는다. */
+  const handleDeleteTab = async (tabId: string) => {
     const tabIdx = tabs.findIndex((t) => t.id === tabId);
     if (tabIdx < 2) return; // 문제/풀이 탭은 삭제 불가
 
     const tabLabel = tabs[tabIdx].label;
-    if (!confirm(`'${tabLabel}' 탭을 삭제하시겠습니까? 탭 안의 모든 블록이 삭제됩니다.`)) return;
+    if (!await confirmDialog({
+      title: '탭 삭제',
+      message: `'${tabLabel}' 탭을 삭제하시겠습니까? 탭 안의 모든 블록이 삭제됩니다.`,
+      danger: true, confirmLabel: '삭제',
+    })) return;
 
     pushUndo();   // C3: confirm 통과 후
     setTabs((prev) => prev.filter((t) => t.id !== tabId));

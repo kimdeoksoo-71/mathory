@@ -35,6 +35,8 @@ import SearchOverlay from '../layout/SearchOverlay';
 import FolderView from '../problem/FolderView';
 import ProblemView from '../problem/ProblemView';
 import EditorView from '../editor/EditorView';
+import FolderPickerDialog from '../ui/FolderPickerDialog';
+import { alertDialog, confirmDialog, promptDialog } from '../../lib/dialogs';
 
 type ViewState =
   | { type: 'home' }
@@ -87,6 +89,8 @@ export default function AppShell() {
   const { user, loading: authLoading } = useAuth();
 
   const [collapsed, setCollapsed] = useState(false);
+  /* 개선묶음 M2 A-4 — 폴더 이동 픽커 대상 문항(null이면 닫힘) */
+  const [moveTarget, setMoveTarget] = useState<Problem | null>(null);
   /* Phase 62 D13·D18 — 좌측 사이드바 폭. 상한을 창 비례로 묶는 것은 편집창 최소 폭(≈1054px@15px)
      때문이다: 사이드바를 무한정 넓히면 content-frame이 가로 스크롤로 떨어진다. */
   const sidebar = useDrawerResize({
@@ -319,7 +323,7 @@ export default function AppShell() {
   };
 
   const handleNewProblem = async () => {
-    if (!user) { alert('로그인이 필요합니다.'); return; }
+    if (!user) { await alertDialog('로그인이 필요합니다.'); return; }
     // FolderView에서 호출 시: 현재 폴더 아래 생성 (가상 폴더 — 휴지통/미지정/공유받음 — 제외)
     // ProblemView/EditorView/Home에서 호출 시: 미지정(folder_id 없음)
     let targetFolderId: string | undefined;
@@ -349,7 +353,7 @@ export default function AppShell() {
       setCollapsed(true);
     } catch (error) {
       console.error('새 문제 생성 에러:', error);
-      alert('문제 생성에 실패했습니다.');
+      await alertDialog('문제 생성에 실패했습니다.');
     }
   };
 
@@ -378,7 +382,7 @@ export default function AppShell() {
 
   const handleNewFolder = async () => {
     if (!user) return;
-    const name = prompt('새 폴더 이름:');
+    const name = await promptDialog({ title: '새 폴더', placeholder: '폴더 이름' });
     if (!name?.trim()) return;
     try {
       const rootCount = getChildren(folders, null).length;
@@ -390,7 +394,11 @@ export default function AppShell() {
   // Phase 40: 하위 폴더 생성
   const handleNewSubfolder = async (parent: Folder) => {
     if (!user) return;
-    const name = prompt(`"${parent.name}" 안에 만들 하위 폴더 이름:`);
+    const name = await promptDialog({
+      title: '하위 폴더 만들기',
+      message: `"${parent.name}" 안에 만듭니다.`,
+      placeholder: '폴더 이름',
+    });
     if (!name?.trim()) return;
     try {
       const siblingCount = getChildren(folders, parent.id).length;
@@ -403,7 +411,7 @@ export default function AppShell() {
   const handleMoveFolder = async (folder: Folder, newParentId: string | null) => {
     if ((folder.parent_id || null) === (newParentId || null)) return;
     if (newParentId && getDescendantIds(folders, folder.id).has(newParentId)) {
-      alert('폴더를 자기 자신의 하위 폴더로는 이동할 수 없습니다.');
+      await alertDialog('폴더를 자기 자신의 하위 폴더로는 이동할 수 없습니다.');
       return;
     }
     try {
@@ -417,7 +425,10 @@ export default function AppShell() {
   const handleFolderAction = async (action: 'rename' | 'delete', folder: Folder) => {
     switch (action) {
       case 'rename': {
-        const newName = prompt('새 폴더 이름:', folder.name);
+        const newName = await promptDialog({
+          title: '폴더 이름 변경', defaultValue: folder.name, placeholder: '폴더 이름',
+          confirmLabel: '변경',
+        });
         if (newName?.trim() && newName.trim() !== folder.name) {
           try {
             await updateFolder(folder.id, { name: newName.trim() });
@@ -438,7 +449,9 @@ export default function AppShell() {
         const lines = [`"${folder.name}" 폴더를 삭제하시겠습니까?`];
         if (subCount > 0) lines.push(`하위 폴더 ${subCount}개도 함께 삭제됩니다.`);
         if (problemCount > 0) lines.push(`포함된 ${problemCount}개 문항은 미분류로 이동됩니다.`);
-        if (confirm(lines.join('\n'))) {
+        if (await confirmDialog({
+          title: '폴더 삭제', message: lines, danger: true, confirmLabel: '삭제',
+        })) {
           try {
             if (!user) return;
             await deleteFolder(folder.id, user.uid);
@@ -491,7 +504,10 @@ export default function AppShell() {
   const handleProblemAction = async (action: string, problem: Problem) => {
     switch (action) {
       case 'rename': {
-        const newName = prompt('새 이름:', problem.title);
+        const newName = await promptDialog({
+          title: '문항 이름 변경', defaultValue: problem.title, placeholder: '문항 이름',
+          confirmLabel: '변경',
+        });
         if (newName?.trim()) {
           const { updateProblem } = await import('../../lib/firestore');
           await updateProblem(problem.id, { title: newName.trim() });
@@ -506,7 +522,7 @@ export default function AppShell() {
           setView({ type: 'problem', problemId: newId });
         } catch (error) {
           console.error('사본 생성 에러:', error);
-          alert('사본 생성에 실패했습니다.');
+          await alertDialog('사본 생성에 실패했습니다.');
         }
         break;
       }
@@ -524,7 +540,10 @@ export default function AppShell() {
       }
       case 'delete': {
         // 휴지통에서 영구 삭제 (하위 호환)
-        if (confirm(`"${problem.title}"을(를) 영구 삭제하시겠습니까?`)) {
+        if (await confirmDialog({
+          title: '영구 삭제', message: `"${problem.title}"을(를) 영구 삭제하시겠습니까?`,
+          danger: true, confirmLabel: '영구 삭제',
+        })) {
           const { deleteProblem } = await import('../../lib/firestore');
           await deleteProblem(problem.id);
           setView({ type: 'home' });
@@ -543,14 +562,17 @@ export default function AppShell() {
       }
       case 'leave_shared': {
         if (!user) break;
-        if (!confirm(`"${problem.title}" 공유 받기를 해제하시겠습니까?`)) break;
+        if (!await confirmDialog({
+          title: '공유 받기 해제', message: `"${problem.title}" 공유 받기를 해제하시겠습니까?`,
+          danger: true, confirmLabel: '해제',
+        })) break;
         try {
           const { leaveAsMember } = await import('../../lib/membership');
           await leaveAsMember(problem.id, user.uid);
           await loadData();
         } catch (error) {
           console.error('공유 해제 에러:', error);
-          alert('공유 해제에 실패했습니다.');
+          await alertDialog('공유 해제에 실패했습니다.');
         }
         break;
       }
@@ -559,15 +581,11 @@ export default function AppShell() {
         break;
       }
       case 'move': {
-        const folderOptions = folders.map((f) => `${f.name}`).join(', ');
-        const target = prompt(`이동할 폴더 이름 (${folderOptions}):`);
-        if (target) {
-          const folder = folders.find((f) => f.name === target.trim());
-          if (folder) {
-            await moveProblemToFolder(problem.id, folder.id);
-            await loadData();
-          }
-        }
+        /* 개선묶음 M2 A-4 (D6′) — 이름 타이핑 prompt를 폴더 픽커로 교체.
+           옛 방식은 이름 문자열 매칭이라 ① 동명 폴더가 있으면 엉뚱한 곳으로 가고
+           ② 오타를 내면 아무 일도 안 일어났다(무음 실패) ③ '미지정'으로 되돌릴
+           방법이 없었다. 셋 다 픽커에서는 구조적으로 생기지 않는다. */
+        setMoveTarget(problem);
         break;
       }
       case 'download_md': {
@@ -576,11 +594,11 @@ export default function AppShell() {
           if (full) {
             downloadMarkdown(full);
           } else {
-            alert('문제 데이터를 불러올 수 없습니다.');
+            await alertDialog('문제 데이터를 불러올 수 없습니다.');
           }
         } catch (error) {
           console.error('MD 다운로드 에러:', error);
-          alert('다운로드에 실패했습니다.');
+          await alertDialog('다운로드에 실패했습니다.');
         }
         break;
       }
@@ -590,10 +608,15 @@ export default function AppShell() {
   const handleEmptyTrash = async () => {
     const trashCount = allProblems.filter((p) => p.folder_id === TRASH_FOLDER_ID).length;
     if (trashCount === 0) {
-      alert('휴지통이 비어 있습니다.');
+      await alertDialog('휴지통이 비어 있습니다.');
       return;
     }
-    if (confirm(`휴지통의 ${trashCount}개 문항을 영구 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) {
+    if (await confirmDialog({
+      title: '휴지통 비우기',
+      message: [`휴지통의 ${trashCount}개 문항을 영구 삭제하시겠습니까?`,
+                '이 작업은 되돌릴 수 없습니다.'],
+      danger: true, confirmLabel: '영구 삭제',
+    })) {
       try {
         if (!user) return;
         await emptyTrash(user.uid);
@@ -601,7 +624,7 @@ export default function AppShell() {
         await loadData();
       } catch (error) {
         console.error('휴지통 비우기 에러:', error);
-        alert('휴지통 비우기에 실패했습니다.');
+        await alertDialog('휴지통 비우기에 실패했습니다.');
       }
     }
   };
@@ -657,8 +680,10 @@ export default function AppShell() {
         user={user}
         onNewProblem={handleNewProblem}
         onSearch={() => setShowSearch(true)}
-        onSheetImport={() => {
-          if (!user) { alert('로그인이 필요합니다.'); return; }
+        onSheetImport={async () => {
+          // ⚠ 개선묶음 M2 A — 57곳 중 sync였던 두 번째 자리(A-7′).
+          //   prop 타입은 `() => void`지만 `() => Promise<void>`가 할당 가능하다.
+          if (!user) { await alertDialog('로그인이 필요합니다.'); return; }
           setSheetImportOpen(true);
         }}
         onSelectFolder={handleSelectFolder}
@@ -865,6 +890,29 @@ export default function AppShell() {
           problem={shareModalProblem}
           onClose={() => setShareModalProblem(null)}
           onChanged={() => loadData()}
+        />
+      )}
+
+      {/* 개선묶음 M2 A-4 — 문항의 폴더 이동 픽커.
+          ⚠ 폴더 재부모화(handleMoveFolder)와는 다른 흐름이다 — 문항에는 자손이 없으므로
+            순환 방지 검사가 필요 없다. */}
+      {moveTarget && (
+        <FolderPickerDialog
+          folders={folders}
+          currentFolderId={moveTarget.folder_id ?? null}
+          title={`"${moveTarget.title}" 이동`}
+          onCancel={() => setMoveTarget(null)}
+          onPick={async (folderId) => {
+            const target = moveTarget;
+            setMoveTarget(null);
+            try {
+              await moveProblemToFolder(target.id, folderId);
+              await loadData();
+            } catch (error) {
+              console.error('문항 이동 에러:', error);
+              await alertDialog('문항 이동에 실패했습니다.');
+            }
+          }}
         />
       )}
     </div>

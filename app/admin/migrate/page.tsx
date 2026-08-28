@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import useAuth from '../../../hooks/useAuth';
+import { confirmDialog } from '../../../lib/dialogs';
 
 const ADMIN_EMAIL = 'kimdeoksoo@gmail.com';
 
@@ -62,7 +63,13 @@ export default function MigratePage() {
       appendLog('마이그레이션할 대상 없음');
       return;
     }
-    if (!confirm(`정말 ${total}개 문제를 마이그레이션 하시겠습니까?\n\n- authorUid 누락 ${result.needAuthorUid.length}개에 ${user.uid} 채움\n- visibility 누락 ${result.needVisibility.length}개에 'private' 채움`)) {
+    if (!await confirmDialog({
+      title: '마이그레이션 실행',
+      message: [`정말 ${total}개 문제를 마이그레이션 하시겠습니까?`,
+                `- authorUid 누락 ${result.needAuthorUid.length}개에 ${user.uid} 채움`,
+                `- visibility 누락 ${result.needVisibility.length}개에 'private' 채움`],
+      danger: true, confirmLabel: '실행',
+    })) {
       return;
     }
 

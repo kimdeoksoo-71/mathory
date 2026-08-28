@@ -15,7 +15,8 @@
     "test:batch": "tsc lib/verify/batchPlan.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/batchPlan.test.mjs",
     "test:mathsplit": "tsc lib/mathSplit.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathSplit.test.mjs",
     "test:proofread": "tsc lib/proofread.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/proofread.test.mjs",
-    "test:sheet": "tsc lib/sheetImport.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sheetImport.test.mjs"
+    "test:sheet": "tsc lib/sheetImport.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sheetImport.test.mjs",
+    "test:dialogs": "tsc lib/dialogs.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/dialogs.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.1",

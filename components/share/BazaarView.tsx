@@ -5,6 +5,7 @@ import { BazaarPost } from '../../types/problem';
 import {
   listBazaarFeed, deleteBazaarPost, BazaarFeedPage,
 } from '../../lib/bazaar';
+import { confirmDialog } from '../../lib/dialogs';
 
 /**
  * Phase 52 4단계 + 다듬기: Bazaar 전역 피드 + 검색/필터.
@@ -94,7 +95,11 @@ export default function BazaarView({
   };
 
   const handleTakedown = async (post: BazaarPost) => {
-    if (!confirm('Bazaar 게시를 내리시겠습니까? (공개 자체는 유지됩니다)')) return;
+    if (!await confirmDialog({
+      title: 'Bazaar 게시 내리기',
+      message: 'Bazaar 게시를 내리시겠습니까? (공개 자체는 유지됩니다)',
+      danger: true, confirmLabel: '내리기',
+    })) return;
     try {
       await deleteBazaarPost(post.id);
       setPosts((prev) => prev.filter((p) => p.id !== post.id));

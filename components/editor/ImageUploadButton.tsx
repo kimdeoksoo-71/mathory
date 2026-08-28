@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { alertDialog } from '../../lib/dialogs';
 
 interface ImageUploadButtonProps {
   onUpload: (file: File) => Promise<void>;
@@ -20,13 +21,13 @@ export default function ImageUploadButton({ onUpload }: ImageUploadButtonProps) 
 
     // 이미지 파일만 허용
     if (!file.type.startsWith('image/')) {
-      alert('이미지 파일만 업로드할 수 있습니다.');
+      await alertDialog('이미지 파일만 업로드할 수 있습니다.');
       return;
     }
 
     // 5MB 제한
     if (file.size > 5 * 1024 * 1024) {
-      alert('파일 크기는 5MB 이하만 가능합니다.');
+      await alertDialog('파일 크기는 5MB 이하만 가능합니다.');
       return;
     }
 
@@ -35,7 +36,7 @@ export default function ImageUploadButton({ onUpload }: ImageUploadButtonProps) 
       await onUpload(file);
     } catch (error) {
       console.error('업로드 에러:', error);
-      alert('이미지 업로드에 실패했습니다.');
+      await alertDialog('이미지 업로드에 실패했습니다.');
     } finally {
       setUploading(false);
       // input 초기화 (같은 파일 재업로드 가능하도록)

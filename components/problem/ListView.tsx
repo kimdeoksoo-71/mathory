@@ -8,6 +8,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import { IconDotsVertical, IconShare, IconCopy, IconTrash } from '../ui/Icons';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
+import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
 export type ListMode = 'my' | 'received' | 'sent';
 
@@ -72,10 +73,13 @@ export default function ListView({
   const handleMenuAction = async (action: string, p: Problem) => {
     setMenu(null);
     if (action === 'stop_share' && recipientUid) {
-      if (!confirm('이 사용자와의 공유를 중단하시겠습니까?')) return;
+      if (!await confirmDialog({
+        title: '공유 중단', message: '이 사용자와의 공유를 중단하시겠습니까?',
+        danger: true, confirmLabel: '중단',
+      })) return;
       setBusyId(p.id);
       try { await removeMember(p.id, recipientUid); onChanged(); }
-      catch (e) { alert(e instanceof Error ? e.message : '공유 중단 실패'); }
+      catch (e) { await alertDialog(e instanceof Error ? e.message : '공유 중단 실패'); }
       finally { setBusyId(null); }
       return;
     }
@@ -86,7 +90,7 @@ export default function ListView({
     if (!recipientUid) return;
     setBusyId(p.id);
     try { await updateMemberRole(p.id, recipientUid, role); onChanged(); }
-    catch (e) { alert(e instanceof Error ? e.message : '권한 변경 실패'); }
+    catch (e) { await alertDialog(e instanceof Error ? e.message : '권한 변경 실패'); }
     finally { setBusyId(null); }
   };
 

@@ -5,6 +5,7 @@ import { ShareWithSnapshot, createShare, revokeShare, EXPIRY_PRESET_DAYS } from 
 import { updateProblem } from '../../lib/firestore';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { Problem } from '../../types/problem';
+import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
 interface PublishListProps {
   /** 스냅샷 공개 (Phase 50) */
@@ -82,15 +83,22 @@ export default function PublishList({ shares, publicProblems, onChanged }: Publi
   };
 
   const handleRevokeSnapshot = async (s: ShareWithSnapshot) => {
-    if (!confirm('이 공개를 중단하시겠습니까? 링크가 즉시 무효화됩니다.')) return;
+    if (!await confirmDialog({
+      title: '공개 중단', message: '이 공개를 중단하시겠습니까? 링크가 즉시 무효화됩니다.',
+      danger: true, confirmLabel: '중단',
+    })) return;
     setBusyId(`s:${s.id}`);
     try { await revokeShare(s.id); onChanged(); }
-    catch (e) { alert(e instanceof Error ? e.message : '공개 중단 실패'); }
+    catch (e) { await alertDialog(e instanceof Error ? e.message : '공개 중단 실패'); }
     finally { setBusyId(null); }
   };
 
   const handleReissue = async (s: ShareWithSnapshot, days: number | null) => {
-    if (!confirm('만료일을 바꾸면 링크가 새로 발급되어 기존 링크는 무효화됩니다. 계속할까요?')) return;
+    if (!await confirmDialog({
+      title: '만료일 변경',
+      message: '만료일을 바꾸면 링크가 새로 발급되어 기존 링크는 무효화됩니다. 계속할까요?',
+      danger: true, confirmLabel: '변경',
+    })) return;
     setBusyId(`s:${s.id}`);
     try {
       await revokeShare(s.id);
@@ -102,15 +110,18 @@ export default function PublishList({ shares, publicProblems, onChanged }: Publi
       });
       onChanged();
     } catch (e) {
-      alert(e instanceof Error ? e.message : '재발급 실패');
+      await alertDialog(e instanceof Error ? e.message : '재발급 실패');
     } finally { setBusyId(null); }
   };
 
   const handleUnpublishLive = async (p: Problem) => {
-    if (!confirm('실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단됩니다.')) return;
+    if (!await confirmDialog({
+      title: '실시간 공개 중단', message: '실시간 공개를 중단하시겠습니까? 링크 접속이 즉시 차단됩니다.',
+      danger: true, confirmLabel: '중단',
+    })) return;
     setBusyId(`p:${p.id}`);
     try { await updateProblem(p.id, { visibility: 'private' }); onChanged(); }
-    catch (e) { alert(e instanceof Error ? e.message : '공개 중단 실패'); }
+    catch (e) { await alertDialog(e instanceof Error ? e.message : '공개 중단 실패'); }
     finally { setBusyId(null); }
   };
 

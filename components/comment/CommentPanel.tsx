@@ -25,6 +25,7 @@ import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
 import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
+import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
 const HISTORY_LIMIT = 5;
 
@@ -389,7 +390,10 @@ export default function CommentPanel({
   };
 
   const handleDelete = async (commentId: string) => {
-    if (!confirm('이 메시지를 삭제하시겠습니까?')) return;
+    if (!await confirmDialog({
+      title: '메시지 삭제', message: '이 메시지를 삭제하시겠습니까?',
+      danger: true, confirmLabel: '삭제',
+    })) return;
     // Optimistic local update — listener 도착 전이라도 즉시 AI 컨텍스트에서 제외되도록
     // (삭제 직후 새 메시지 전송 시 race condition 차단)
     setComments((prev) => prev.filter((c) => c.id !== commentId));
@@ -400,7 +404,7 @@ export default function CommentPanel({
       // 실패 시 롤백
       console.error('메시지 삭제 실패:', err);
       await refreshComments();
-      alert('삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
+      await alertDialog('삭제 실패: ' + (err instanceof Error ? err.message : String(err)));
     }
   };
 
@@ -424,7 +428,7 @@ export default function CommentPanel({
       await refreshSessions();
       setActiveSessionId(id);
     } catch (e) {
-      alert(e instanceof Error ? e.message : '세션 생성 실패');
+      await alertDialog(e instanceof Error ? e.message : '세션 생성 실패');
     } finally {
       sessionSubmittingRef.current = false;
     }
@@ -443,7 +447,7 @@ export default function CommentPanel({
       setRenamingSessionId(null);
       await refreshSessions();
     } catch (e) {
-      alert(e instanceof Error ? e.message : '이름 변경 실패');
+      await alertDialog(e instanceof Error ? e.message : '이름 변경 실패');
     } finally {
       sessionSubmittingRef.current = false;
     }
@@ -451,7 +455,12 @@ export default function CommentPanel({
 
   const handleDeleteSession = async (s: DiscussionSession) => {
     if (s.type !== 'normal') return;  // 댓글/public 세션은 삭제 불가
-    if (!confirm(`세션 "${s.name}"을(를) 삭제하시겠습니까?\n(메시지는 그대로 남되, 어느 세션에서도 보이지 않게 됩니다.)`)) return;
+    if (!await confirmDialog({
+      title: '세션 삭제',
+      message: [`세션 "${s.name}"을(를) 삭제하시겠습니까?`,
+                '메시지는 그대로 남되, 어느 세션에서도 보이지 않게 됩니다.'],
+      danger: true, confirmLabel: '삭제',
+    })) return;
     try {
       await deleteSession(problemId, s.id);
       await refreshSessions();
@@ -460,7 +469,7 @@ export default function CommentPanel({
         setActiveSessionId(remaining.length > 0 ? remaining[0].id : '');
       }
     } catch (e) {
-      alert(e instanceof Error ? e.message : '세션 삭제 실패');
+      await alertDialog(e instanceof Error ? e.message : '세션 삭제 실패');
     }
   };
 
@@ -631,7 +640,7 @@ export default function CommentPanel({
 
     // 2. agent 모드 — 세션이 있어야 함
     if (!activeSessionId) {
-      alert('먼저 세션을 만들어 주세요.');
+      await alertDialog('먼저 세션을 만들어 주세요.');
       return;
     }
 

@@ -7,6 +7,7 @@ import {
 } from '../../lib/membership';
 import { getProblem } from '../../lib/firestore';
 import { getUserProfile } from '../../lib/users';
+import { confirmDialog } from '../../lib/dialogs';
 
 interface MemberRow {
   uid: string;
@@ -102,7 +103,10 @@ export default function ShareTargetModal({ problem, onClose, onChanged }: ShareT
   };
 
   const handleRemove = async (uid: string) => {
-    if (!confirm('이 사용자와의 공유를 해제하시겠습니까?')) return;
+    if (!await confirmDialog({
+      title: '공유 해제', message: '이 사용자와의 공유를 해제하시겠습니까?',
+      danger: true, confirmLabel: '해제',
+    })) return;
     setBusy(true); setError(null);
     try { await removeMember(problem.id, uid); await refresh(true); }
     catch (e) { setError(e instanceof Error ? e.message : '공유 해제 실패'); }
