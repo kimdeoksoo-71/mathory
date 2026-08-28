@@ -33,7 +33,13 @@ export default function ChoicesBlock({ rawText, locale = 'ko' }: ChoicesBlockPro
       marginTop: '1em',
     }}>
       {choices.map(({ label, content }, i) => (
-        <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: '1em' }}>
+        // 개선묶음 M2 B — 라벨 세로 정렬은 center다(baseline 금지).
+        //   그리드 아이템은 기본 align-items:stretch라 5개 셀의 높이가 이미 같다 →
+        //   center는 5개 라벨을 정확히 같은 y에 놓는다(실측 편차 0.00px @11·15·24px).
+        //   baseline은 큰 수식(.base:has(.mfrac,.sqrt,.op-symbol.large-op)의 상하 0.4em
+        //   padding)이 든 셀에서 첫 라인박스 베이스라인이 내려가 셀마다 어긋난다
+        //   (실측 편차 9.33 / 12.81 / 20.91px). 인쇄 사본(.print-choice-item)도 같은 값.
+        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '1em' }}>
           {/* 원문자 라벨: 유니코드 글리프 그대로. 크기는 --font-circled(P5)가 담당 */}
           <span style={{ flexShrink: 0, lineHeight: 1 }}>{label}</span>
           <div style={{ flex: 1 }}>

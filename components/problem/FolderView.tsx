@@ -24,8 +24,8 @@ import {
 } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
-import CoachLabel from '../ui/CoachLabel';
-import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
+import CoachBlock from '../ui/CoachBlock';
+import { isCoachBlock } from '../../lib/coachBlock';
 import BatchVerifyDialog from './BatchVerifyDialog';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
@@ -338,12 +338,13 @@ export default function FolderView({
         );
       }
       if (isCoachBlock(block.type)) {
-        /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+        /* Phase 59a: 코칭 — 라벨은 raw_text가 아니라 렌더가 붙인다.
+           개선묶음 M2 G(Q13): 카드는 **항상 펼침**이다 — 320px 축약 미리보기에서
+           아이콘 하나만 남으면 무엇이 들었는지 알 수 없다. */
         return (
-          <div key={block.id || `q-${i}`} className={coachClassName(block.type)}>
-            <CoachLabel type={block.type} />
+          <CoachBlock key={block.id || `q-${i}`} type={block.type}>
             <EditorPreview content={block.raw_text} borderless locale="ko" />
-          </div>
+          </CoachBlock>
         );
       }
       if (block.type === 'callout') {
@@ -500,7 +501,15 @@ export default function FolderView({
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
       }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 32px', boxSizing: 'border-box' }}>
+        {/* 개선묶음 M2 E — 카드보기의 열수 제한을 푼다.
+            2열 제한의 진범은 grid가 아니라 이 래퍼의 maxWidth:1200이었다
+            (가용 1136 < 3열 필요폭 1600). 카드보기일 때만 열어 준다 —
+            리스트보기는 Phase 62 D8의 "행 폭 = 제목바 폭(1136)" 정렬 기준선이 걸려 있다.
+            ⚠ longhand는 키를 빼지 말고 항상 값을 줄 것(조건부 style 함정). */}
+        <div style={{
+          maxWidth: effectiveViewMode === 'card' ? 'none' : 1200,
+          margin: '0 auto', padding: '0 32px', boxSizing: 'border-box',
+        }}>
 
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>

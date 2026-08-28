@@ -10,8 +10,8 @@ import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapCl
 import { useOutlineState } from '../../hooks/useOutlineState';
 import OutlineSections from '../problem/OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
-import CoachLabel from '../ui/CoachLabel';
-import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
+import CoachBlock from '../ui/CoachBlock';
+import { isCoachBlock } from '../../lib/coachBlock';
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
@@ -84,12 +84,12 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
     }
 
     if (isCoachBlock(block.type)) {
-      /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
+      /* Phase 59a: 코칭 — 라벨은 raw_text가 아니라 렌더가 붙인다.
+         개선묶음 M2 G: 라벨은 'Tip' 하나, 공개 뷰어도 기본 접힘(아이콘만) */
       return (
-        <div key={block.id} className={coachClassName(block.type)}>
-          <CoachLabel type={block.type} />
+        <CoachBlock key={block.id} type={block.type} collapsible>
           <EditorPreview content={block.raw_text} borderless locale="ko" />
-        </div>
+        </CoachBlock>
       );
     }
     if (block.type === 'callout') {

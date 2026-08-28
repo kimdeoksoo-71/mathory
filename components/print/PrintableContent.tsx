@@ -13,8 +13,8 @@ import './PrintStyles.css';
 import { preprocess, Locale } from '../../lib/preprocess';
 import { toneClass } from '../../lib/keyTone';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
-import CoachLabel from '../ui/CoachLabel';
-import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
+import CoachBlock from '../ui/CoachBlock';
+import { isCoachBlock } from '../../lib/coachBlock';
 
 export interface PrintBlock {
   id: string;
@@ -103,11 +103,11 @@ export default function PrintableContent({
                   /* Phase 59: 경우 — 래퍼가 이미 .case-block이므로 라벨만 주입한다 */
                   <PrintBlockRenderer content={injectCaseLabel(block.raw_text, caseLabel)} locale={locale} />
                 ) : isCoachBlock(block.type) ? (
-                  /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
-                  <div className={coachClassName(block.type)}>
-                    <CoachLabel type={block.type} />
+                  /* Phase 59a: 코칭 — 라벨은 raw_text가 아니라 렌더가 붙인다.
+                     개선묶음 M2 G: 인쇄는 **항상 펼침 + 토글 없음**(지면에 버튼 금지) */
+                  <CoachBlock type={block.type}>
                     <PrintBlockRenderer content={block.raw_text} locale={locale} />
-                  </div>
+                  </CoachBlock>
                 ) : block.type === 'callout' ? (
                   /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
                   <div className="callout-block">

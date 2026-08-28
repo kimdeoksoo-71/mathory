@@ -251,9 +251,12 @@
   margin: 6pt 0;
   break-inside: avoid;
 }
+/* 개선묶음 M2 B — 화면(ChoicesBlock.tsx)과 같은 값. baseline이면 큰 수식이 든 칸의
+   라벨만 내려앉는다. 이 클래스는 PrintableContent에만 있어 화면 누출이 없으므로
+   .print-body 접두를 붙이지 않는다(붙이면 특이도만 바뀐다). */
 .print-choice-item {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.5em;
   min-width: 0;
 }

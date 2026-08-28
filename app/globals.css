@@ -184,8 +184,9 @@
      ⚠ 구속 조건은 FolderView 카드 배경 **#E8DFCE**다(#EDE6DA가 아니다 — 커밋 78a780f).
      ⚠ 이 색과 dim 본문(#675F52)의 대비는 1.17~1.25:1뿐이다. 라벨을 색만으로 구분시키지
        말 것 — 아이콘 + 600 굵기가 실제 식별 수단이다. */
+  /* ⚠ 개선묶음 M2 G — --coach-caution(#a40e26) 삭제. 코칭은 'Tip' 한 종류이고
+       coachClassName이 타입과 무관하게 .coach-important만 낸다. 되살리지 말 것. */
   --coach-important: #6639ba;
-  --coach-caution:   #a40e26;
 
   /* Sizing */
   /* Phase 62 D20 — --sidebar-expanded / --sidebar-collapsed 삭제.
@@ -622,15 +623,16 @@ p:has(.marker-circled) {
      글상자 3종(gana·roman·box)이 이미 같은 일을 하고 아무도 그것을 들여쓰기라 부르지
      않는다. 위치 강조가 필요하면 그건 들여쓰기 블록(callout)의 일이다.
    ⚠ 그래서 경우 사이에 끼어도(.case-gap) rail(-1.8em)과 바(0)가 겹치지 않는다.
-   ⚠ --coach-accent는 .coach-important/.coach-caution이 세우고 .coach-block이 쓴다.
-     두 클래스는 **같은 요소**에 있어야 한다(coachClassName이 그렇게 만든다). */
+   ⚠ --coach-accent는 .coach-important가 세우고 .coach-block이 쓴다.
+     두 클래스는 **같은 요소**에 있어야 한다(coachClassName이 그렇게 만든다).
+   ⚠ 개선묶음 M2 G — 종류는 'Tip' 하나다(.coach-caution 삭제). 색을 나누려면
+     토큰·클래스·coachClassName·CoachLabel 아이콘을 함께 되살려야 한다. */
 .coach-block {
   margin: 1.1em 0;                                   /* K1 — 다른 블록과 동일 */
   border-left: 0.25em solid var(--coach-accent);
   padding-left: 1em;
 }
 .coach-important { --coach-accent: var(--coach-important); }
-.coach-caution   { --coach-accent: var(--coach-caution); }
 
 /* 제목 줄 — 아이콘 + 라벨 어절. 아이콘은 stroke="currentColor"라 이 색을 따라온다.
    ⚠ 특이도 (0,2,0)이 필수다. (0,1,0)으로 두면 .solution-tone(0,1,0)과 동률이 되어
@@ -648,6 +650,24 @@ p:has(.marker-circled) {
   letter-spacing: 0.01em;
 }
 .coach-block .coach-label svg { flex-shrink: 0; }
+
+/* 개선묶음 M2 G — 접힘/펼침 토글(아이콘 클릭).
+   ⚠ 히트 영역은 padding으로 넓히고 **같은 크기의 음수 margin으로 되돌린다** —
+     padding만 주면 아이콘이 밀려 접힘↔펼침에서 좌표가 흔들린다.
+   ⚠ 특이도는 .coach-block 스코프를 유지한다(.solution-tone 동률 회피, Phase 59a F1).
+   ⚠ 인쇄·편집 미리보기·폴더뷰는 onToggle을 넘기지 않아 이 클래스 자체가 붙지 않는다. */
+.coach-block .coach-label .coach-toggle {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
+  margin: -3px -5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.coach-block .coach-label .coach-toggle:focus-visible {
+  outline: 2px solid var(--coach-accent);
+  outline-offset: 1px;
+}
 /* 마지막 문단의 꼬리 마진(0.6em)은 패딩 안에 갇혀 바가 아래로 삐져나온 것처럼 보인다 */
 .coach-block .preview-content > p:last-child { margin-bottom: 0; }
 

@@ -27,8 +27,8 @@ import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '..
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toneClass } from '../../lib/keyTone';
-import { coachClassName, isCoachBlock } from '../../lib/coachBlock';
-import CoachLabel from '../ui/CoachLabel';
+import { isCoachBlock } from '../../lib/coachBlock';
+import CoachBlock from '../ui/CoachBlock';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
@@ -101,8 +101,10 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
   //   `**` 하나만 가리킨다 — 타입 id·클래스·DB는 그대로다(라벨만 바뀐다).
   callout: '들여쓰기',
   // Phase 59a: 코칭 — 강조 4축 중 '신호'. 색·아이콘은 GitHub alert 문법을 가져왔다
-  coach_important: '코칭 (Important)',
-  coach_caution: '코칭 (Caution)',
+  // 개선묶음 M2 G: 종류를 'Tip' 하나로 단일화. coach_caution은 드롭다운에서 빠졌지만
+  //   레거시 블록이 이 라벨 맵을 지나갈 수 있으므로 키는 남겨 둔다.
+  coach_important: '코칭 (Tip)',
+  coach_caution: '코칭 (Tip)',
   // Phase 59: 첫 줄이 제목행(조건), 둘째 줄부터 본문. 번호는 렌더 시 자동 부여
   case: '경우',
   subcase: '하위 경우',
@@ -117,8 +119,12 @@ const BLOCK_TYPE_LABELS: Record<string, string> = {
 };
 
 /** 사용자가 드롭다운에서 직접 선택 가능한 타입. svg는 '그림' 블록에서 종류 모달로만 진입. */
+/* ⚠ 개선묶음 M2 G: coach_caution은 **이 목록에서만** 뺐다.
+     BLOCK_PRESETS·TEXT_BASED_TYPES·SPLITTABLE_TYPES·BLOCK_TYPE_LABELS와
+     lib/solutionOutline.ts에는 그대로 남겨 둔다 — 정규화(normalizeBlockType) 이전에
+     로드된 레거시 블록의 편집·분할·요약이 조용히 죽지 않게 해야 한다. */
 const BLOCK_TYPES: Block['type'][] = [
-  'text', 'heading', 'list', 'callout', 'coach_important', 'coach_caution',
+  'text', 'heading', 'list', 'callout', 'coach_important',
   'case', 'subcase', 'gana', 'roman', 'box', 'choices', 'image',
 ];
 
@@ -160,9 +166,15 @@ const SPLITTABLE_TYPES: Set<string> = new Set([
   'case', 'subcase', 'gana', 'roman', 'box',
 ]);
 
-/** 레거시 타입 → text 정규화 (DB 마이그레이션용) */
+/** 레거시 타입 정규화 (DB 마이그레이션용).
+ *  ⚠ 개선묶음 M2 G — coach_caution → coach_important를 여기서 흡수한다.
+ *    배치 마이그레이션은 돌리지 않는다(E-M2-4): 편집창을 연 문항만 다음 저장에
+ *    확정되고, 열람·공유·인쇄는 coachClassName/COACH_LABELS가 이미 두 타입을
+ *    같게 렌더하므로 어느 시점에도 표시가 갈리지 않는다.
+ *    math_block·bullet → text와 같은 전례다. */
 function normalizeBlockType(type: Block['type']): Block['type'] {
   if (type === 'math_block' || type === 'bullet') return 'text';
+  if (type === 'coach_caution') return 'coach_important';
   return type;
 }
 
@@ -3690,9 +3702,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                       onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                     />
                   ) : isCoachBlock(block.type) ? (
-                    /* Phase 59a: 코칭 — 라벨(Important/Caution)은 raw_text가 아니라 렌더가 붙인다 */
-                    <div className={coachClassName(block.type)}>
-                      <CoachLabel type={block.type} />
+                    /* Phase 59a: 코칭 — 라벨은 raw_text가 아니라 렌더가 붙인다.
+                       개선묶음 M2 G: 편집 미리보기는 **항상 펼침**(편집 중 본문이 숨으면 안 된다) */
+                    <CoachBlock type={block.type}>
                       <EditorPreview
                         content={block.raw_text}
                         borderless
@@ -3700,7 +3712,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                         activeMathId={isActivePreview ? activeMathId : undefined}
                         onClickMath={(mathId) => handlePreviewMathClick(block.id, mathId)}
                       />
-                    </div>
+                    </CoachBlock>
                   ) : block.type === 'callout' ? (
                     /* Phase 57: 들여쓰기 블록(구 '강조문') — 테두리 없이 display 수식과 같은 좌단·상하 여백 */
                     <div className="callout-block">
