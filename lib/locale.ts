@@ -220,6 +220,23 @@ export const REF_CIRCLED_RE = /[①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮]/;
 export const REF_GIYEOK_RE =
   /(?<![가-힣ㄱ-ㅎㅏ-ㅣA-Za-z0-9])([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])(\.?)(?![ㄱ-ㅎㅏ-ㅣA-Za-z0-9])/;
 
+/** 본문 중간 평문 `(3)` 수식 번호 재인용 (개선묶음 M2 C 후속, 2026-08-28).
+ *
+ *  ⚠ v3 D11′은 "평문 `(3)`은 자동 인식하지 않는다(재인용은 `\ref{n}` 규약)"였다.
+ *    **덕수 실사용 보고로 뒤집었다** — `\ref{3}`이 렌더되면 화면에는 그냥 `(3)`이므로,
+ *    사용자가 그것을 보고 다음부터 `(3)`을 직접 타이핑하는 것이 자연스럽다.
+ *  ⚠ 금지의 근거였던 오탐 위험은 두 가지가 이미 막고 있다:
+ *      ① 수식은 이 시점에 `⟦MATH_n⟧`이라 `f(3)`·`(3,5)` 같은 것이 애초에 오지 않는다.
+ *      ② 정의부(`\tag{3}`)가 없으면 말풍선이 **뜨지 않는다** — 오탐의 대가는
+ *         `cursor:help` 하나뿐이다(D18′로 시각 표시가 없어서 눈에도 안 띈다).
+ *  ⚠ 앞이 영숫자·한글 음절·역슬래시면 제외한다 — 평문에 남은 `f(3)`·`A(2)` 방어.
+ *  ⚠ 괄호 안이 **숫자뿐**이어야 한다 — `(3, 5)` 같은 좌표·구간은 안 걸린다.
+ *  ⚠ 행 시작도 인식한다(REF_LEAD_RE에 넣지 않는다) — `(3)에서 x=1이다.`가 실제 인용
+ *    형태이기 때문이다. 대가로 `(1) 첫째` 같은 숫자 열거가 걸리지만, 이 앱의 열거 마커는
+ *    `(가)`·`ㄱ.`·`①`이고 `(1)`은 지원 표기가 아니다 — 게다가 정의부가 없으니
+ *    말풍선은 뜨지 않고 커서만 바뀐다. */
+export const REF_TAGNUM_RE = /(?<![0-9A-Za-z가-힣_\\])\((\d{1,3})\)/;
+
 /** 행 선두의 "정의부 자리" — 여기 있는 마커는 참조가 아니다.
  *  (변환된 정의부는 이미 span이라 보호되지만, 들여쓴 `  (가)`처럼 변환을 못 받은
  *   것이 남을 수 있어 한 겹 더 막는다.) */
@@ -282,7 +299,8 @@ export function convertRefMarkers(text: string): string {
       const rest = body.slice(lead.length)
         .replace(new RegExp(REF_GANA_RE.source, 'g'), (m, ch) => refSpan('gana', ch, m))
         .replace(new RegExp(REF_CIRCLED_RE.source, 'g'), (m) => refSpan('circled', m, m))
-        .replace(new RegExp(REF_GIYEOK_RE.source, 'g'), (m, ch) => refSpan('giyeok', ch, m));
+        .replace(new RegExp(REF_GIYEOK_RE.source, 'g'), (m, ch) => refSpan('giyeok', ch, m))
+        .replace(new RegExp(REF_TAGNUM_RE.source, 'g'), (m, n) => refSpan('tag', n, m));
       return ind + lead + rest;
     }).join('\n'));
 }

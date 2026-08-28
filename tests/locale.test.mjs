@@ -246,3 +246,28 @@ test('M2-C7 행 시작 `ㄱ. `는 참조가 아니라 정의부다 (말풍선은
   assert.equal((out.match(/class="marker-giyeok"/g) || []).length, 2);
   assert.equal(/data-reftype="giyeok"/.test(out), false);
 });
+
+test('M2-C8 평문 (3)은 tag 재인용으로 인식한다 (v3 D11′ 번복)', () => {
+  assert.equal(P('식 (3) 에서'), '식 ' + ref('tag', '3', '(3)') + ' 에서');
+  assert.equal(P('(3)과 (12)를 더하면'),
+    ref('tag', '3', '(3)') + '과 ' + ref('tag', '12', '(12)') + '를 더하면');
+});
+
+test('M2-C9 평문 (N) 오탐 방어', () => {
+  // 앞이 영숫자·한글 음절이면 함수값·식별자다
+  assert.equal(P('평문 f(3)는 함수값'), '평문 f(3)는 함수값');
+  assert.equal(P('수열 a(2)의 값'), '수열 a(2)의 값');
+  // 괄호 안이 숫자뿐이어야 한다 — 좌표·구간은 안 걸린다
+  assert.equal(P('점 (3, 4)와 구간 (0, 1)'), '점 (3, 4)와 구간 (0, 1)');
+  // 수식 안은 애초에 보호된다
+  assert.equal(P('$f(3) = (3)$ 이다'), '$f(3) = (3)$ 이다');
+  // ⚠ 행 시작 (N)은 **인식한다** — `(3)에서 …`가 실제 인용 형태다.
+  //   숫자 열거가 걸리는 것은 감수한다(정의부가 없으면 말풍선이 안 뜬다).
+  assert.match(P('(3)에서 얻은 식'), /^<span class="ref-marker" data-reftype="tag"/);
+});
+
+test('M2-C10 \\ref{n}이 만든 (n)을 다시 감싸지 않는다 (멱등)', () => {
+  const once = P('식 \\ref{3} 과 (4) 에서');
+  assert.equal(preprocessLocale(once, 'ko'), once);
+  assert.equal(once.match(/ref-marker[^>]*><span class="ref-marker"/g), null);
+});

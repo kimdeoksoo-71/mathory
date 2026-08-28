@@ -52,10 +52,12 @@ const CLASS_TO_TYPE: [string, string][] = [
   ['marker-circled', 'circled'],
   ['case-label', 'case'],
   ['tag-marker', 'tag'],
+  ['tag', 'tag'],            // KaTeX 수식 안 \tag — 두 번째 등장이면 첫 번째를 가리킨다
 ];
 
 const TRIGGER_SELECTOR =
-  '[data-reftype], .marker-gana, .marker-giyeok, .marker-circled, .case-label, .tag-marker';
+  '[data-reftype], .marker-gana, .marker-giyeok, .marker-circled, .case-label,'
+  + ' .tag-marker, .katex-html > .tag';
 
 function typeOf(el: HTMLElement): string {
   if (el.dataset.reftype) return el.dataset.reftype;
