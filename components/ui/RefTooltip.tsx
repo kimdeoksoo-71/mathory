@@ -37,6 +37,32 @@ const DEF_SELECTOR: Record<string, string> = {
   tag: '.tag-marker, .katex-html > .tag',
 };
 
+/* ⚠ 정의부 마커도 hover 대상이다 — "첫 등장 = 정의, 이후 = 그 정의에 대한 참조".
+     덕수 실사용 보고(2026-08-28)로 밝혀진 자리다: 풀이에서 보기를 다시 언급할 때
+     `ㄱ. 참이다.`처럼 **행 시작에 마침표 표기**를 쓰는데, 행 시작 `ㄱ.`은 Phase 60이
+     정의부(marker-giyeok)로 못박아 둔 자리라 ref-marker가 붙지 않는다.
+     → 마크업으로는 보기의 `ㄱ.`과 풀이의 `ㄱ.`이 구별되지 않는다. 구별은 **순서**뿐이다.
+     그래서 트리거를 정의부 마커까지 넓히고, 앞선 같은 라벨이 있을 때만 말풍선을 띄운다
+     (첫 등장은 자기 자신이 원본이므로 조용히 아무 일도 하지 않는다).
+   ⚠ 그래서 `.marker-*`에는 cursor:help를 주지 않는다 — 첫 등장은 말풍선이 없는데
+     커서만 바뀌면 거짓 약속이 된다. */
+const CLASS_TO_TYPE: [string, string][] = [
+  ['marker-gana', 'gana'],
+  ['marker-giyeok', 'giyeok'],
+  ['marker-circled', 'circled'],
+  ['case-label', 'case'],
+  ['tag-marker', 'tag'],
+];
+
+const TRIGGER_SELECTOR =
+  '[data-reftype], .marker-gana, .marker-giyeok, .marker-circled, .case-label, .tag-marker';
+
+function typeOf(el: HTMLElement): string {
+  if (el.dataset.reftype) return el.dataset.reftype;
+  for (const [cls, type] of CLASS_TO_TYPE) if (el.classList.contains(cls)) return type;
+  return '';
+}
+
 /** 정의부가 속한 "원문 한 덩어리". 가장 가까운 것이 이긴다(closest의 성질). */
 const HOST_SELECTOR = '.katex-display, p, li, blockquote, td, th';
 
@@ -58,21 +84,27 @@ export default function RefTooltip() {
       if (box) { box.remove(); box = null; }
     };
 
-    /** 참조보다 앞선 것 중 가장 가까운 정의부 → 없으면 문서 첫 번째 → 없으면 null (D15′·Q7) */
+    /** 참조보다 **앞선** 것 중 가장 가까운 정의부. 없으면 null (D15′·Q7).
+     *
+     *  ⚠ `.ref-marker`(명시적 재인용)일 때만 "앞이 없으면 문서 첫 번째"로 물러선다.
+     *    정의부 마커(`.marker-*`)가 트리거일 때는 **앞선 것이 없으면 그것이 곧 원본**이므로
+     *    말풍선을 띄우면 안 된다(자기 자신을 보여주는 꼴이 된다). */
     const findDefinition = (root: HTMLElement, el: HTMLElement): HTMLElement | null => {
-      const type = el.dataset.reftype || '';
+      const type = typeOf(el);
       const sel = DEF_SELECTOR[type];
       if (!sel) return null;
       const want = normalizeRefText(el.textContent || '');
       if (!want) return null;
 
       const hits = Array.from(root.querySelectorAll<HTMLElement>(sel))
-        .filter((d) => d !== el && !el.contains(d) && normalizeRefText(d.textContent || '') === want);
+        .filter((d) => d !== el && !el.contains(d) && !d.contains(el)
+                    && normalizeRefText(d.textContent || '') === want);
       if (hits.length === 0) return null;
 
       // DOCUMENT_POSITION_PRECEDING(2) = 후보가 참조보다 앞에 있다
       const before = hits.filter((d) => el.compareDocumentPosition(d) & Node.DOCUMENT_POSITION_PRECEDING);
-      return before.length ? before[before.length - 1] : hits[0];
+      if (before.length) return before[before.length - 1];
+      return el.dataset.reftype ? hits[0] : null;
     };
 
     const show = (el: HTMLElement, root: HTMLElement) => {
@@ -117,7 +149,7 @@ export default function RefTooltip() {
       const t = e.target as HTMLElement | null;
       if (!t || typeof t.closest !== 'function') return;
       if (box && box.contains(t)) return;                 // 말풍선 내부 이동
-      const el = t.closest<HTMLElement>('[data-reftype]');
+      const el = t.closest<HTMLElement>(TRIGGER_SELECTOR);
       if (!el) return;
       const root = el.closest<HTMLElement>('[data-ref-tooltip]');
       if (!root) return;                                  // 게이트: 열람 2뷰에서만 (D16′)
@@ -130,7 +162,7 @@ export default function RefTooltip() {
     const onOut = (e: Event) => {
       const t = e.target as HTMLElement | null;
       if (!t || typeof t.closest !== 'function') return;
-      if (!t.closest('[data-reftype]')) return;
+      if (!t.closest(TRIGGER_SELECTOR)) return;
       clearTimers();
       // 말풍선으로 건너가는 중일 수 있다 — 유예를 준다
       closeTimer = window.setTimeout(close, GRACE_MS);

@@ -234,3 +234,15 @@ test('M2-C6 멱등: 두 번 돌려도 ref-marker가 중첩되지 않는다', () 
   assert.equal(twice, once, '보호 목록에 ref-marker 자신이 없으면 여기서 깨진다(W3)');
   assert.equal(once.match(/ref-marker[^>]*><span class="ref-marker"/g), null);
 });
+
+test('M2-C7 행 시작 `ㄱ. `는 참조가 아니라 정의부다 (말풍선은 DOM 순서로 가른다)', () => {
+  // 덕수 실사용 보고(2026-08-28): 풀이에서 보기를 다시 언급할 때 행 시작 `ㄱ. `를 쓴다.
+  // 그 자리는 Phase 60이 정의부로 못박아 둔 곳이라 여기서는 ref-marker가 붙지 않는다 —
+  // **마크업으로는 보기의 ㄱ.과 풀이의 ㄱ.이 구별되지 않는다.**
+  // 구별은 순서뿐이고, 그 판정은 RefTooltip이 한다("첫 등장 = 정의, 이후 = 참조").
+  // 이 테스트는 그 전제를 고정한다 — 여기서 ref-marker가 나오기 시작하면
+  // RefTooltip의 순서 규칙과 이중으로 걸려 정의부가 자기 자신을 가리키게 된다.
+  const out = P('ㄱ. 명제 하나\n\nㄱ. 참이다.');
+  assert.equal((out.match(/class="marker-giyeok"/g) || []).length, 2);
+  assert.equal(/data-reftype="giyeok"/.test(out), false);
+});
