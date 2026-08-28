@@ -120,7 +120,29 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **활성 블록을 바꾸는 모든 경로는 `skipNextBlockScrollRef` 계약을 맺을 것 (Phase 45a)**: 플래그는 자동 스크롤 effect **맨 앞**에서 소비한다. `collapseMode` 가드 뒤에 두면 전체접기 중엔 소비되지 않고 남아 나중 전환 하나를 삼킨다. 반대로 **직접 스크롤을 호출하는 핸들러**(`handleSelectBlockBar`)는 effect의 게이트를 우회하므로 같은 조건을 자기 안에 다시 적어야 한다 — Phase 56이 이걸 빠뜨려 Phase 45의 접기 모드 가드가 무력화됐다
 - **click의 `stopPropagation`은 `dblclick`을 막지 않는다 (Phase 45a)**: 별개 이벤트 타입이다. 더블클릭 핸들러가 달린 컨테이너 안의 버튼·스위치에는 `onDoubleClick` 차단을 **따로** 달 것
 - **편집창 블록 인셋은 E형 (Phase 45a)**: 비활성 = 전폭·직각·간격 0 / 활성·선택 = radius 8 + `--block-border-active`. 선은 전부 **0.5px**(레티나 1물리픽셀)이고 **그림자는 쓰지 않는다**. **블록 사이 구분선은 하나뿐** — 그래서 가로선은 **위쪽만** 그린다(아래까지 그리면 인접 두 블록이 각자 내어 2줄). 덕분에 첫 블록은 상단 선이 없고 마지막 블록 아래는 열린다. 직전이 활성 카드면 그 카드의 아래 테두리가 선을 담당하므로 생략(`hideTopLine` — **CSS 형제 선택자로는 불가**, `<div key>` 래퍼가 형제 관계를 끊는다). **비활성의 네 변 0.5px은 `transparent`로 자리를 잡아 둔다** — 아예 빼면 활성 전환 순간 내용물이 밀린다. 편집 패널이 좌우 패딩 0이라 **좌측 기준선 16px**(`.cm-content` 패딩)에 바·하단툴바·미디어 블록·교정 박스를 모두 맞춘다. 열람·공유·인쇄에는 적용하지 않는다
-- **U자 프레임(상·좌·우 0.5px, 상단 직각)은 문항 단위 화면 2곳이 공유한다**: `EditorView` · `ProblemView`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸하므로 **둘을 항상 함께** 손댈 것. Phase 45a는 테두리 선은 **그대로 두고**(블록 좌우 선을 없애는 것만으로 이중 외곽이 풀린다) 상단 라운드 10만 직각으로 바꿨다. ⚠ **`FolderView`는 Phase 62부터 의도적으로 프레임이 없다** — 클레이 = "문항 하나를 보는 중", 아이보리 = "문항 밖"이고 클레이는 카드·리스트 행이 담당한다. **FolderView에 프레임을 되살리지 말 것**(그 점멸이 곧 의도된 상황 변화 신호다)
+- **U자 프레임은 이제 `EditorView` 한 곳뿐이다 (개선묶음 M2 D20′)**: ⚠ **`ProblemView`는 M2에서 프레임을 걷어냈다** — 바탕이 아이보리가 되고 클레이는 **탭별 카드**가 담당한다(FolderView가 Phase 62에서 한 것과 같은 이동). 아래 "2곳 공유" 서술은 M2 이전 기록이다. 화면 전환 시 배경이 달라지는 것은 **수용된 결과**다(E-M2-2). 옛 규약 전문:
+- ~~**U자 프레임(상·좌·우 0.5px, 상단 직각)은 문항 단위 화면 2곳이 공유한다**~~: `EditorView` · `ProblemView`. 한 곳만 바꾸면 화면 전환 시 프레임이 점멸하므로 **둘을 항상 함께** 손댈 것. Phase 45a는 테두리 선은 **그대로 두고**(블록 좌우 선을 없애는 것만으로 이중 외곽이 풀린다) 상단 라운드 10만 직각으로 바꿨다. ⚠ **`FolderView`는 Phase 62부터 의도적으로 프레임이 없다** — 클레이 = "문항 하나를 보는 중", 아이보리 = "문항 밖"이고 클레이는 카드·리스트 행이 담당한다. **FolderView에 프레임을 되살리지 말 것**(그 점멸이 곧 의도된 상황 변화 신호다)
+- **네이티브 `alert`/`confirm`/`prompt` 직접 호출 금지 (개선묶음 M2 A)**: `lib/dialogs.ts` 경유.
+  그 파일은 **import 0**이라 `npm run test:dialogs`가 단독 컴파일한다. 훅이 아니라 **모듈 싱글턴**인
+  이유는 호출부가 React 밖에도 있기 때문이다(`lib/pdfPrint.tsx`). **큐 필수**(겹치면 Escape가 어느 것을
+  닫는지 알 수 없다) · **Host 부재 시 기본값으로 흘려보낼 것**(안 하면 호출부가 영원히 `await`한다).
+  스타일은 `components/ui/dialogStyles.ts` 하나가 소유하고 SheetImportModal 값을 복제했다 —
+  ⚠ 새 규격을 만들지 말 것(목적은 갈래를 없애는 것이지 아홉 번째 모달 디자인이 아니다).
+  `Z_DIALOG = 10500`(현행 최고 10000 위). ⚠ **문항 이동 픽커 ≠ 폴더 재부모화** — 문항엔 자손이 없어
+  순환 방지가 필요 없다(v1 계획서가 둘을 섞어 적었다)
+- **참조 인용 말풍선의 정의부를 언마운트하지 말 것 (개선묶음 M2 C)**: 보기의 정의부(`ㄱ.`·`(가)`·`①`·`\tag`)는
+  **문제 탭에 살고** 참조는 풀이에 있다. 접힘·요약이 문제 탭 내용을 DOM에서 지우면 풀이의 참조가
+  **한꺼번에 무음**이 된다(실제로 그랬다). 숨겨야 하면 `visibility:hidden`(+`position:absolute`)으로
+  **노드를 남길 것**. 그 밖의 규약: 보호 목록에 `ref-marker` **자신**이 들어가야 멱등하고(빠지면 2회째에
+  재감쌈), marker 계열을 **요소 통째로** 보호해야 정의부가 참조로 둔갑하지 않으며, 자모 경계는
+  **뒤쪽 lookahead에서 한글 음절을 배제하지 않는다**(배제하면 `ㄱ이`·`ㄱ은`을 놓친다).
+  게이트(`data-ref-tooltip`)는 **탭 전체를 감싸는 컨테이너**에 — 탭 하나에 붙이면 탭을 가로지르는 인용이 죽는다
+- **ProblemView 본문 컨테이너는 block이어야 한다 (개선묶음 M2 D23′·D45′·D46′)**: flex는 두 가지를 동시에 깬다 —
+  ① `justify-content:center`의 좌측 넘침은 **스크롤 영역에 포함되지 않아** `overflow-x:auto`로도 닿을 수 없다
+  (실측: 자식 780인데 `scrollWidth` 690) ② 기본 `align-items:stretch`가 자식 높이를 눌러 **sticky가 죽는다**
+  (실측: 300px 스크롤 후 −220px). 자식 폭은 `fit-content`가 아니라 **`max-content`**(전자는 유동 폭에서
+  조용히 클램프한다). ⚠ **하단 스페이서 70vh는 자동접힘의 전제**다 — 제목행 접힘은 scrollTop이 아니라
+  clientHeight를 키우므로 스크롤 여유가 없으면 브라우저가 클램프해 임계값 밑으로 떨어뜨리고 진동이 반복된다
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
@@ -206,7 +228,25 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 62(폴더뷰 구조 변경 · 좌우 사이드바 UI 통일)** — 구현·검수·**배포 완료(2026-08-27)**
+## 현재 Phase: **개선묶음 M2(기능 개편 7건)** — 구현·검수 완료(2026-08-28) · **배포 대기**
+
+문서: `docs/phasedocs/개선묶음 M2 기능 개편 v4 실행판.md`
+(계보: v1 web → v2 CLI 실측(v2.1·v2.2) → v3 web 재검증 → **v4 CLI 실행판 = 구현 기록**. v4만 볼 것)
+
+**서버 0 · Firestore 규칙 0 · 스키마 0 · 배치 마이그레이션 0 · 블록 타입 union 0.** 커밋 20개 · 45파일.
+
+- **A** 네이티브 팝업 56곳/14파일 제거 → `lib/dialogs.ts` 3종 + 폴더 픽커
+- **B** 선택지 세로 정렬 `baseline → center`(실측 편차 9.33/12.81/20.91px → **0.00px**)
+- **C** 참조 인용 hover 말풍선(`(가)`·`ㄱ`·`①`·`(3)`·`C1`) — 500ms 후 원문 문단
+- **D** ProblemView 탭별 카드 · 가로폭 조절(35~45em) · sticky 문제 카드 · 스크롤 자동접힘
+- **E** 폴더뷰 카드보기 열수 제한 해제 · **F** 사이드바 자동접힘 제거
+- **G** 코칭블록 'Tip' 단일화 + 기본 접힘
+- **+** 좌·중·우 3단을 밝기 서열로 가름(계획에 없던 후속)
+
+⚠ **계획을 뒤집은 것이 7건(R1~R7)** 있다 — v1~v3을 인용하기 전에 v4 §3을 볼 것.
+로직 검증: 10종 **262개**(`test:dialogs` 6 신설 · `test:locale` 20→30).
+
+### 이전: Phase 62(폴더뷰 구조 변경 · 좌우 사이드바 UI 통일) — 구현·검수·**배포 완료(2026-08-27)**
 
 > ⚠ Vercel 배포 후 **Cmd+Shift+R로 하드 리프레시**할 것 — CDN 캐시 때문에 옛 CSS가 남는다.
 
@@ -263,7 +303,10 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **경우 제목행을 누르면 '구역'이 열린다 (Phase 59a 후속)**: 펼침 단위는 경우 블록 하나가 아니라 **그 경우 + 다음 '제목행 있는' 경우 직전까지의 모든 블록**이다. 경계는 제목 블록에서도 끊기고, **이어짓기는 경계가 아니다**(직전 경우의 연속이므로 딸려 들어간다 — 덕분에 이어짓기 내용이 요약에서 다시 닿는다). 이유: 경우 본문의 일부를 들여쓰기 블록으로 떼어내면 예전 방식에서는 뒷부분이 요약에서 영영 사라져 **"분리하면 요약이 망가지니 분리를 못 하는"** 상태였다. `OutlineItem.segment`(구역 전체)와 `.pinned`(그중 스위치 켠 것)를 `buildOutline`이 만들고, 렌더는 **접힘 = pinned / 펼침 = segment 배타**다(동시에 그리면 같은 블록이 두 번 나온다)
 - **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
-- **우측 패널 3종은 한 규약이다 (2026-08-18)**: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
+- **우측 패널은 4종이고 '떠 있는 카드'다 (개선묶음 M2)**: 우측 단(ProblemView 메뉴·메타) · 댓글 · agent · 버전 드로어. 넷 다 `DRAWER_INSET 8`(사면) · `DRAWER_RADIUS 10` · `DRAWER_BORDER 1px --border-content` · 2겹 그림자 · 폭 `PANEL_WIDTH_DEFAULT 420`. 값은 전부 `components/ui/dialogStyles.ts`가 소유한다. ⚠ **한 변이라도 여백이 0이면** "붙어 있는 패널"로 읽혀 3단 구분이 무너진다. ⚠ **`DRAWER_ROW1_H = 57 − DRAWER_INSET − DRAWER_BORDER_W`(=48)** — 중앙 컨텐츠의 두 가로선(y=57·98)과 정렬하기 위한 값이다. 48을 숫자로 굳히지 말 것이고, 2행(41)은 두 선의 간격이므로 건드리지 말 것. ⚠ **컨텐츠 예약 폭의 정의는 "드로어 카드의 좌측 경계선까지"** 다 — 그보다 크면 그 차이만큼 빈 띠가 생겨 컨텐츠가 잘려 나간 것처럼 보인다. 두 경우의 식이 다르다: 댓글·agent `width + 8`, 우측 단 `width − 8`(우측 단만 바깥 자리를 width로 잡고 카드를 그 안에 넣기 때문)
+- **⚠ EditorView Row1·Row2는 '덮는다' (개선묶음 M2 R6)**: 아래 "덮지 않고 밀어낸다" 규약을 그 두 행에 한해 의도적으로 깼다 — 패널을 여닫을 때마다 제목·탭이 줄었다 늘었다 하며 "편집 대상이 바뀐 것처럼" 보였다. **Row3(content-frame)의 밀어내기는 그대로**다(본문까지 덮으면 편집이 막힌다). 대가로 Row1 우측 끝의 버전 기록·글꼴 조절이 패널 뒤로 숨는다
+- **좌·중·우 3단은 밝기 서열로 가른다 (개선묶음 M2 R7)**: 상대휘도 실측 — 사이드바 `--bg-sidebar #FAF7F2` 0.9326 < 중앙 `--bg-functional #FCFAF6` 0.9572 < 드로어 `--bg-drawer #FFFFFF` 1.0000. 여기에 사이드바 우변 `--rail-hairline`(0.25pt)이 더해진다. ⚠ **서열이 뒤집히면 3단 구분이 통째로 무너진다** — 셋을 함께 볼 것. ⚠ 중앙을 더 낮추지 말 것(`#FBF8F3` 0.9412면 사이드바와의 차가 0.009로 줄어 사실상 사라진다). ⚠ 셋 다 아이보리 계열이라 **명암비 최악값(FolderView 카드 hover `#E8DFCE`)은 불변** — Phase 58·59a 계산은 그대로 유효하다
+- ~~**우측 패널 3종은 한 규약이다 (2026-08-18)**~~: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다
 - **패널 폭 조절은 `useDrawerResize` + `DrawerResizeHandle` 한 벌이 전부다 (Phase 62)**: 소비처 5곳(EditorView 댓글·버전 드로어 / ProblemView 댓글·우측 단 / AppShell 사이드바). **폭 수치만 패널별**이고 문법은 공유한다. ⚠ **훅의 `anchor`(패널이 뷰포트의 어느 변에 고정됐나)와 핸들의 `side`(strip을 부모의 어느 변에서 offset하나)는 다른 개념**이다 — 버전 드로어가 유일하게 갈린다(`anchor:'right'` + `side:'left'`). ⚠ **핸들을 `overflow`가 걸린 상자 안에 두지 말 것** — `overflow-y: auto`는 **가로도 함께 잘린다**(Sidebar `<aside>`는 `overflow:hidden`, ProblemView 우측 단은 `overflowY:auto`라 둘 다 화면 루트에 마운트한다). ⚠ 폭은 **세션 내 상태**이고 새로고침하면 기본값으로 돌아간다(localStorage 금지, 덕수 확정). ⚠ 드래그 중에는 **밀어내기 transition도 함께 꺼야** 본문이 0.2s 뒤처지지 않는다. ⚠ **활성선은 패널 변이 아니라 클레이 우측 경계선(`rightPanelWidth + 8`)에 맞춘다** — 사이드바·ProblemView 우측 단은 자기 변이 곧 경계선이라 `offset: width - 5`지만 **버전 드로어만 자기 변이 경계선이 아니라 `offset: -13`이다**(`-5`로 두면 활성선이 댓글·agent보다 8px 오른쪽에 뜬다 — Phase 62 T7 검수에서 잡힌 유일한 결함)
 - **ProblemView는 댓글·agent 패널이 열리면 우측 단이 존재하지 않는다 (Phase 62)**: 열·리사이즈 핸들·토글 버튼이 함께 사라진다. 패널(min 360)이 우측 단(max 360)을 **완전히 덮는** 구조라(zIndex 50 vs flex 형제) 남겨 두면 보이지 않는 열과 그 위에 뜨는 핸들(zIndex 100 > 50)·무의미한 토글이 생기고, 본문이 `paddingRight`와 우측 단에 **이중으로** 밀려 228~368px 死공간이 남는다. **둘을 공존시키려면 `CommentPanel`에 `rightOffset`을 넣어 패널을 우측 단 왼쪽에 붙이는 별도 작업이 필요하다 — 그것 없이 한쪽만 되살리지 말 것**
 - **ProblemView 컨텐츠 행(`:672`)에 `position:relative`를 주지 말 것 (Phase 62)**: 글자크기 컨트롤(`:730`)과 우측 단 토글(`:777`)이 그 행 **안**에 있으면서 **루트 기준** `top:16`/`top:52`로 배치돼 있다 → 행이 positioned가 되는 순간 둘이 제목바 높이(98px)만큼 내려간다. 우측 단 핸들을 "제목바를 안 가리게" 두려는 우회가 정확히 이 함정이다
