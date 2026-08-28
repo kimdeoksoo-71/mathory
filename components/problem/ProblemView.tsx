@@ -5,7 +5,7 @@ import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder } from '../../types/pr
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
 import { DIFFICULTIES, CATEGORY_OPTIONS } from '../../lib/constants';
-import TabBody, { LABEL_GAP_EM, CARD_PAD_L, CARD_PAD_R } from './TabBody';
+import TabBody, { LABEL_GAP_EM, CARD_PAD_L, CARD_PAD_R, COLLAPSED_CARD_H } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -158,6 +158,11 @@ export default function ProblemView({
   const manualQuestionRef = useRef(false);
   /* sticky 문제 행의 실측 높이 → 풀이 라벨 열의 sticky top (D51 · v3 W7) */
   const questionRowRef = useRef<HTMLDivElement>(null);
+  /* 덕수 보완 1 — 슬림 바에서는 글자크기·가로폭 컨트롤을 **1행 안**으로 올린다.
+     그 아래 띠에 컨트롤만 떠 있으면 정보가 없는 공간이 남는다.
+     우측 단 토글은 같은 줄 왼쪽에 두어야 하므로 컨트롤 묶음의 실폭이 필요하다. */
+  const ctrlRef = useRef<HTMLDivElement>(null);
+  const [ctrlW, setCtrlW] = useState(0);
   const [qStickyH, setQStickyH] = useState(0);
   /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
   const contentScrollRef = useRef<HTMLDivElement>(null);
@@ -415,6 +420,8 @@ export default function ProblemView({
        useOutlineState의 keepAnchor와 같은 처방 — 델타만큼 scrollTop을 되돌린다.
        ⚠ 다만 T1 아래로는 내리지 않는다. 그대로 보정하면 접힘 직후 scrollTop이
          임계값 밑으로 떨어져 자동으로 다시 펼쳐지고, 그 진동이 반복된다. */
+    setCtrlW(ctrlRef.current?.offsetWidth ?? 0);
+
     const prev = lastQHRef.current;
     lastQHRef.current = h;
     const el = contentScrollRef.current;
@@ -872,6 +879,7 @@ export default function ProblemView({
                       contentFontSize={contentFontSize}
                       widthEm={widthEm}
                       collapsedPreview={isQ && questionCollapsed}
+                      compactTop={isQ && headerSlim}
                       onToggleTab={() => toggleTab(tab.id)}
                       onCopy={() => handleCopyTabMarkdown(tab.id)}
                     />
@@ -882,13 +890,26 @@ export default function ProblemView({
                        고정된 문제 행의 위·아래 여백을 **통과하며 비친다**
                        (ListView.tsx:100-107이 같은 함정에 대해 남긴 주석과 같은 처방).
                      ⚠ sticky는 스크롤 컨테이너가 block이어야 동작한다(D46′). */
+                  /* 덕수 보완 3 — 스크롤 중 문제/풀이 카드가 맞닿아 여백이 사라지던 것을
+                     ① 아래 여백(리스트 뷰 카드 간격 4보다 살짝 넓은 8)과
+                     ② 카드보다 살짝 긴 가로선으로 해결한다.
+                     풀이 카드는 그 선 **밑으로** 밀려 들어가며 사라진다. */
+                  const cardW = widthEm * contentFontSize + CARD_PAD_L + CARD_PAD_R;
+                  const lineLeft = 7 * contentFontSize + LABEL_GAP_EM * contentFontSize - 10;
                   return (
                     <div key={tab.id} ref={questionRowRef} style={{
                       position: 'sticky', top: 0, zIndex: 3,
                       background: 'var(--bg-functional)',
-                      paddingTop: 12, marginTop: -12,
+                      paddingTop: headerSlim ? 6 : 12,
+                      marginTop: headerSlim ? -6 : -12,
+                      paddingBottom: 8,
                     }}>
                       {body}
+                      <div aria-hidden style={{
+                        position: 'absolute', left: lineLeft, width: cardW + 20, bottom: 0,
+                        borderBottom: '0.5px solid var(--border-light)',
+                        pointerEvents: 'none',
+                      }} />
                     </div>
                   );
                 })}
@@ -907,11 +928,12 @@ export default function ProblemView({
             제목행이 98→36으로 접히면 좌표를 함께 내려야 콘텐츠 카드 위로 겹치지 않는다.
           ⚠ 컨텐츠 행(:793)에 position:relative를 주지 말 것 — 그 순간 이 컨트롤과
             우측 단 토글이 제목바 높이만큼 통째로 내려간다(Phase 62 규약). */}
-      <div style={{
-        position: 'absolute', top: headerSlim ? HEADER_H.slim + 8 : 16,
+      <div ref={ctrlRef} style={{
+        /* 슬림: 36px 바의 세로 중앙(컨트롤 높이 ≈22) — 아래 띠를 만들지 않는다 */
+        position: 'absolute', top: headerSlim ? 7 : 16,
         right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
-        zIndex: 10, display: 'flex', alignItems: 'center', gap: 4,
-        transition: panelDragging ? 'none' : 'right 0.18s ease',
+        zIndex: 12, display: 'flex', alignItems: 'center', gap: 4,
+        transition: panelDragging ? 'none' : 'right 0.18s ease, top 0.2s ease',
       }}>
         {/* D24′ — 가로폭 스테퍼(em). 글자크기 옆에 같은 문법으로 둔다.
             ⚠ 최소는 기본값과 같은 35em이다 — "현재 폭을 최소 한계로, 그 미만 축소 불가"(메모). */}
@@ -1000,9 +1022,11 @@ export default function ProblemView({
         onClick={() => setRightOpen((o) => !o)}
         title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
         style={{
-          // D49 — 제목행 접힘에 연동(글자크기 컨트롤 바로 아래 유지)
-          position: 'absolute', top: headerSlim ? HEADER_H.slim + 44 : 52,
-          right: 16 + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
+          /* D49 + 덕수 보완 1 — 펼침: 컨트롤 바로 아래 / 슬림: 컨트롤 **왼쪽 같은 줄**.
+             슬림에서 아래로 내려가면 정보 없는 띠가 한 줄 더 생긴다. */
+          position: 'absolute', top: headerSlim ? 5 : 52,
+          right: 16 + (headerSlim ? ctrlW + 10 : 0)
+               + (panelMode ? comment.width + 8 : (rightColShown ? rightCol.width : 0)),
           zIndex: 11, width: 26, height: 26,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           border: 'none', background: 'transparent', cursor: 'pointer',

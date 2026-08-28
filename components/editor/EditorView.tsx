@@ -3132,14 +3132,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         width={version.width}
         resizeHandle={activeResizeHandle === 'version' ? (
           /* Phase 62 D14 — 드로어 **안쪽** 좌변. 핸들 좌표계가 드로어 기준이라 offset이 음수다.
-             ⚠ -5(드로어 좌변 중앙)가 아니라 **-13**이다: 밀어내기 때문에 클레이 우측 경계선은
-                드로어 좌변보다 8px 왼쪽(rightPanelWidth + 8)에 있다. strip 가운데를 거기 맞춰야
-                댓글·agent 핸들(offset = width + 3 → 가운데 width + 8)과 활성선 위치가 통일된다.
+             ⚠ 개선묶음 M2(덕수 보완 4)로 **-13 → -5**로 되돌렸다. Phase 62의 -13은
+                "클레이 우측 경계선이 드로어 좌변보다 8px 왼쪽"이라는 기하에서 나온 값인데,
+                드로어가 8px 안쪽으로 들어가 떠 있는 카드가 되면서 **드로어 좌변 자체가
+                그 경계선**이 됐다. 이제 -5(strip 가운데 = 드로어 좌변)가 정답이고,
+                댓글·agent 핸들(offset = width + 3 → 가운데 width + 8 = 드로어 좌변)과도
+                여전히 같은 자리다.
              ⚠ zIndex는 기본값(100)을 유지할 것 — 드로어의 스태킹 컨텍스트(110) 안이라
                 RestoreConfirm(fixed·1400)이 핸들 위를 덮는다. */
           <DrawerResizeHandle
             side="left"
-            offset={-13}
+            offset={-5}
             active={version.dragging || version.hover}
             {...version.handleProps}
           />

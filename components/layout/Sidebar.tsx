@@ -819,7 +819,11 @@ export default function Sidebar({
       style={{
         width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : width,
         flexShrink: 0,
-        background: 'var(--bg-functional)',
+        /* 개선묶음 M2(덕수 보완 4) — 중앙보다 **미세하게 어둡게** + 가는 세로 구분선.
+           ProblemView의 클레이 프레임이 사라져 좌·중 경계가 안 보이던 것을 되살린다.
+           ⚠ 밝기 서열(사이드바 < 중앙 < 드로어)이 3단 구분의 전부다. 뒤집지 말 것. */
+        background: 'var(--bg-sidebar)',
+        borderRight: 'var(--rail-hairline)',
         display: 'flex',
         flexDirection: 'column',
         transition: dragging ? 'none' : 'width var(--transition-normal)',

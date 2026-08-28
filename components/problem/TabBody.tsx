@@ -42,12 +42,23 @@ export const LABEL_GAP_EM = 2.8;
 export const CARD_PAD_L = 40;
 export const CARD_PAD_R = 36;
 
+/** 카드 모서리 반지름. 덕수 요청(2026-08-28)으로 12 → 6(절반)으로 낮췄다. */
+export const CARD_RADIUS = 6;
+
+/** 접힘 상태 문제 카드의 세로 두께 = 리스트 보기의 가로 막대와 같은 크기.
+ *  ListView 행: padding 9px + 13.5px 텍스트 1줄 + 0.5px 테두리 ≈ 35px.
+ *  ⚠ 본문 글꼴(11~24px)에 비례시키지 않는다 — 이건 본문이 아니라 **크롬**이라
+ *    글꼴을 키워도 두께가 따라 커지면 "접었다"는 신호가 흐려진다. */
+export const COLLAPSED_CARD_H = 35;
+
 interface Props {
   tab: TabMeta;
   /** 본문 폭(em). 기본 35 — 사용자가 우측 상단 스테퍼로 넓힐 수 있다(M2 D24′). */
   widthEm: number;
-  /** 문제 탭 접힘(첫 줄만 보이기). 문제 탭에만 전달된다(M2 D25′). */
+  /** 문제 탭 접힘. 내용은 **완전히** 숨고 리스트 행 두께의 막대만 남는다(덕수 보완 2). */
   collapsedPreview?: boolean;
+  /** 제목행이 슬림일 때 첫 행의 상단 여백을 줄여 카드를 더 위로 올린다(덕수 보완 1). */
+  compactTop?: boolean;
   blocks: Block[];
   tabIdx: number;
   isOpen: boolean;
@@ -58,7 +69,8 @@ interface Props {
 }
 
 export default function TabBody({
-  tab, blocks, tabIdx, isOpen, copied, contentFontSize, widthEm, collapsedPreview, onToggleTab, onCopy,
+  tab, blocks, tabIdx, isOpen, copied, contentFontSize, widthEm,
+  collapsedPreview, compactTop, onToggleTab, onCopy,
 }: Props) {
   const caseLabels = useMemo(() => buildCaseLabels(blocks), [blocks]);
   const caseGaps = useMemo(() => buildCaseGapKeys(blocks), [blocks]);
@@ -195,7 +207,7 @@ export default function TabBody({
          sticky가 움직일 여지를 잃는다(v2 D-19 실측: 300px 스크롤 후 −220px로 흘러감). */
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP_EM * contentFontSize,
-      marginTop: tabIdx === 0 ? 24 : 0,
+      marginTop: tabIdx === 0 ? (compactTop ? 6 : 24) : 0,
       marginBottom: isOpen ? '2em' : '1em',
     }}>
       {/* 라벨 열 — 라벨 · 복사 · 요약 보기.
@@ -259,26 +271,29 @@ export default function TabBody({
            ⚠ --case-dot-fill을 카드 배경으로 재정의한다. 접힘 dot의 속이 배경색이라
              재정의하지 않으면 rail이 dot을 관통한다(globals.css:157 전례).
            ⚠ question 탭의 옛 `marginLeft:-24` 분기는 제거했다 — 이제 모든 탭이 카드다. */
-        <div style={{
-          ...mainColStyle,
-          width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
-          boxSizing: 'border-box',
-          background: collapsedPreview ? 'var(--block-bg-active)' : 'var(--bg-content)',
-          border: '0.5px solid var(--border-content)',
-          borderRadius: 12,
-          padding: `20px ${CARD_PAD_R}px 20px ${CARD_PAD_L}px`,
-          transition: 'background 0.15s',
-          ['--case-dot-fill' as any]:
-            collapsedPreview ? 'var(--block-bg-active)' : 'var(--bg-content)',
-          /* 접힘(문제 탭 전용): 첫 줄만 남기고 하단 페이드 */
-          ...(collapsedPreview ? {
-            maxHeight: `calc(1.8em + 40px)`,
-            overflow: 'hidden',
-            position: 'relative',
-          } : null),
-        }}>
+        <div
+          className={isQuestion ? 'problem-tab-card' : undefined}
+          onClick={isQuestion ? onToggleTab : undefined}
+          title={isQuestion ? (collapsedPreview ? '문제 펼치기' : '문제 접기') : undefined}
+          style={{
+            ...mainColStyle,
+            width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
+            boxSizing: 'border-box',
+            background: 'var(--card-surface, var(--bg-content))',
+            border: '0.5px solid var(--border-content)',
+            borderRadius: CARD_RADIUS,
+            transition: 'background 0.15s, height 0.18s ease',
+            ['--case-dot-fill' as any]: 'var(--card-surface, var(--bg-content))',
+            /* 접힘(문제 탭 전용): 내용을 **아예 그리지 않고** 리스트 행 두께의 막대만 남긴다.
+               ⚠ 첫 줄을 남기면 "잘렸다"로 읽혀 오히려 시선을 끈다 — 접힘은 조용해야 한다. */
+            ...(collapsedPreview
+              ? { height: COLLAPSED_CARD_H, padding: 0, overflow: 'hidden' }
+              : { padding: `20px ${CARD_PAD_R}px 20px ${CARD_PAD_L}px` }),
+            /* 카드 전체가 접힘/펼침 영역이다(덕수 보완 2) — 라벨만으로는 과녁이 너무 작다. */
+            ...(isQuestion ? { cursor: 'pointer' as const } : null),
+          }}>
           {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프 */}
-          <div
+          {!collapsedPreview && <div
             className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id)}`}
             style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
           >
@@ -294,16 +309,7 @@ export default function TabBody({
             ) : (
               blocks.map(renderBlock)
             )}
-          </div>
-          {collapsedPreview && (
-            /* 하단 페이드 — 잘린 자리가 "여기서 끝"이 아니라 "더 있다"로 읽히게 한다.
-               색은 카드 접힘 배경과 같아야 이음매가 보이지 않는다. */
-            <div aria-hidden style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0, height: 22,
-              background: 'linear-gradient(to bottom, rgba(232,223,206,0), var(--block-bg-active))',
-              pointerEvents: 'none',
-            }} />
-          )}
+          </div>}
         </div>
       )}
     </div>

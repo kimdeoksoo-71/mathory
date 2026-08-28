@@ -10,6 +10,7 @@ import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
+import { DRAWER_INSET, DRAWER_RADIUS } from '../ui/dialogStyles';
 
 /**
  * Phase 55 Stage 5 — 우측 버전 기록 드로어.
@@ -286,9 +287,17 @@ export default function VersionDrawer({
        스태킹 컨텍스트를 만들므로, 안에서 열리는 RestoreConfirm(fixed·zIndex 1400)이
        바깥 요소를 덮으려면 드로어 자신이 위에 있어야 한다. */
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0,
+      /* 개선묶음 M2(덕수 보완 4) — 드로어는 **떠 있는 카드**다.
+         상하좌우 네 변에 여백을 두고 둥근 모서리 + 가장 밝은 바탕 + 그림자.
+         (밝기 서열: 사이드바 < 중앙 < 드로어 — 이 서열이 3단 구분의 전부다)
+         ⚠ 리사이즈 활성선은 이제 이 카드의 **좌측 경계선**이다 — 여백 때문에 카드 변과
+           패널 폭이 어긋나므로, 핸들 offset은 카드 변에 맞춰야 한다. */
+      position: 'absolute', top: DRAWER_INSET, right: DRAWER_INSET, bottom: DRAWER_INSET,
       width: width ?? VERSION_DRAWER_WIDTH, maxWidth: '90vw',
-      background: 'var(--bg-panel-agent)',
+      background: 'var(--bg-drawer)',
+      borderRadius: DRAWER_RADIUS,
+      boxShadow: 'var(--drawer-shadow)',
+      overflow: 'hidden',
       display: open ? 'flex' : 'none', flexDirection: 'column', zIndex: 110,
       fontFamily: 'var(--font-ui)',
     }}>

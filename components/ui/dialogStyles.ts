@@ -88,3 +88,9 @@ export function dialogBtn(
     color: kind === 'ghost' ? 'var(--text-primary, #222)' : '#fff',
   };
 }
+
+/* ═══ 개선묶음 M2 (덕수 보완 4) — 우측 드로어 = 떠 있는 카드 ═══
+   상하좌우 같은 여백을 둔다. 한 변이라도 0이면 "붙어 있는 패널"로 읽혀
+   3단 구분(사이드바 < 중앙 < 드로어)의 인상이 무너진다. */
+export const DRAWER_INSET = 8;
+export const DRAWER_RADIUS = 10;

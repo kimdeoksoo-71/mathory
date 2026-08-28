@@ -26,6 +26,7 @@ import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
+import { DRAWER_INSET, DRAWER_RADIUS } from '../ui/dialogStyles';
 
 const HISTORY_LIMIT = 5;
 
@@ -802,11 +803,17 @@ export default function CommentPanel({
 
   return (
     <div style={{
-      position: 'absolute', top: 0, right: 0, bottom: 0,
+      /* 개선묶음 M2(덕수 보완 4) — 드로어는 **떠 있는 카드**다.
+         상하좌우 네 변에 여백을 두고 둥근 모서리 + 가장 밝은 바탕 + 그림자.
+         (밝기 서열: 사이드바 < 중앙 < 드로어 — 이 서열이 3단 구분의 전부다)
+         ⚠ 리사이즈 활성선은 이제 이 카드의 **좌측 경계선**이다 — 여백 때문에 카드 변과
+           패널 폭이 어긋나므로, 핸들 offset은 카드 변에 맞춰야 한다. */
+      position: 'absolute', top: DRAWER_INSET, right: DRAWER_INSET, bottom: DRAWER_INSET,
       width: width, maxWidth: '90vw',
-      // 댓글·agent 모두 아이보리. 댓글 전용 틴트(--bg-panel-comment)는 클레이와 구별이
-      // 흐려 폐기했다(덕수) — 두 패널이 같은 '기능 영역' 키를 쓴다.
-      background: 'var(--bg-panel-agent)',
+      background: 'var(--bg-drawer)',
+      borderRadius: DRAWER_RADIUS,
+      boxShadow: 'var(--drawer-shadow)',
+      overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
       zIndex: 50,
       fontFamily: 'var(--font-ui)',
