@@ -1030,9 +1030,12 @@ export default function ProblemView({
       {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══
           Phase 62 F5 — 패널 열림 중에는 우측 단이 없으므로 이 버튼도 렌더하지 않는다
           (보이지 않는 것을 켜고 끄는 버튼을 남기지 않는다). */}
-      {!panelMode && <button
-        onClick={() => setRightOpen((o) => !o)}
-        title={rightOpen ? '우측 패널 닫기' : '우측 패널 열기'}
+      {/* 덕수 요청 — 닫기는 패널 **안** 1행 왼쪽 버튼이 담당한다.
+          바깥의 이 버튼은 '열기' 전용이라 패널이 열려 있으면 렌더하지 않는다
+          (같은 일을 하는 버튼이 둘이면 어느 것이 무엇인지 알 수 없다). */}
+      {!panelMode && !rightColShown && <button
+        onClick={() => setRightOpen(true)}
+        title="우측 패널 열기"
         style={{
           /* D49 — 제목행 접힘에 연동. 스테퍼가 우측 패널로 들어가면서 이 버튼이
              콘텐츠 우상단의 유일한 떠 있는 컨트롤이 됐다(ctrlW 보정 불필요). */
@@ -1044,7 +1047,7 @@ export default function ProblemView({
           color: 'var(--text-muted)', transition: panelDragging ? 'none' : 'right 0.18s ease',
         }}
       >
-        {rightOpen ? <IconChevron size={16} /> : <IconChevronLeft size={16} />}
+        <IconChevronLeft size={16} />   {/* 열기 전용 — 닫기는 패널 안 1행 왼쪽 */}
       </button>}
 
       {/* ═══ 오른쪽 단: 독립 스크롤, 탭 + 메뉴 + 메타 ═══ */}
@@ -1070,14 +1073,29 @@ export default function ProblemView({
         boxShadow: 'var(--drawer-shadow)',
         display: 'flex', flexDirection: 'column',
       }}>
-        {/* 덕수 요청 — 머리 행(보기 컨트롤) + 구분선. 댓글·agent 패널의 2행 규격
-            (minHeight 41 · padding '0 12px' · gap 6)을 그대로 따라 모양이 통일된다.
-            ⚠ 규격을 바꿀 때는 CommentPanel·VersionDrawer의 같은 행도 함께 볼 것. */}
+        {/* 덕수 요청(2026-08-28) — 머리 행은 댓글·agent·버전 드로어의 **1행 규격**을 따른다:
+            minHeight 57 · padding '0 16px' · gap 12 · 아래 구분선.
+            그래야 패널을 오갈 때 첫 가로선의 Y가 흔들리지 않는다.
+            왼쪽 = 접는 버튼(패널 밖에 떠 있던 것을 안으로), 오른쪽 = 보기 컨트롤.
+            ⚠ 규격을 바꿀 때는 CommentPanel·VersionDrawer의 1행도 함께 볼 것. */}
         <div style={{
-          minHeight: 41, flexShrink: 0, padding: '0 12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6,
+          minHeight: 57, flexShrink: 0, padding: '0 16px',
+          display: 'flex', alignItems: 'center', gap: 12,
           borderBottom: '1px solid var(--border-light)',
         }}>
+          <button
+            onClick={() => setRightOpen(false)}
+            title="우측 패널 닫기"
+            style={{
+              width: 26, height: 26, flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              border: 'none', background: 'transparent', cursor: 'pointer',
+              color: 'var(--text-muted)',
+            }}
+          >
+            <IconChevron size={16} />
+          </button>
+          <div style={{ flex: 1 }} />
           {viewControls}
         </div>
         <div style={{
