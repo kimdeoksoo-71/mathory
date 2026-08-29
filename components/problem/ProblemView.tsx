@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { ProblemWithBlocks, TabMeta, DEFAULT_TABS, Folder } from '../../types/problem';
 import { getProblemWithBlocks, updateProblem, TRASH_FOLDER_ID } from '../../lib/firestore';
 import { getFolderPath } from '../../lib/folder-tree';
@@ -8,7 +8,7 @@ import {
   DIFFICULTIES, CATEGORY_OPTIONS,
   WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
 } from '../../lib/constants';
-import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, COLLAPSED_CARD_H } from './TabBody';
+import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, CARD_RADIUS } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -44,14 +44,26 @@ const FONT_SIZE_MAX = 24;
 const FONT_SIZE_STEP = 1;
 
 
-/* ═══ 스크롤 자동접힘 (D52 · v3 W9) ═══
-   순방향 T1을 넘으면 제목행을 슬림 바로 접고, DELAY_MS 뒤에 문제 카드를 접는다.
-   역방향은 T2(최상단)에서 역순 복원. T1 ≠ T2가 히스테리시스다.
-   튜닝 허용 범위: T1 60~120 · DELAY 200~500 · COOLDOWN 300~600. 밖으로 나가면 문서도 갱신할 것. */
-const M2_COLLAPSE = { T1: 80, T2: 8, DELAY_MS: 300, COOLDOWN_MS: 400 };
+/* ═══ v3 P — 제목행 고정 · 문제 카드는 흐름 그대로 · hold-to-peek ═══
+   M2의 스크롤 자동접힘(M2_COLLAPSE·HEADER_H 2단)은 **통째로 철거**됐다.
+   덕수 판정: "처음엔 신기했는데 반복 사용하니 시각적 피로감" · "카드가 사라지고
+   나타나는 순간 화면이 튄다". 그래서 v3는 튐을 보정하지 않고 **튈 일을 만들지 않는다** —
+   문제 카드를 숨기지도 고정하지도 않고 흐름대로 밀려 올라가게 둔다.
+   ⚠ 되살리지 말 것. 레이아웃을 바꾸는 코드가 하나도 없다는 것이 이 설계의 값이다:
+     scrollTop 보정 · 진동 쿨다운 · 접힘 높이 델타가 전부 필요 없어졌고, 무엇보다
+     **참조 말풍선 회귀 위험이 원천 소멸**했다(카드가 늘 정상 상태로 DOM에 있다). */
 
-/** 제목행 높이 — 펼침(현행 98) / 접힘(슬림 바). D50: height 애니메이션이라 둘 다 px 확정값이어야 한다. */
-const HEADER_H = { open: 98, slim: 36 };
+/** 제목행 높이. ⚠ minHeight가 아니라 height다 — 제목이 줄바꿈해도 커지면 안 된다.
+ *  EditorView Row1+Row2의 가로선 Y(98)와 맞춘 값이다. */
+const HEADER_H = 98;
+
+/** hold-to-peek 알약. 좌측 라벨 거터의 풀이 라벨 **바로 위**에 산다.
+ *  ⚠ ON/OFF가 달라야 한다(히스테리시스). 같으면 경계 스크롤에서 깜빡인다. */
+const PEEK = {
+  BTN_TOP: 12,   // 스크롤 영역 상단 ↔ 알약 (라벨 sticky top 40보다 위)
+  ON: 0,         // 카드 하단 <= 컨테이너 상단 + ON  -> 등장
+  OFF: 8,        // 카드 하단 >= 컨테이너 상단 + OFF -> 소멸
+};
 
 /** 가운데 영역의 좌우 바깥 여백. D22′ — 카드가 좌우 76px을 더하므로 32 → 16으로 낮춰
  *  순증을 +44px로 억제한다. 바탕이 아이보리라 여백이 줄어도 답답해지지 않는다. */
@@ -148,14 +160,14 @@ export default function ProblemView({
     });
   };
 
-  /* D25′·D27′ — 제목행 슬림 여부 · 문제 카드 접힘. 둘 다 비영속(세션 내 상태). */
-  const [headerSlim, setHeaderSlim] = useState(false);
-  const [questionCollapsed, setQuestionCollapsed] = useState(false);
-  /* 사용자가 직접 토글했으면 최상단 복귀까지 자동접힘을 보류한다(D27′). */
-  const manualQuestionRef = useRef(false);
-  /* sticky 문제 행의 실측 높이 → 풀이 라벨 열의 sticky top (D51 · v3 W7) */
+  /* v3 P3 — 문제 카드가 화면 밖으로 완전히 나갔는가. **알약 표시만** 좌우하고
+     레이아웃은 건드리지 않는다(그래서 진동이 구조적으로 불가능하다). */
+  const [problemOffscreen, setProblemOffscreen] = useState(false);
+  /* v3 P6 — 알약을 누르고 있는 동안만 true. 토글이 아니다: 손을 떼면 원상복귀라
+     "되돌리는 것을 잊는" 상태가 남지 않는다. */
+  const [peeking, setPeeking] = useState(false);
+  /* 문제 행 실측용(P3 판정 전용). ⚠ 더 이상 sticky가 아니다. */
   const questionRowRef = useRef<HTMLDivElement>(null);
-  const [qStickyH, setQStickyH] = useState(0);
   /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
@@ -308,13 +320,10 @@ export default function ProblemView({
 
   /* ─── 탭 토글 ─── */
   const toggleTab = (tabId: string) => {
-    /* D25′ — 문제 탭 라벨 클릭은 "탭 열고 닫기"가 아니라 **접힘 미리보기 토글**이다.
-       (수동 조작은 최상단으로 돌아갈 때까지 자동접힘을 이긴다) */
-    if (tabId === 'question') {
-      manualQuestionRef.current = true;
-      setQuestionCollapsed((v) => !v);
-      return;
-    }
+    /* v3 P15 — 문제 탭의 접힘 개념이 사라졌다. 라벨·카드 클릭 토글도 함께 제거했고
+       openTabs['question']은 항상 true다. 되살리지 말 것: 접기가 있으면 그 순간
+       레이아웃이 바뀌고, v3가 없앤 튐이 그 경로로 되돌아온다. */
+    if (tabId === 'question') return;
     setOpenTabs((prev) => ({ ...prev, [tabId]: !prev[tabId] }));
   };
 
@@ -395,15 +404,13 @@ export default function ProblemView({
           (mathEl ?? el).classList.add(mathEl ? 'math-highlight-active' : 'verify-jump-flash');
 
           /* 강조 대상을 화면 세로 중앙에 (화면보다 크면 상단 기준).
-             ⚠ D29′ — sticky 문제 행이 상단을 덮으므로 그만큼 더 올려야 대상이 그 뒤로
-               숨지 않는다. 중앙 정렬이라 대개는 안전하지만, 화면보다 큰 블록은 상단
-               기준(−80)이라 정확히 그 자리에서 가려진다. */
-          const stickyH = questionRowRef.current?.offsetHeight ?? 0;
+             ⚠ v3 P16 — D29′의 sticky 오프셋을 걷어냈다. 문제 행이 더 이상 상단을
+               덮지 않으므로 보정할 것이 없다. 카드를 "먼저 되살리는" 처리도 불필요하다. */
           const r = target.getBoundingClientRect();
           const cr = container.getBoundingClientRect();
-          const top = r.height < cr.height - stickyH
-            ? r.top - cr.top + container.scrollTop + r.height / 2 - (cr.height + stickyH) / 2
-            : r.top - cr.top + container.scrollTop - 80 - stickyH;
+          const top = r.height < cr.height
+            ? r.top - cr.top + container.scrollTop + r.height / 2 - cr.height / 2
+            : r.top - cr.top + container.scrollTop - 80;
           fastScrollTo(container, Math.max(0, top), 300);
 
           // 수식 강조는 잠깐만 — 남아 있으면 "지금 여기"라는 신호가 죽는다
@@ -416,67 +423,35 @@ export default function ProblemView({
     }
   }, [problem, openTabs]);
 
-  /* ═══ D51 — sticky 문제 행의 높이를 CSS 변수로 (풀이 라벨 열의 sticky top) ═══
-     ResizeObserver를 상시 돌리지 않는다(Q10 우려). 값이 달라질 수 있는 계기에만 1회 잰다:
-     문제 카드 접힘 토글 · 글꼴 크기 · 본문 폭 · 문항 로드. */
-  const lastQHRef = useRef(0);
-  useLayoutEffect(() => {
-    const h = questionRowRef.current?.offsetHeight ?? 0;
-    setQStickyH(h);
-
-    /* D27′ — 문제 카드 높이가 급변하면 아래 내용이 그만큼 위로 올라와 화면이 튄다.
-       (sticky라 화면 위쪽에 고정돼 있어도 **흐름상의 자리**는 문서 최상단이므로
-        그 높이가 줄면 아래가 전부 당겨 올라온다.)
-       useOutlineState의 keepAnchor와 같은 처방 — 델타만큼 scrollTop을 되돌린다.
-       ⚠ 다만 T1 아래로는 내리지 않는다. 그대로 보정하면 접힘 직후 scrollTop이
-         임계값 밑으로 떨어져 자동으로 다시 펼쳐지고, 그 진동이 반복된다. */
-    const prev = lastQHRef.current;
-    lastQHRef.current = h;
-    const el = contentScrollRef.current;
-    if (el && prev && h && prev !== h && el.scrollTop > 0) {
-      const delta = prev - h;
-      el.scrollTop = Math.max(M2_COLLAPSE.T1 + 1, el.scrollTop - delta);
-    }
-  }, [questionCollapsed, contentFontSize, widthEm, problem, openTabs]);
-
-  /* ═══ D27′ — 스크롤 자동접힘 (문제 탭만) ═══
-     순방향: T1 초과 → 제목행 슬림 → DELAY_MS 뒤 문제 카드 접힘.
-     역방향: T2 이하(최상단) → 문제 펼침 → 제목행 복원.
-     ⚠ 히스테리시스: T1 ≠ T2 + 쿨다운. 없으면 경계 스크롤에서 진동한다.
-     ⚠ 제목행 접힘은 scrollTop을 바꾸지 않고 컨테이너 clientHeight만 키운다 →
-       스크롤 여유가 없으면 브라우저가 scrollTop을 클램프해 다시 T1 아래로 떨어뜨린다.
-       하단 스페이서(70vh)가 그것을 막는다 — **스페이서를 줄이거나 없애지 말 것**(D28′).
-     ⚠ 사용자가 라벨을 눌러 직접 토글했으면 최상단 복귀까지 자동접힘을 보류한다. */
-  const collapseTimerRef = useRef<number | null>(null);
-  const lastFlipRef = useRef(0);
+  /* ═══ v3 P3 — 문제 카드가 완전히 화면 밖으로 나갔는가 ═══
+     ⚠ 여기서 하는 일은 **불리언 하나를 뒤집는 것**이 전부다. scrollTop을 쓰지도,
+       되돌리지도 않는다. M2의 D51 높이 측정 effect와 D27′ 자동접힘 effect는
+       통째로 사라졌다 — 레이아웃이 변하지 않으므로 잴 것도 보정할 것도 없다.
+     ⚠ 히스테리시스(ON 0 / OFF 8): 같은 임계값이면 경계에서 알약이 깜빡인다.
+     ⚠ rect 비교라 스크롤 위치와 무관하게 항상 옳다. 스페이서·패딩·글꼴이 바뀌어도
+       "카드 하단이 컨테이너 상단 위로 갔는가"는 그대로 성립한다. */
   const handleContentScroll = useCallback(() => {
     const el = contentScrollRef.current;
-    if (!el) return;
-    const y = el.scrollTop;
-    const now = performance.now();
-
-    if (y > M2_COLLAPSE.T1) {
-      if (!headerSlim && now - lastFlipRef.current > M2_COLLAPSE.COOLDOWN_MS) {
-        lastFlipRef.current = now;
-        setHeaderSlim(true);
-        if (collapseTimerRef.current) window.clearTimeout(collapseTimerRef.current);
-        collapseTimerRef.current = window.setTimeout(() => {
-          if (!manualQuestionRef.current) setQuestionCollapsed(true);
-        }, M2_COLLAPSE.DELAY_MS);
-      }
-    } else if (y <= M2_COLLAPSE.T2) {
-      if (collapseTimerRef.current) { window.clearTimeout(collapseTimerRef.current); collapseTimerRef.current = null; }
-      manualQuestionRef.current = false;            // 최상단 복귀 = 수동 조작 해제
-      if (questionCollapsed) setQuestionCollapsed(false);
-      if (headerSlim && now - lastFlipRef.current > M2_COLLAPSE.COOLDOWN_MS) {
-        lastFlipRef.current = now;
-        setHeaderSlim(false);
-      }
-    }
-  }, [headerSlim, questionCollapsed]);
-  useEffect(() => () => {
-    if (collapseTimerRef.current) window.clearTimeout(collapseTimerRef.current);
+    const row = questionRowRef.current;
+    if (!el || !row) return;
+    const gap = row.getBoundingClientRect().bottom - el.getBoundingClientRect().top;
+    setProblemOffscreen((prev) => (prev ? gap < PEEK.OFF : gap <= PEEK.ON));
   }, []);
+
+  /* 문항이 바뀌면 초기화. 새 문항은 최상단에서 시작하므로 알약이 남아 있으면 거짓말이 된다. */
+  useEffect(() => { setProblemOffscreen(false); setPeeking(false); }, [problem?.id]);
+
+  /* ═══ v3 P6·P7 — hold-to-peek ═══
+     ⚠ setPointerCapture 필수: 누른 채 알약 밖으로 나가서 떼면 pointerup이 알약에
+       오지 않아 **카드가 안 닫힌다**. 캡처하면 뗀 위치와 무관하게 여기로 온다.
+     ⚠ blur·pointercancel도 닫아야 한다(탭 전환·시스템 제스처로 포인터가 증발한다).
+     ⚠ keydown은 길게 누르면 반복 발화하므로 이미 열려 있으면 무시한다. */
+  const startPeek = useCallback((e: React.PointerEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* 캡처 실패해도 열기는 한다 */ }
+    setPeeking(true);
+  }, []);
+  const endPeek = useCallback(() => setPeeking(false), []);
 
   /* ─── 탭 Markdown 복사 ─── */
   const handleCopyTabMarkdown = async (tabId: string) => {
@@ -755,23 +730,27 @@ export default function ProblemView({
       overflow: 'hidden', position: 'relative',
     }}>
       {/* ═══ 제목바: U자 밖 아이보리 chrome — [폴더경로 | 제목]. 아래 빈 공간은 추후 메타데이터 ═══ */}
-      {/* D50 — 접힘은 **height 애니메이션**이다(transform 금지: 공간을 회수하지 못한다).
-          제목행은 스크롤 컨테이너의 형제라 높이가 바뀌어도 sticky top 계산에 영향이 없다.
-          ⚠ 접힘 상태에서는 EditorView와의 가로 경계선 Y 정렬(98)이 의도적으로 깨진다
-            — 배경 차이를 감수한 E-M2-2와 같은 범위의 수용이다(v3 W10). */}
+      {/* v3 P1 — 제목행은 스크롤과 무관하게 위치·크기를 그대로 유지한다(덕수: 안정감).
+          M2의 슬림 접힘(height 애니메이션 98↔36)은 철거했다.
+          ⚠ height는 고정값이다. minHeight로 두면 제목이 줄바꿈할 때 커져 EditorView와의
+            가로선 Y 정렬(98)이 깨진다.
+          v3 P18 — 아래 경계선은 **상시**다. 제목행과 스크롤 영역이 둘 다 아이보리라
+          선이 없으면 클레이 카드가 보이지 않는 경계에서 잘려 "왜 잘렸지"가 된다.
+          ⚠ 값은 EditorView Row1과 **같아야** 한다(1px --border-light) — 두 화면을 오갈 때
+            첫 가로선의 굵기·색이 달라지면 그것이 곧 불안정으로 읽힌다. */}
       <div style={{
         flexShrink: 0, background: 'var(--bg-functional)',
-        height: headerSlim ? HEADER_H.slim : HEADER_H.open,
+        height: HEADER_H,
         overflow: 'hidden',
         paddingRight: rightReserve,
-        transition: panelDragging ? 'none' : 'padding-right 0.18s ease, height 0.2s ease',
+        transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
         display: 'flex', justifyContent: 'center',
-        alignItems: headerSlim ? 'center' : 'flex-start',
-        borderBottom: headerSlim ? '0.5px solid var(--border-light)' : 'none',
+        alignItems: 'flex-start',
+        borderBottom: '1px solid var(--border-light)',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: LABEL_GAP,
-          padding: headerSlim ? `0 ${OUTER_PAD}px` : `22px ${OUTER_PAD}px 0`,
+          padding: `22px ${OUTER_PAD}px 0`,
           boxSizing: 'border-box',
         }}>
           {/* 헤더 라벨 박스 — 폭 7em 고정. 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}
@@ -779,12 +758,9 @@ export default function ProblemView({
               제목 좌단이 좌측으로 튀어 접힘/펼침에서 제목이 가로로 움직인다(D40″). */}
           <div
             ref={labelBoxRef}
-            onMouseEnter={() => { if (hasAncestors && !headerSlim) setFolderPathHover(true); }}
+            onMouseEnter={() => { if (hasAncestors) setFolderPathHover(true); }}
             onMouseLeave={() => setFolderPathHover(false)}
             style={{
-              opacity: headerSlim ? 0 : 1,
-              pointerEvents: headerSlim ? 'none' : 'auto',
-              transition: 'opacity 0.15s',
               ...labelColStyle,
               position: 'relative', height: '1.5em',
               display: 'flex', alignItems: 'center',
@@ -849,32 +825,32 @@ export default function ProblemView({
                 버튼이 밀려나 사라진다 → .btns에 flexShrink:0, 컨테이너에 minWidth:0.
               ⚠ 폭·좌단은 펼침과 같다(D40″) — 접힘/펼침에서 제목이 가로로 움직이면 안 된다. */}
           <h1
-            onClick={() => { if (isOwnerView && !headerSlim) onEdit?.(problem); }}
+            onClick={() => { if (isOwnerView) onEdit?.(problem); }}
             style={{
               ...mainColStyle,
               width: (mainColStyle.width as number) + CARD_PAD_L_EM * contentFontSize + CARD_PAD_R_EM * contentFontSize,
               paddingLeft: CARD_PAD_L_EM * contentFontSize, boxSizing: 'border-box',
               minWidth: 0,
-              fontSize: headerSlim ? 12.5 : 22, fontWeight: 600,
-              color: headerSlim ? 'var(--text-secondary)' : 'var(--text-primary)',
-              margin: 0, lineHeight: headerSlim ? 1 : 1.2,
+              fontSize: 22, fontWeight: 600,
+              color: 'var(--text-primary)',
+              margin: 0, lineHeight: 1.2,
               fontFamily: 'var(--font-ui)',
-              cursor: isOwnerView && !headerSlim ? 'pointer' : 'default',
+              cursor: isOwnerView ? 'pointer' : 'default',
               display: 'flex', alignItems: 'center',
-              transform: expanded && !headerSlim ? `translateX(${titleSlide}px)` : 'translateX(0)',
-              transition: 'color 0.15s, transform 0.25s ease, font-size 0.2s ease',
+              transform: expanded ? `translateX(${titleSlide}px)` : 'translateX(0)',
+              transition: 'color 0.15s, transform 0.25s ease',
             }}
             onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)'; }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.color =
-                headerSlim ? 'var(--text-secondary)' : 'var(--text-primary)';
+                'var(--text-primary)';
             }}
             title="클릭하여 편집"
           >
             <span style={{
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
             }}>{problem.title}</span>
-            {!headerSlim && <BlockchainBadge problem={problem} size={16} />}
+            <BlockchainBadge problem={problem} size={16} />
             {/* Phase 47: 댓글 버튼 — 오너 OR (멤버 && 댓글 보임) */}
             {user && (isOwnerView || (isMemberView && problem.commentsVisible !== false)) && (
               <button
@@ -949,92 +925,120 @@ export default function ProblemView({
               fit-content는 정의상 가용폭으로 **클램프**해서, 나중에 카드 폭이 유동이 되면
               조용히 잘리기 시작한다. 의미가 곧 의도인 쪽을 쓴다.
             ⚠ 패널 열림 시의 우측 정렬은 `margin-left:auto`로 등가 이전(구 unsafe flex-end).
-            ⚠ --m2-q-sticky-h: 풀이 라벨 열의 sticky top (D51). */}
+            ⚠ v3 P13 — hold-to-peek로 띄우는 문제 카드는 **이 게이트 밖**에 그려야 한다.
+              같은 블록을 두 번 그리는 것이라 안에 두면 보기(ㄱ.·(가)·①)의 정의부가
+              두 벌이 되어 "참조보다 앞선 것 중 가장 가까운 것"이라는 탐색이 흔들린다. */}
         <div data-ref-tooltip style={{
           width: 'max-content',
           margin: panelMode ? '0 0 0 auto' : '0 auto',
           padding: `0 ${OUTER_PAD}px`,
           boxSizing: 'border-box',
-          ['--m2-q-sticky-h' as any]: `${qStickyH}px`,
         }}>
-          {(() => {
-            return (
-              <>
-                {/* 탭 행: [탭 라벨 | 탭 본문] — 라벨은 항상 표시, 본문은 토글.
-                    Phase 59: 탭별 요약 보기 상태를 들어야 해서 TabBody로 분리했다. */}
-                {tabs.map((tab, tabIdx) => {
-                  const isQ = tab.id === 'question';
-                  const body = (
-                    <TabBody
-                      key={tab.id}
-                      tab={tab}
-                      blocks={problem.tabBlocks[tab.id] || []}
-                      tabIdx={tabIdx}
-                      isOpen={!!openTabs[tab.id]}
-                      copied={copiedTab === tab.id}
-                      contentFontSize={contentFontSize}
-                      widthEm={widthEm}
-                      collapsedPreview={isQ && questionCollapsed}
-                      compactTop={isQ && headerSlim}
-                      onToggleTab={() => toggleTab(tab.id)}
-                      onCopy={() => handleCopyTabMarkdown(tab.id)}
-                    />
-                  );
-                  if (!isQ) return body;
-                  /* D25′ — 문제 카드는 스크롤 컨테이너 안에서 상단에 고정된다.
-                     ⚠ 래퍼가 아이보리를 칠해야 한다. 안 칠하면 스크롤된 풀이 카드가
-                       고정된 문제 행의 위·아래 여백을 **통과하며 비친다**
-                       (ListView.tsx:100-107이 같은 함정에 대해 남긴 주석과 같은 처방).
-                     ⚠ sticky는 스크롤 컨테이너가 block이어야 동작한다(D46′). */
-                  /* 덕수 보완 3 — 스크롤 중 문제/풀이 카드가 맞닿아 여백이 사라지던 것을
-                     ① 아래 여백(리스트 뷰 카드 간격 4보다 살짝 넓은 8)과
-                     ② 카드보다 살짝 긴 가로선으로 해결한다.
-                     풀이 카드는 그 선 **밑으로** 밀려 들어가며 사라진다. */
-                  const cardW = (widthEm + CARD_PAD_L_EM + CARD_PAD_R_EM) * contentFontSize;
-                  const lineLeft = 7 * contentFontSize + LABEL_GAP_EM * contentFontSize - 10;
-                  return (
-                    <div key={tab.id} ref={questionRowRef} style={{
-                      position: 'sticky', top: 0, zIndex: 3,
-                      background: 'var(--bg-functional)',
-                      paddingTop: headerSlim ? 6 : 12,
-                      marginTop: headerSlim ? -6 : -12,
-                      paddingBottom: 8,   // 덕수 요청 — 풀이 카드 위 여백 2배(4 → 8)
-                    }}>
-                      {body}
-                      {/* 풀이 영역 상단 가로선 — 카드가 이 선 밑으로 밀려 들어가며 사라진다.
-                          덕수 요청으로 0.5px --border-light → 1px --border-content(가장 뚜렷한 선). */}
-                      <div aria-hidden style={{
-                        position: 'absolute', left: lineLeft, width: cardW + 20, bottom: 0,
-                        borderBottom: '1px solid var(--border-content)',
-                        pointerEvents: 'none',
-                      }} />
-                      {/* 덕수 요청 — 선 바로 아래에서 내용이 흐려지며 사라진다.
-                          선만 있으면 글자가 선에서 **딱 잘려** 밀려 들어가는 느낌이 없다.
-                          ⚠ 그라디언트 색은 토큰을 그대로 쓴다(하드코딩 rgba 금지) —
-                            바탕색을 바꿨을 때 페이드만 옛 색으로 남던 사고가 있었다(커밋 78a780f).
-                          ⚠ 스티키 래퍼(zIndex 3) 안이라 스크롤되는 카드 위에 그려진다.
-                            래퍼에 overflow를 주면 이 띠가 잘려 효과가 사라진다. */}
-                      <div aria-hidden style={{
-                        position: 'absolute', left: lineLeft, width: cardW + 20,
-                        /* ⚠ 선 **아래**에서 시작한다(+1px = 선 두께) — 그라디언트가 선 위에
-                           얹히면 선 자체가 흐려져 "밀려 들어가는 경계"가 뭉개진다. */
-                        top: 'calc(100% + 1px)', height: 14,
-                        background: 'linear-gradient(to bottom, var(--bg-functional), transparent)',
-                        pointerEvents: 'none',
-                      }} />
-                    </div>
-                  );
-                })}
+          {/* ═══ v3 P5 — hold-to-peek 알약 ═══
+              좌측 라벨 거터의 **풀이 라벨 바로 위**. 방금 `문제` 라벨이 밀려 올라간 자리라
+              "문제가 있던 그 자리"로 읽힌다(덕수).
+              ⚠ 높이 0 sticky 상자 안의 absolute다 — 흐름 높이를 차지하지 않으므로
+                등장·소멸이 **아무것도 밀지 않는다**. 자리 예약도 필요 없다.
+              ⚠ sticky를 탭(TabBody) 안에 두지 말 것: 탭이 여럿이면 아래 탭으로 스크롤할 때
+                알약이 함께 사라진다. 여기(탭 전체의 첫 형제)라야 스크롤 내내 상단에 남는다.
+              ⚠ 마운트/언마운트가 아니라 opacity로 여닫는다 — 페이드가 살고, 어차피
+                흐름 밖이라 레이아웃 비용이 0이다. */}
+          <div style={{ position: 'sticky', top: 0, height: 0, zIndex: 4 }}>
+            <button
+              onPointerDown={startPeek}
+              onPointerUp={endPeek}
+              onPointerCancel={endPeek}
+              onBlur={endPeek}
+              onKeyDown={(e) => {
+                /* ⚠ 길게 누르면 keydown이 반복 발화한다 — 이미 열려 있으면 무시할 것. */
+                if ((e.key === 'Enter' || e.key === ' ') && !peeking) { e.preventDefault(); setPeeking(true); }
+              }}
+              onKeyUp={(e) => { if (e.key === 'Enter' || e.key === ' ') setPeeking(false); }}
+              onContextMenu={(e) => e.preventDefault()}
+              title="누르고 있는 동안 문제가 보입니다"
+              aria-label="문제 잠깐 보기"
+              style={{
+                position: 'absolute', top: PEEK.BTN_TOP, left: 0,
+                padding: '4px 10px', border: 'none', borderRadius: 999,
+                background: 'var(--accent-primary)', color: '#fff',
+                fontSize: 12, fontWeight: 600, fontFamily: 'var(--font-ui)',
+                whiteSpace: 'nowrap', cursor: 'pointer',
+                /* 터치에서 길게 누르기가 스크롤·선택·컨텍스트 메뉴로 새지 않도록 */
+                touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none',
+                opacity: problemOffscreen ? 1 : 0,
+                pointerEvents: problemOffscreen ? 'auto' : 'none',
+                transition: 'opacity 0.15s',
+              }}
+            >
+              문제
+            </button>
+          </div>
 
-                {/* 하단 여백 — width:0으로 fit-content 부모의 폭 계산에 영향 안 주도록 */}
-                <div style={{ height: '70vh', width: 0 }} />
-              </>
+          {/* 탭 행: [탭 라벨 | 탭 본문].
+              ⚠ v3 P2 — 문제 행에 더는 sticky·가로선·페이드가 없다. 그냥 흐름대로
+                밀려 올라간다. 래퍼 div는 **실측 전용**이다(P3 판정). */}
+          {tabs.map((tab, tabIdx) => {
+            const body = (
+              <TabBody
+                key={tab.id}
+                tab={tab}
+                blocks={problem.tabBlocks[tab.id] || []}
+                tabIdx={tabIdx}
+                isOpen={!!openTabs[tab.id]}
+                copied={copiedTab === tab.id}
+                contentFontSize={contentFontSize}
+                widthEm={widthEm}
+                onToggleTab={() => toggleTab(tab.id)}
+                onCopy={() => handleCopyTabMarkdown(tab.id)}
+              />
             );
-          })()}
+            if (tab.id !== 'question') return body;
+            return <div key={tab.id} ref={questionRowRef}>{body}</div>;
+          })}
+
+          {/* 하단 여백 — width:0으로 max-content 부모의 폭 계산에 영향 안 주도록 */}
+          <div style={{ height: '70vh', width: 0 }} />
         </div>
         </div>
       </div>
 
+
+      {/* ═══ v3 P6·P9~P14 — hold-to-peek: 누르고 있는 동안만 문제 카드가 화면 중앙에 ═══
+          ⚠ 별도 팝업 크롬(제목바·닫기·모달 테두리)을 만들지 않는다 — 이질적인 상자는
+            그 자체로 시각적 불안 요소다(덕수). 흐름에 있을 때와 **같은 카드**를 그대로 띄운다.
+          ⚠ 딤을 쓰지 않는다. 배경과의 구분은 아래로 떨어지는 그림자(--drawer-shadow,
+            우측 패널 4종이 쓰는 2겹)가 담당한다.
+          ⚠ [data-ref-tooltip] **밖**이다(P13).
+          ⚠ 컨테이너는 pointerEvents:none, 카드만 auto — 긴 문제를 hold 중에 휠로 넘길 수
+            있어야 하는데(P11) 컨테이너까지 none이면 휠이 뒤 컨텐츠로 빠진다.
+            뗄 때의 pointerup은 setPointerCapture 덕분에 알약으로 간다(P7).
+          ⚠ 라벨은 띄우지 않는다(P14) — 좌측에 빈 열이 생겨 카드가 중앙에서 어긋나 보인다. */}
+      {peeking && (
+        <div style={{
+          position: 'absolute', inset: 0, zIndex: 40,
+          paddingRight: rightReserve,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          pointerEvents: 'none', animation: 'peekIn 0.08s ease-out',
+        }}>
+          <div style={{
+            maxHeight: '80vh', overflow: 'auto', pointerEvents: 'auto',
+            borderRadius: CARD_RADIUS, boxShadow: 'var(--drawer-shadow)',
+          }}>
+            <TabBody
+              tab={tabs.find((t) => t.id === 'question') ?? tabs[0]}
+              blocks={problem.tabBlocks['question'] || []}
+              tabIdx={0}
+              isOpen
+              copied={false}
+              contentFontSize={contentFontSize}
+              widthEm={widthEm}
+              hideLabel
+              onToggleTab={() => {}}
+              onCopy={() => {}}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ═══ 오른쪽 단 토글 버튼 (접힘/펼침 모두 글자크기 버튼 바로 아래, 같은 우측 정렬) ═══
           Phase 62 F5 — 패널 열림 중에는 우측 단이 없으므로 이 버튼도 렌더하지 않는다
@@ -1048,7 +1052,7 @@ export default function ProblemView({
         style={{
           /* D49 — 제목행 접힘에 연동. 스테퍼가 우측 패널로 들어가면서 이 버튼이
              콘텐츠 우상단의 유일한 떠 있는 컨트롤이 됐다(ctrlW 보정 불필요). */
-          position: 'absolute', top: headerSlim ? 5 : 16,
+          position: 'absolute', top: 16,
           right: 16 + rightReserve,
           zIndex: 11, width: 26, height: 26,
           display: 'flex', alignItems: 'center', justifyContent: 'center',

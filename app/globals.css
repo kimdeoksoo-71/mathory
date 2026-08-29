@@ -700,14 +700,17 @@ p:has(.marker-circled) {
 /* 마지막 문단의 꼬리 마진(0.6em)은 패딩 안에 갇혀 바가 아래로 삐져나온 것처럼 보인다 */
 .coach-block .preview-content > p:last-child { margin-bottom: 0; }
 
-/* ═══ 개선묶음 M2 D — ProblemView 문제 탭 카드 ═══
-   카드 전체가 접힘/펼침 과녁이다(덕수 보완 2) — 라벨만으로는 과녁이 너무 작다.
-   ⚠ 배경은 인라인이 `var(--card-surface, var(--bg-content))`를 참조하므로 여기서는
-     **변수만 갈아끼운다** — 폴더뷰 카드가 Phase 62에서 세운 방식 그대로라
-     !important도, 특이도 경쟁도 없다.
-   ⚠ hover 배경을 #E8DFCE(--block-bg-active)보다 어둡게 내리지 말 것 —
-     화면 최악 배경이 바뀌어 Phase 58·59a의 명암비 계산이 전부 무너진다. */
-.problem-tab-card:hover { --card-surface: var(--block-bg-active); }
+/* ═══ v3 P15 — ProblemView 문제 탭 카드 ═══
+   M2의 `.problem-tab-card:hover { --card-surface: … }`는 삭제됐다. 카드 전체가 접힘/펼침
+   과녁이던 시절의 규칙인데 v3에서 접힘 개념 자체가 사라졌다 — 누를 수 없는 카드에
+   "누를 수 있다"는 hover 신호를 남기면 거짓말이 된다.
+   ⚠ 화면 최악 배경은 그대로 FolderView 카드 hover(#E8DFCE = --block-bg-active)다.
+     이 규칙이 사라져도 Phase 58·59a의 명암비 계산은 유효하다. */
+
+/* v3 P12 — hold-to-peek로 띄우는 문제 카드의 등장.
+   ⚠ 사라질 때는 애니메이션이 없다(즉시). hold는 즉각성이 생명이고, 뗄 때 지체가 있으면
+     "손을 뗐다 = 닫혔다"가 흐려진다. 그래서 unmount만 하고 out 애니메이션을 두지 않는다. */
+@keyframes peekIn { from { opacity: 0; } to { opacity: 1; } }
 
 /* ═══ 개선묶음 M2 C — 참조 인용 hover 말풍선 ═══
    ⚠ 시각 표시는 **커서뿐이다**(D18′). 밑줄·색·배경을 주지 말 것 —

@@ -53,20 +53,20 @@ export const CARD_PAD_R_EM = 2.4;
 /** 카드 모서리 반지름. 덕수 요청(2026-08-28)으로 12 → 6(절반)으로 낮췄다. */
 export const CARD_RADIUS = 6;
 
-/** 접힘 상태 문제 카드의 세로 두께 = 리스트 보기의 가로 막대와 같은 크기.
- *  ListView 행: padding 9px + 13.5px 텍스트 1줄 + 0.5px 테두리 ≈ 35px.
- *  ⚠ 본문 글꼴(11~24px)에 비례시키지 않는다 — 이건 본문이 아니라 **크롬**이라
- *    글꼴을 키워도 두께가 따라 커지면 "접었다"는 신호가 흐려진다. */
-export const COLLAPSED_CARD_H = 35;
+/** 라벨 열의 sticky top (풀이 계열 탭).
+ *  ⚠ v3 P5-1 — 12에서 40으로 올렸다. 그 **위**에 hold-to-peek 알약이 서기 때문이다
+ *    (알약 22 + 간격 6 + 12 = 40). 12로 두면 알약이 y≈-16이라 스크롤 영역 상단에 잘린다.
+ *  ⚠ 상수라 튐이 없다. 고정되지 않은 상태(페이지 최상단)에서는 sticky top이 아무 효과가
+ *    없으므로 라벨은 여전히 paddingTop 14로 카드 첫 줄에 정렬된다. */
+export const LABEL_STICKY_TOP = 40;
 
 interface Props {
   tab: TabMeta;
   /** 본문 폭(em). 기본 35 — 사용자가 우측 상단 스테퍼로 넓힐 수 있다(M2 D24′). */
   widthEm: number;
-  /** 문제 탭 접힘. 내용은 **완전히** 숨고 리스트 행 두께의 막대만 남는다(덕수 보완 2). */
-  collapsedPreview?: boolean;
-  /** 제목행이 슬림일 때 첫 행의 상단 여백을 줄여 카드를 더 위로 올린다(덕수 보완 1). */
-  compactTop?: boolean;
+  /** hold-to-peek로 화면 중앙에 띄울 때만 true — 라벨 열을 그리지 않는다(v3 P14).
+   *  ⚠ 라벨을 함께 띄우면 좌측에 빈 열이 생겨 카드가 중앙에서 어긋나 보인다. */
+  hideLabel?: boolean;
   blocks: Block[];
   tabIdx: number;
   isOpen: boolean;
@@ -78,7 +78,7 @@ interface Props {
 
 export default function TabBody({
   tab, blocks, tabIdx, isOpen, copied, contentFontSize, widthEm,
-  collapsedPreview, compactTop, onToggleTab, onCopy,
+  hideLabel, onToggleTab, onCopy,
 }: Props) {
   const caseLabels = useMemo(() => buildCaseLabels(blocks), [blocks]);
   const caseGaps = useMemo(() => buildCaseGapKeys(blocks), [blocks]);
@@ -219,27 +219,31 @@ export default function TabBody({
          sticky가 움직일 여지를 잃는다(v2 D-19 실측: 300px 스크롤 후 −220px로 흘러감). */
     <div style={{
       display: 'flex', alignItems: 'flex-start', gap: LABEL_GAP_EM * contentFontSize,
-      marginTop: tabIdx === 0 ? (compactTop ? 6 : 24) : 0,
+      marginTop: hideLabel ? 0 : (tabIdx === 0 ? 24 : 0),
       /* 덕수 요청(2026-08-28) — 문제↔풀이 간격을 절반으로.
          그 간격은 **두 값의 합**이다: 이 marginBottom + sticky 래퍼의 paddingBottom.
          문제 행만 1em으로 낮추고 래퍼도 8 → 4로 함께 줄인다(fs15에서 38 → 19px).
          ⚠ 풀이↔풀이2는 2em 그대로다 — 거기까지 좁히면 탭 경계가 흐려진다. */
-      marginBottom: isOpen ? (isQuestion ? '1em' : '2em') : '1em',
+      /* ⚠ hideLabel(중앙에 띄운 카드)은 0 — 마진이 남으면 overflow:auto 래퍼가 BFC라
+         마진이 밖으로 빠지지 못하고 그림자가 카드보다 1em 아래까지 늘어진다. */
+      marginBottom: hideLabel ? 0 : (isOpen ? (isQuestion ? '1em' : '2em') : '1em'),
     }}>
       {/* 라벨 열 — 라벨 · 복사 · 요약 보기.
           ⚠ flexWrap 필수: 탭 이름은 3번째 탭부터 사용자가 자유롭게 짓고 길이 제한이
             없다. 폭(7em)을 넘으면 토글이 다음 행으로 내려가야 레이아웃이 버틴다. */}
-      {/* 개선묶음 M2 D51 — 라벨 열은 카드가 스크롤돼도 제자리에 남는다.
-          top은 sticky 문제 카드의 접힘 높이를 담은 CSS 변수다(ProblemView가 세운다) —
-          0으로 두면 문제 행(z 상위)에 상시 가려진다(v3 W7). */}
-      <div style={{
+      {/* 라벨 열은 카드가 스크롤돼도 제자리에 남는다(M2 D51).
+          ⚠ v3 P5-2 — top이 CSS 변수(--m2-q-sticky-h)였던 것은 sticky 문제 행이 상단을
+            덮었기 때문이다. 그 행이 사라져 변수도 함께 폐기하고 상수 LABEL_STICKY_TOP을 쓴다.
+          ⚠ 그 40은 임의값이 아니다 — 이 라벨 **바로 위**에 hold-to-peek 알약이 선다(P5-1).
+          ⚠ hideLabel(중앙에 띄운 카드)에서는 열 자체를 그리지 않는다(P14). */}
+      {!hideLabel && <div style={{
         ...labelColStyle,
         display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 4,
         flexWrap: 'wrap', rowGap: 2,
         paddingTop: isOpen ? 14 : 0,
         ...(isQuestion ? null : {
           position: 'sticky' as const,
-          top: 'calc(var(--m2-q-sticky-h, 0px) + 12px)',
+          top: LABEL_STICKY_TOP,
           alignSelf: 'flex-start' as const,
         }),
       }}>
@@ -277,7 +281,7 @@ export default function TabBody({
             <OutlineToggle mode={outline.mode} onToggle={outline.toggleMode} disabled={!outline.available} />
           </span>
         )}
-      </div>
+      </div>}
 
       {isOpen && (
         /* 개선묶음 M2 D20′·D21′ — 탭 본문 열이 **클레이 카드**가 된다(바탕은 아이보리).
@@ -288,9 +292,6 @@ export default function TabBody({
              재정의하지 않으면 rail이 dot을 관통한다(globals.css:157 전례).
            ⚠ question 탭의 옛 `marginLeft:-24` 분기는 제거했다 — 이제 모든 탭이 카드다. */
         <div
-          className={isQuestion ? 'problem-tab-card' : undefined}
-          onClick={isQuestion ? onToggleTab : undefined}
-          title={isQuestion ? (collapsedPreview ? '문제 펼치기' : '문제 접기') : undefined}
           style={{
             ...mainColStyle,
             width: (mainColStyle.width as number) + cardPadL + cardPadR,
@@ -305,33 +306,17 @@ export default function TabBody({
             borderRadius: CARD_RADIUS,
             transition: 'background 0.15s, height 0.18s ease',
             ['--case-dot-fill' as any]: 'var(--card-surface, var(--bg-content))',
-            /* 접힘(문제 탭 전용): 리스트 행 두께의 막대만 남긴다.
-               ⚠ 첫 줄을 남기면 "잘렸다"로 읽혀 오히려 시선을 끈다 — 접힘은 조용해야 한다.
-               ⚠ **내용을 DOM에서 지우지는 않는다**(아래 참조) — 보기(ㄱ.·(가)·①)의
-                 정의부가 문제 탭에 있어서, 지우면 풀이의 참조 말풍선이 통째로 죽는다. */
-            ...(collapsedPreview
-              ? { height: COLLAPSED_CARD_H, padding: 0, overflow: 'hidden', position: 'relative' as const }
-              : { padding: `20px ${cardPadR}px 20px ${cardPadL}px` }),
-            /* 카드 전체가 접힘/펼침 영역이다(덕수 보완 2) — 라벨만으로는 과녁이 너무 작다. */
-            ...(isQuestion ? { cursor: 'pointer' as const } : null),
+            padding: `20px ${cardPadR}px 20px ${cardPadL}px`,
           }}>
           {/* Phase 58 P2 — 톤 기준선 + 탭별 톤 스코프.
-              ⚠ 접힘일 때도 **DOM에는 남긴다**(visibility:hidden + absolute).
-                문제 탭이 보기의 정의부(ㄱ.·(가)·①·\tag)를 들고 있어서, 언마운트하면
-                풀이에서 그 번호를 hover해도 원문을 찾지 못한다(덕수 신고 2026-08-28).
-                visibility:hidden은 노드를 남기므로 textContent 매칭·cloneNode가 그대로 된다
-                (display:none과 달리 레이아웃 박스도 유지된다).
-              ⚠ absolute라 카드의 35px 높이에 영향을 주지 않는다. */}
+              ⚠ v3 P2 — M2의 접힘(visibility:hidden + absolute) 우회가 사라졌다.
+                문제 카드를 숨기지 않으므로 정의부가 늘 정상 상태로 DOM에 있다.
+                **문제 탭을 언마운트하거나 숨기는 처리를 다시 넣지 말 것** — 보기
+                (ㄱ.·(가)·①·\tag)의 정의부가 여기 살고 참조는 풀이에 있어서,
+                지우는 순간 풀이의 참조 말풍선이 통째로 죽는다(M2에서 실제로 그랬다). */}
           <div
             className={`problem-content-scaled problem-content-toned tone-baseline ${toneClass(tab.id)}`}
-            aria-hidden={collapsedPreview || undefined}
-            style={{
-              ['--content-font-size' as any]: `${contentFontSize}px`,
-              ...(collapsedPreview ? {
-                position: 'absolute' as const, top: 0, left: 0, width: '100%',
-                visibility: 'hidden' as const, pointerEvents: 'none' as const,
-              } : null),
-            }}
+            style={{ ['--content-font-size' as any]: `${contentFontSize}px` }}
           >
             {scoped && outline.mode === 'outline' ? (
               <OutlineSections
