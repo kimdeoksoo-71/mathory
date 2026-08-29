@@ -141,8 +141,28 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   ① `justify-content:center`의 좌측 넘침은 **스크롤 영역에 포함되지 않아** `overflow-x:auto`로도 닿을 수 없다
   (실측: 자식 780인데 `scrollWidth` 690) ② 기본 `align-items:stretch`가 자식 높이를 눌러 **sticky가 죽는다**
   (실측: 300px 스크롤 후 −220px). 자식 폭은 `fit-content`가 아니라 **`max-content`**(전자는 유동 폭에서
-  조용히 클램프한다). ⚠ **하단 스페이서 70vh는 자동접힘의 전제**다 — 제목행 접힘은 scrollTop이 아니라
-  clientHeight를 키우므로 스크롤 여유가 없으면 브라우저가 클램프해 임계값 밑으로 떨어뜨리고 진동이 반복된다
+  조용히 클램프한다). ⚠ ②의 sticky는 이제 **풀이 라벨 열 전용**이다 — 문제 카드 sticky는 철거됐다.
+  ⚠ 옛 "하단 스페이서 70vh는 자동접힘의 전제" 조항은 **폐기**됐다(자동접힘 자체가 없다). 스페이서는
+  남겨 두지만 이유가 달라졌다 — 마지막 카드 아래 읽기 여백일 뿐이다
+- **ProblemView는 스크롤로 레이아웃이 변하지 않는다 (ProblemView 디자인 개선 P1·P2)**: 제목행 접힘·
+  문제 카드 sticky·숨김을 **다시 넣지 말 것**. 덕수 판정("카드가 사라지고 나타나는 순간 화면이 튄다")으로
+  방향을 *보정*에서 **튈 일을 안 만든다**로 뒤집었고, 그 결과 최종 코드에 **`scrollTop`을 읽고 쓰는 곳이
+  하나도 없다**(판정은 rect 비교뿐). 남은 상태 `problemOffscreen`·`peeking`은 **둘 다 레이아웃에 영향이
+  없어** 진동이 구조적으로 불가능하다. ⚠ 부수 효과가 본체보다 크다 — **M2에서 가장 값비쌌던 참조 말풍선
+  회귀 위험이 원천 소멸**했다(카드가 늘 정상 상태로 DOM에 있어 `visibility:hidden` 우회조차 불필요)
+- **hold-to-peek은 `setPointerCapture` 없이 만들지 말 것 (P7)**: 누른 채 알약 밖으로 나가서 떼면
+  `pointerup`이 안 와 **카드가 안 닫힌다**. `pointercancel`·`blur`도 닫을 것이고, `keydown`은 길게
+  누르면 **반복 발화**하므로 이미 열려 있으면 무시한다. ⚠ 중앙에 띄우는 카드는 **`[data-ref-tooltip]` 밖**
+  (안이면 보기의 정의부가 두 벌이 되어 "참조보다 앞선 것 중 가장 가까운 것" 탐색이 흔들린다).
+  ⚠ 오버레이는 **컨테이너 `pointerEvents:none` + 카드만 `auto`** — 둘 다 none이면 긴 문제를 hold 중에
+  휠로 못 넘기고, 둘 다 auto면 뒤를 막는다. ⚠ 알약은 탭(TabBody) 안이 아니라 **탭 전체의 첫 형제**여야
+  아래 탭으로 스크롤해도 남는다. 흐름 높이 0(sticky 상자 안 `absolute`)이라 등장·소멸이 아무것도 안 민다
+- **제목행 높이 57은 앱 전역 1행 높이다 (P1 · R6)**: `dialogHead`·`dialogFoot`·`BatchVerifyDialog`·
+  EditorView Row1(`minHeight 57` + `borderBottom 1px --border-light`)·`DRAWER_ROW1_H`(= 57 − inset 8 −
+  테두리 1)이 전부 이 값이다 → **모든 드로어의 첫 가로선이 y=57**. ProblemView 우측 단도 드로어라
+  이제 중앙 제목행 선과 우측 단 1행 선이 **같은 Y**에 선다. ⚠ 옛 98은 EditorView Row1+**Row2** 두 행치라,
+  중앙에 하나뿐인 선이 드로어의 *둘째* 선과 짝지어지는 어긋난 대응이었다(빈 띠 ~50px은 "추후 메타데이터"
+  예약이었는데 끝내 오지 않았다). ⚠ `minHeight`가 아니라 `height` — 제목 span이 nowrap+ellipsis라 안전하다
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
@@ -222,13 +242,37 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **`.case-block`에 상하 padding 금지 (Phase 59 G7)**: 지금은 자식 `<p>` 마진이 블록 밖으로 빠져나와(부모-자식 collapse) 형제 간격이 정확히 K1(1.1em)이다. 상하 padding이 1px라도 생기면 마진이 갇혀 간격이 1.7em이 되고 rail 브리징(`bottom: -1.1em`)이 짧아진다
 - **`$$x=1$$`를 한 줄로 쓰면 인라인 수식이 된다 (Phase 59 실측)**: `.katex-display`가 생기지 않아 들여쓰기·상하 여백(K1) 규칙이 전부 비껴간다. 독립행 수식은 반드시 `$$` / 내용 / `$$` 세 줄로. 경우 블록은 제목행 뒤 빈 줄까지 `injectCaseLabel`이 렌더 시 보장한다(안 그러면 본문이 제목행 문단에 흡수된다)
 - **연결선(rail)은 조각을 이어 붙인 것이다 (Phase 59 §11-1)**: `.case-block`/`.case-gap`이 각자 조각을 그리고 **위쪽으로** 브리지해 잇는다. ① 브리지가 위쪽이어야 종단(마지막 dot)이 정확하고 ② 색이 불투명해야 겹친 구간이 진해지지 않으며 ③ 브리지 1.5em(인쇄 14pt)은 "최대 간격보다 크고 최소 간격+0.9em보다 작아야" 한다는 양쪽 제약의 값이다. 블록 마진을 바꾸면 이 값을 다시 볼 것
-- **구조 신호는 거터, 본문은 본문 (Phase 59a §1 — Phase 59 §11-6을 대체)**: rail·dot·chevron은 본문 **왼쪽 바깥**에 있고 경우 본문의 좌단은 **일반 텍스트와 같은 0**이다. 좌표는 `:root`의 `--case-rail-x(-1.8em)` · `--case-chevron-x(-0.7em)` 두 토큰이 전부이고 인쇄 rail만 `-1.2em` 리터럴이다(단 간격 10mm 제약). ⚠ 셋은 서로 간섭한다 — dot 우단 = `rail_x + 0.26em`, chevron 좌단 = `chevron_x - 0.5em`, 현재 여유 0.34em. **필요 거터 폭은 2.06em(실사용 2.2em)** 이고 각 렌더 사이트가 그만큼을 `overflow:hidden` 경계 **안쪽**에 확보해야 한다. Phase 59가 세웠던 2단 들여쓰기(본문 3em/하위 6em/그 안 6·9em, `.case-gap-body`, 경우 안 ul·① override)는 **전량 철거**됐다 — 전례를 찾아 되살리지 말 것
+- **구조 신호는 거터, 본문은 본문 (Phase 59a §1 → ProblemView 디자인 개선 R1~R3에서 개정)**: rail·dot은 본문 **왼쪽 바깥**에 있고 경우 본문의 좌단은 **일반 텍스트와 같은 0**이다. ⚠ **chevron은 사라졌다** — 요약 보기의 여닫이 노브를 제목 줄·경우 줄 **둘 다** 없애면서 `--case-chevron-x`도 삭제했다(소비처 0 토큰 금지). 이제 거터에 사는 것은 rail·dot 둘뿐이라 **서로 간섭하지 않는다**. 좌표는 `--case-rail-x(-1.3em)` 하나이고 인쇄만 `-1.2em` 리터럴이다(화면이 인쇄에 가까워진 방향). dot 좌단 = `rail_x - 0.26em` = **1.56em**. ⚠ **거터는 이제 카드 *안*에 있다** — `CARD_PAD_L_EM 2.6`이 1.56em을 품고 1.04em이 남는다. 그래서 `LABEL_GAP_EM`은 rail 통로가 아니라 **순수한 시각 간격**이고(2.8 → 1.4로 절반), 각 렌더 사이트가 `overflow:hidden` 밖에 거터를 확보할 필요도 없어졌다. Phase 59가 세웠던 2단 들여쓰기(본문 3em/하위 6em/그 안 6·9em, `.case-gap-body`, 경우 안 ul·① override)는 **전량 철거**됐다 — 전례를 찾아 되살리지 말 것
 - **경우 블록 안은 최상위와 **완전히** 같다 (Phase 59a)**: 본문 0, display 수식 3em, 리스트·① 밭은 각자의 기본값. override가 하나도 없다. 어긋나 보이면 최상위 규칙을 봐야 한다. **좌표는 `padding-left`로 줄 것** — `margin-left`를 쓰면 rail을 그리는 박스가 통째로 밀려 세로선이 엉뚱한 자리에 하나 더 생긴다
-- **em/px를 섞으면 글꼴 크기에서 무너진다 (Phase 59a C5)**: 거터 좌표가 전부 em인데 chevron 아이콘만 `size={12}` 고정 px이라, 글꼴을 줄일수록 chevron이 상대적으로 커져 11px에서 dot과 **겹쳤다**(15px에서는 2.1px 여유라 안 보인다). `.outline-chevron svg { width: .8em }`로 em화했고, `justify-content: center`가 없으면 1em 상자 안에서 glyph가 좌측에 붙어 두 chevron 열이 0.1em 어긋난다(F6). **좌표를 손대면 반드시 11 / 15 / 24px 세 조건 전부 실측할 것** — 한 크기만 보면 못 잡는다. 같은 이유로 `LABEL_GAP`도 `2.8 * contentFontSize`로 비례화했다
+- **em/px를 섞으면 글꼴 크기에서 무너진다 (Phase 59a C5 → ProblemView 디자인 개선 F1에서 재발)**: 같은 함정을 **두 번** 밟았다. ① Phase 59a: chevron 아이콘만 고정 px이라 11px에서 dot과 겹쳤다(노브가 사라져 지금은 무효한 기록). ② **카드 좌측 패딩만 px(40) 고정이고 rail 좌표는 em이라, 글꼴을 *키울수록* rail이 카드 밖으로 걸어 나갔다** — 실측 rail 11/15/24px = 20.2 / 13.0 / **−3.2**(카드 밖), dot 좌단은 24px에서 **−9.4**. `CARD_PAD_L/R`을 `_EM`(2.6/2.4)으로 바꿔 고쳤고 지금은 15.3/20.5/32.2px(1.34~1.39em)로 수렴한다. **좌표를 손대면 반드시 11 / 15 / 24px 세 조건 전부 실측할 것** — 15px 하나만 보면 두 번 다 통과한다. 같은 이유로 `LABEL_GAP`도 `× contentFontSize`다
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M2(기능 개편 7건)** — 구현·검수·**배포 완료(2026-08-28)**
+## 현재 Phase: **ProblemView 디자인 개선(5건)** — 구현·검수 완료(2026-08-30) · 배포 대기
+
+문서: `docs/phasedocs/ProblemView 디자인 개선 v4 실행판.md`
+(계보: 덕수 메모 → v1 CLI → v2 **두 판**(web 계획서 · CLI 교차검토판) → v3 착수판 **3회 개정**
+ → **v4 실행판 = 구현 기록**. v4만 볼 것)
+
+**서버 0 · Firestore 규칙 0 · 스키마 0 · 마이그레이션 0 · 블록 타입 union 0 · 전처리 0.**
+수정 5파일 · 신규 0 · 커밋 5개. 로직 검증 262개 무회귀.
+
+M2 D가 만든 ProblemView를 실사용한 덕수 판정에서 출발했다 —
+*"시각적 안정감이 줄어들어 보인다. 카드가 사라지고 나타나는 순간 화면이 튄다."*
+그래서 방향이 **"튐을 보정한다" → "튈 일을 만들지 않는다"** 로 뒤집혔다.
+
+- **P** 제목행 자동접힘·문제 카드 sticky/접힘 **통째로 철거**. 제목행 `height 57` 고정,
+  문제 카드는 흐름대로 밀려 올라간다. ⚠ **최종 코드에 `scrollTop`을 읽고 쓰는 곳이 0이다**
+- **P** **hold-to-peek** — 좌측 라벨 거터의 '문제' 알약을 **누르고 있는 동안만** 문제 카드가
+  화면 중앙에(딤 없음·별도 팝업 크롬 없음·`--drawer-shadow`만)
+- **Q** 풀이 카드 위 선·페이드 **폐기**(sticky 전용 처방이었다) → 제목행 상시 `borderBottom` 1줄
+- **R** `--case-rail-x` −1.8 → **−1.3em** · `CARD_PAD_L/R` px → **em** · `LABEL_GAP_EM` 절반
+- **S** 요약 보기 **여닫이 노브 전량 제거**(제목 줄 포함) + 톤 사다리(카드 → 펼침 1단 → hover 2단, 카드 전폭)
+
+⚠ **계획을 뒤집은 것이 7건(R1~R7)** 있고 **그중 둘(R5·R6)은 계획서가 원본 메모를 좁힌 것**이다 —
+v1~v3을 인용하기 전에 v4 §3을 볼 것.
+
+### 이전: **개선묶음 M2(기능 개편 7건)** — 구현·검수·**배포 완료(2026-08-28)**
 
 문서: `docs/phasedocs/개선묶음 M2 기능 개편 v4 실행판.md`
 (계보: v1 web → v2 CLI 실측(v2.1·v2.2) → v3 web 재검증 → **v4 CLI 실행판 = 구현 기록**. v4만 볼 것)
@@ -238,7 +282,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **A** 네이티브 팝업 56곳/14파일 제거 → `lib/dialogs.ts` 3종 + 폴더 픽커
 - **B** 선택지 세로 정렬 `baseline → center`(실측 편차 9.33/12.81/20.91px → **0.00px**)
 - **C** 참조 인용 hover 말풍선(`(가)`·`ㄱ`·`①`·`(3)`·`C1`) — 500ms 후 원문 문단
-- **D** ProblemView 탭별 카드 · 가로폭 조절(35~45em) · sticky 문제 카드 · 스크롤 자동접힘
+- **D** ProblemView 탭별 카드 · 가로폭 조절(35~45em) · ~~sticky 문제 카드 · 스크롤 자동접힘~~
+  (⚠ 뒤 둘은 **ProblemView 디자인 개선에서 철거**됐다 — 위 절 참조. 되살리지 말 것)
 - **E** 폴더뷰 카드보기 열수 제한 해제 · **F** 사이드바 자동접힘 제거
 - **G** 코칭블록 'Tip' 단일화 + 기본 접힘
 - **+** 좌·중·우 3단을 밝기 서열로 가름(계획에 없던 후속)
