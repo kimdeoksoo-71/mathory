@@ -8,7 +8,7 @@ import {
   DIFFICULTIES, CATEGORY_OPTIONS,
   WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
 } from '../../lib/constants';
-import TabBody, { LABEL_GAP_EM, CARD_PAD_L, CARD_PAD_R, COLLAPSED_CARD_H } from './TabBody';
+import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, COLLAPSED_CARD_H } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -852,8 +852,8 @@ export default function ProblemView({
             onClick={() => { if (isOwnerView && !headerSlim) onEdit?.(problem); }}
             style={{
               ...mainColStyle,
-              width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
-              paddingLeft: CARD_PAD_L, boxSizing: 'border-box',
+              width: (mainColStyle.width as number) + CARD_PAD_L_EM * contentFontSize + CARD_PAD_R_EM * contentFontSize,
+              paddingLeft: CARD_PAD_L_EM * contentFontSize, boxSizing: 'border-box',
               minWidth: 0,
               fontSize: headerSlim ? 12.5 : 22, fontWeight: 600,
               color: headerSlim ? 'var(--text-secondary)' : 'var(--text-primary)',
@@ -990,7 +990,7 @@ export default function ProblemView({
                      ① 아래 여백(리스트 뷰 카드 간격 4보다 살짝 넓은 8)과
                      ② 카드보다 살짝 긴 가로선으로 해결한다.
                      풀이 카드는 그 선 **밑으로** 밀려 들어가며 사라진다. */
-                  const cardW = widthEm * contentFontSize + CARD_PAD_L + CARD_PAD_R;
+                  const cardW = (widthEm + CARD_PAD_L_EM + CARD_PAD_R_EM) * contentFontSize;
                   const lineLeft = 7 * contentFontSize + LABEL_GAP_EM * contentFontSize - 10;
                   return (
                     <div key={tab.id} ref={questionRowRef} style={{

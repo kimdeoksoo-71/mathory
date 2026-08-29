@@ -193,16 +193,18 @@
 
   /* 경우 블록의 거터 좌표 (Phase 59a). x = 0 이 본문 좌단이고 음수가 본문 바깥이다.
      rail·dot·chevron을 본문 밖으로 내보내 "구조 신호는 거터, 본문은 본문"을 만든다.
-     ⚠ 셋은 서로 간섭한다. 값을 바꿀 땐 함께 볼 것:
-         dot 우단     = rail_x + 0.26em   (dot 지름 0.52em)
-         chevron 좌단 = chevron_x - 0.5em (상자 폭 1em)
-       현재 여유 = -1.54em → -1.2em = 0.34em. 전부 em이라 글꼴 11~24px에서 비례 유지된다.
+     ⚠ v3 S1에서 **경우 줄 chevron이 제거되어 --case-chevron-x도 함께 삭제됐다**
+       (소비처 0 토큰 금지 — 다크 토큰 전례). 이제 거터에 사는 것은 rail·dot 둘뿐이라
+       서로 간섭하지 않는다. 제목 줄 chevron은 흐름 안 flex 항목이라 이 좌표계 밖이다.
+       옛 여유 계산("-1.54em → -1.2em = 0.34em")은 chevron이 있던 시절의 것이다.
+         dot 우단 = rail_x + 0.26em   (dot 지름 0.52em)
+     ⚠ chevron이 비운 자리를 써서 rail을 -1.8em → **-1.3em**으로 당겼다(v3 R2).
+       카드 좌단 기준 rail = (2.6 - 1.3)em = 1.3em, dot 좌단 1.04em — 11/15/24px 전부 카드 안.
      ⚠ 필요한 거터 폭은 dot 좌단까지 2.06em(실사용 2.2em)이다 — 각 렌더 사이트가
        그만큼의 좌측 여백을 확보해야 하고, overflow:hidden 경계 안쪽이어야 한다.
      ⚠ .section-head의 padding/margin 1.6em은 chevron 히트 영역이지 이 좌표계가 아니다.
        숫자가 비슷하다고 묶지 말 것 — 한쪽만 조정할 때 다른 쪽이 끌려간다. */
-  --case-rail-x:    -1.8em;
-  --case-chevron-x: -0.7em;
+  --case-rail-x: -1.3em;
 
   /* 코칭 블록의 신호색 (Phase 59a). GitHub alert 팔레트를 가져오되 **한 단 진한 700 계열**을 쓴다.
      GitHub light 기본값(Important #8250df · Caution #cf222e)은 라벨 어절이 텍스트라
@@ -903,9 +905,10 @@ p:has(.marker-circled) {
    작성자가 '요약에 넣기'로 고른 블록. 발췌 관련 레이아웃 규칙을 되살리지 말 것. */
 
 /* ── 여닫이 줄 ──
-   chevron은 어느 쪽도 내용을 오른쪽으로 밀지 않는다. Phase 59a에서 두 chevron의
-   glyph 중심을 --case-chevron-x(-0.7em) 한 열에 맞췄다 — 제목 줄과 경우 줄이
-   같은 세로선에 서야 요약 보기의 뼈대가 하나로 읽힌다.
+   ⚠ v3 S1 — **경우 줄에는 chevron이 없다.** dot이 이미 접힘(테두리)/펼침(채움)을
+     말하는데 chevron이 그 옆에서 같은 것을 반복했고, 거터가 좁아 dot과 0.34em까지
+     붙어 있었다(11px에서 겹쳤던 Phase 59a C5의 자리). 남은 chevron은 제목 줄뿐이다.
+   chevron은 내용을 오른쪽으로 밀지 않는다.
    - 제목 줄: chevron이 1em 폭을 차지하고 제목 좌단이 본문(0)에 선다.
      세로는 baseline 정렬 — 제목은 h1/h2/h3마다 font-size와 margin-top이 달라
      (게다가 EditorPreview 인라인 style이라 CSS로 못 만진다) 고정 높이로는 맞출 수 없다.
@@ -940,18 +943,8 @@ p:has(.marker-circled) {
   cursor: pointer;
   transition: background 0.15s;
 }
-.case-head .outline-chevron {
-  position: absolute;         /* 기준은 .case-block (position: relative) */
-  /* ⚠ width 명시 필수 — 없으면 상자가 svg 크기(내용)로 줄어 left가 '중심'이 아니라
-     '좌단'을 가리키게 되고, 토큰 이름과 실제 의미가 어긋난다. */
-  width: 1em;
-  left: calc(var(--case-chevron-x) - 0.5em);   /* glyph 중심 = --case-chevron-x */
-  top: 0.9em;                 /* dot과 같은 세로선 */
-  transform: translateY(-50%);
-}
-/* 펼침 표시 회전. ⚠ 인라인 style로 주면 위 translateY를 덮어써 chevron이 내려앉는다 */
+/* 펼침 표시 회전 */
 .section-head[aria-expanded="true"] .outline-chevron { transform: rotate(90deg); }
-.case-head[aria-expanded="true"] .outline-chevron { transform: translateY(-50%) rotate(90deg); }
 .section-head:hover,
 .case-head:hover { background: var(--bg-hover); }
 
@@ -965,7 +958,6 @@ p:has(.marker-circled) {
 /* 여닫을 것이 없는 줄(레거시 Case 라벨)은 평범한 텍스트로 둔다 */
 .case-head.is-static { cursor: default; }
 .case-head.is-static:hover { background: none; }
-.case-head.is-static .outline-chevron { visibility: hidden; }
 .section-head.is-preface {
   font-size: 0.85em;
   color: var(--text-faint);
@@ -976,8 +968,9 @@ p:has(.marker-circled) {
    ⚠ justify-content: center 필수 (Phase 59a). 상자 폭(1em)이 glyph보다 넓은데
      기본값 flex-start면 glyph가 좌측에 붙어 중심이 상자 중심보다 왼쪽으로 밀린다
      → 제목 줄 chevron이 경우 줄과 0.1em 어긋난다.
-   ⚠ svg 크기도 em이어야 한다. IconChevron은 size={12} 고정 px이라, 그대로 두면
-     글꼴을 줄일수록 chevron만 상대적으로 커져 11px에서 dot과 겹친다(em/px 혼합). */
+   ⚠ svg 크기는 em이어야 한다(Phase 59a C5). IconChevron은 size={12} 고정 px이라
+     그대로 두면 글꼴을 줄일수록 chevron만 상대적으로 커진다 — 경우 줄이 사라진 지금
+     dot과 겹칠 일은 없지만 제목 줄 위계가 크기마다 흔들린다. */
 .outline-chevron {
   display: inline-flex;
   align-items: center;

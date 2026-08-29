@@ -35,13 +35,17 @@ interface Props {
 /** 클릭·키보드로 여닫는 줄. <button>으로 감쌀 수 없다 —
  *  내부에 <p>·KaTeX(MathML)가 들어가 HTML이 무효가 된다. */
 function Toggler({
-  open, onToggle, controls, className, children,
+  open, onToggle, controls, className, children, chevron = true,
 }: {
   open: boolean;
   onToggle: (el: HTMLElement | null) => void;
   controls: string;
   className: string;
   children: React.ReactNode;
+  /** 경우 줄은 false. dot 자체가 접힘(테두리)/펼침(채움)을 이미 말하므로
+   *  chevron은 같은 정보를 거터에서 두 번 반복하는 것이었다(v3 S1).
+   *  ⚠ 그 자리를 rail이 쓴다 — --case-rail-x를 -1.3em으로 당기는 R2의 전제다. */
+  chevron?: boolean;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const fire = () => onToggle(ref.current);
@@ -58,12 +62,14 @@ function Toggler({
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
       }}
     >
-      {/* ⚠ 회전을 인라인 style로 주지 말 것 — 경우 줄의 chevron은 CSS에서
-          translateY(-50%)로 dot과 세로를 맞추는데 인라인 transform이 그것을 덮어써
-          chevron만 반 칸 내려앉는다. 회전은 aria-expanded를 보고 CSS가 건다. */}
-      <span className="outline-chevron" aria-hidden>
-        <IconChevron size={12} />
-      </span>
+      {/* ⚠ 회전을 인라인 style로 주지 말 것 — 회전은 aria-expanded를 보고 CSS가 건다.
+          ⚠ 경우 줄(chevron=false)에는 span 자체를 그리지 않는다. visibility:hidden으로
+            숨기면 거터에 1em 상자가 남아 R2의 rail 이동 자리를 계속 점유한다. */}
+      {chevron && (
+        <span className="outline-chevron" aria-hidden>
+          <IconChevron size={12} />
+        </span>
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
     </div>
   );
@@ -89,7 +95,7 @@ function CaseItem({
   return (
     <div className={cls}>
       {toggleable ? (
-        <Toggler open={open} onToggle={(el) => onToggle(item.itemKey, el)} controls={bodyId} className="case-head">
+        <Toggler open={open} onToggle={(el) => onToggle(item.itemKey, el)} controls={bodyId} className="case-head" chevron={false}>
           {head}
         </Toggler>
       ) : (

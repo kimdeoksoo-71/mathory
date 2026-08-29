@@ -28,19 +28,27 @@ import { IconCheck, IconCopy } from '../ui/Icons';
    ═══════════════════════════════════════════════════════════════ */
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
-/* 라벨 열 ↔ 본문 사이 간격. Phase 59a: 경우 rail이 이 틈으로 나오므로 px 고정을 버리고
-   글꼴에 비례시킨다 — 라벨 열 폭이 이미 `7 * contentFontSize`라 정합적이다.
-   2.8em = dot 좌단 2.06em + 라벨과의 여유 0.74em.
-   ⚠ 고정 px으로 되돌리지 말 것: 28px은 24px 글꼴에서 1.17em이라 dot이 라벨을 파고들고,
-     11px에서는 2.55em이라 rail이 본문에서 멀어진다(em/px 혼합 함정). */
-export const LABEL_GAP_EM = 2.8;
+/* 라벨 열 ↔ 카드 사이 간격.
+   ⚠ **더 이상 rail 통로가 아니다**(v3 R1·R2·R3). Phase 59a 시절엔 rail·dot이 이 틈으로
+     나왔지만, 이제 카드 패딩(2.6em)이 dot 좌단(1.56em)을 통째로 품고 1.04em이 남는다
+     → 거터가 카드 **안**에 있다. 그래서 2.8em을 절반으로 줄여도 아무것도 잘리지 않는다.
+     옛 주석의 "경우 rail이 이 틈으로 나온다 / 2.8em = dot 좌단 2.06em + 여유 0.74em"은
+     그 시절의 산식이다 — 인용하지 말 것.
+   ⚠ em은 유지한다: 고정 px으로 되돌리면 라벨 열 폭(`7 * contentFontSize`)만 글꼴을
+     따라가고 간격은 안 따라가 크기마다 균형이 달라진다(em/px 혼합 함정). */
+export const LABEL_GAP_EM = 1.4;
 
-/* 개선묶음 M2 D — 카드 좌우 안쪽 여백. 좌 40px은 경우 rail·dot이 사는 거터(2.06em@15,
-   실사용 2.2em)를 카드 **안쪽**에 확보하기 위한 값이다 — 공개 뷰어 ContentCard가 쓰는
-   `32px 36px 32px 40px`의 좌우와 같다.
-   ⚠ 카드에 overflow:hidden을 주지 말 것 — 거터에 그린 rail이 통째로 잘린다(Phase 59a Q5). */
-export const CARD_PAD_L = 40;
-export const CARD_PAD_R = 36;
+/* 카드 좌우 안쪽 여백 — **em 숫자**다(v3 R3). px 고정이던 40/36을 글꼴에 비례시킨다.
+   ⚠ 이것이 잠복 버그의 수정이다: 좌 40px 고정 + rail 좌표는 em이라, 글꼴을 키울수록
+     rail이 카드 밖으로 걸어 나갔다. 실측(옛 rail -1.8em, 카드 좌단 기준):
+       11px  20.2px  /  15px  13.0px  /  24px  **-3.2px** ← 카드 밖
+     dot 좌단은 24px에서 -9.4px로 더 심했다. em화 + R2(-1.3em)로 전 크기 1.3em / 1.04em 고정.
+   ⚠ 소비처는 반드시 `× contentFontSize`로 px화할 것(LABEL_GAP_EM과 같은 문법).
+   ⚠ 카드에 overflow:hidden을 주지 말 것 — 거터에 그린 rail이 통째로 잘린다(Phase 59a Q5).
+   ⚠ 공개 뷰어 ContentCard는 fontSize 15 고정이라 40/36px을 그대로 둔다(v3 R4) —
+     2.6em×15 = 39px으로 1px 차인데, 맞추려면 그쪽 paddingLeft를 39로. */
+export const CARD_PAD_L_EM = 2.6;
+export const CARD_PAD_R_EM = 2.4;
 
 /** 카드 모서리 반지름. 덕수 요청(2026-08-28)으로 12 → 6(절반)으로 낮췄다. */
 export const CARD_RADIUS = 6;
@@ -79,6 +87,10 @@ export default function TabBody({
   const outline = useOutlineState(blocks, 'outline');
   const scoped = isToneScoped(tab.id);
   const isQuestion = tab.id === 'question';
+
+  /* v3 R3 — em 상수를 이 컴포넌트의 글꼴로 px화한다. */
+  const cardPadL = CARD_PAD_L_EM * contentFontSize;
+  const cardPadR = CARD_PAD_R_EM * contentFontSize;
 
   const labelColStyle: React.CSSProperties = {
     width: 7 * contentFontSize, flexShrink: 0,
@@ -281,8 +293,13 @@ export default function TabBody({
           title={isQuestion ? (collapsedPreview ? '문제 펼치기' : '문제 접기') : undefined}
           style={{
             ...mainColStyle,
-            width: (mainColStyle.width as number) + CARD_PAD_L + CARD_PAD_R,
+            width: (mainColStyle.width as number) + cardPadL + cardPadR,
             boxSizing: 'border-box',
+            /* v3 S3 — 요약 보기의 펼친 섹션이 이 두 값으로 카드 전폭 음수 마진을 만든다.
+               ⚠ TS 상수 하나가 카드 패딩과 CSS 음수 마진을 **함께** 공급해야 한다.
+                 CSS에 리터럴을 적으면 글꼴을 바꿀 때 톤 영역만 어긋난다. */
+            ['--card-pad-l' as any]: `${cardPadL}px`,
+            ['--card-pad-r' as any]: `${cardPadR}px`,
             background: 'var(--card-surface, var(--bg-content))',
             border: '0.5px solid var(--border-content)',
             borderRadius: CARD_RADIUS,
@@ -294,7 +311,7 @@ export default function TabBody({
                  정의부가 문제 탭에 있어서, 지우면 풀이의 참조 말풍선이 통째로 죽는다. */
             ...(collapsedPreview
               ? { height: COLLAPSED_CARD_H, padding: 0, overflow: 'hidden', position: 'relative' as const }
-              : { padding: `20px ${CARD_PAD_R}px 20px ${CARD_PAD_L}px` }),
+              : { padding: `20px ${cardPadR}px 20px ${cardPadL}px` }),
             /* 카드 전체가 접힘/펼침 영역이다(덕수 보완 2) — 라벨만으로는 과녁이 너무 작다. */
             ...(isQuestion ? { cursor: 'pointer' as const } : null),
           }}>
