@@ -5,7 +5,6 @@ import type { Block } from '../../types/problem';
 import type { OutlineItem, OutlineSection } from '../../lib/solutionOutline';
 import { caseClassName } from '../../lib/caseBlock';
 import EditorPreview from '../editor/EditorPreview';
-import { IconChevron } from '../ui/Icons';
 
 /* ═══════════════════════════════════════════════════════════════
    Phase 59 — 요약 보기 스켈레톤 렌더 (열람 2뷰 공용)
@@ -35,17 +34,13 @@ interface Props {
 /** 클릭·키보드로 여닫는 줄. <button>으로 감쌀 수 없다 —
  *  내부에 <p>·KaTeX(MathML)가 들어가 HTML이 무효가 된다. */
 function Toggler({
-  open, onToggle, controls, className, children, chevron = true,
+  open, onToggle, controls, className, children,
 }: {
   open: boolean;
   onToggle: (el: HTMLElement | null) => void;
   controls: string;
   className: string;
   children: React.ReactNode;
-  /** 경우 줄은 false. dot 자체가 접힘(테두리)/펼침(채움)을 이미 말하므로
-   *  chevron은 같은 정보를 거터에서 두 번 반복하는 것이었다(v3 S1).
-   *  ⚠ 그 자리를 rail이 쓴다 — --case-rail-x를 -1.3em으로 당기는 R2의 전제다. */
-  chevron?: boolean;
 }) {
   const ref = React.useRef<HTMLDivElement>(null);
   const fire = () => onToggle(ref.current);
@@ -62,14 +57,13 @@ function Toggler({
         if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fire(); }
       }}
     >
-      {/* ⚠ 회전을 인라인 style로 주지 말 것 — 회전은 aria-expanded를 보고 CSS가 건다.
-          ⚠ 경우 줄(chevron=false)에는 span 자체를 그리지 않는다. visibility:hidden으로
-            숨기면 거터에 1em 상자가 남아 R2의 rail 이동 자리를 계속 점유한다. */}
-      {chevron && (
-        <span className="outline-chevron" aria-hidden>
-          <IconChevron size={12} />
-        </span>
-      )}
+      {/* ⚠ v3 S1 — 여닫이 노브(chevron)는 **제목 줄·경우 줄 둘 다** 없앴다.
+          덕수 원안: "현재의 노브는 없앤다. 간결함을 저해하는 요소로 작용되고
+          배경톤 진해짐 효과와 기능 중복". 펼침/접힘은 이제 톤이 말한다 —
+          접힘 hover 2단 · 펼침 1단 상시(S2·S3), 경우는 dot의 테두리/채움.
+          ⚠ 되살리지 말 것: 노브를 다시 넣으면 같은 정보를 두 번 말하게 되고,
+            경우 줄에서는 rail이 -1.3em으로 당겨 온 자리(R2)를 도로 빼앗는다.
+          ⚠ 여닫이라는 사실은 role="button" + aria-expanded가 계속 나른다. */}
       <div style={{ flex: 1, minWidth: 0 }}>{children}</div>
     </div>
   );
@@ -95,7 +89,7 @@ function CaseItem({
   return (
     <div className={cls}>
       {toggleable ? (
-        <Toggler open={open} onToggle={(el) => onToggle(item.itemKey, el)} controls={bodyId} className="case-head" chevron={false}>
+        <Toggler open={open} onToggle={(el) => onToggle(item.itemKey, el)} controls={bodyId} className="case-head">
           {head}
         </Toggler>
       ) : (
