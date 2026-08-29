@@ -53,9 +53,17 @@ const FONT_SIZE_STEP = 1;
      scrollTop 보정 · 진동 쿨다운 · 접힘 높이 델타가 전부 필요 없어졌고, 무엇보다
      **참조 말풍선 회귀 위험이 원천 소멸**했다(카드가 늘 정상 상태로 DOM에 있다). */
 
-/** 제목행 높이. ⚠ minHeight가 아니라 height다 — 제목이 줄바꿈해도 커지면 안 된다.
- *  EditorView Row1+Row2의 가로선 Y(98)와 맞춘 값이다. */
-const HEADER_H = 98;
+/** 제목행 높이 = 앱 전역의 **1행**(덕수 요청 2026-08-30: 아래 빈 2행은 공간 낭비).
+ *  옛 98은 EditorView의 Row1+Row2 두 행치 높이였는데 ProblemView는 1행 내용만 담아
+ *  아래 ~50px이 빈 띠로 남았다("추후 메타데이터"용으로 잡아 뒀지만 끝내 오지 않았다).
+ *  ⚠ 57은 임의값이 아니라 앱이 이미 쓰는 1행 높이다 — dialogHead·dialogFoot ·
+ *    BatchVerifyDialog · EditorView Row1(minHeight 57 + borderBottom 1px --border-light) ·
+ *    DRAWER_ROW1_H(= 57 - inset 8 - 테두리 1)이라 **모든 드로어의 첫 가로선이 y=57**이다.
+ *    ProblemView 자신의 우측 단도 드로어라, 이제 중앙 제목행 아래 선과 우측 단 1행
+ *    아래 선이 정확히 같은 Y에 선다(옛 98은 드로어의 **둘째** 선과 맞던 값이다).
+ *  ⚠ minHeight가 아니라 height다. 제목 span이 nowrap + ellipsis라 줄바꿈이 없으므로
+ *    안전하고, 고정이어야 가로선 Y가 문항마다 흔들리지 않는다. */
+const HEADER_H = 57;
 
 /** hold-to-peek 알약. 좌측 라벨 거터의 풀이 라벨 **바로 위**에 산다.
  *  ⚠ ON/OFF가 달라야 한다(히스테리시스). 같으면 경계 스크롤에서 깜빡인다. */
@@ -729,7 +737,7 @@ export default function ProblemView({
       background: 'var(--bg-functional)', fontSize: contentFontSize,
       overflow: 'hidden', position: 'relative',
     }}>
-      {/* ═══ 제목바: U자 밖 아이보리 chrome — [폴더경로 | 제목]. 아래 빈 공간은 추후 메타데이터 ═══ */}
+      {/* ═══ 제목바: U자 밖 아이보리 chrome — [폴더경로 | 제목] 한 행 ═══ */}
       {/* v3 P1 — 제목행은 스크롤과 무관하게 위치·크기를 그대로 유지한다(덕수: 안정감).
           M2의 슬림 접힘(height 애니메이션 98↔36)은 철거했다.
           ⚠ height는 고정값이다. minHeight로 두면 제목이 줄바꿈할 때 커져 EditorView와의
@@ -745,12 +753,12 @@ export default function ProblemView({
         paddingRight: rightReserve,
         transition: panelDragging ? 'none' : 'padding-right 0.18s ease',
         display: 'flex', justifyContent: 'center',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         borderBottom: '1px solid var(--border-light)',
       }}>
         <div style={{
           display: 'flex', alignItems: 'center', gap: LABEL_GAP,
-          padding: `22px ${OUTER_PAD}px 0`,
+          padding: `0 ${OUTER_PAD}px`,
           boxSizing: 'border-box',
         }}>
           {/* 헤더 라벨 박스 — 폭 7em 고정. 경로는 absolute 오버레이, 제목은 transform 슬라이드 */}

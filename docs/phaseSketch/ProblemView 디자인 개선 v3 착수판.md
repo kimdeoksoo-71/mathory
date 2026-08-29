@@ -108,7 +108,7 @@ R-3 `PublicViewerShell.tsx:140 fontSize:15` · R-4 알약 라벨 `'보기'` · R
 
 | # | 결정 |
 |---|---|
-| **P1** | 제목행 자동접힘 철거. `headerSlim`·`HEADER_H`·`M2_COLLAPSE`·슬림 축약 제목·`borderBottom` 분기·D49 컨트롤 top 연동(`16` 고정)·`font-size`/`height` 트랜지션 삭제. 제목행은 **`height: 98` 고정**(web R-11 — `minHeight`면 줄바꿈 시 커져 EditorView와의 y=98 가로선 정렬이 깨진다) |
+| **P1** | 제목행 자동접힘 철거. `headerSlim`·`HEADER_H`·`M2_COLLAPSE`·슬림 축약 제목·`borderBottom` 분기·D49 컨트롤 top 연동(`16` 고정)·`font-size`/`height` 트랜지션 삭제. 제목행은 **`height: 57` 고정**(⚠ web R-11의 98에서 개정 — 덕수 2026-08-30 "아래 빈 2행은 공간 낭비". 98은 EditorView Row1+Row2 두 행치인데 ProblemView는 1행 내용만 담아 ~50px이 빈 띠였다. 57은 앱 전역의 1행 높이 — `dialogHead`·`BatchVerifyDialog`·EditorView Row1·`DRAWER_ROW1_H`(드로어 첫 선 y=57). 이제 중앙 제목행 선과 **우측 단 1행 선이 같은 Y**에 선다. `minHeight`가 아닌 이유는 R-11 그대로) |
 | **P2** | ⚠ **문제 카드를 숨기지 않는다.** sticky도 떼고(E-P4) 그냥 흐름에 둔다. 스크롤하면 위로 밀려 사라지고 역방향으로 내려온다. **레이아웃을 바꾸는 코드가 없다** = 튐·진동이 구조적으로 불가능 |
 | **P3** | `problemOffscreen` 상태 하나: `onScroll`에서 `rowRef.getBoundingClientRect().bottom <= container.getBoundingClientRect().top`. **버튼 표시만** 좌우하고 레이아웃은 건드리지 않는다. 경계 깜빡임은 **등장 ≤0px / 소멸 ≥8px 히스테리시스** + `opacity` 0.15s |
 | **P4** | 알약 버튼: `--accent-primary` · 흰 글자 12px/600 · radius 999 · `padding 4px 10px`(기존 '보기' 알약과 같은 규격). 라벨은 **'문제'** 한 단어(V5′ 재수정 — N-7의 폭 제약 + 거터에서 밀려 올라간 `문제` 라벨의 자리를 그대로 잇는다). 누르고 있는 동안만 보인다는 것은 `title`이 보완한다. **`problemOffscreen`일 때만** 보인다 |
