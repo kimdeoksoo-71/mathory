@@ -948,8 +948,51 @@ p:has(.marker-circled) {
 }
 /* 펼침 표시 회전 */
 .section-head[aria-expanded="true"] .outline-chevron { transform: rotate(90deg); }
+/* v3 S2 — 톤 사다리: 카드(--bg-content) → 1단(--block-bg, 펼친 섹션 상시)
+   → 2단(--block-bg-active, hover). hover가 상시 톤보다 한 단 진해야 "지금 가리키는 것"이
+   펼친 섹션 위에서도 읽힌다. 옛 --bg-hover는 휘도 0.8349로 --block-bg(0.8276)와
+   거의 같아 펼친 섹션 안에서 hover가 사라졌다. */
 .section-head:hover,
-.case-head:hover { background: var(--bg-hover); }
+.case-head:hover { background: var(--block-bg-active); }
+
+/* v3 S3·S5·S6 — 펼친 섹션의 상시 톤. 카드 좌우 패딩만큼 음수 마진으로 넓혀 카드 전폭.
+   ⚠ S6 — --case-dot-fill을 함께 재정의해야 한다. 접힘 dot의 속은 배경색으로 칠하는데
+     (globals.css:157 전례) 재정의하지 않으면 dot 안쪽만 옛 클레이로 남아 **더 밝은
+     구멍**이 된다. TabBody·ProblemTabContent가 카드에서 같은 이유로 하는 일이다.
+   ⚠ S7 — 톤은 반드시 **조상 배경**이어야 한다. 자손(.case-block::before의 rail·dot)은
+     조상 배경 위에 그려지므로 덮이지 않는다. 형제 오버레이로 만들면 그때는 덮인다.
+   ⚠ S5 — 인접 두 섹션이 모두 열리면 한 덩어리로 뭉쳐 얼룩져 보인다 → 위쪽만 띄운다.
+     과하면 이 규칙 블록의 background 한 줄만 지우면 hover 전용으로 되돌아간다. */
+/* ⚠ 좌우 음수 마진 + 패딩은 **열림과 무관하게 상시**다. is-open일 때만 주면
+     닫힌 섹션의 여닫이 줄이 전폭이 될 수 없고(보정할 패딩이 없어 카드 밖으로 넘친다),
+     열고 닫을 때마다 좌우가 미세하게 움직인다. 상쇄되므로 본문 좌단은 그대로 0이다. */
+.outline-section {
+  margin-left: calc(-1 * var(--card-pad-l, 0px));
+  margin-right: calc(-1 * var(--card-pad-r, 0px));
+  padding-left: var(--card-pad-l, 0px);
+  padding-right: var(--card-pad-r, 0px);
+}
+.outline-section.is-open {
+  background: var(--block-bg);
+  --case-dot-fill: var(--block-bg);
+  border-radius: 6px;
+  padding-top: 0.3em;
+  padding-bottom: 0.3em;
+}
+.outline-section.is-open + .outline-section.is-open { margin-top: 0.4em; }
+
+/* 여닫이 줄도 같은 식으로 카드 전폭 — hover 띠가 섹션 톤과 같은 폭이라야
+   "행 하나"와 "섹션 전체"의 관계가 읽힌다.
+   ⚠ .section-head의 padding-left 1.6em / margin-left -1.6em(chevron 히트 영역)은
+     여기에 **흡수**된다. chevron은 flex 항목으로 margin-left -1.2em이라 늘어난 패딩
+     안쪽에 그대로 들어간다 — 별도 보정이 필요 없다. */
+.outline-section .section-head,
+.outline-section .case-head {
+  margin-left: calc(-1 * var(--card-pad-l, 0px));
+  margin-right: calc(-1 * var(--card-pad-r, 0px));
+  padding-left: var(--card-pad-l, 0px);
+  padding-right: var(--card-pad-r, 0px);
+}
 
 /* Phase 61c — 검증 리포트 지적 행의 hover.
    ⚠️ JS state로 하지 말 것: 카드 안 리렌더가 MathText의 innerHTML을 다시 쓰고,

@@ -137,6 +137,13 @@ function ContentCard({ children }: { children: React.ReactNode }) {
            카드에도 ScrollColumn에도 overflow:hidden이 없어 잘림 위험은 없다. */
       width: '100%', maxWidth: 'calc(35em + 76px)', background: 'var(--bg-card, #fff)', borderRadius: 8,
       padding: '32px 36px 32px 40px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', boxSizing: 'border-box',
+      /* v3 S4 — 요약 보기의 .outline-section이 카드 전폭 톤을 만들 때 읽는 값.
+         ⚠ 안 세우면 var(--card-pad-l, 0)으로 떨어져 톤 폭이 본문에 머문다 — 깨지진
+           않지만 앱 열람뷰와 공개 뷰어가 다르게 보인다.
+         ⚠ 여기는 fontSize 15 고정이라 px 리터럴이 맞다(v3 R4). 앱은 TabBody가
+           CARD_PAD_*_EM × contentFontSize로 세운다. */
+      ['--card-pad-l' as any]: '40px',
+      ['--card-pad-r' as any]: '36px',
       fontSize: 15,
     }}>
       {children}

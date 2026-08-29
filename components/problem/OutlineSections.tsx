@@ -145,8 +145,12 @@ export default function OutlineSections({
           </>
         );
 
+        /* v3 S3 — 펼친 섹션은 카드 전폭 톤을 입는다. 음수 마진 값은 CSS가
+           --card-pad-l/r(TabBody가 카드 인라인 style에 세운다)에서 읽는다.
+           ⚠ TS 상수 하나가 카드 패딩과 톤 폭을 함께 공급해야 한다 — CSS에 리터럴을
+             적으면 글꼴을 바꿀 때 톤 영역만 어긋난다. */
         return (
-          <div key={sec.key}>
+          <div key={sec.key} className={`outline-section${open ? ' is-open' : ''}`}>
             {sec.heading ? (
               <Toggler open={open} onToggle={(el) => onToggleSection(sec.key, el)} controls={bodyId} className="section-head">
                 {renderBlock(sec.heading, 0)}
