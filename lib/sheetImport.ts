@@ -16,6 +16,10 @@
  * 0-based, `A1:P`(16열) 기준. */
 export const SHEET_COL = {
   id: 0,             // A  문항 제목 + source + 중복검사 키
+  /** B  정규화 **전** 문제 원문. 본문으로 쓰지 않고 **그림 파일명 복구에만** 쓴다(Phase 61e D13).
+   *  GAS `normalizeProblem`이 선택지 뒤 `\includegraphics`를 trailer로 잘라내면 E에서 사라지는데
+   *  B에는 남아 있다(실측: Data_DS 1공통13). */
+  problem: 1,
   given_solution: 2, // C  풀이
   given_answer: 3,   // D  공식 정답
   problem_stem: 4,   // E  문제 본문
@@ -36,6 +40,7 @@ export const SHEET_COL_COUNT = 16;
  *  ⚠️ `sloution_note`는 시트 원문의 오타를 그대로 옮긴 것이다(고치지 말 것). */
 export const EXPECTED_HEADERS: Partial<Record<keyof typeof SHEET_COL, string>> = {
   id: 'id',
+  problem: 'problem',        // Phase 61e Z4 — 실측 확정(2026-08-30)
   given_solution: 'given_solution',
   given_answer: 'given_answer',
   problem_stem: 'problem_stem',
@@ -64,8 +69,12 @@ export interface ImportRow {
 
 /** 순서는 배열 인덱스가 소유한다 — `order` 필드를 두지 않는다(계획서 Y3). */
 export interface DraftBlock {
-  type: 'text' | 'choices';
+  type: 'text' | 'choices' | 'image';
+  /** image 블록은 **저장 직전까지 빈 문자열**이다 — Storage URL이 그때 정해진다.
+   *  미리보기는 blob URL을, 저장본은 Storage URL을 넣는다(Y1의 유일한 예외). */
   raw_text: string;
+  /** image 전용. Drive `IMAGE_FIG` 폴더의 파일명(`<stem>_figN.<ext>`). */
+  figName?: string;
 }
 
 export interface DraftTab {
@@ -165,6 +174,69 @@ export function normalizeText(raw: string): { text: string; warnings: string[] }
   return { text: t, warnings };
 }
 
+/* ═══ 그림 분할 (Phase 61e) ═══ */
+
+/**
+ * `\includegraphics[opt]{파일명}`.
+ *
+ * ⚠ 여기서 `\{[^}]*\}`를 쓰는 것은 개선묶음 M1 W2 규약(중괄호를 정규식으로 자르지 말 것)의
+ *   **예외가 아니라 적용 대상이 아니다** — GAS가 만드는 이름은 `<stem>_figN.<ext>`뿐이라
+ *   중괄호가 들어갈 수 없다. 중첩이 없으므로 균형 스캔이 필요 없다.
+ *   (제어열 일반을 다루는 `lib/proofread.ts`는 반대로 `readGroup`을 쓴다 — 거긴 `\frac{a}{b}`가 온다.)
+ */
+const INCLUDEGRAPHICS_RE = /\\includegraphics(?:\[[^\]\n]*\])?\{([^}\n]+)\}/;
+
+/** 패치 3이 안 돈 잔재. **경계로 삼지 않는다**(Phase 61e D21) — 경고만 낸다. */
+const MATHPIX_IMG_RE = /!\[[^\]\n]*\]\(\s*https?:\/\/[^)\s]+\s*\)/;
+
+/**
+ * 본문을 `\includegraphics{…}` 경계로 조각내 text/image 블록 배열을 만든다.
+ *
+ * - **그림이 하나도 없으면 원문 그대로 text 블록 1개**를 돌려준다(빈 문자열이어도).
+ *   61a의 기존 동작과 비트 단위로 같아야 하므로 이 갈래를 없애지 말 것.
+ * - 빈/공백뿐인 텍스트 조각은 버린다 — 순서는 배열 인덱스가 소유한다(Y3).
+ * - ⚠ `![alt](url)`은 **분할하지 않는다**(D21). 그 형태는 오늘도 `EditorPreview`가 마크다운
+ *   이미지로 그대로 렌더하고, 분할하려면 Drive가 아닌 외부 URL 경로가 필요해져
+ *   프록시의 폴더 고정(D12)이 무너진다. 경고만 남기고 현행 동작을 보존한다.
+ */
+export function splitFigures(text: string): {
+  blocks: DraftBlock[]; figNames: string[]; warnings: string[];
+} {
+  const warnings: string[] = [];
+  if (MATHPIX_IMG_RE.test(text)) {
+    warnings.push('변환되지 않은 Mathpix 이미지 링크가 있습니다 — 외부 링크로 표시됩니다');
+  }
+
+  const re = new RegExp(INCLUDEGRAPHICS_RE.source, 'g');
+  const blocks: DraftBlock[] = [];
+  const figNames: string[] = [];
+  let last = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const before = text.slice(last, m.index).trim();
+    if (before) blocks.push({ type: 'text', raw_text: before });
+    const figName = m[1].trim();
+    blocks.push({ type: 'image', raw_text: '', figName });
+    figNames.push(figName);
+    last = m.index + m[0].length;
+  }
+
+  if (figNames.length === 0) return { blocks: [{ type: 'text', raw_text: text }], figNames, warnings };
+
+  const tail = text.slice(last).trim();
+  if (tail) blocks.push({ type: 'text', raw_text: tail });
+  return { blocks, figNames, warnings };
+}
+
+/** 텍스트에 든 `\includegraphics` 파일명만 뽑는다(블록으로 쪼개지 않는다). B열 복구용. */
+export function scanFigureNames(text: string): string[] {
+  const re = new RegExp(INCLUDEGRAPHICS_RE.source, 'g');
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(String(text ?? ''))) !== null) out.push(m[1].trim());
+  return out;
+}
+
 /* ═══ 선택지 라벨 ═══ */
 
 /**
@@ -227,37 +299,80 @@ export function rowToDraft(row: ImportRow): ProblemDraft | DraftError {
   /* ── 문제 탭 ── */
   const stem = take('problem_stem');
   if (!stem) warnings.push('E열(문제 본문)이 비어 있습니다');
-  const questionBlocks: DraftBlock[] = [{ type: 'text', raw_text: stem }];
+  // ⚠ `stemHash`는 **분할 전** 값이다(아래 반환문). 분할·자동 수정이 앞서면 가져오기 옵션에 따라
+  //   중복 키가 바뀌어 같은 문항이 두 벌 저장된다(Phase 61e N-4).
+  const stemSplit = splitFigures(stem);
+  warnings.push(...stemSplit.warnings.map((w) => `E열: ${w}`));
+  const questionBlocks: DraftBlock[] = [...stemSplit.blocks];
 
   const choices = CHOICE_KEYS.map((k) => stripChoiceLabel(take(k)));
   const filled = choices.map((c, i) => ({ label: CHOICE_LABELS[i], content: c, index: i }))
                         .filter((c) => c.content !== '');
   if (filled.length > 0) {
     // 빈 선택지는 줄 자체를 생략한다 — parseChoices가 내용 없는 줄을 건너뛰는 규격과 일치.
-    questionBlocks.push({
-      type: 'choices',
-      raw_text: filled.map((c) => `${c.label} ${c.content}`).join('\n'),
-    });
+    const choicesText = filled.map((c) => `${c.label} ${c.content}`).join('\n');
+    questionBlocks.push({ type: 'choices', raw_text: choicesText });
     // ⚠️ 중간이 비어 라벨이 건너뛰면(①③④) ChoicesBlock은 **개수** 기준으로 배치하므로
     //    화면에서 ①과 ③이 이웃한다. 데이터 이상 신호이므로 알린다.
     const lastIndex = filled[filled.length - 1].index;
     if (filled.length !== lastIndex + 1) {
       warnings.push(`선택지 중간이 비어 라벨이 건너뜁니다(${filled.map((c) => c.label).join('')}) — 시트를 확인하세요`);
     }
+    // Phase 61e D3′ — 선택지 **셀 안** 그림은 실측 0건이라 인라인 처리를 만들지 않았다.
+    //   나타나면 문자열 그대로 남으므로(자동 수정도 호출부가 끈다) 알리고 사람에게 넘긴다.
+    if (INCLUDEGRAPHICS_RE.test(choicesText)) {
+      warnings.push('선택지 안에 그림이 있습니다 — 편집창에서 손봐야 합니다');
+    }
+  }
+
+  /* ── B열 그림 복구 (D13) ──
+     GAS `normalizeProblem`이 선택지 뒤 `\includegraphics`를 trailer로 잘라내면 E에서 사라진다.
+     정규화 전 원문인 B에는 남아 있으므로, E에 없는 이름만 문제 탭 **맨 끝**에 붙인다.
+     ⚠ B를 본문으로 쓰지는 않는다 — 정규화 이전 텍스트라 표기가 E와 다르다. */
+  const inQuestion = new Set(stemSplit.figNames);
+  const recovered: string[] = [];
+  for (const name of scanFigureNames(cell(row, 'problem'))) {
+    if (inQuestion.has(name)) continue;
+    inQuestion.add(name);                       // B 안의 중복도 한 번만
+    recovered.push(name);
+    questionBlocks.push({ type: 'image', raw_text: '', figName: name });
+  }
+  if (recovered.length > 0) {
+    warnings.push(`E열에서 사라진 그림 ${recovered.length}개를 B열에서 복구했습니다`);
+  }
+
+  // N-8 — 문제 탭에 텍스트 블록이 하나도 없으면 정밀 검증이 `empty_question`으로 사전 차단된다.
+  // ⚠ **그림이 있을 때만** 울린다 — E가 통째로 비었을 때는 위의 'E열이 비어 있습니다'가 이미 말했고,
+  //   둘 다 내면 같은 사실을 두 번 알리면서 원인을 흐린다.
+  const hasFigure = questionBlocks.some((b) => b.type === 'image');
+  const hasBody = questionBlocks.some((b) => b.type !== 'image' && b.raw_text.trim());
+  if (hasFigure && !hasBody) {
+    warnings.push('문제 본문이 그림뿐입니다 — 정밀 검증이 차단됩니다');
   }
 
   /* ── 풀이 탭 ── (비어도 빈 text 블록 1개 — AppShell 신규 문항 관례) */
   const solution = take('given_solution');
   if (!solution) warnings.push('C열(풀이)이 비어 있습니다');
-  const solutionBlocks: DraftBlock[] = [{ type: 'text', raw_text: solution }];
+  const solSplit = splitFigures(solution);
+  warnings.push(...solSplit.warnings.map((w) => `C열: ${w}`));
+  const solutionBlocks: DraftBlock[] = [...solSplit.blocks];
 
   /* ── AI풀이 탭 ── (O·P 중 하나라도 있을 때만) */
   const derived = take('derived_answer');
   const note = take('solution_note');
   const aiBlocks: DraftBlock[] = [];
   // D10: O열 앞에만 고정 접두를 붙인다. §"친절한 가공 금지"의 유일한 예외.
-  if (derived) aiBlocks.push({ type: 'text', raw_text: `**AI 정답:** ${derived}` });
-  if (note) aiBlocks.push({ type: 'text', raw_text: note });
+  // ⚠ O는 **분할하지 않는다** — 정답 값 한 줄이고 고정 접두가 붙어 조각내면 접두가 떨어져 나간다.
+  //   그림이 들어 있으면(사실상 없다) 알리기만 한다.
+  if (derived) {
+    if (INCLUDEGRAPHICS_RE.test(derived)) warnings.push('O열(AI 정답)에 그림이 있습니다 — 문자열 그대로 들어갑니다');
+    aiBlocks.push({ type: 'text', raw_text: `**AI 정답:** ${derived}` });
+  }
+  if (note) {
+    const noteSplit = splitFigures(note);
+    warnings.push(...noteSplit.warnings.map((w) => `P열: ${w}`));
+    aiBlocks.push(...noteSplit.blocks);
+  }
 
   const tabs: DraftTab[] = [
     { id: 'question', label: '문제' },

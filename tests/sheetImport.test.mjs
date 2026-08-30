@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import {
   SHEET_COL, SHEET_COL_COUNT, EXPECTED_HEADERS,
   parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash, stripChoiceLabel,
+  splitFigures, scanFigureNames,
 } from '../.test-build/lib/sheetImport.js';
 
 /** 16칸 셀 배열을 만든다. `{ id: 'x', problem_stem: 'y' }` 형태로 지정. */
@@ -260,4 +261,126 @@ test('L6 라벨을 뗀 뒤에도 건너뛴 라벨 경고는 위치 기준으로 
   const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', choice1: '① a', choice3: '③ c' });
   assert.equal(d.blocksByTab.question[1].raw_text, '① a\n③ c');
   assert.ok(d.warnings.some((w) => /건너뜁니다/.test(w)));
+});
+
+/* ═══ F — 그림 분할 (Phase 61e D2 · D13 · D21) ═══ */
+
+const FIG1 = '\\includegraphics{연구실모의6회(260824)_문제_1공통07_fig1.jpg}';
+const NAME1 = '연구실모의6회(260824)_문제_1공통07_fig1.jpg';
+
+test('F1 그림이 없으면 원문 그대로 text 블록 1개 (61a 동작 불변)', () => {
+  const r = splitFigures('그냥 본문');
+  assert.deepEqual(r.blocks, [{ type: 'text', raw_text: '그냥 본문' }]);
+  assert.deepEqual(r.figNames, []);
+});
+
+test('F2 빈 문자열도 빈 text 블록 1개 (AppShell 신규 문항 관례)', () => {
+  assert.deepEqual(splitFigures('').blocks, [{ type: 'text', raw_text: '' }]);
+});
+
+test('F3 본문 중간 그림 → text / image / text', () => {
+  const r = splitFigures(`그래프가 그림과 같다.\n${FIG1}\n이때 값은?`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text']);
+  assert.equal(r.blocks[0].raw_text, '그래프가 그림과 같다.');
+  assert.equal(r.blocks[1].figName, NAME1);
+  assert.equal(r.blocks[1].raw_text, '');       // URL은 저장 직전에 채운다
+  assert.equal(r.blocks[2].raw_text, '이때 값은?');
+  assert.deepEqual(r.figNames, [NAME1]);
+});
+
+test('F4 맨 앞·맨 뒤 그림에서 빈 조각은 버린다', () => {
+  assert.deepEqual(splitFigures(`${FIG1}\n뒤`).blocks.map((b) => b.type), ['image', 'text']);
+  assert.deepEqual(splitFigures(`앞\n${FIG1}`).blocks.map((b) => b.type), ['text', 'image']);
+  assert.deepEqual(splitFigures(FIG1).blocks.map((b) => b.type), ['image']);
+});
+
+test('F5 연속 그림 2개 사이에 빈 text 블록을 만들지 않는다', () => {
+  const r = splitFigures(`${FIG1}\n\\includegraphics{a_fig2.jpg}`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['image', 'image']);
+  assert.deepEqual(r.figNames, [NAME1, 'a_fig2.jpg']);
+});
+
+test('F6 옵션 인자 `[...]`가 붙어도 파일명만 뽑는다', () => {
+  assert.deepEqual(splitFigures('\\includegraphics[width=5cm]{a_fig1.jpg}').figNames, ['a_fig1.jpg']);
+});
+
+test('F7 `![](url)`은 분할하지 않고 경고만 낸다 (D21 — 현행 렌더 동작 보존)', () => {
+  const src = '앞 ![](https://cdn.mathpix.com/x.jpg) 뒤';
+  const r = splitFigures(src);
+  assert.deepEqual(r.blocks, [{ type: 'text', raw_text: src }]);
+  assert.equal(r.figNames.length, 0);
+  assert.ok(r.warnings.some((w) => /Mathpix/.test(w)), r.warnings.join('|'));
+});
+
+test('F8 scanFigureNames는 쪼개지 않고 이름만 준다', () => {
+  assert.deepEqual(scanFigureNames(`a ${FIG1} b \\includegraphics{c_fig9.png} d`), [NAME1, 'c_fig9.png']);
+  assert.deepEqual(scanFigureNames(''), []);
+});
+
+/* ═══ G — rowToDraft 통합 (Phase 61e) ═══ */
+
+test('G1 stemHash는 분할 전 값이다 — 그림이 섞여도 E 원문 기준', () => {
+  const stem = `문제 본문\n${FIG1}\n이어서`;
+  const d = draft({ id: 'X', problem_stem: stem, given_solution: 's' });
+  assert.equal(d.stemHash, stemHash(normalizeText(stem).text));
+});
+
+test('G2 문제 탭이 text/image/text/choices로 쪼개진다', () => {
+  const d = draft({
+    id: 'X', problem_stem: `앞\n${FIG1}\n뒤`, given_solution: 's',
+    choice1: '① a', choice2: '② b',
+  });
+  assert.deepEqual(d.blocksByTab.question.map((b) => b.type), ['text', 'image', 'text', 'choices']);
+});
+
+test('G3 풀이 탭(C열)도 분할된다', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: `풀이\n${FIG1}` });
+  assert.deepEqual(d.blocksByTab.solution.map((b) => b.type), ['text', 'image']);
+});
+
+test('G4 D13 — E에서 사라진 그림을 B열에서 복구해 문제 탭 끝에 붙인다', () => {
+  const d = draft({
+    id: 'X', problem: `원문 ${FIG1}`, problem_stem: '정규화된 본문', given_solution: 's',
+    choice1: '① a', choice2: '② b',
+  });
+  const types = d.blocksByTab.question.map((b) => b.type);
+  assert.deepEqual(types, ['text', 'choices', 'image']);       // 선택지 **뒤**에 온다
+  assert.equal(d.blocksByTab.question[2].figName, NAME1);
+  assert.ok(d.warnings.some((w) => /B열에서 복구/.test(w)), d.warnings.join('|'));
+});
+
+test('G5 E에 이미 있는 그림은 B열에서 다시 붙이지 않는다', () => {
+  const d = draft({ id: 'X', problem: `원문 ${FIG1}`, problem_stem: `본문 ${FIG1}`, given_solution: 's' });
+  assert.equal(d.blocksByTab.question.filter((b) => b.type === 'image').length, 1);
+  assert.ok(!d.warnings.some((w) => /B열에서 복구/.test(w)));
+});
+
+test('G6 선택지 안 그림은 경고만 (D3′ — 인라인 처리는 만들지 않았다)', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', choice1: `① ${FIG1}`, choice2: '② b' });
+  assert.ok(d.warnings.some((w) => /선택지 안에 그림/.test(w)), d.warnings.join('|'));
+  assert.ok(d.blocksByTab.question.some((b) => b.type === 'choices' && b.raw_text.includes('includegraphics')));
+});
+
+test('G7 N-8 — 본문이 그림뿐이면 경고, 빈 E에서는 울리지 않는다', () => {
+  const onlyFig = draft({ id: 'X', problem_stem: FIG1, given_solution: 's' });
+  assert.ok(onlyFig.warnings.some((w) => /그림뿐/.test(w)), onlyFig.warnings.join('|'));
+  const emptyE = draft({ id: 'X', given_solution: 's' });
+  assert.ok(!emptyE.warnings.some((w) => /그림뿐/.test(w)), emptyE.warnings.join('|'));
+});
+
+test('G8 O열은 분할하지 않는다 — 고정 접두가 떨어져 나가면 안 된다', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', derived_answer: `12 ${FIG1}` });
+  assert.ok(d.blocksByTab.extra_0[0].raw_text.startsWith('**AI 정답:** '));
+  assert.ok(d.blocksByTab.extra_0[0].raw_text.includes('includegraphics'));
+  assert.ok(d.warnings.some((w) => /O열/.test(w)), d.warnings.join('|'));
+});
+
+test('G9 P열(AI 풀이)은 분할한다', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', solution_note: `풀이\n${FIG1}` });
+  assert.deepEqual(d.blocksByTab.extra_0.map((b) => b.type), ['text', 'image']);
+});
+
+test('G10 B열 헤더 기대값이 등록돼 있다 (Z4)', () => {
+  assert.equal(EXPECTED_HEADERS.problem, 'problem');
+  assert.equal(SHEET_COL.problem, 1);
 });
