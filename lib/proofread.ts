@@ -6,7 +6,7 @@
  * - 인라인 수식과 한글 조사 사이의 잘못된 공백 로컬 검출 (결정적, 토큰 절약)
  */
 
-import { skipEnvArgs } from './latexScan';
+import { readGroup, skipEnvArgs } from './latexScan';
 
 export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'latex-comma' | 'other';
 
@@ -342,6 +342,9 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);          // 마크다운 링크/이미지
   addAll(/`[^`\n]*`/g);                          // 인라인 코드
   addAll(/\\(?:tag|ref)\{[^}]*\}/g);             // \tag, \ref (안의 숫자 보호)
+  // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 위 tag/ref 줄을 포함하지만
+  // 명시성을 위해 둘 다 남긴다(중복 보호는 무해하다).
+  protectedRanges.push(...collectControlSeqRanges(text));
   addAll(/\(\d+\)/g);                             // 참조 번호 (1), (2), (3) … 은 수식화 제외
   // 순서 리스트 마커: 라인 선두 "  3. " 등의 숫자
   {
@@ -400,6 +403,9 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
   addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);
   addAll(/`[^`\n]*`/g);
   addAll(/\\(?:tag|ref)\{[^}]*\}/g);
+  // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 이 줄이 없으면
+  // `\includegraphics{…}`가 `\$includegraphics${…}`로 파괴된다.
+  protectedRanges.push(...collectControlSeqRanges(text));
   // ol 라벨 예외:
   //   - 단일 영문 글자 in parens: (a), (b), ..., (z), (A), ...
   //   - 로마 숫자 in parens: (i), (ii), (iii), (iv), (v), (vi)... 대소문자 모두
@@ -517,6 +523,53 @@ export function normalizeDisplayMathDelimiters(text: string): { fixed: string; c
  * 반환값의 count는 실제 수정된 건수 (UI 알림용)
  */
 /* ─── 개선묶음 M1: 수식/코드 보호 구간 (공용) ─── */
+
+/**
+ * 텍스트 영역에 남은 **LaTeX 제어열**(`\cmd`와 그 뒤의 `[opt]`·`{arg}`) 범위 수집. (Phase 61e D15)
+ *
+ * ⚠ 이것이 없으면 `autoWrapBareLetters`가 `\includegraphics{a_fig1.jpg}`를
+ *   `\$includegraphics${$a$_fig1.$jpg$}`로 **파괴한다**(실측 count 6). `\begin{itemize}`·`\item`·
+ *   `\hline`도 같다. 시트 가져오기는 이 잔재를 그대로 안고 들어오므로, 보호가 없으면 그림 파일명이
+ *   조각나 나중에 `includegraphics`로 **검색조차 되지 않는다**.
+ *
+ * ⚠ **중괄호를 정규식으로 자르지 말 것** — `readGroup`의 균형 스캔을 쓴다(개선묶음 M1 W2).
+ *   `\{[^}]*\}`는 `\frac{\frac{1}{2}}{3}` 같은 중첩에서 잘못 끊긴다.
+ *
+ * ⚠ **인자를 통째로 보호하므로 `\textbf{2개}`의 `2`는 수식화되지 않는다 — 의도한 트레이드오프다.**
+ *   실데이터의 텍스트 영역 제어열은 `\includegraphics`·`\begin`·`\item`·`\hline`이 사실상 전부라
+ *   잃는 것이 없고, 반대로 인자를 열어 두면 위 파괴가 재발한다.
+ *   **"왜 `\textbf{3}`은 안 감싸지나"를 버그로 오인하지 말 것.**
+ *
+ * ⚠ `convertJamoRefs`에는 **넣지 말 것.** 그쪽은 `\text{(ㄱ)}`처럼 제어열 인자 안의 참조까지
+ *   변환하는 것이 명시된 사양이다(덕수 2026-08-26). 여기서 "통일"하면 그 결정이 조용히 뒤집힌다.
+ */
+function collectControlSeqRanges(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  // `(?<!\\)`가 있어 `\\`(줄바꿈)·`\$`·`\{`에는 걸리지 않는다 → `\\[6pt]`(행렬 행간)도 무사하다.
+  const re = /(?<!\\)\\[A-Za-z]+\*?/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    let end = m.index + m[0].length;
+    // 뒤따르는 `[opt]`·`{arg}`를 흡수한다(연속 인자 허용: `\frac{a}{b}`). 사이 공백은 허용하지 않는다.
+    for (;;) {
+      if (text[end] === '[') {
+        const close = text.indexOf(']', end + 1);
+        if (close === -1 || text.slice(end, close).includes('\n')) break;
+        end = close + 1;
+        continue;
+      }
+      if (text[end] === '{') {
+        const close = readGroup(text, end);
+        if (close === -1) break;              // 짝이 없으면 제어열 본체까지만 보호한다
+        end = close + 1;
+        continue;
+      }
+      break;
+    }
+    out.push([m.index, end]);
+  }
+  return out;
+}
 
 /**
  * 수식 영역(구분자 포함) 범위 수집.

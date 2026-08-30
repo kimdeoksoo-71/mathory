@@ -141,3 +141,67 @@ test('autoFixDeterministicIssues — 반환 형태는 그대로 { fixed, count }
   assert.equal(typeof r.fixed, 'string');
   assert.equal(typeof r.count, 'number');
 });
+
+/* ═══ ⑤ Phase 61e D15 — 텍스트 영역의 LaTeX 제어열 보호 ═══
+ *
+ * 없으면 `autoWrapBareLetters`가 `\includegraphics{…}`를 `\$includegraphics${…}`로 파괴한다.
+ * 시트 가져오기(61e)는 그 잔재를 그대로 안고 들어오므로, 파괴되면 그림 파일명이 조각나
+ * 나중에 `includegraphics`로 검색조차 되지 않는다.
+ */
+
+const FIG = '\\includegraphics{연구실모의6회(260824)_문제_1공통07_fig1.jpg}';
+
+test('P-1 \\includegraphics 는 원형 그대로 남는다', () => {
+  const { fixed, count } = P.autoFixDeterministicIssues(FIG);
+  assert.equal(fixed, FIG);
+  assert.equal(count, 0);
+});
+
+test('P-1b 문장 속 \\includegraphics — 주변은 고쳐도 태그는 불변', () => {
+  const src = `그래프가 그림과 같다. ${FIG} 이때 $f(1)$ 의 값은?`;
+  const { fixed } = P.autoFixDeterministicIssues(src);
+  assert.ok(fixed.includes(FIG), fixed);            // 태그 원형 보존
+  assert.ok(fixed.includes('$f(1)$의'), fixed);     // 조사 공백 제거는 여전히 동작
+});
+
+test('P-2 \\begin{itemize} · \\item 은 불변', () => {
+  const src = '\\begin{itemize}\n\\item 첫째 조건\n\\item 둘째 조건\n\\end{itemize}';
+  const { fixed, count } = P.autoFixDeterministicIssues(src);
+  assert.equal(fixed, src);
+  assert.equal(count, 0);
+});
+
+test('P-3 tabular 변환은 그대로 일어나고 뒤따르는 그림 태그만 보존된다', () => {
+  const { fixed } = P.autoFixDeterministicIssues(`${TABULAR}\n\n${FIG}`);
+  assert.ok(fixed.includes('| :---: |'), fixed);    // 표 변환 정상
+  assert.ok(fixed.includes(FIG), fixed);            // 그림 태그 원형
+});
+
+test('P-4 `\\\\[6pt]`(행렬 행간)는 제어열로 오인되지 않는다', () => {
+  const src = '$\\begin{aligned} x &= 1 \\\\[6pt] y &= 2 \\end{aligned}$';
+  const { fixed } = P.autoFixDeterministicIssues(src);
+  assert.ok(fixed.includes('\\\\[6pt]'), fixed);
+});
+
+test('P-5 과잉 보호 회귀 — 평범한 본문에서는 자동 수정이 여전히 일한다', () => {
+  const { fixed, count } = P.autoFixDeterministicIssues('함수 f가 $x^2$ 일 때');
+  assert.ok(fixed.includes('$f$'), fixed);          // 맨 영문자 수식화
+  assert.ok(fixed.includes('x^{2}'), fixed);        // 지수 중괄호
+  assert.ok(count >= 2);
+});
+
+test('P-6 옵션 인자 `[...]`가 붙어도 통째로 보호된다', () => {
+  const src = '\\includegraphics[width=5cm]{a_fig1.jpg}';
+  assert.equal(P.autoFixDeterministicIssues(src).fixed, src);
+});
+
+test('P-7 중첩 중괄호는 균형 스캔으로 흡수된다 (정규식으로 자르면 깨지는 자리)', () => {
+  const src = '\\frac{\\frac{1}{2}}{3} 뒤에 텍스트 5개';
+  const { fixed } = P.autoFixDeterministicIssues(src);
+  assert.ok(fixed.startsWith('\\frac{\\frac{1}{2}}{3}'), fixed);
+  assert.ok(fixed.includes('$5$'), fixed);          // 보호 범위 밖은 정상 처리
+});
+
+test('P-8 convertJamoRefs 는 제어열 인자 안도 계속 변환한다 (덕수 2026-08-26 사양)', () => {
+  assert.equal(P.convertJamoRefs('\\text{(ㄱ)}').fixed, '\\text{(1)}');
+});
