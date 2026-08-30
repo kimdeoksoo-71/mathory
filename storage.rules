@@ -8,15 +8,26 @@ service firebase.storage {
     //       URL을 모르면 추측 불가능하며, URL은 Firestore 규칙으로 보호된
     //       blocks/{id}.raw_text 안에만 저장됨.
     // 쓰기: 로그인 사용자만, 10MB 이하, 이미지 또는 .ggb 파일
+    //
+    // ⚠️ Phase 61e — `write` 한 덩어리로 두지 말 것. delete 요청에는 **`request.resource`가 없다**
+    //    (쓰이는 객체가 없으므로 null). null의 `.size`를 읽으면 조건이 오류로 평가되어 **거부**된다
+    //    → `deleteObject`가 100% 실패하는데 best-effort 호출이라 조용히 실패한다("지우는 줄 알았는데
+    //    아무것도 안 지워지는" 가장 나쁜 형태). 그래서 create·update와 delete를 갈라 놓는다.
+    //
+    // ⚠️ delete 조건이 `request.auth != null`뿐인 것은 권한 완화가 아니다 — 아래 create/update가
+    //    이미 같은 조건이라 로그인 사용자는 남의 객체를 덮어쓸 수 있었다. Storage 규칙은 Firestore를
+    //    읽지 못해 소유자 판정을 할 수 없고, 경로에 uid가 없어(`problems/{problemId}/…`) 좁힐 수단도
+    //    없다. 소유자 단위로 잠그려면 경로 설계부터 바꿔야 하며 이 Phase의 범위가 아니다.
     match /problems/{problemId}/{fileName=**} {
       allow read;
-      allow write: if request.auth != null
+      allow create, update: if request.auth != null
         && request.resource.size < 10 * 1024 * 1024  // 10MB
         && (
           request.resource.contentType.matches('image/.*')
           || request.resource.contentType == 'application/vnd.geogebra.file'
           || request.resource.contentType == 'application/octet-stream'
         );
+      allow delete: if request.auth != null;
     }
 
     // 기타 경로는 기본 차단
