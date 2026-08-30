@@ -40,6 +40,7 @@ components/import/
   SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a)
 lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수)
 app/api/sheet-import/      — 스프레드시트 읽기 프록시 (읽기 전용 스코프)
+app/api/sheet-import/figure/ — Drive 그림 읽기 프록시 (Phase 61e, drive.readonly 단독 JWT)
 lib/verify/               — 정밀 검증 (Phase 61b, 전부 import 0 순수 모듈)
   prompts.ts               — 프롬프트 3세트 · 함수형 치환 · 블록 라벨링
   parse.ts                 — JSON 4단계 폴백 · LaTeX 복구 · 앵커 · 합성
@@ -163,6 +164,27 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   이제 중앙 제목행 선과 우측 단 1행 선이 **같은 Y**에 선다. ⚠ 옛 98은 EditorView Row1+**Row2** 두 행치라,
   중앙에 하나뿐인 선이 드로어의 *둘째* 선과 짝지어지는 어긋난 대응이었다(빈 띠 ~50px은 "추후 메타데이터"
   예약이었는데 끝내 오지 않았다). ⚠ `minHeight`가 아니라 `height` — 제목 span이 nowrap+ellipsis라 안전하다
+- **자동 수정은 텍스트 영역의 LaTeX 제어열을 보호한다 (Phase 61e)**: `autoWrapBareNumbers`·
+  `autoWrapBareLetters`의 보호 목록에 수식·HTML·URL·코드·`\tag`/`\ref`는 있었지만 **일반 제어열이
+  없어** `\includegraphics{a_fig1.jpg}`가 `\$includegraphics${$a$_fig1.$jpg$}`로 파괴됐다(실측 count 6).
+  `\begin{itemize}`·`\item`·`\hline`도 같다. 공용 헬퍼 `collectControlSeqRanges` 하나를 두 함수가
+  부르고, 중괄호는 **`readGroup`의 균형 스캔**으로 흡수한다(정규식 금지 — M1 W2). `[opt]` 인자도 함께
+  흡수한다(안 하면 `\includegraphics[width=5cm]{name}`에서 `{` 흡수가 시작되지 않아 **파일명이 통째로
+  무방비**가 된다). ⚠ **인자를 통째로 보호하므로 `\textbf{2개}`의 `2`는 수식화되지 않는다 — 의도한
+  트레이드오프다.** ⚠ **`convertJamoRefs`에는 넣지 말 것** — 그쪽은 `\text{(ㄱ)}`처럼 제어열 인자 안의
+  참조까지 변환하는 것이 **명시된 사양**이다(덕수 2026-08-26). 세 함수가 `collectMathRanges`를 공유해
+  "통일"하고 싶어지는 자리인데, 통일하면 그 결정이 조용히 뒤집힌다
+- **`lib/proofread.ts`는 `grep -a`로 볼 것 (Phase 61e)**: 내부에 `⟦M0⟧` 등 비ASCII 제어 문자열이 있어
+  `file(1)`이 **`data`로 판정**한다 → 맨 `grep`이 매치를 **조용히 감춘다**(0건으로 보인다).
+  이 저장소에서 "분명히 있는데 grep이 0건"이면 이 함정을 먼저 의심할 것
+- **Storage 규칙의 `write`를 한 덩어리로 되돌리지 말 것 (Phase 61e)**: `delete` 요청에는
+  **`request.resource`가 없다**(쓰이는 객체가 없으므로 null) → `request.resource.size`를 읽는 조건이
+  **오류로 평가되어 거부**된다. `lib/storage.ts`의 `deleteUploadedFile`이 best-effort 호출이라
+  **조용히 100% 실패한다**. 그래서 `allow create, update` / `allow delete`로 갈라 두었다.
+  ⚠ `delete` 조건이 `request.auth != null`뿐인 것은 완화가 아니다 — `create,update`가 이미 같은 조건이라
+  로그인 사용자는 남의 객체를 덮어쓸 수 있었다. 경로에 uid가 없어(`problems/{problemId}/…`) 소유자 단위로
+  좁히려면 경로 설계부터 바꿔야 한다. ⚠ `deleteProblem`(lib/firestore.ts)은 **Firestore만** 캐스케이드하고
+  Storage를 건드리지 않는다 — 고아 파일은 호출부가 지운다
 - **dnd-kit + `<input type="file">`**: pointerdown 전파 차단 필수
 - **Korean IME + CodeMirror 단축키**: `event.code` (물리키) 사용, `event.key` 사용 금지
 - **CSS @page + position:fixed**: mm 단위 정밀 배치 불안정 → Puppeteer/jsPDF 필요
@@ -248,7 +270,30 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **ProblemView 디자인 개선(5건)** — 구현·검수 완료(2026-08-30) · 배포 대기
+## 현재 Phase: **Phase 61e — 시트 가져오기 × 그림 블록 · 교정 연동** — 구현·검수 완료(2026-08-30) · 배포 대기
+
+문서: `docs/phasedocs/Phase61e 시트 그림 블록·교정 연동 v5 실행판.md`
+(계보: v1 web 타당성 → v2 CLI 실측 → v3 web 재검증 → v4 CLI 착수판 → **v5 실행판**. v5만 볼 것)
+
+**Firestore 규칙 0 · 스키마 0 · 마이그레이션 0 · 블록 타입 union 0 · 전처리 0 · 렌더 5곳 0.**
+⚠ **Storage 규칙은 1건 변경**했다(아래). 신규 2 · 수정 5 · 커밋 6개. 로직 검증 262 → **289개**.
+
+Data_DS 본문에 **파일명 문자열로만** 있던 `\includegraphics{<stem>_figN.jpg}`를 Drive
+`PBMAI/IMAGE_FIG`에서 실물로 받아 image 블록으로 분할하고, 가져오는 김에 편집창의 결정적
+자동 수정을 한 번 태운다.
+
+- **⚠ 가장 값비싼 발견: 자동 수정이 LaTeX 제어열을 파괴하고 있었다** — 아래 규약 절 참조.
+  이것을 고치는 것이 **커밋 1**이고, 그것이 그림 실패 폴백(리터럴 보존)이 성립하는 전제다
+- **⚠ `hasImages`는 죽은 필드다** — `app/api/verify/route.ts:116`에 선언만 있고 아무도 읽지 않는다.
+  그림이 image 블록이 되면 `verifyBlocksOf`가 걸러내 **정밀 검증 모델이 그림의 존재조차 모르게
+  된다**(알고 두는 손실). v1 계획서의 "의도한 방향"은 **틀렸다** — 61f 후보
+- **D13 B열 복구**: GAS 정규화가 선택지 뒤 `\includegraphics`를 trailer로 잘라내 E에서 사라지지만
+  원문인 B(`SHEET_COL.problem = 1`)에는 남는다. B에만 있는 이름을 문제 탭 맨 끝에 붙인다
+  (실측: Data_DS 38행 중 그림 문항 10행, 복구 1행 = 1공통13)
+- **미결 1건**: `[4점]` 배점의 숫자가 `[$4$점]`으로 수식화된다. 편집창 [교정]과 같은 기존 동작이라
+  회귀는 아니지만 모든 문항에 박힌다 — 실행판 §5 O-A
+
+### 이전: **ProblemView 디자인 개선(5건)** — 구현·검수 완료(2026-08-30) · 배포 대기
 
 문서: `docs/phasedocs/ProblemView 디자인 개선 v4 실행판.md`
 (계보: 덕수 메모 → v1 CLI → v2 **두 판**(web 계획서 · CLI 교차검토판) → v3 착수판 **3회 개정**
@@ -598,6 +643,16 @@ gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore �
 - **`lib/sheetImport.ts`에 import 문을 두지 말 것**: `npm run test:sheet`가 이 파일 하나를 tsc로
   단독 컴파일한다. 타입도 로컬 정의. `--rootDir .`이 있어야 산출물이 `.test-build/lib/`로 떨어진다
 - **`$$` 앞뒤 빈 줄 정규화를 여기서 하지 말 것** — `toPersistedBlock`이 소유한다. 두 곳에서 하면 규칙이 갈린다
+- **그림·자동 수정의 순서가 규칙이다 (Phase 61e)**: `rowToDraft → splitFigures → autoFix →
+  toPersistedBlock`. autoFix가 `\[..\]`·tabular를 새 `$$`로 바꾸고 `toPersistedBlock`이 그 `$$` 앞뒤
+  빈 줄을 소유한다 — 뒤집으면 새로 생긴 `$$`가 정규화를 못 받는다. ⚠ **`stemHash`는 `normalizeText(E)`
+  직후 값으로 고정**이다. 분할·자동 수정이 앞서면 자동 수정 토글 상태에 따라 중복 키가 바뀌어 같은 문항이
+  **두 벌** 저장된다. ⚠ **자동 수정 호출부는 `SheetImportModal`이다** — `lib/sheetImport.ts`는 import 0
+  규약이라 `proofread`를 부를 수 없다. ⚠ **image 블록의 `raw_text`는 저장 직전까지 빈 문자열**이다
+  (미리보기 blob URL ↔ 저장 Storage URL — Y1 "미리보기=저장"의 유일한 예외). 파일명은
+  `draft.blocksByTab[tab][i].figName`에 있고 `persisted[tab][i]`와 **인덱스가 정렬**된다 — 그 정렬을 깨지 말 것
+- **`splitFigures`가 그림 없는 본문에 text 블록 1개를 돌려주는 갈래를 없애지 말 것 (Phase 61e)**:
+  빈 문자열이어도 그렇다. 61a의 기존 동작과 비트 단위로 같아야 한다
 - **Sheets 응답 함정**: ① 행 끝의 빈 셀이 잘려 온다 → 16칸 패딩 필수 ② `UNFORMATTED_VALUE`의
   체크박스 해제는 boolean `false`인데, 먼저 `String()`을 걸면 `"false"`라는 **비어 있지 않은 문자열**이
   되어 truthy 검사가 전부 참이 된다 → **원시값으로 판정할 것**

@@ -1874,6 +1874,36 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 61e: 시트 가져오기 × 그림 블록 · 교정 연동 ✅ (구현·검수 완료 2026-08-30 · 배포 대기)
+
+계획서: `docs/phasedocs/Phase61e 시트 그림 블록·교정 연동 v5 실행판.md`
+(v1 web 타당성 → v2 CLI 실측 → v3 web 재검증 → v4 CLI 착수판 → **v5 실행판**. v5만 볼 것)
+
+**Firestore 규칙 0 · 스키마 0 · 마이그레이션 0 · 블록 타입 union 0 · 전처리 0 · 렌더 5곳 0.**
+⚠ **Storage 규칙 1건 변경 + 선배포.** 신규 2 · 수정 5 · 커밋 6개. 로직 검증 262 → **289개**.
+
+Data_DS 본문에 **파일명 문자열로만** 있던 `\includegraphics{<stem>_figN.jpg}`(GAS 패치 3이 Mathpix
+CDN URL을 치환하고 실물은 Drive `PBMAI/IMAGE_FIG`에 비공개 저장 — Drive 링크는 Data_Latex에만 있고
+Data_DS로 넘어오지 않는다)를 프록시로 받아 image 블록으로 분할한다.
+
+| 커밋 | 내용 |
+|---|---|
+| 0 | `storage.rules`의 `write` → `create,update` / `delete` 분리 + 선배포. **delete에는 `request.resource`가 없어** 기존 조건이 오류로 죽는다 |
+| 1 | `lib/proofread.ts` LaTeX 제어열 보호. ⚠ **이 Phase의 가장 값비싼 발견** — 자동 수정이 `\includegraphics{…}`를 `\$includegraphics${…}`로 파괴하고 있었다(편집창에도 있던 실재 버그) |
+| 2 | `lib/sheetImport.ts` 분할 · B열 복구(D13) · 경고 4종 |
+| 3 | `app/api/sheet-import/figure/route.ts` — 자기 JWT(`drive.readonly` 단독) · 4중 게이트 |
+| 4·5 | 미리보기 지연 로딩 · image 분기 · 자동 수정 토글 · 저장/롤백 · `deleteUploadedFile` |
+
+**실측**: 라우트 9경로 통과(200/401/403/404/400×4) · Data_DS 38행 중 그림 문항 10행 ·
+B열 복구 1행(1공통13) · 제어열 파괴 0건 · `stemHash` 전 행 불변 · 덕수 실물 검수 통과.
+
+⚠ **계획을 뒤집은 것 9건(R1~R9)이 실행판 §3에 있다** — v1~v4를 인용하기 전에 볼 것.
+⚠ **알고 두는 손실**: `hasImages`는 죽은 필드라, 그림이 image 블록이 되면 `verifyBlocksOf`가 걸러
+정밀 검증 모델이 **그림의 존재조차 모르게 된다**(61f 후보). v1 §4의 "의도한 방향"은 틀렸다.
+⚠ **미결**: `[4점]` 배점의 숫자가 `[$4$점]`으로 수식화된다(실행판 §5 O-A).
+
+---
+
 ## Phase 62: 폴더뷰 구조 변경 · 좌우 사이드바 UI 통일 ✅ (구현·검수·배포 완료 2026-08-27)
 
 계획서: `docs/phasedocs/Phase62 폴더뷰 구조 변경·좌우 사이드바 UI 통일 v6 최종판.md` (v1 web → v6 CLI, 판본마다 정정)
