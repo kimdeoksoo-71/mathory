@@ -1,4 +1,4 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { app } from './firebase';
 import { sanitizeSvg } from './svg-sanitizer';
 
@@ -103,6 +103,24 @@ export async function uploadImage(file: File, problemId: string): Promise<string
   const url = await getDownloadURL(storageRef);
   console.log('[uploadImage] URL 획득 완료');
   return url;
+}
+
+/**
+ * 업로드한 파일을 다운로드 URL로 지운다. **롤백 전용이고 best-effort다**(Phase 61e D7″).
+ *
+ * ⚠ `deleteProblem`(lib/firestore.ts)은 Firestore만 캐스케이드하고 **Storage를 건드리지 않는다.**
+ *   시트 가져오기는 `createProblem → uploadImage → saveTabBlock` 순서라, 블록 저장이 실패해
+ *   문항을 되돌리면 그림 파일이 고아로 남는다. 일괄 경로라 한 번에 수십 개가 쌓인다.
+ *
+ * ⚠ `storage.rules`가 `create,update`와 `delete`로 **갈라져 있어야** 통과한다.
+ *   delete 요청에는 `request.resource`가 없어(쓰이는 객체가 없다) `request.resource.size`를 읽는
+ *   조건이 오류로 평가되어 거부된다 — 규칙을 한 덩어리 `write`로 되돌리면 이 함수가 **조용히
+ *   100% 실패한다**(best-effort 호출이라 아무도 모른다).
+ *
+ * ⚠ `ref(storage, url)`은 https 다운로드 URL을 그대로 받는다. 경로를 직접 조립하지 말 것.
+ */
+export async function deleteUploadedFile(url: string): Promise<void> {
+  await deleteObject(ref(storage, url));
 }
 
 /**
