@@ -205,3 +205,26 @@ test('P-7 중첩 중괄호는 균형 스캔으로 흡수된다 (정규식으로 
 test('P-8 convertJamoRefs 는 제어열 인자 안도 계속 변환한다 (덕수 2026-08-26 사양)', () => {
   assert.equal(P.convertJamoRefs('\\text{(ㄱ)}').fixed, '\\text{(1)}');
 });
+
+/* ═══ ④ 마크다운 이미지 보호 (Phase 61e-2차 V1 회귀 고정) ═══
+ *
+ * `proofread.ts:342·403`의 `!?\[…\](…)` 보호가 **alt까지** 지킨다는 사실을 고정한다.
+ * 이 두 건이 깨지면 시트 가져오기의 새 그림 표기(`![파일명](Drive링크)`)에서
+ * **파일명 안 숫자가 `$…$`로 감싸여** 프록시 조회가 통째로 실패한다.
+ * ⚠ 코드 변경 없이 처음부터 통과해야 하는 테스트다 — 계획서 v3가 "alt는 무방비"로
+ *   오판했고 v4가 실행 프로브로 잡았다. 그 판정을 여기 못 박는다. */
+
+test('P-9 마크다운 이미지의 alt는 수식화되지 않는다 (URL도 함께 보호)', () => {
+  const url = 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view?usp=drivesdk';
+  const src = `그림과 같다. ![연구실모의6회(260824)_문제_1공통07_fig1.jpg](${url}) 이때 f(1)은?`;
+  const { fixed } = P.autoFixDeterministicIssues(src);
+  assert.ok(fixed.includes(`![연구실모의6회(260824)_문제_1공통07_fig1.jpg](${url})`), fixed);
+  assert.ok(fixed.includes('$f$'), fixed);          // 보호 범위 밖은 정상 처리
+});
+
+test('P-10 alt 안 영문자·숫자 둘 다 보호된다 (autoWrapBareLetters 쪽도)', () => {
+  const src = '![a_fig1.jpg](https://drive.google.com/file/d/1x/view)\n선택지 2개';
+  const { fixed } = P.autoFixDeterministicIssues(src);
+  assert.ok(fixed.includes('![a_fig1.jpg](https://drive.google.com/file/d/1x/view)'), fixed);
+  assert.ok(fixed.includes('$2$개'), fixed);
+});

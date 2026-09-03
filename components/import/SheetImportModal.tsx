@@ -95,13 +95,20 @@ const dupeKey = (sourceId: string, stemHash: string) => `${sourceId}|${stemHash}
  * 제외 규칙은 편집창(`EditorView.AUTOFIX_EXCLUDED_TYPES` = image·svg·ggb)과 같다.
  * `choices`는 `skipJamoRefs`로 `(ㄱ)→(1)`만 끄고 숫자 수식화 등은 받는다(편집창과 동일).
  *
- * ⚠ **`\includegraphics`가 남은 choices 블록은 통째로 건너뛴다**(D3′). 선택지 셀 안 그림은
+ * ⚠ **그림이 남은 choices 블록은 통째로 건너뛴다**(D3′). 선택지 셀 안 그림은
  *   실측 0건이라 인라인 처리를 만들지 않았고, 문자열로 남은 것을 자동 수정에 넣을 이유가 없다.
  *   (제어열 보호는 `lib/proofread.ts`가 이미 하지만, 손댈 이유가 없는 블록은 손대지 않는다.)
+ * ⚠ **두 형식을 함께 본다**(61e-2차) — 구형 태그와 GAS 패치 11의 `![이름](Drive링크)`.
+ *   ⚠ 근거는 **기존 가드와의 대칭**이지 "수식화 방지"가 아니다. 마크다운 이미지의 alt·URL은
+ *     `lib/proofread.ts:342·403`(`!?\[…\](…)` 보호)이 이미 지킨다 — 실행 프로브로 확인했고
+ *     `tests/proofread.test.mjs` P-9·P-10이 고정한다. 거짓 근거를 남기면 나중에 이 가드를
+ *     지우려는 사람이 없는 위험과 씨름한다.
  */
+const CHOICE_FIG_RE = /\\includegraphics|!\[[^\]\n]*\]\([ \t]*https:\/\/drive\.google\.com\//;
+
 function applyAutoFix(b: DraftBlock, enabled: boolean): { text: string; count: number } {
   if (!enabled || b.type === 'image') return { text: b.raw_text, count: 0 };
-  if (b.type === 'choices' && /\\includegraphics/.test(b.raw_text)) return { text: b.raw_text, count: 0 };
+  if (b.type === 'choices' && CHOICE_FIG_RE.test(b.raw_text)) return { text: b.raw_text, count: 0 };
   const { fixed, count } = autoFixDeterministicIssues(b.raw_text, { skipJamoRefs: b.type === 'choices' });
   return { text: fixed, count };
 }
@@ -155,8 +162,13 @@ async function fetchFigures(
  * 그림을 받지 못했으면 **`\includegraphics{…}` 리터럴을 넣은 text 블록으로 되돌린다**(D5) —
  * `(이미지 없음)`만 남기면 원인 추적이 안 되고, 리터럴이면 나중에 검색으로 되찾을 수 있다.
  *
- * ⚠ 이 리터럴이 온전한 것은 `lib/proofread.ts`가 제어열을 보호하기 때문이다(D15).
- *   그 보호를 걷어내면 `\$includegraphics${…}`로 조각나 **복구 경로가 통째로 죽는다.**
+ * ⚠ 이 리터럴 자체는 autoFix **이후**에 삽입되므로 `lib/proofread.ts`를 지나지 않는다.
+ *   제어열 보호(D15)가 실제로 일하는 자리는 **분할하지 않는 텍스트에 남은 그림 표기**다 —
+ *   O열(AI 정답)·선택지의 구형 `\includegraphics{…}`는 `collectControlSeqRanges`가,
+ *   같은 자리의 신형 `![이름](링크)`는 `proofread.ts:342·403`이 지킨다. 그 보호를 걷어내면
+ *   `\$includegraphics${…}`로 조각나 **복구 경로가 통째로 죽는다.**
+ * ⚠ 신형식이어도 폴백은 **구형 리터럴**이다(61e-2차 D30) — `![이름](Drive링크)`를 되살리면
+ *   저장본에 **깨진 이미지**가 남아, 이번에 고친 "주소만 붙는" 증상과 구별되지 않는다.
  */
 function materializeImage(
   block: PersistedBlockData, draftBlock: DraftBlock | undefined, urlByFig: Map<string, string>,

@@ -174,51 +174,104 @@ export function normalizeText(raw: string): { text: string; warnings: string[] }
   return { text: t, warnings };
 }
 
-/* ═══ 그림 분할 (Phase 61e) ═══ */
+/* ═══ 그림 분할 (Phase 61e · 61e-2차) ═══ */
 
 /**
- * `\includegraphics[opt]{파일명}`.
+ * Drive `IMAGE_FIG`의 허용 파일명. **클라 게이트와 서버 게이트가 이 하나를 공유한다**(61e-2차 D32).
+ * `app/api/sheet-import/figure/route.ts`가 이 상수를 import한다 —
+ * ⚠️ "import 0" 규약은 **이 파일이 남을 import하지 않는다**는 뜻이라 저촉되지 않는다.
  *
- * ⚠ 여기서 `\{[^}]*\}`를 쓰는 것은 개선묶음 M1 W2 규약(중괄호를 정규식으로 자르지 말 것)의
- *   **예외가 아니라 적용 대상이 아니다** — GAS가 만드는 이름은 `<stem>_figN.<ext>`뿐이라
- *   중괄호가 들어갈 수 없다. 중첩이 없으므로 균형 스캔이 필요 없다.
- *   (제어열 일반을 다루는 `lib/proofread.ts`는 반대로 `readGroup`을 쓴다 — 거긴 `\frac{a}{b}`가 온다.)
+ * ⚠️ `'`를 문자 집합에서 **배제**한다 → Drive 검색 `q`의 작은따옴표 이스케이프가 아예 불필요해진다.
+ *    NFC 정규화로는 `'`가 새로 생기지 않으므로 그 방어는 정규화 뒤에도 유지된다.
  */
-const INCLUDEGRAPHICS_RE = /\\includegraphics(?:\[[^\]\n]*\])?\{([^}\n]+)\}/;
-
-/** 패치 3이 안 돈 잔재. **경계로 삼지 않는다**(Phase 61e D21) — 경고만 낸다. */
-const MATHPIX_IMG_RE = /!\[[^\]\n]*\]\(\s*https?:\/\/[^)\s]+\s*\)/;
+export const FIG_NAME_RE =
+  /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ()._\-]{1,200}_fig\d+\.(jpe?g|png|gif|webp)$/;
 
 /**
- * 본문을 `\includegraphics{…}` 경계로 조각내 text/image 블록 배열을 만든다.
+ * 그림 경계 **두 형식**을 한 벌로 훑는다.
+ *
+ *   구형: `\includegraphics[opt]{파일명}`          (61e까지의 유일한 형식)
+ *   신형: `![파일명](https://drive.google.com/…)`  (GAS 패치 11, 2026-09-01)
+ *
+ * m[1] = 구형 이름 / m[2] = alt / m[3] = Drive 링크.
+ *
+ * ⚠ **교대(alternation) 한 벌**이어야 한다 — 두 정규식을 따로 돌려 병합하면 등장 순서를
+ *   손으로 맞춰야 하고, 한 셀에 두 형식이 섞인 행(패치 11이 링크를 못 찾아 태그를 남긴 행)에서
+ *   블록 순서가 어긋난다.
+ * ⚠ 호스트를 `drive.google.com`으로 좁힌 것은 의도다(D33) — GAS `iv_collectFigRefs_`의
+ *   `reLink`와 문자 그대로 같다. 모르는 형식은 **오늘 동작**(텍스트 유지 + 경고)으로 떨어진다.
+ * ⚠ `[ \t]*`다 — `\s*`는 개행을 삼킨다(CLAUDE.md). `](` 뒤 공백을 허용하지 않으면
+ *   `]( https://… )` 같은 링크가 **분할도 경고도 없이 침묵**한다.
+ * ⚠ 중괄호를 정규식으로 자르는 것은 개선묶음 M1 W2의 예외가 아니라 **적용 대상이 아니다** —
+ *   GAS가 만드는 이름은 `<stem>_figN.<ext>`뿐이라 중괄호가 들어갈 수 없다.
+ */
+const FIG_SCAN_RE =
+  /\\includegraphics[ \t]*(?:\[[^\]\n]*\])?\{([^}\n]+)\}|!\[([^\]\n]*)\]\([ \t]*(https:\/\/drive\.google\.com\/[^)\s]+)[ \t]*\)/;
+
+/** Drive가 **아닌** 이미지 링크. 패치 3이 안 돈 Mathpix 잔재다 — 경계로 삼지 않고 경고만 낸다(61e D21).
+ *  ⚠ Drive 링크를 lookahead로 빼지 않으면 정상적인 신형식마다 이 경고가 덧난다. */
+const FOREIGN_IMG_RE =
+  /!\[[^\]\n]*\]\(\s*(?!https:\/\/drive\.google\.com\/)https?:\/\/[^)\s]+\s*\)/;
+
+interface FigMatch {
+  index: number;
+  length: number;
+  /** 시트 원문 그대로의 파일명. **정규형을 바꾸지 않는다** — 정규형 시도는 프록시 몫이다(D29). */
+  name: string;
+}
+
+/**
+ * 본문에서 그림 참조를 등장 순서대로 뽑는다. `splitFigures`·`scanFigureNames`·경고 판정이 공유한다.
+ *
+ * - 구형 태그는 **게이트하지 않는다**(61e 동작 보존).
+ * - 신형 링크는 alt가 `FIG_NAME_RE` 규격일 때만 경계로 삼고, 아니면 경고만 낸다(D24·D34).
+ *   ⚠ **게이트 판정에만 NFC를 쓴다.** 원문 그대로 검사하면 NFD 한글 alt가 규격 외로 떨어져
+ *     분할 자체가 안 된다(NFD 한글은 U+1100 계열 자모라 `[가-힣]`에 안 걸린다).
+ */
+function scanFigMatches(text: string): { figs: FigMatch[]; warnings: string[] } {
+  const re = new RegExp(FIG_SCAN_RE.source, 'g');
+  const figs: FigMatch[] = [];
+  const warnings: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(String(text ?? ''))) !== null) {
+    if (m[1] !== undefined) {
+      figs.push({ index: m.index, length: m[0].length, name: m[1].trim() });
+      continue;
+    }
+    const alt = (m[2] ?? '').trim();
+    if (!FIG_NAME_RE.test(alt.normalize('NFC'))) {
+      warnings.push(`그림 링크의 파일명이 규격과 다릅니다(${alt || '이름 없음'}) — 본문에 그대로 둡니다`);
+      continue;
+    }
+    figs.push({ index: m.index, length: m[0].length, name: alt });
+  }
+  return { figs, warnings };
+}
+
+/**
+ * 본문을 그림 경계로 조각내 text/image 블록 배열을 만든다.
  *
  * - **그림이 하나도 없으면 원문 그대로 text 블록 1개**를 돌려준다(빈 문자열이어도).
  *   61a의 기존 동작과 비트 단위로 같아야 하므로 이 갈래를 없애지 말 것.
  * - 빈/공백뿐인 텍스트 조각은 버린다 — 순서는 배열 인덱스가 소유한다(Y3).
- * - ⚠ `![alt](url)`은 **분할하지 않는다**(D21). 그 형태는 오늘도 `EditorPreview`가 마크다운
- *   이미지로 그대로 렌더하고, 분할하려면 Drive가 아닌 외부 URL 경로가 필요해져
- *   프록시의 폴더 고정(D12)이 무너진다. 경고만 남기고 현행 동작을 보존한다.
  */
 export function splitFigures(text: string): {
   blocks: DraftBlock[]; figNames: string[]; warnings: string[];
 } {
-  const warnings: string[] = [];
-  if (MATHPIX_IMG_RE.test(text)) {
+  const { figs, warnings } = scanFigMatches(text);
+  if (FOREIGN_IMG_RE.test(text)) {
     warnings.push('변환되지 않은 Mathpix 이미지 링크가 있습니다 — 외부 링크로 표시됩니다');
   }
 
-  const re = new RegExp(INCLUDEGRAPHICS_RE.source, 'g');
   const blocks: DraftBlock[] = [];
   const figNames: string[] = [];
   let last = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    const before = text.slice(last, m.index).trim();
+  for (const f of figs) {
+    const before = text.slice(last, f.index).trim();
     if (before) blocks.push({ type: 'text', raw_text: before });
-    const figName = m[1].trim();
-    blocks.push({ type: 'image', raw_text: '', figName });
-    figNames.push(figName);
-    last = m.index + m[0].length;
+    blocks.push({ type: 'image', raw_text: '', figName: f.name });
+    figNames.push(f.name);
+    last = f.index + f.length;
   }
 
   if (figNames.length === 0) return { blocks: [{ type: 'text', raw_text: text }], figNames, warnings };
@@ -228,13 +281,16 @@ export function splitFigures(text: string): {
   return { blocks, figNames, warnings };
 }
 
-/** 텍스트에 든 `\includegraphics` 파일명만 뽑는다(블록으로 쪼개지 않는다). B열 복구용. */
+/** 텍스트에 든 그림 파일명만 뽑는다(블록으로 쪼개지 않는다). B열 복구용.
+ *  ⚠ B는 **정규화 전 원문**이라 패치 11 형식이 반드시 온다 — 통합 스캔을 쓰는 이유다. */
 export function scanFigureNames(text: string): string[] {
-  const re = new RegExp(INCLUDEGRAPHICS_RE.source, 'g');
-  const out: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(String(text ?? ''))) !== null) out.push(m[1].trim());
-  return out;
+  return scanFigMatches(String(text ?? '')).figs.map((f) => f.name);
+}
+
+/** 텍스트에 그림 참조가 있나 — 분할하지 않는 자리(선택지·O열)의 경고 판정용.
+ *  ⚠ `rowToDraft` 안에 동명의 지역 상수가 있어 이름을 달리한다. */
+function containsFigure(text: string): boolean {
+  return scanFigMatches(text).figs.length > 0;
 }
 
 /* ═══ 선택지 라벨 ═══ */
@@ -320,7 +376,7 @@ export function rowToDraft(row: ImportRow): ProblemDraft | DraftError {
     }
     // Phase 61e D3′ — 선택지 **셀 안** 그림은 실측 0건이라 인라인 처리를 만들지 않았다.
     //   나타나면 문자열 그대로 남으므로(자동 수정도 호출부가 끈다) 알리고 사람에게 넘긴다.
-    if (INCLUDEGRAPHICS_RE.test(choicesText)) {
+    if (containsFigure(choicesText)) {
       warnings.push('선택지 안에 그림이 있습니다 — 편집창에서 손봐야 합니다');
     }
   }
@@ -329,11 +385,14 @@ export function rowToDraft(row: ImportRow): ProblemDraft | DraftError {
      GAS `normalizeProblem`이 선택지 뒤 `\includegraphics`를 trailer로 잘라내면 E에서 사라진다.
      정규화 전 원문인 B에는 남아 있으므로, E에 없는 이름만 문제 탭 **맨 끝**에 붙인다.
      ⚠ B를 본문으로 쓰지는 않는다 — 정규화 이전 텍스트라 표기가 E와 다르다. */
-  const inQuestion = new Set(stemSplit.figNames);
+  //  ⚠ 대조 키는 **NFC**다 — B는 원문, E는 정규화본이라 정규형이 갈릴 수 있다(61e-2차 C10).
+  //    블록에 담는 `figName`은 원문 그대로 둔다.
+  const inQuestion = new Set(stemSplit.figNames.map((n) => n.normalize('NFC')));
   const recovered: string[] = [];
   for (const name of scanFigureNames(cell(row, 'problem'))) {
-    if (inQuestion.has(name)) continue;
-    inQuestion.add(name);                       // B 안의 중복도 한 번만
+    const key = name.normalize('NFC');
+    if (inQuestion.has(key)) continue;
+    inQuestion.add(key);                        // B 안의 중복도 한 번만
     recovered.push(name);
     questionBlocks.push({ type: 'image', raw_text: '', figName: name });
   }
@@ -365,7 +424,7 @@ export function rowToDraft(row: ImportRow): ProblemDraft | DraftError {
   // ⚠ O는 **분할하지 않는다** — 정답 값 한 줄이고 고정 접두가 붙어 조각내면 접두가 떨어져 나간다.
   //   그림이 들어 있으면(사실상 없다) 알리기만 한다.
   if (derived) {
-    if (INCLUDEGRAPHICS_RE.test(derived)) warnings.push('O열(AI 정답)에 그림이 있습니다 — 문자열 그대로 들어갑니다');
+    if (containsFigure(derived)) warnings.push('O열(AI 정답)에 그림이 있습니다 — 문자열 그대로 들어갑니다');
     aiBlocks.push({ type: 'text', raw_text: `**AI 정답:** ${derived}` });
   }
   if (note) {

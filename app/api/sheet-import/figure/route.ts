@@ -5,9 +5,12 @@
  * headers: Authorization: Bearer <Firebase ID token>
  * 응답:    이미지 바이트 (Content-Type = 원본, X-Fig-Duplicates = 동명 파일 수)
  *
- * Data_DS 본문에는 `\includegraphics{<stem>_figN.jpg}` **파일명 문자열만** 있고 실물은
- * Drive `PBMAI/IMAGE_FIG`에 비공개로 있다(Drive 링크는 Data_Latex에만 있고 Data_DS로
- * 넘어오지 않는다). 그래서 Mathory가 파일명으로 실물을 가져오는 경로를 새로 만든다.
+ * Data_DS 본문의 그림은 **파일명 문자열**이고 실물은 Drive `PBMAI/IMAGE_FIG`에 비공개로 있다.
+ * 그래서 Mathory가 파일명으로 실물을 가져오는 경로를 새로 만든다.
+ *
+ * ⚠️ 표기는 두 가지다(61e-2차) — 구형 `\includegraphics{<stem>_figN.jpg}` 와, GAS 패치 11이
+ *    2026-09-01부터 만드는 `![<stem>_figN.jpg](https://drive.google.com/…)`. 어느 쪽이든
+ *    **이 라우트에 오는 것은 파일명뿐**이다(링크의 fileId는 쓰지 않는다 — 아래 D29 주석).
  *
  * ⚠️ **`../route.ts`(시트 읽기)를 건드리지 않는다.** 그쪽 JWT는 스코프가
  *    `spreadsheets.readonly` 하나로 잠겨 있어 "쓰기 API를 안 부르는" 게 아니라 **못 부른다**.
@@ -26,19 +29,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { JWT } from 'google-auth-library';
 import { ApiError, verifyUid } from '../../../../lib/apiAuth';
+import { FIG_NAME_RE } from '../../../../lib/sheetImport';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-/**
- * 허용 파일명. GAS가 만드는 이름은 `<stem>_figN.<ext>`뿐이다
- * (실측: `연구실모의6회(260824)_문제_1공통07_fig1.jpg`).
- *
- * ⚠️ `'`를 문자 집합에서 **배제**한다 → Drive 검색 `q`의 작은따옴표 이스케이프가 아예 불필요해진다.
- *    "이스케이프를 올바로 하기"보다 "이스케이프할 문자가 못 들어오게 하기"가 안전하다.
- */
-const FIG_NAME_RE = /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ()._\-]{1,200}_fig\d+\.(jpe?g|png|gif|webp)$/;
+/* 허용 파일명 `FIG_NAME_RE`는 `lib/sheetImport.ts`가 소유한다(61e-2차 D32) —
+ * **클라의 분할 게이트와 서버의 조회 게이트가 한 벌이어야** 한다. 사본이 갈리면
+ * 접미사만 맞는 이름이 클라에서 분할된 뒤 여기서 400으로 죽는다. */
 
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status });
 
@@ -126,15 +125,34 @@ export async function GET(req: NextRequest) {
     const env = readEnv();
     await verifyUid(req.headers.get('authorization'), env.apiKey, env.allowedUids);
 
-    const name = (req.nextUrl.searchParams.get('name') ?? '').trim();
-    if (!name) return fail(400, 'name 파라미터가 필요합니다');
-    if (!FIG_NAME_RE.test(name)) {
+    const raw = (req.nextUrl.searchParams.get('name') ?? '').trim();
+    if (!raw) return fail(400, 'name 파라미터가 필요합니다');
+
+    // ⚠️ 정규식 검사는 **NFC 정규화 뒤**에 한다(61e-2차 C4).
+    //    NFD 한글은 U+1100 계열 자모라 `[가-힣ㄱ-ㅎㅏ-ㅣ]`에 안 걸린다 → 그냥 검사하면
+    //    NFD 이름이 **검색해 보기도 전에 400**으로 죽는다(61e에도 잠복해 있던 버그).
+    const nfc = raw.normalize('NFC');
+    if (!FIG_NAME_RE.test(nfc)) {
       return fail(400, '허용되지 않는 파일명입니다 — 시트가 만든 그림 파일만 가져올 수 있습니다');
     }
 
     const token = await getToken(env);
-    const { file, count } = await findFile(name, token, env);
-    if (!file) return fail(404, '그림 파일을 Drive에서 찾지 못했습니다');
+
+    /* GAS 패치 11이 본문의 alt를 `nfc_()`로 만드는데(Datalatex_To_Data_DS.gs:184-191)
+       Drive의 실제 파일명은 비정규화 원형이다(Mathpix 그림 추출.gs:229 — `stemOf_`가
+       정규화하지 않고, 파일명 수집도 "비교만 NFC, 기록은 원본명"이다). 두 형태가 다 오므로
+       **NFC 먼저, 0건이면 NFD로 한 번 더** 찾는다(D29).
+       ⚠️ 이름으로 찾는다 — 링크의 fileId를 쓰지 않는 이유는 그림을 재추출하면 `saveBlob_`이
+          동명 파일을 휴지통에 보내고 새로 만들어, 시트에 박힌 id가 **옛 휴지통 판본**을
+          가리키기 때문이다. 이름 검색은 `trashed=false`라 늘 최신을 집는다.
+       ⚠️ GAS처럼 폴더 밖(드라이브 전역)으로 넓히지 말 것 — 폴더 고정이 4중 방어의 한 축이다. */
+    let hit: { file?: { id: string; mimeType?: string }; count: number } | null = null;
+    for (const variant of Array.from(new Set([nfc, raw.normalize('NFD')]))) {
+      const r = await findFile(variant, token, env);
+      if (r.file) { hit = r; break; }
+    }
+    if (!hit?.file) return fail(404, '그림 파일을 Drive에서 찾지 못했습니다');
+    const { file, count } = hit;
 
     const media = await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`, {
       headers: { Authorization: `Bearer ${token}` },

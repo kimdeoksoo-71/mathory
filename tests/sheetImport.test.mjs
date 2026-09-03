@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {
   SHEET_COL, SHEET_COL_COUNT, EXPECTED_HEADERS,
   parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash, stripChoiceLabel,
-  splitFigures, scanFigureNames,
+  splitFigures, scanFigureNames, FIG_NAME_RE,
 } from '../.test-build/lib/sheetImport.js';
 
 /** 16칸 셀 배열을 만든다. `{ id: 'x', problem_stem: 'y' }` 형태로 지정. */
@@ -383,4 +383,105 @@ test('G9 P열(AI 풀이)은 분할한다', () => {
 test('G10 B열 헤더 기대값이 등록돼 있다 (Z4)', () => {
   assert.equal(EXPECTED_HEADERS.problem, 'problem');
   assert.equal(SHEET_COL.problem, 1);
+});
+
+/* ═══ F9~F17 · G11~G14 — 그림 링크 이관(GAS 패치 11) 대응 (Phase 61e-2차) ═══
+ *
+ * Data_DS의 그림 표기가 `\includegraphics{이름}` → `![이름](Drive링크)` 로 바뀌었다.
+ * 두 형식이 **한 셀에 섞여** 오는 행이 실제로 있다(패치 11이 링크를 못 찾은 태그를 남긴다). */
+
+const DRIVE = 'https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view?usp=drivesdk';
+const LINK1 = `![${NAME1}](${DRIVE})`;
+
+test('F9 패치 11 형식도 분할된다 — text/image/text', () => {
+  const r = splitFigures(`그래프가 그림과 같다.\n${LINK1}\n이때 값은?`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text']);
+  assert.deepEqual(r.figNames, [NAME1]);
+  assert.equal(r.blocks[1].figName, NAME1);
+  assert.equal(r.blocks[1].raw_text, '');           // 저장 직전까지 빈 문자열(Y1의 유일한 예외)
+});
+
+test('F10 한 셀에 두 형식이 섞여도 등장 순서대로 나온다', () => {
+  const r = splitFigures(`앞 ${FIG1} 가운데 ${LINK1} 뒤`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text', 'image', 'text']);
+  assert.deepEqual(r.figNames, [NAME1, NAME1]);
+});
+
+test('F11 규격 외 alt는 경계로 삼지 않고 경고만 낸다 (D24)', () => {
+  const src = `앞 ![무제 1.jpg](${DRIVE}) 뒤`;
+  const r = splitFigures(src);
+  assert.deepEqual(r.blocks, [{ type: 'text', raw_text: src }]);
+  assert.equal(r.figNames.length, 0);
+  assert.ok(r.warnings.some((w) => /규격과 다릅니다/.test(w)), r.warnings.join('|'));
+});
+
+test('F12 비-Drive 이미지 링크는 현행 경고 그대로 (F7 무회귀)', () => {
+  const src = '앞 ![](https://cdn.mathpix.com/x.jpg) 뒤';
+  const r = splitFigures(src);
+  assert.deepEqual(r.blocks, [{ type: 'text', raw_text: src }]);
+  assert.ok(r.warnings.some((w) => /Mathpix/.test(w)), r.warnings.join('|'));
+});
+
+test('F13 Drive 링크만 있을 때 Mathpix 경고가 덧나지 않는다', () => {
+  const r = splitFigures(`본문 ${LINK1} 끝`);
+  assert.ok(!r.warnings.some((w) => /Mathpix/.test(w)), r.warnings.join('|'));
+  assert.equal(r.warnings.length, 0);
+});
+
+test('F14 `\\includegraphics {name}` — 태그 뒤 공백도 잡는다 (GAS는 \\s*)', () => {
+  assert.deepEqual(splitFigures('\\includegraphics {a_fig1.jpg}').figNames, ['a_fig1.jpg']);
+});
+
+test('F15 FIG_NAME_RE는 NFD 원문에 걸리지 않는다 — NFC 정규화가 게이트 앞에 와야 하는 이유', () => {
+  assert.equal(FIG_NAME_RE.test(NAME1), true);
+  assert.equal(FIG_NAME_RE.test(NAME1.normalize('NFD')), false);
+  assert.equal(FIG_NAME_RE.test(NAME1.normalize('NFD').normalize('NFC')), true);
+});
+
+test('F16 NFD alt도 분할된다 — 게이트만 NFC로 판정하고 figName은 원문 그대로', () => {
+  const nfd = NAME1.normalize('NFD');
+  const r = splitFigures(`![${nfd}](${DRIVE})`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['image']);
+  assert.equal(r.figNames[0], nfd);                 // 원문 보존 — 정규형 시도는 프록시 몫(D29)
+  assert.notEqual(r.figNames[0], NAME1);
+});
+
+test('F17 `]( url )` 괄호 안 공백이 있어도 분할된다', () => {
+  const r = splitFigures(`![${NAME1}]( ${DRIVE} )`);
+  assert.deepEqual(r.figNames, [NAME1]);
+  assert.ok(!r.warnings.some((w) => /Mathpix/.test(w)), r.warnings.join('|'));
+});
+
+test('F18 scanFigureNames도 두 형식을 본다', () => {
+  assert.deepEqual(scanFigureNames(`a ${FIG1} b ${LINK1} c`), [NAME1, NAME1]);
+});
+
+test('G11 B열이 새 형식이어도 D13 복구가 된다', () => {
+  const d = draft({
+    id: 'X', problem: `원문 ${LINK1}`, problem_stem: '정규화된 본문', given_solution: 's',
+    choice1: '① a', choice2: '② b',
+  });
+  assert.deepEqual(d.blocksByTab.question.map((b) => b.type), ['text', 'choices', 'image']);
+  assert.equal(d.blocksByTab.question[2].figName, NAME1);
+  assert.ok(d.warnings.some((w) => /B열에서 복구/.test(w)), d.warnings.join('|'));
+});
+
+test('G12 B·E의 정규형이 갈려도 같은 그림을 두 번 붙이지 않는다 (C10)', () => {
+  const nfd = NAME1.normalize('NFD');
+  const d = draft({
+    id: 'X', problem: `원문 ![${nfd}](${DRIVE})`, problem_stem: `본문 ${LINK1}`, given_solution: 's',
+  });
+  assert.equal(d.blocksByTab.question.filter((b) => b.type === 'image').length, 1);
+  assert.ok(!d.warnings.some((w) => /B열에서 복구/.test(w)), d.warnings.join('|'));
+});
+
+test('G13 선택지 안 새 형식도 D3′ 경고를 낸다', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', choice1: `① ${LINK1}`, choice2: '② b' });
+  assert.ok(d.warnings.some((w) => /선택지 안에 그림/.test(w)), d.warnings.join('|'));
+});
+
+test('G14 O열 새 형식도 경고를 낸다 (분할하지 않는다)', () => {
+  const d = draft({ id: 'X', problem_stem: 'q', given_solution: 's', derived_answer: `3 ${LINK1}` });
+  assert.ok(d.warnings.some((w) => /O열\(AI 정답\)에 그림/.test(w)), d.warnings.join('|'));
+  assert.deepEqual(d.blocksByTab.extra_0.map((b) => b.type), ['text']);
 });
