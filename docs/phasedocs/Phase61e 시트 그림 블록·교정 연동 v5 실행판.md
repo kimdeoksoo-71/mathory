@@ -183,7 +183,7 @@ GET /api/sheet-import/figure?name=<파일명>   headers: Authorization: Bearer <
 
 ## 4. 검증
 
-**로직 검증 262 → 289개** (`test:proofread` 17→26 · `test:sheet` 35→53). 나머지 8종 무회귀.
+**로직 검증 262 → 289개** (`test:proofread` 17→26 · `test:sheet` 35→53) — 이후 O-A 해결로 `test:proofread` 28→30. 나머지 8종 무회귀.
 `tsc --noEmit` 클린.
 
 **라우트 실측**(dev 서버 + 실제 Drive, ID 토큰 발급해 9경로):
@@ -224,7 +224,7 @@ GET /api/sheet-import/figure?name=<파일명>   headers: Authorization: Bearer <
 
 | # | 항목 | 상태 |
 |---|---|---|
-| **O-A** | **`[4점]` 배점의 숫자가 `[$4$점]`으로 수식화된다** | **미결.** 편집창 [교정]과 같은 기존 동작이라 회귀는 아니지만, 배점은 모든 문항에 있어 일괄 가져오기에서 전 문항에 박힌다. `autoWrapBareNumbers`의 `(n)` 보호 옆에 `\[\d+점\]` 한 줄이면 되지만 **편집창 동작도 함께 바뀐다** → 덕수 판단 대기 |
+| **O-A** | ~~`[4점]` 배점의 숫자가 `[$4$점]`으로 수식화된다~~ | **해결(2026-08-30 덕수 판정: "배점까지 수식으로 처리하는 것은 과하다").** `autoWrapBareNumbers`의 보호 목록에 `/\[\d+점\]/` 추가 — `(n)` 참조 번호 보호 바로 옆이다. **편집창 [교정]의 동작도 함께 바뀐다**(의도한 것: 배점은 어떤 경우에도 수식이 아니다). 대괄호 안 공백은 허용하지 않는다(실데이터가 전부 붙여쓰기). 실측: 배점이 든 블록 39개 전부 보존, 구간 `[3, 5]`의 숫자는 여전히 수식화(P-10). 테스트 P-9·P-10 |
 | **O-B** | 동명 파일 2건일 때 `X-Fig-Duplicates: 2` | 미검증 — Drive에 중복 파일을 만들어야 한다. `dup=1`로 헤더 경로는 확인 |
 | P1 | GAS 패치 5(`mergeHeader_`·`mpf_repairHeaders`) push | 어림 — 데이터 품질, 구현과 무관 |
 | P2 | `MainMenu.gs`에 `mpf_runRange`/`mpf_stop` 등록 | 어림 — GAS |

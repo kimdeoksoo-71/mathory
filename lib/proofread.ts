@@ -346,6 +346,10 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   // 명시성을 위해 둘 다 남긴다(중복 보호는 무해하다).
   protectedRanges.push(...collectControlSeqRanges(text));
   addAll(/\(\d+\)/g);                             // 참조 번호 (1), (2), (3) … 은 수식화 제외
+  // 배점 `[4점]`. 시험 문항의 관용 표기이고 **어떤 경우에도 수식이 아니다**(덕수 2026-08-30).
+  // 없으면 `[$4$점]`이 되는데, 배점은 거의 모든 문항에 있어 시트 일괄 가져오기에서 전 문항에 박힌다.
+  // ⚠ 대괄호 안 공백은 허용하지 않는다 — 실데이터가 전부 `[4점]` 붙여쓰기다(Data_DS 실측).
+  addAll(/\[\d+점\]/g);
   // 순서 리스트 마커: 라인 선두 "  3. " 등의 숫자
   {
     const re = /^[ \t]*(\d+)\.(?=\s)/gm;
