@@ -1874,6 +1874,34 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 61e-2차: 그림 링크 이관(GAS 패치 11) 대응 ✅ (구현 완료 2026-09-03 · 실데이터 검수 진행 중)
+
+계획서: `docs/phasedocs/Phase61e-2차 그림 링크 이관 대응 v5 실행판.md`
+(v1 web → v2 web·GAS 재검토 → v3 CLI 원본 대조 → v4 web 검증 턴 → **v5 CLI 최종**. §10이 구현 기록)
+
+**수정 3파일 · 신규 0 · 서버 신규 0 · Storage 규칙 0 · Firestore 규칙 0 · 스키마 0 ·
+마이그레이션 0 · 블록 타입 union 0 · 전처리 0 · 렌더 5사이트 0.** 로직 검증 289 → **305건**.
+
+GAS 패치 11이 Data_Latex→Data_DS 이관 시 `\includegraphics{파일명}`을 **`![파일명](Drive링크)`** 로
+치환하면서 61e가 세운 계약이 바뀌었다. 61e는 `![](…)`을 **의도적으로** 경계에서 제외했으므로
+(D21) 그림 블록이 만들어지지 않고 본문에 비공개 Drive URL이 텍스트로 남았다 — "주소만 붙는" 증상.
+되돌릴 수 없다(audition 검증 패치 12·13이 이 형식을 쓴다) → **Mathory가 두 형식을 모두 인식한다.**
+
+| 파일 | 내용 |
+|---|---|
+| `lib/sheetImport.ts` | `FIG_NAME_RE` 이주·export · `FIG_SCAN_RE` 통합 스캔 · `FOREIGN_IMG_RE` · `scanFigMatches`/`containsFigure` · 이름 대조 NFC |
+| `app/api/sheet-import/figure/route.ts` | NFC 정규화 → 게이트 → **NFC·NFD 순차 검색** |
+| `components/import/SheetImportModal.tsx` | choices 자동 수정 가드에 새 형식 추가 |
+
+⚠ **그림 표기 계약이 바뀌면 다섯 자리가 함께 움직인다**: `splitFigures` · `scanFigureNames` ·
+`applyAutoFix` 가드 · D3′/O열 경고 · 폴백 리터럴.
+⚠ **Drive 실제 파일명은 NFD가 절반이다**(실측 고유 36개 중 18개) — GAS는 비교만 NFC로 하고 기록은
+원본명이다. **NFD 폴백을 제거하지 말 것**(수정 전이라면 그 18개가 전부 400이었다).
+⚠ 구현 중 이름 충돌 1건: 계획서의 `hasFigure`가 `rowToDraft` 지역 상수와 같은 블록에서 충돌해
+TDZ `ReferenceError`가 될 뻔했다(컴파일은 통과한다) → `containsFigure`로 개명.
+
+---
+
 ## Phase 61e: 시트 가져오기 × 그림 블록 · 교정 연동 ✅ (구현·검수 완료 2026-08-30 · 배포 대기)
 
 계획서: `docs/phasedocs/Phase61e 시트 그림 블록·교정 연동 v5 실행판.md`
@@ -1900,7 +1928,9 @@ B열 복구 1행(1공통13) · 제어열 파괴 0건 · `stemHash` 전 행 불�
 ⚠ **계획을 뒤집은 것 9건(R1~R9)이 실행판 §3에 있다** — v1~v4를 인용하기 전에 볼 것.
 ⚠ **알고 두는 손실**: `hasImages`는 죽은 필드라, 그림이 image 블록이 되면 `verifyBlocksOf`가 걸러
 정밀 검증 모델이 **그림의 존재조차 모르게 된다**(61f 후보). v1 §4의 "의도한 방향"은 틀렸다.
-**후속 해결(2026-08-30)**: `[4점]` 배점 수식화(§5 O-A) — 보호 목록에 `/\[\d+점\]/` 추가. 편집창 [교정]도 함께 바뀐다(의도).
+**후속 해결(2026-08-30)**: `[4점]` 배점 수식화(§5 O-A) — `autoWrapBareNumbers` 보호 목록에
+`/\[\d+점\]/` 추가. 편집창 [교정]도 함께 바뀐다(의도). 대괄호 안 공백은 불허 — 넓히면 구간 표기
+`[3, 5]`까지 먹는다(P-12가 경계를 고정).
 
 ---
 
