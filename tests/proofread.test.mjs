@@ -229,13 +229,13 @@ test('P-10 alt 안 영문자·숫자 둘 다 보호된다 (autoWrapBareLetters �
   assert.ok(fixed.includes('$2$개'), fixed);
 });
 
-test('P-9 배점 `[4점]`은 수식화하지 않는다 (덕수 2026-08-30 — 배점은 수식이 아니다)', () => {
+test('P-11 배점 `[4점]`은 수식화하지 않는다 (덕수 2026-08-30 — 배점은 수식이 아니다)', () => {
   const src = '$A-B$ 의 값은? [4점]';
   const { fixed } = P.autoFixDeterministicIssues(src);
   assert.equal(fixed, '$A-B$의 값은? [4점]');       // 조사 공백만 고치고 배점은 그대로
 });
 
-test('P-10 배점 보호가 다른 대괄호 숫자까지 번지지 않는다', () => {
+test('P-12 배점 보호가 다른 대괄호 숫자까지 번지지 않는다 — 구간 [3, 5]는 그대로 수식화', () => {
   const { fixed } = P.autoFixDeterministicIssues('구간 [3, 5] 에서');
   assert.ok(fixed.includes('$3$') && fixed.includes('$5$'), fixed);
 });
