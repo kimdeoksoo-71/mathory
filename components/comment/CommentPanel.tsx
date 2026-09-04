@@ -18,6 +18,7 @@ import {
   listSessions, createNormalSession, renameSession, deleteSession, ensureCommentSession,
 } from '../../lib/discussion-sessions';
 import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
+import { FIG_PLACEHOLDER, imageSrcOf, scanImgTags, countPlaceholders } from '../../lib/verify/figures';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
@@ -38,7 +39,26 @@ function stripForHistory(content: string): string {
     .replace(/```mathory-graph[\s\S]*?```/g, '[그래프 첨부됨]')
     .replace(/```mathory-verify[\s\S]*?```/g, '[검증 리포트 첨부됨]')
     .replace(/<details>[\s\S]*?<\/details>/g, '[검산 코드 첨부됨]')
+    // Phase 61f D16 — 옛 라운드의 그림 번호는 이번 요청과 어긋난다. 번호만 지운 중립 표기로.
+    //   (⟦그림⟧ 자리표시자로 바꾸지 않는다 — 슬롯 없는 자리표시자를 만들면 번호가 밀린다.)
+    .replace(/\[그림 \d+[^\]]*\]/g, '[그림]')
     .trim();
+}
+
+/** Phase 61f — 전송용 사본에서 `<img>`를 자리표시자로 바꾸고 src를 슬롯으로 뽑는다.
+ *  ⚠ Firestore 저장본은 건드리지 않는다 — 호출부가 반드시 사본에만 쓸 것. */
+function replaceImgTags(text: string): { text: string; slots: (string | null)[] } {
+  const tags = scanImgTags(text);
+  if (tags.length === 0) return { text, slots: [] };
+  let out = '';
+  let last = 0;
+  const slots: (string | null)[] = [];
+  for (const t of tags) {
+    out += text.slice(last, t.index) + FIG_PLACEHOLDER;
+    slots.push(t.src || null);
+    last = t.index + t.length;
+  }
+  return { text: out + text.slice(last), slots };
 }
 
 interface CommentPanelProps {
@@ -109,6 +129,13 @@ interface DiscussRequestContext {
   discussionHistory: Array<{ role: 'human' | 'ai'; nickname: string; content: string }>;
   participantNicknames: string[];
   currentMessage: string;
+  /** Phase 61f — 필드별 자리표시자(⟦그림⟧)와 정렬된 그림 URL (서버 DiscussImages와 동일 계약) */
+  images?: {
+    problem: (string | null)[];
+    tab: (string | null)[];
+    history: (string | null)[][];
+    message: (string | null)[];
+  };
 }
 
 export default function CommentPanel({
@@ -474,23 +501,35 @@ export default function CommentPanel({
     }
   };
 
-  // ─── 컨텍스트 조립 (Phase 37-G와 함께 구현) ───
-  const fetchTabBlocksText = useCallback(async (tabId: string): Promise<string> => {
+  // ─── 컨텍스트 조립 (Phase 37-G와 함께 구현 · Phase 61f에서 그림 슬롯 추가) ───
+  //  미디어 블록은 URL 문자열 대신 자리표시자(⟦그림⟧)로 —
+  //  image는 src를 슬롯에, svg·ggb는 null(서버가 "첨부되지 않음: SVG/GeoGebra"로 렌더, D5).
+  //  자리표시자는 늘 비어 있지 않으므로 아래 .filter(Boolean)이 슬롯 정렬을 깨지 못한다.
+  const fetchTabBlocksForModel = useCallback(async (
+    tabId: string,
+  ): Promise<{ text: string; slots: (string | null)[] }> => {
     try {
       const snap = await getDocs(
         query(collection(db, 'problems', problemId, tabSubcollection(tabId)), orderBy('order')),
       );
       const blocks = snap.docs.map((d) => d.data() as Block);
-      return blocks
+      const slots: (string | null)[] = [];
+      const text = blocks
         .map((b) => {
+          if (b.type === 'image' || b.type === 'svg' || b.type === 'ggb') {
+            const src = b.type === 'image' ? imageSrcOf(b.raw_text || '') : '';
+            slots.push(src || null);
+            return FIG_PLACEHOLDER;
+          }
           const title = b.title ? `### ${b.title}\n` : '';
           return title + (b.raw_text || '');
         })
         .filter(Boolean)
         .join('\n\n');
+      return { text, slots };
     } catch (e) {
       console.warn('블록 로드 실패:', tabId, e);
-      return '';
+      return { text: '', slots: [] };
     }
   }, [problemId]);
 
@@ -498,25 +537,35 @@ export default function CommentPanel({
   // question은 보존하고, 초과 시 나머지(풀이/참고)를 뒤에서 자른다.
   const CONTEXT_CHAR_CAP = 15000;
   const buildContext = useCallback(async () => {
-    const problemContent = await fetchTabBlocksText('question');
+    const q = await fetchTabBlocksForModel('question');
     const otherTabs = tabs.filter((t) => t.id !== 'question');
     const parts: string[] = [];
+    const tabSlots: (string | null)[] = [];
     for (const t of otherTabs) {
-      const txt = await fetchTabBlocksText(t.id);
-      if (txt) parts.push(`### [${t.label}]\n${txt}`);
+      const r = await fetchTabBlocksForModel(t.id);
+      if (r.text) {
+        parts.push(`### [${t.label}]\n${r.text}`);
+        tabSlots.push(...r.slots);
+      }
     }
     let otherContent = parts.join('\n\n');
-    const room = Math.max(0, CONTEXT_CHAR_CAP - problemContent.length);
+    const room = Math.max(0, CONTEXT_CHAR_CAP - q.text.length);
     if (otherContent.length > room) {
-      otherContent = otherContent.slice(0, room);
+      otherContent = otherContent.slice(0, room)
+        // 반토막 난 자리표시자 잔재 제거 — ⟦는 이 표식 말고는 안 쓰는 글자다
+        .replace(/⟦[^⟧]*$/, '');
       console.warn(`[discuss] 컨텍스트 ${CONTEXT_CHAR_CAP}자 상한 초과 — 풀이/참고 탭 일부 잘림`);
     }
     return {
-      problemContent,
+      problemContent: q.text,
       currentTabContent: otherContent || undefined,
       currentTabLabel: otherContent ? '풀이·참고 전체' : undefined,
+      problemSlots: q.slots,
+      // ⚠ Phase 61f D19 — 번호·첨부는 **자르고 남은** 자리표시자 기준이다. 여기서 슬롯을
+      //   함께 자르지 않으면 잘려 나간 그림이 그대로 첨부돼 k 번호가 밀린다(v2 C2).
+      tabSlots: tabSlots.slice(0, countPlaceholders(otherContent)),
     };
-  }, [fetchTabBlocksText, tabs]);
+  }, [fetchTabBlocksForModel, tabs]);
 
   const buildHistory = useCallback(() => {
     // 최근 5개 메시지 (현재 visible 기준), 답글 제외
@@ -534,14 +583,20 @@ export default function CommentPanel({
       return sessionIdSet.has(c.discussionSessionId);
     });
     const recent = tops.slice(-HISTORY_LIMIT);
-    return recent.map((c) => {
+    // Phase 61f — 히스토리 그림도 자리표시자 + 슬롯으로 (D12-③). stripForHistory가 옛
+    // `[그림 k]` 번호를 먼저 지우고, replaceImgTags가 <img>를 ⟦그림⟧으로 바꾼다.
+    const slots: (string | null)[][] = [];
+    const history = recent.map((c) => {
       const info = getDisplayInfo(c);
+      const r = replaceImgTags(stripForHistory(c.content));
+      slots.push(r.slots);
       return {
         role: info.isAI ? ('ai' as const) : ('human' as const),
         nickname: info.name,
-        content: stripForHistory(c.content),
+        content: r.text,
       };
     });
+    return { history, slots };
   }, [visibleComments, sessions, getDisplayInfo]);
 
   // ─── 단일 AI 호출 (전송 + 재시도에서 공유) ───
@@ -560,6 +615,8 @@ export default function CommentPanel({
             participantNicknames: context.participantNicknames,
             myNickname: model.nickname,
             currentMessage: context.currentMessage,
+            // Phase 61f — 없으면 필드 자체가 빠져 요청이 기존과 동일하다
+            ...(context.images ? { images: context.images } : {}),
           }),
         });
         const data = await res.json();
@@ -664,8 +721,15 @@ export default function CommentPanel({
 
     // 3. 컨텍스트 조립
     const ctx = await buildContext();
-    const history = buildHistory();
+    const { history, slots: historySlots } = buildHistory();
     const participantNicknames = [myNickname, ...invokedModels.map((m) => m.nickname)];
+
+    // Phase 61f — 방금 쓴 메시지의 <img>도 자리표시자로 (D12-②).
+    //   Firestore에는 위에서 원문(content)이 이미 저장됐다 — 여기는 전송용 사본이다.
+    const msg = replaceImgTags(content);
+
+    const hasAnyFig = ctx.problemSlots.length > 0 || ctx.tabSlots.length > 0
+      || msg.slots.length > 0 || historySlots.some((a) => a.length > 0);
 
     const baseContext: Omit<DiscussRequestContext, 'currentMessage'> & { currentMessage: string } = {
       problemContent: ctx.problemContent,
@@ -673,7 +737,15 @@ export default function CommentPanel({
       currentTabLabel: ctx.currentTabLabel,
       discussionHistory: history,
       participantNicknames,
-      currentMessage: content,
+      currentMessage: msg.text,
+      ...(hasAnyFig ? {
+        images: {
+          problem: ctx.problemSlots,
+          tab: ctx.tabSlots,
+          history: historySlots,
+          message: msg.slots,
+        },
+      } : {}),
     };
 
     // 4. pending 상태 — 동일 (sessionId, modelId) 중복 제거 후 신규 추가

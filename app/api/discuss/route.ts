@@ -8,6 +8,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getModelConfig } from '../../../lib/ai-models';
 import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
+import { numberFigures, buildImageNote, allMissingFigures, countPlaceholders, type FigMeta } from '../../../lib/verify/figures';
+import { fetchFigures } from '../../../lib/figureFetch';
 import type { AIModelConfig } from '../../../types/problem';
 
 export const runtime = 'nodejs';
@@ -31,6 +33,18 @@ interface DiscussRequest {
   participantNicknames: string[];
   myNickname: string;
   currentMessage: string;
+  /** Phase 61f — 본문 자리표시자(⟦그림⟧)와 정렬된 그림 URL. **필드별로 나눠** 보낸다 —
+   *  평평한 배열 하나면 클라·서버가 "등장 순서" 계약을 손으로 맞춰야 해서 어긋날 자리가 생긴다.
+   *  null = URL이 없는 미디어 블록(svg·ggb). */
+  images?: DiscussImages;
+}
+
+interface DiscussImages {
+  problem?: (string | null)[];
+  tab?: (string | null)[];
+  /** discussionHistory와 인덱스 정렬 */
+  history?: (string | null)[][];
+  message?: (string | null)[];
 }
 
 interface DiscussSuccess {
@@ -187,6 +201,17 @@ const GRAPH_INSTRUCTION = `
 - 펜스 내용은 답변 글자수 제한(800자/1200자)에 **포함되지 않습니다.**
 - 그래프가 불필요한 질문엔 펜스를 넣지 마세요.`;
 
+/**
+ * Phase 61f D15: 그림 자리표시자 지침 — **모든 provider에** #14로 추가.
+ * 첨부 여부·누락 사유는 user 프롬프트 꼬리말(buildImageNote)이 말한다 —
+ * 시스템 프롬프트는 표기의 의미만 정의하므로 provider를 가리지 않는다.
+ */
+const FIGURE_INSTRUCTION = `
+14. **그림 표기**:
+- 본문의 \`[그림 k]\`는 이 요청에 첨부된 k번째 이미지입니다. 첨부된 그림은 직접 보고 판단하세요.
+- \`[그림 k — 첨부되지 않음: …]\`으로 표시된 그림은 이 요청에 없습니다. 그 그림을 근거로
+  단정하지 말고, 필요하면 "그림 확인 필요"로 남기세요.`;
+
 function buildSystemPrompt(args: {
   appendPrompt: string;
   participantNicknames: string[];
@@ -212,6 +237,7 @@ function buildSystemPrompt(args: {
   if (args.graphTool) {
     lines.push(GRAPH_INSTRUCTION);
   }
+  lines.push(FIGURE_INSTRUCTION);   // Phase 61f — 모든 provider (D15)
   if (args.appendPrompt.trim()) {
     lines.push('', `[추가 지침] ${args.appendPrompt.trim()}`);
   }
@@ -360,6 +386,13 @@ function isGraphModel(config: AIModelConfig): boolean {
   return config.provider === 'google' || config.provider === 'openai';
 }
 
+/** 이미지 입력 가능 모델 판정 — 민(google)·클(anthropic)·쳇(openai) (Phase 61f D13).
+ *  deepseek·xai는 자리표시자+꼬리말만 받는다. xai가 vision 모델을 쓰게 되면 여기 추가
+ *  전에 실제 사용 모델로 실측할 것(ai_models 필드 승격 검토 포함). */
+function isVisionProvider(config: AIModelConfig): boolean {
+  return config.provider === 'google' || config.provider === 'anthropic' || config.provider === 'openai';
+}
+
 function buildUserPrompt(body: DiscussRequest): string {
   const parts: string[] = [];
 
@@ -421,6 +454,18 @@ function validate(body: Partial<DiscussRequest>): string | null {
     return 'participantNicknames는 배열이어야 합니다';
   if (!body.myNickname || typeof body.myNickname !== 'string')
     return 'myNickname이 필요합니다';
+  if (body.images !== undefined) {
+    const im = body.images as DiscussImages;
+    const okArr = (a: unknown): boolean =>
+      a === undefined || (Array.isArray(a) && a.every((x) => x === null || typeof x === 'string'));
+    if (typeof im !== 'object' || im === null) return 'images 형식이 잘못됐습니다';
+    if (!okArr(im.problem) || !okArr(im.tab) || !okArr(im.message)) return 'images 형식이 잘못됐습니다';
+    if (im.history !== undefined && !(Array.isArray(im.history) && im.history.every(okArr)))
+      return 'images 형식이 잘못됐습니다';
+    const total = (im.problem?.length ?? 0) + (im.tab?.length ?? 0) + (im.message?.length ?? 0)
+      + (im.history ?? []).reduce((n, a) => n + a.length, 0);
+    if (total > 50) return '그림 참조가 너무 많습니다';   // 방어 — 실제 첨부 상한은 FIG_LIMITS가 따로 건다
+  }
   return null;
 }
 
@@ -485,7 +530,41 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
   if (graphForced) currentMessage += USER_MESSAGE_GRAPH_SUFFIX;
   const promptBody: DiscussRequest =
     currentMessage === body.currentMessage ? body : { ...body, currentMessage };
-  const userPrompt = buildUserPrompt(promptBody);
+
+  /* ── Phase 61f: 그림 슬롯 → 실물 첨부 → 자리표시자 번호 확정 ──
+     번호(k)는 **최종 프롬프트 문자열의 등장 순서**다(자르기는 클라가 이미 끝냈다 — D19).
+     첨부 우선순위(D12: 문항 → 현재 메시지 → 히스토리 최근 것부터)는 장수 상한에서만 작동한다 —
+     등장 순서(문항 → 히스토리 → 메시지)와 **다른 축**이라 priority 배열로 분리한다. */
+  const im = body.images ?? {};
+  const hist = im.history ?? [];
+  const slotGroups: { slots: (string | null)[]; pri: (i: number) => number }[] = [
+    { slots: im.problem ?? [], pri: (i) => i },                 // 문항 (0~)
+    { slots: im.tab ?? [], pri: (i) => 100 + i },               // 풀이·참고 (문항 다음)
+    ...hist.map((a, j) => ({                                     // 히스토리 — 최근 메시지일수록 앞
+      slots: a, pri: (i: number) => 2000 + (hist.length - 1 - j) * 100 + i,
+    })),
+    { slots: im.message ?? [], pri: (i) => 1000 + i },          // 현재 메시지 (히스토리보다 앞)
+  ];
+  const slots = slotGroups.flatMap((g) => g.slots);
+  const priority = slotGroups.flatMap((g) => g.slots.map((_, i) => g.pri(i)));
+
+  const rawPrompt = buildUserPrompt(promptBody);
+  // 방어 — 자리표시자 수와 슬롯 수가 어긋나면(클라 버그) 앞에서부터 자리표시자 수만큼만 쓴다.
+  const n = Math.min(slots.length, countPlaceholders(rawPrompt));
+
+  const bucket = (process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '').trim();
+  const figs: FigMeta & { parts: { mimeType: string; data: string }[] } =
+    n === 0
+      ? { attachedKs: [], missing: [], slotStatuses: [], parts: [] }
+      : !isVisionProvider(config)
+        ? { ...allMissingFigures(slots.slice(0, n), '이 모델은 이미지를 받지 않음'), parts: [] }
+        : !bucket
+          // D6 — 토론은 설정 문제로 500을 내지 않는다. 그림만 누락 처리하고 텍스트로 계속.
+          ? { ...allMissingFigures(slots.slice(0, n), '서버 그림 설정 누락'), parts: [] }
+          : await fetchFigures(slots.slice(0, n), bucket, 'SVG/GeoGebra', priority.slice(0, n));
+
+  const userPrompt = numberFigures(rawPrompt, figs.slotStatuses)
+    + buildImageNote(figs.attachedKs, figs.missing);
 
   try {
     const result = await withTimeout(
@@ -494,6 +573,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<DiscussSucces
         // Anthropic Claude는 시스템 프롬프트만으론 도구를 안 부르는 경향이 있어,
         // 검산 트리거가 명시되면 tool_choice로 code_execution 강제 호출.
         forceCodeExecution: codeExecForced && config.provider === 'anthropic',
+        // Phase 61f — 비면 요청 바디는 기존과 바이트 동일(D10)
+        ...(figs.parts.length ? { images: figs.parts } : {}),
       }),
       TIMEOUT_MS,
     );
