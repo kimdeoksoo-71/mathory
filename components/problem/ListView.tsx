@@ -6,7 +6,7 @@ import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash } from '../ui/Icons';
+import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave } from '../ui/Icons';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
@@ -36,17 +36,52 @@ function fmtDate(d?: Date): string {
   return `${yy}-${mm}-${dd}`;
 }
 
+/** 정렬 개선(2026-09-04) — 24시간 이내 수정이면 상대 시각. 그 밖(미래 시각 포함)은 null. */
+function recentLabel(d?: Date): string | null {
+  if (!d) return null;
+  const mins = Math.floor((Date.now() - d.getTime()) / 60_000);
+  if (mins < 0) return null;
+  if (mins < 1) return '방금 전';
+  if (mins < 60) return `${mins}분 전`;
+  const hours = Math.floor(mins / 60);
+  return hours < 24 ? `${hours}시간 전` : null;
+}
+
+/** 수정일 칸 — 최근 24시간 안에 저장된 문항은 날짜 대신 저장 아이콘(구름+체크) + 상대 시각.
+ *  정렬 기본값이 수정일 내림차순 → 제목 오름차순으로 바뀌면서(정렬 개선 메모 2-1) "방금 만진
+ *  문항이 맨 위"라는 신호가 사라졌다 — 그 신호를 자리 이동 없이 이 칸이 대신 낸다.
+ *  ⚠ 아이콘 색은 상태 표시기 3:1 규약(Phase 59 G1)에 맞는 --mathory-red-dark. 텍스트는 본문색. */
+function UpdatedCell({ d }: { d?: Date }) {
+  const recent = recentLabel(d);
+  if (!recent) {
+    return <div style={{ width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(d)}</div>;
+  }
+  return (
+    <div style={{
+      width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-primary)',
+      display: 'flex', alignItems: 'center', gap: 4,
+    }}>
+      <IconSave size={13} color="var(--mathory-red-dark, #BC5F3F)" />
+      {recent}
+    </div>
+  );
+}
+
 export default function ListView({
   problems, scopeKey, mode, recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
-  const [sort, setSort] = useState<SortState>({ key: 'updated', dir: 'desc' });
+  // 정렬 개선(2026-09-04): 기본 = 제목 오름차순. "수정하면 맨 위로 튀는" 자동 정렬을 없앴다 —
+  // 최근 수정 신호는 UpdatedCell(구름+체크 + 상대 시각)이 자리 이동 없이 낸다.
+  // 헤더 클릭으로 수정일 정렬을 고르는 것은 그대로 된다(자동이 아니라 수동이므로).
+  const [sort, setSort] = useState<SortState>({ key: 'title', dir: 'asc' });
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const sorted = [...problems].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
-    if (sort.key === 'title') return mul * (a.title || '').localeCompare(b.title || '');
+    // numeric — "문제2"가 "문제10" 앞에 오게 (GAS 파일명 정렬과 같은 옵션)
+    if (sort.key === 'title') return mul * (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });
     return mul * ((a.updated_at?.getTime() || 0) - (b.updated_at?.getTime() || 0));
   });
 
@@ -120,7 +155,7 @@ export default function ListView({
         <HeaderCell label="제목" active={sort.key === 'title'} dir={sort.dir} onClick={() => toggleSort('title')} style={{ flex: 1, minWidth: 0 }} />
         {showOwner && <div style={{ width: 120, flexShrink: 0 }}>소유자</div>}
         {showPerm && <div style={{ width: 64, flexShrink: 0 }}>권한</div>}
-        <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => toggleSort('updated')} style={{ width: 72, flexShrink: 0 }} />
+        <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => toggleSort('updated')} style={{ width: 86, flexShrink: 0 }} />
         <div style={{ width: 28, flexShrink: 0 }} />
       </div>
       </div>
@@ -207,10 +242,8 @@ export default function ListView({
               </div>
             )}
 
-            {/* 수정일 */}
-            <div style={{ width: 72, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>
-              {fmtDate(p.updated_at)}
-            </div>
+            {/* 수정일 — 최근 24시간은 저장 아이콘 + 상대 시각 (정렬 개선 2-1-③) */}
+            <UpdatedCell d={p.updated_at} />
 
             {/* 액션 */}
             <button

@@ -54,7 +54,7 @@ function loadSort(): SortState {
 function compareBySort(a: Problem, b: Problem, s: SortState): number {
   let v: number;
   if (s.key === 'name') {
-    v = (a.title || '').localeCompare(b.title || '', 'ko');
+    v = (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });   // "문제2" < "문제10"
   } else {
     const ta = a.updated_at ? a.updated_at.getTime() : 0;
     const tb = b.updated_at ? b.updated_at.getTime() : 0;

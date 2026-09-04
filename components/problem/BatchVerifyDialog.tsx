@@ -83,15 +83,24 @@ const fmtElapsed = (ms: number) => {
 type Phase = 'select' | 'running' | 'summary';
 
 export default function BatchVerifyDialog({
-  folderName, problems, user, onClose,
+  folderName, problems: problemsProp, user, onClose,
 }: {
   folderName: string;
-  /** 폴더 직속 문항 — 현재 정렬 순서 그대로 (하위폴더 문항은 이미 걸러져 있다, §3-6) */
+  /** 폴더 직속 문항 (하위폴더 문항은 이미 걸러져 있다, §3-6).
+   *  ⚠ 순서는 여기서 **제목 오름차순으로 고정**한다(정렬 개선 2026-09-04) — FolderView의
+   *    보기 모드·정렬 상태에 따라 검증 실행 순서가 달라지지 않게. */
   problems: Problem[];
   user: User;
   /** didChange = 성공 1건 이상 → 호출부가 목록을 1회 리프레시한다(W5) */
   onClose: (didChange: boolean) => void;
 }) {
+  // 표시·실행 순서 모두 이 정렬을 따른다 (아래 모든 problems 참조가 이 배열이다)
+  const problems = useMemo(
+    () => [...problemsProp].sort((a, b) =>
+      (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' })),
+    [problemsProp],
+  );
+
   const [phase, setPhase] = useState<Phase>('select');
   const [checked, setChecked] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
