@@ -10,7 +10,7 @@
     "test:case": "tsc lib/solutionOutline.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/caseBlock.test.mjs",
     "test:locale": "tsc lib/locale.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/locale.test.mjs",
     "probe:verify": "npm run test:verify --silent && node scripts/verifyProbe.mjs",
-    "test:verify": "tsc lib/verify/providerParams.ts lib/verify/prompts.ts lib/verify/parse.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/aiProviderParams.test.mjs tests/verify.test.mjs",
+    "test:verify": "tsc lib/verify/providerParams.ts lib/verify/prompts.ts lib/verify/parse.ts lib/verify/figures.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/aiProviderParams.test.mjs tests/verify.test.mjs tests/figures.test.mjs",
     "test:extract": "tsc lib/chatExtract.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/chatExtract.test.mjs",
     "test:batch": "tsc lib/verify/batchPlan.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/batchPlan.test.mjs",
     "test:mathsplit": "tsc lib/mathSplit.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathSplit.test.mjs",
