@@ -38,6 +38,8 @@ import {
   synthesizeVerdict, compareAnswer, repairLatexControlCharsInString,
   type RawFinding, type VerifyKind,
 } from '../../../lib/verify/parse';
+import { figureLabel, buildImageNote } from '../../../lib/verify/figures';
+import { fetchFigures, type FigureSet } from '../../../lib/figureFetch';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -113,7 +115,6 @@ interface VerifyRequestBody {
    *  클라가 prompts를 import하면 프롬프트 전문이 클라이언트 번들에 실린다. */
   hasChoices?: boolean;
   hasGanaOrRoman?: boolean;
-  hasImages?: boolean;
 }
 
 /* ═══ 환경변수 ═══ */
@@ -126,6 +127,8 @@ function readEnv() {
     return v;
   };
   const apiKey = need('NEXT_PUBLIC_FIREBASE_API_KEY');
+  // Phase 61f — 그림 fetch의 D2 화이트리스트가 자기 버킷명을 요구한다.
+  const bucket = need('NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET');
   // 허용목록은 시트 가져오기와 같은 사람이라 env를 재사용한다. 사용자 집합이 갈리는 날
   // VERIFY_ALLOWED_UIDS만 채우면 분리된다.
   const allowedRaw = process.env.VERIFY_ALLOWED_UIDS || process.env.AUDITION_ALLOWED_UIDS || '';
@@ -135,7 +138,7 @@ function readEnv() {
     throw new ApiError(500, `서버 환경변수가 설정되지 않았습니다: ${missing.join(', ')}`);
   }
   return {
-    apiKey,
+    apiKey, bucket,
     allowedUids: allowedRaw.split(',').map((s) => s.trim()).filter(Boolean),
     geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
     claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-4-8',
@@ -181,6 +184,18 @@ export async function POST(req: NextRequest) {
     // 지적이 가리킬 대상: 문제 검증은 문제 블록, 풀이 검증은 풀이 블록
     const targetBlocks = kind === 'problem' ? problemBlocks : solutionBlocks;
 
+    /* ── Phase 61f: 그림 실물 첨부 + 자리표시자 번호 확정 ──
+       슬롯 = 미디어 타입 블록(등장 순서). 텍스트를 `[그림 k]` 계열로 덮어쓴 **뒤에**
+       labelBlocks·anchorByQuote가 돌므로 앵커도 그 번호를 본다(D20).
+       ⚠ `chars` 상한 검사는 이 위(자리표시자 4자 기준)에서 이미 끝났다 — 클라 셈법과 대칭.
+       1차·2차가 같은 첨부를 쓰고, judge 단독 요청도 이 경로로 다시 fetch한다(D3). */
+    const figBlocks = [...problemBlocks, ...solutionBlocks]
+      .filter((b) => b.type === 'image' || b.type === 'svg' || b.type === 'ggb');
+    const figs: FigureSet = await fetchFigures(
+      figBlocks.map((b) => b.imageUrl ?? null), env.bucket, 'SVG/GeoGebra');
+    figBlocks.forEach((b, i) => { b.text = figureLabel(figs.slotStatuses[i]); });
+    const imageNote = buildImageNote(figs.attachedKs, figs.missing);
+
     const { first, judge } = getVerifyProviders({
       gemini: env.geminiModel, claude: env.claudeModel,
     });
@@ -190,7 +205,7 @@ export async function POST(req: NextRequest) {
       const given = Array.isArray(body.candidates) ? body.candidates : [];
       if (given.length === 0) return fail(400, '판정할 후보가 없습니다');
       return await runJudge({
-        kind, judge, env, problemBlocks, solutionBlocks, targetBlocks,
+        kind, judge, env, problemBlocks, solutionBlocks, targetBlocks, figs, imageNote,
         candidates: given,
         derivedAnswer: body.derivedAnswer,
         answerCheck: body.answerCheck,
@@ -215,9 +230,11 @@ export async function POST(req: NextRequest) {
     const passes = kind === 'problem' ? [PROMPT_PROBLEM_FIRST] : SOLUTION_FIRST_PASSES;
 
     const firstResults = await Promise.all(passes.map((pr) =>
-      first.complete(pr.system, fillTemplate(pr.user, vars), FIRST_MAX_TOKENS, {
+      first.complete(pr.system, fillTemplate(pr.user, vars) + imageNote, FIRST_MAX_TOKENS, {
         geminiThinkingLevel: 'HIGH',
         geminiJsonMime: true,
+        // Phase 61f — 두 패스·2차가 같은 첨부를 쓴다. 비면 바디는 기존과 바이트 동일(D10).
+        ...(figs.parts.length ? { images: figs.parts } : {}),
       })));
 
     let inputTokens = 0;
@@ -308,6 +325,9 @@ async function runJudge(a: {
   problemBlocks: LabeledBlock[];
   solutionBlocks: LabeledBlock[];
   targetBlocks: LabeledBlock[];
+  /** Phase 61f — 핸들러가 이미 fetch·번호 확정을 끝낸 결과 (블록 text는 `[그림 k]` 계열) */
+  figs: FigureSet;
+  imageNote: string;
   candidates: RawFinding[];
   derivedAnswer?: string;
   answerCheck?: 'match' | 'mismatch' | 'no_answer';
@@ -331,7 +351,7 @@ async function runJudge(a: {
       problem: labelBlocks(problemBlocks),
       solution: kind === 'problem' ? labelBlocks(problemBlocks) : labelBlocks(solutionBlocks),
       candidates: formatCandidatesForJudge(candidates),
-    });
+    }) + a.imageNote;
 
     const judgeRes = await judge.complete(PROMPT_JUDGE.system, judgeUser, JUDGE_MAX_TOKENS, {
       // ⚠ Opus 4.8은 thinking을 생략하면 사고가 꺼진 채 돈다. 시트 STEP3와 같은 설정.
@@ -340,6 +360,8 @@ async function runJudge(a: {
       // F1: 시트에 전례가 없는 신규 요소라 env로 켠다. tool_choice 강제는 절대 하지 않는다
       //     (도구 호출을 강제하면 모델이 최종 JSON 턴을 낼 수 없다).
       enableCodeExecution: env.judgeCodeExec,
+      // Phase 61f D3 — 2차도 같은 첨부를 본다. 비면 바디는 기존과 바이트 동일(D10).
+      ...(a.figs.parts.length ? { images: a.figs.parts } : {}),
     });
     inputTokens += judgeRes.inputTokens;
     outputTokens += judgeRes.outputTokens;
@@ -383,6 +405,10 @@ async function runJudge(a: {
       report: report(kind, synthesizeVerdict(findings), findings, {
         models: { first: env.geminiModel, judge: env.claudeModel },
         derivedAnswer: a.derivedAnswer, answerCheck: a.answerCheck,
+        // Phase 61f — 누락 그림은 사람이 알아야 한다 (Y열 fig_info의 등가물)
+        ...(a.figs.missing.length
+          ? { note: `첨부되지 않은 그림 ${a.figs.missing.length}장: ${a.figs.missing.map((m) => `[그림 ${m.k} — ${m.reason}]`).join(', ')}` }
+          : {}),
       }),
       usage: { inputTokens, outputTokens, costUsd: round4(a.carriedUsd + usdJudge) },
     });
@@ -396,10 +422,15 @@ function normalizeBlocks(raw: unknown): LabeledBlock[] {
   return raw
     .map((b) => {
       const o = (b ?? {}) as Record<string, unknown>;
+      // Phase 61f — imageUrl을 함께 실어야 한다(이 함수는 받은 객체를 **재구성**한다 — v2 C1).
+      //   화이트리스트 판정은 여기서 하지 않는다: planSlots가 하면 탈락 사유가
+      //   "허용되지 않는 그림 주소"로 정확히 남는다.
+      const imageUrl = typeof o.imageUrl === 'string' && o.imageUrl ? { imageUrl: o.imageUrl } : {};
       return {
         blockKey: String(o.blockKey ?? ''),
         type: String(o.type ?? 'text'),
         text: String(o.text ?? ''),
+        ...imageUrl,
       };
     })
     .filter((b) => b.blockKey && b.text.trim());

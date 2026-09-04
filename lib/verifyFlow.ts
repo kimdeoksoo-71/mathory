@@ -14,23 +14,35 @@ import type { Block, TabMeta, VerifyKind, VerifyReport } from '../types/problem'
 import { addComment } from './comments';
 import { setVerification } from './firestore';
 import { blockKeyOf } from './caseBlock';
+import { FIG_PLACEHOLDER, imageSrcOf } from './verify/figures';
 import { collectCurrentContent } from './version/adapter';
 import { hashPerTab, sha256 } from './version/hash';
 
-/** 검증에 넘길 블록. 미디어 블록은 텍스트가 없으므로 제외하고 hasImages로만 센다. */
-export function verifyBlocksOf(blocks: Block[]): { blockKey: string; type: string; text: string }[] {
-  return blocks
-    .filter((b) => !['image', 'svg', 'ggb'].includes(b.type))
-    .map((b) => ({
-      blockKey: blockKeyOf(b),
-      type: b.type,
-      text: (b.title ? `### ${b.title}\n` : '') + (b.raw_text || ''),
-    }))
-    .filter((b) => b.text.trim());
-}
+/** 검증에 넘길 블록 (Phase 61f).
+ *
+ * 미디어 블록도 **자리표시자로 포함**한다 — 본문 안 원래 위치가 보존되고, 서버가 image의
+ * `imageUrl`을 받아 실물을 첨부한다(D4). svg·ggb는 URL을 보내지 않는다(D5 — 서버가
+ * "첨부되지 않음: SVG/GeoGebra"로 렌더). 자리표시자 4자는 `verifyCharCountOf`와 서버
+ * `totalChars`에 똑같이 들어가 61d W1 대칭이 유지된다.
+ *
+ * ⚠ 부수 효과(의도됨): `batchVerify`의 `questionBlockCount`가 이 함수 길이라, 그림뿐인
+ *   문항의 61d `empty_question` 사전 차단이 저절로 풀린다(batchPlan은 수치 주입형 — 무변경). */
+export interface VerifyBlockPayload { blockKey: string; type: string; text: string; imageUrl?: string }
 
-export function hasMedia(blocks: Block[]): boolean {
-  return blocks.some((b) => ['image', 'svg', 'ggb'].includes(b.type));
+export function verifyBlocksOf(blocks: Block[]): VerifyBlockPayload[] {
+  return blocks
+    .map((b) => {
+      if (b.type === 'image' || b.type === 'svg' || b.type === 'ggb') {
+        const src = b.type === 'image' ? imageSrcOf(b.raw_text || '') : '';
+        return { blockKey: blockKeyOf(b), type: b.type, text: FIG_PLACEHOLDER, ...(src ? { imageUrl: src } : {}) };
+      }
+      return {
+        blockKey: blockKeyOf(b),
+        type: b.type,
+        text: (b.title ? `### ${b.title}\n` : '') + (b.raw_text || ''),
+      };
+    })
+    .filter((b) => b.text.trim());
 }
 
 /** `/api/verify`가 돌려준 HTTP 상태를 실은 오류 (Phase 61d D5①) */
@@ -103,7 +115,6 @@ export async function runVerifyFlow(args: {
 }): Promise<{ report: VerifyReport; usage: VerifyUsage; commentId: string }> {
   const question = args.blocksByTab['question'] || [];
   const solution = args.blocksByTab['solution'] || [];
-  const targetRaw = args.kind === 'solution' ? solution : question;
 
   const call = async (payload: Record<string, unknown>) => {
     const res = await fetch('/api/verify', {
@@ -132,7 +143,8 @@ export async function runVerifyFlow(args: {
     // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
     hasChoices: question.some((b) => b.type === 'choices'),
     hasGanaOrRoman: question.some((b) => b.type === 'gana' || b.type === 'roman'),
-    hasImages: hasMedia(targetRaw),
+    // Phase 61f D9 — `hasImages`(죽은 필드)와 `hasMedia`는 함께 삭제됐다. 그림은 이제
+    // image 블록의 `imageUrl`로 실려 가 서버가 실물을 첨부한다.
   };
 
   const first = await call({ ...base, phase: 'first' });

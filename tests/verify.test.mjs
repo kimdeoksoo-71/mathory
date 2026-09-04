@@ -273,3 +273,33 @@ test('labelBlocks — [블록 n] 라벨과 총 글자 수', () => {
   assert.match(s, /\[블록 2\] \(choices\)/);
   assert.equal(P.totalChars(bs), '첫째'.length + '① 1 ② 2'.length);
 });
+
+/* ═══ Phase 61f — 그림 첨부 후의 프롬프트·라벨 ═══ */
+
+test('61f labelBlocks — image 블록이 (image) 라벨과 자리표시자로 나온다', async () => {
+  const P = await import('../.test-build/lib/verify/prompts.js');
+  const F = await import('../.test-build/lib/verify/figures.js');
+  // 서버는 번호 확정 후의 텍스트로 labelBlocks를 부른다 — [그림 1]이 그대로 실린다
+  const out = P.labelBlocks([
+    { blockKey: 'b1', type: 'text', text: '그래프가 그림과 같다.' },
+    { blockKey: 'b2', type: 'image', text: F.numberFigures(F.FIG_PLACEHOLDER, [{ k: 1, ok: true }]) },
+  ]);
+  assert.ok(out.includes('[블록 2] (image)\n[그림 1]'), out);
+});
+
+test('61f D8 — 프롬프트가 "이미지를 보지 못합니다"를 더는 단정하지 않는다', async () => {
+  const P = await import('../.test-build/lib/verify/prompts.js');
+  const all = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES, P.PROMPT_JUDGE]
+    .map((pr) => pr.system + pr.user).join('\n');
+  assert.ok(!all.includes('이미지를 보지 못합니다'), '첨부 후에는 거짓이 되는 단정 문구');
+  assert.ok(all.includes('첨부되지 않음'), '첨부되지 않은 그림에 한해 skip/uncertain');
+  assert.ok(all.includes('[그림 k]'), '자리표시자 의미 설명');
+});
+
+test('61f LabeledBlock.imageUrl — totalChars는 text만 센다 (자리표시자 4자)', async () => {
+  const P = await import('../.test-build/lib/verify/prompts.js');
+  const F = await import('../.test-build/lib/verify/figures.js');
+  const n = P.totalChars([{ blockKey: 'b', type: 'image', text: F.FIG_PLACEHOLDER, imageUrl: 'https://x' }]);
+  assert.equal(n, F.FIG_PLACEHOLDER.length);
+  assert.equal(n, 4);
+});
