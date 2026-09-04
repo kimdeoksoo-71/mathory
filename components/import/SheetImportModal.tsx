@@ -78,9 +78,11 @@ interface SaveOutcome {
   detail?: string;
 }
 
+/** 61e-2차 D27 — GAS `pv_load_`가 검증 실행마다 Data_DS를 **통째로 비우고 다시 채운다**
+ *  (M열 체크박스까지 지워진다 — N8). 그래서 Data_DS는 "마지막 검증 실행분", 누적본은 Stack이다. */
 const SHEETS: { id: SheetName; label: string; hint: string }[] = [
-  { id: 'Data_DS', label: 'Data_DS', hint: '최근 검사 세트' },
-  { id: 'Stack', label: 'Stack', hint: '누적' },
+  { id: 'Data_DS', label: 'Data_DS', hint: '마지막 검증 실행분 (불러올 때마다 교체됨)' },
+  { id: 'Stack', label: 'Stack', hint: '누적 (전체 세트)' },
 ];
 
 /** 저장 동시성. 문항 1건이 문서 1 + 블록 2~5개라 왕복이 많다. 너무 높이면
@@ -696,6 +698,7 @@ function FormPane({
           사전 선별(M열 체크 표시)된 문제 포함하기
           <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 2 }}>
             행 범위를 비워 두면 사전 선별 문제만 가져옵니다. 둘 다 쓰면 합집합입니다.
+            <br />⚠ Data_DS는 검증을 새로 돌릴 때마다 M열 체크까지 비워집니다 — 체크는 Stack에서 하세요.
           </span>
         </span>
       </label>
