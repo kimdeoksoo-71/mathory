@@ -270,7 +270,42 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61e-2차 — 그림 링크 이관(GAS 패치 11) 대응** — 구현·검수 완료(2026-09-04) · 배포 대기
+## 현재 Phase: **Phase 61f — 정밀 검증·agent 토론 그림 첨부** — 구현·검수 완료(2026-09-04) · 배포 대기
+
+문서: `docs/phasedocs/Phase61f 정밀 검증·토론 그림 첨부 v3 실행판.md`
+(계보: v1 web → v2 CLI 실측 교차검토 → **v3 착수판 = 실행판**(§9가 구현 기록·검수). web v3 재검증은 생략 — 덕수 판정)
+
+Mathory의 AI 경로 두 개(정밀 검증·토론) 어느 쪽도 그림 바이트를 모델에 보내지 않던 것을
+GAS 패치 12·13 이식으로 고쳤다 — 서버가 Storage 그림을 받아 Gemini `inlineData` ·
+Claude `image` · OpenAI `input_image`로 첨부하고, 본문엔 `[그림 k]`, 꼬리말에 첨부·누락 목록.
+**신규 2(`lib/verify/figures.ts` 순수 · `lib/figureFetch.ts` 서버) · 수정 8 · GAS/규칙/스키마/렌더 0.**
+로직 검증 305 → **336건**. 덕수 검수 5항 전항 통과(그림 검증 실판정 · 3사 그림 기반 답 ·
+메시지 그림 · 무회귀 · 61d empty_question 해소). ⚠ 61e·61e-2차와 함께 **아직 배포 전**.
+
+- **⚠ 핵심 불변식(D10): `images`가 비면 provider 요청 바디는 바이트 단위로 기존과 같다** —
+  proofread·ai-complete·그림 없는 토론/검증이 전부 이 뒤에 있고 `aiProviderParams` 스냅샷이
+  `===`로 고정한다. ⚠ `ParamOptions`(providerParams)와 `CompleteOptions`(ai-provider)는
+  **별개 선언의 사본**이라 옵션을 더할 때 양쪽을 함께 고칠 것
+- **⚠ 슬롯 모델은 `lib/verify/figures.ts`가 단독 소유한다**: 전송 자리표시자는 `[그림]`이 아니라
+  **`⟦그림⟧`**(본문에 `[그림]`·`[그림N]`이 자연 발생한다 — Fig.N 변환 산물), 모델이 보는 최종형만
+  `[그림 k]`. **번호 매기기는 프롬프트 문자열이 확정된 뒤**(자르기 포함) 한 번에(D19) —
+  토론 클라(`buildContext`)가 15,000자 자르기 **뒤** 남은 자리표시자 수만큼 슬롯을 자르는 이유다
+- **⚠ 등장 순서 ≠ 첨부 우선순위(R-3)**: 등장(=번호 k·첨부 순서)은 문항→히스토리→메시지,
+  장수 상한(6장)에서 살아남는 우선순위는 문항→**메시지**→히스토리(최근 먼저)다. `planSlots`의
+  priority 축이 이걸 나른다 — **두 축을 합치면 사용자가 방금 붙인 그림이 먼저 잘린다**
+- **⚠ `isOwnStorageUrl`이 discuss 무인증 라우트의 유일한 SSRF 방어다**: 자기 버킷
+  `problems/` 접두만 통과. 넓히지 말 것. GAS처럼 Drive 전역 이름 검색으로 폴백하지도 말 것
+- **⚠ 어떤 그림 실패도 요청을 죽이지 않는다(D6)**: 항목별 누락 처리 + 꼬리말 고지 + 텍스트로
+  계속. 검증 리포트 `note`에 누락 목록이 남는다(시트 Y열 fig_info의 등가물)
+- **`hasImages`·`hasMedia`는 삭제됐다(D9)** — 3개 Phase 동안 "보내고 있다"고 믿긴 채 아무도 안
+  읽던 필드. 되살리지 말 것. 그림뿐인 문항이 61d `empty_question`에 안 걸리는 것은 **의도된
+  해소**다(`verifyBlocksOf`가 자리표시자를 세므로 — batchPlan 코드 변경 0)
+- **알고 두는 손실(D20)**: 그림 지적 클릭은 블록 점프만 되고 글자 하이라이트가 없다
+  (`findQuoteRange`가 raw_text(`<img …>`)에서 `[그림 k]`를 못 찾는다 — 버그 아님)
+- **svg·ggb는 첨부하지 않는다(D5)** — `[그림 k — 첨부되지 않음: SVG/GeoGebra]` 자리표시자만.
+  래스터화는 후속. `FIG_MIME_OK`에 gif가 없는 것은 Gemini 최소공통분모(Claude·GPT는 받는다)
+
+### 이전: **Phase 61e-2차 — 그림 링크 이관(GAS 패치 11) 대응** — 구현·검수 완료(2026-09-04) · 배포 대기
 
 문서: `docs/phasedocs/Phase61e-2차 그림 링크 이관 대응 v5 실행판.md`
 (계보: v1 web → v2 web·GAS 재검토 → v3 CLI 원본 대조 → v4 web 검증 턴 → **v5 CLI 최종**. §10이 구현 기록)
@@ -309,9 +344,8 @@ Data_DS 본문에 **파일명 문자열로만** 있던 `\includegraphics{<stem>_
 
 - **⚠ 가장 값비싼 발견: 자동 수정이 LaTeX 제어열을 파괴하고 있었다** — 아래 규약 절 참조.
   이것을 고치는 것이 **커밋 1**이고, 그것이 그림 실패 폴백(리터럴 보존)이 성립하는 전제다
-- **⚠ `hasImages`는 죽은 필드다** — `app/api/verify/route.ts:116`에 선언만 있고 아무도 읽지 않는다.
-  그림이 image 블록이 되면 `verifyBlocksOf`가 걸러내 **정밀 검증 모델이 그림의 존재조차 모르게
-  된다**(알고 두는 손실). v1 계획서의 "의도한 방향"은 **틀렸다** — 61f 후보
+- ~~**⚠ `hasImages`는 죽은 필드다** — 정밀 검증 모델이 그림의 존재조차 모른다(알고 두는 손실)~~
+  → **Phase 61f가 해결했다(2026-09-04)**: 필드 자체를 삭제하고 그림을 실물로 첨부한다. 위 현재 Phase 절 참조
 - **D13 B열 복구**: GAS 정규화가 선택지 뒤 `\includegraphics`를 trailer로 잘라내 E에서 사라지지만
   원문인 B(`SHEET_COL.problem = 1`)에는 남는다. B에만 있는 이름을 문제 탭 맨 끝에 붙인다
   (실측: Data_DS 38행 중 그림 문항 10행, 복구 1행 = 1공통13)
