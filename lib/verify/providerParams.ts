@@ -19,7 +19,13 @@ export interface ParamOptions {
   maxToolTurns?: number;
   geminiThinkingLevel?: 'LOW' | 'MEDIUM' | 'HIGH';
   geminiJsonMime?: boolean;
+  /** Phase 61f — 첨부할 이미지(base64). 비거나 없으면 **요청 바디가 기존과 바이트 동일**(D10).
+   *  ⚠ `lib/ai-provider.ts`의 `CompleteOptions`와 **별개 선언의 사본**이다 — 양쪽을 함께 고칠 것. */
+  images?: ImagePart[];
 }
+
+/** 첨부 이미지 한 장. `data`는 base64(데이터 URL 접두 없이). */
+export interface ImagePart { mimeType: string; data: string }
 
 /** Claude code execution 서버 도구 타입. Phase 41에서 검증된 값 */
 export const CLAUDE_CODE_EXEC_TOOL = { type: 'code_execution_20250825', name: 'code_execution' };
@@ -87,4 +93,55 @@ export function buildGeminiConfig(
 export function resolveMaxToolTurns(opts?: ParamOptions): number {
   const n = opts?.maxToolTurns;
   return typeof n === 'number' && n >= 0 ? n : DEFAULT_MAX_TOOL_TURNS;
+}
+
+/* ═══ Phase 61f — 이미지 파트가 붙는 user content 3종 ═══
+ *
+ * 셋 다 규약이 같다:
+ *   ① `images`가 비거나 없으면 **입력 문자열을 그대로** 반환한다(D10 — 스냅샷 테스트가 `===`로 고정).
+ *   ② 있으면 **텍스트 먼저, 이미지 뒤** (GAS `userParts = [{text}].concat(imgParts)` 등가).
+ *   ③ 이미지 순서 = 배열 순서 = k 오름차순 — 꼬리말(buildImageNote)의 "첨부 순서" 약속이 이것이다.
+ */
+
+/** Gemini `generateContent` 인자. SDK 0.24가 `Array<string | Part>`를 받는다(실측). */
+export function buildGeminiContent(userPrompt: string, opts?: ParamOptions): string | unknown[] {
+  const images = opts?.images;
+  if (!images || images.length === 0) return userPrompt;
+  return [
+    { text: userPrompt },
+    ...images.map((im) => ({ inlineData: { mimeType: im.mimeType, data: im.data } })),
+  ];
+}
+
+/** Claude user 메시지의 content.
+ *  ⚠ `media_type`은 SDK가 닫힌 유니온으로 선언한다 — 호출부(`ai-provider.ts`)가 이미
+ *    params 전체를 `unknown` 캐스트로 넘기므로 여기서는 문자열 그대로 둔다. */
+export function buildClaudeUserContent(userPrompt: string, opts?: ParamOptions): string | unknown[] {
+  const images = opts?.images;
+  if (!images || images.length === 0) return userPrompt;
+  return [
+    { type: 'text', text: userPrompt },
+    ...images.map((im) => ({
+      type: 'image',
+      source: { type: 'base64', media_type: im.mimeType, data: im.data },
+    })),
+  ];
+}
+
+/** OpenAI Responses `input`.
+ *  ⚠ `detail`은 선택이 아니라 **필수 필드**다(SDK 6.39 `ResponseInputImage` — `?`가 없다). */
+export function buildOpenAIResponsesInput(userPrompt: string, opts?: ParamOptions): string | unknown[] {
+  const images = opts?.images;
+  if (!images || images.length === 0) return userPrompt;
+  return [{
+    role: 'user',
+    content: [
+      { type: 'input_text', text: userPrompt },
+      ...images.map((im) => ({
+        type: 'input_image',
+        image_url: `data:${im.mimeType};base64,${im.data}`,
+        detail: 'auto',
+      })),
+    ],
+  }];
 }

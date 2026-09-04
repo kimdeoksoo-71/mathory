@@ -4,6 +4,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { AIModelConfig } from '../types/problem';
 import {
   buildClaudeParams, buildGeminiConfig, resolveMaxToolTurns,
+  buildGeminiContent, buildClaudeUserContent, buildOpenAIResponsesInput, type ImagePart,
 } from './verify/providerParams';
 
 export interface AIProviderResult {
@@ -63,6 +64,9 @@ export interface CompleteOptions {
   /** Gemini `generationConfig.responseMimeType = 'application/json'`.
    *  ⚠️ 켜도 `\f` 계열 이스케이프 손상은 막지 못한다 — 파싱 후 복구가 여전히 필요하다. */
   geminiJsonMime?: boolean;
+  /** Phase 61f — 첨부 이미지(base64). 비거나 없으면 요청 바디는 기존과 **바이트 동일**(D10).
+   *  텍스트 먼저·이미지 뒤(GAS 순서). deepseek·xai(OpenAICompat)는 이 값을 **무시**한다(D13). */
+  images?: ImagePart[];
 }
 
 export interface AIProvider {
@@ -100,7 +104,10 @@ class GeminiProvider implements AIProvider {
       generationConfig: buildGeminiConfig(maxTokens, _opts) as { maxOutputTokens: number },
       ...(this.enableCodeExecution ? { tools: [{ codeExecution: {} }] } : {}),
     });
-    const result = await model.generateContent(userPrompt);
+    // Phase 61f — images가 있으면 [{text}, …{inlineData}] 배열, 없으면 문자열 그대로(D10)
+    const result = await model.generateContent(
+      buildGeminiContent(userPrompt, _opts) as Parameters<typeof model.generateContent>[0],
+    );
     const usage = result.response.usageMetadata;
 
     // parts 순회 직렬화 — text는 본문, executableCode+codeExecutionResult는 검산 부록으로
@@ -207,12 +214,13 @@ class OpenAIResponsesProvider implements AIProvider {
     systemPrompt: string,
     userPrompt: string,
     maxTokens = 1024,
-    _opts?: CompleteOptions, // OpenAI 토론 모델(쳇)은 JSON mode 미사용
+    _opts?: CompleteOptions, // OpenAI 토론 모델(쳇)은 JSON mode 미사용. Phase 61f의 images는 사용.
   ): Promise<AIProviderResult> {
     const res = await this.client.responses.create({
       model: this.modelName,
       instructions: systemPrompt,
-      input: userPrompt,
+      // Phase 61f — images가 있으면 input_text+input_image 배열, 없으면 문자열 그대로(D10)
+      input: buildOpenAIResponsesInput(userPrompt, _opts) as string,
       max_output_tokens: maxTokens,
       tools: [{ type: 'code_interpreter', container: { type: 'auto' } }],
     });
@@ -374,7 +382,8 @@ class ClaudeProvider implements AIProvider {
     // code_execution_20250825는 모든 지원 모델에서 사용 가능 (Bash 기반).
     // 호출되는 도구는 bash_code_execution / text_editor_code_execution / (legacy) code_execution
     // 으로 분기되며, 결과 블록도 *_code_execution_tool_result로 다양함.
-    const messages: unknown[] = [{ role: 'user', content: userPrompt }];
+    // Phase 61f — images가 있으면 [{type:'text'}, …{type:'image'}] content, 없으면 문자열 그대로(D10)
+    const messages: unknown[] = [{ role: 'user', content: buildClaudeUserContent(userPrompt, opts) }];
 
     // Phase 61b: 서버 도구가 붙은 요청은 stop_reason='pause_turn'으로 끊길 수 있다.
     // 토론에서는 "답이 짧다"로 끝나지만 검증에서는 JSON이 잘린 채 와서 리포트가 통째로 날아간다.

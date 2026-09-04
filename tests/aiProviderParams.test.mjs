@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 const {
   buildClaudeParams, buildGeminiConfig, resolveMaxToolTurns, DEFAULT_MAX_TOOL_TURNS,
+  buildGeminiContent, buildClaudeUserContent, buildOpenAIResponsesInput,
 } = await import('../.test-build/lib/verify/providerParams.js');
 
 const MSGS = [{ role: 'user', content: 'hi' }];
@@ -102,4 +103,55 @@ test('resolveMaxToolTurns — 기본 3, 0 허용, 음수/비수치는 기본값'
   assert.equal(resolveMaxToolTurns({ maxToolTurns: 0 }), 0);
   assert.equal(resolveMaxToolTurns({ maxToolTurns: 5 }), 5);
   assert.equal(resolveMaxToolTurns({ maxToolTurns: -1 }), 3);
+});
+
+/* ═══ Phase 61f — user content 3종 빌더 ═══
+ *
+ * D10이 이 파일의 존재 이유와 같은 원칙이다: **images가 비면 입력 문자열과 `===`.**
+ * proofread·ai-complete·그림 없는 토론·그림 없는 검증이 전부 이 세 스냅샷 뒤에 있다. */
+
+const IMG1 = { mimeType: 'image/jpeg', data: 'QUFB' };
+const IMG2 = { mimeType: 'image/png', data: 'QkJC' };
+
+test('61f Gemini — images 없음/빈 배열이면 입력 문자열 그대로 (===)', () => {
+  assert.equal(buildGeminiContent('U'), 'U');
+  assert.equal(buildGeminiContent('U', {}), 'U');
+  assert.equal(buildGeminiContent('U', { images: [] }), 'U');
+});
+
+test('61f Gemini — 텍스트 먼저, inlineData 뒤 (GAS 순서)', () => {
+  assert.deepEqual(buildGeminiContent('U', { images: [IMG1, IMG2] }), [
+    { text: 'U' },
+    { inlineData: { mimeType: 'image/jpeg', data: 'QUFB' } },
+    { inlineData: { mimeType: 'image/png', data: 'QkJC' } },
+  ]);
+});
+
+test('61f Claude — images 없음이면 문자열 그대로, 있으면 base64 source 블록', () => {
+  assert.equal(buildClaudeUserContent('U'), 'U');
+  assert.equal(buildClaudeUserContent('U', { images: [] }), 'U');
+  assert.deepEqual(buildClaudeUserContent('U', { images: [IMG1] }), [
+    { type: 'text', text: 'U' },
+    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: 'QUFB' } },
+  ]);
+});
+
+test('61f OpenAI Responses — images 없음이면 문자열 그대로, 있으면 input_image + detail 필수', () => {
+  assert.equal(buildOpenAIResponsesInput('U'), 'U');
+  assert.equal(buildOpenAIResponsesInput('U', { images: [] }), 'U');
+  assert.deepEqual(buildOpenAIResponsesInput('U', { images: [IMG1] }), [{
+    role: 'user',
+    content: [
+      { type: 'input_text', text: 'U' },
+      // ⚠ detail은 SDK 6.39에서 **필수 필드**다(`?` 없음) — 빼면 타입 오류
+      { type: 'input_image', image_url: 'data:image/jpeg;base64,QUFB', detail: 'auto' },
+    ],
+  }]);
+});
+
+test('61f 다른 옵션이 있어도 images가 없으면 문자열 그대로 (옵션 간 간섭 없음)', () => {
+  const opts = { geminiJsonMime: true, thinking: 'adaptive', effort: 'high' };
+  assert.equal(buildGeminiContent('U', opts), 'U');
+  assert.equal(buildClaudeUserContent('U', opts), 'U');
+  assert.equal(buildOpenAIResponsesInput('U', opts), 'U');
 });
