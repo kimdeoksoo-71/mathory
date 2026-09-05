@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react';
 /* Phase 63 S0 — DndContext·센서·오버레이·드롭 핸들러는 AppShell로 이관(D21).
    여기 남는 것은 Draggable(카드)·Droppable(칩) 등록뿐이고, id는 dndId 프리픽스(D34),
    data에는 type이 필수다(D23 — 전역 핸들러가 type으로 분기한다). */
-import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
+import { Draggable, Droppable, dndId, useDragKind, DROP_RING, DROP_TINT } from '../ui/dnd';
 import type { User } from 'firebase/auth';
 import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
-import ListView, { ListMode } from './ListView';
+import ListView, {
+  ListMode, ListHeader, toggledSort, defaultListSort, type ListSortState, type ListSortKey,
+} from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -147,6 +149,18 @@ export default function FolderView({
   const isSpecial = isTrash || isUnassigned || isSharedWithMe;
   // Phase 63 D2 — listAllowed 폐지: 휴지통·미지정도 리스트가 기본이다. "전용 메뉴" 사유는
   // ListView mode:'trash'가 흡수했다(미지정 메뉴는 원래 기본 메뉴와 같았다 — A-2).
+  const listMode: ListMode = isTrash ? 'trash' : listContext?.mode ?? 'my';
+
+  // Phase 63 S2(D42) — 리스트 정렬은 FolderView 소유(헤더가 제목바 행 2에 살기 때문).
+  // 폴더가 바뀌면 기본으로 리셋 — 휴지통만 수정일 내림차순(D41 "최근 버린 순").
+  // S4에서 listPrefs(폴더별 저장)로 승격 예정.
+  const [listSort, setListSort] = useState<ListSortState>(() => defaultListSort(listMode));
+  useEffect(() => { setListSort(defaultListSort(listMode)); }, [folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const toggleListSort = (key: ListSortKey) => setListSort((prev) => toggledSort(prev, key));
+
+  // Phase 63 D3 — 드래그 중에는 스냅을 꺼야 dnd-kit 자동 스크롤과 스냅 보정이 싸우지 않는다.
+  // DragKindContext는 드래그 시작·끝에만 바뀐다(F7) — 매 move 리렌더가 아니다.
+  const dragKind = useDragKind();
 
   // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
@@ -414,8 +428,16 @@ export default function FolderView({
             </button>
           )}
         </div>
-        {/* 행 2: 하위 폴더 — 제목행과 함께 U자 밖 아이보리 영역에 위치 (가로 스크롤, 드롭 타깃) */}
-        {childFolders.length > 0 && (
+        {/* 행 2 (Phase 63 D42): 리스트 모드 = 칼럼 헤더 — 스크롤 밖이라 트랙패드 고무줄
+            오버스크롤에도 밀리지 않는다. 하위 폴더 칩은 카드 모드 전용이 됐고,
+            리스트의 하위 폴더 접근은 S3(D11)의 폴더 행이 잇는다. */}
+        {viewMode === 'list' && (
+          <div style={{ display: 'flex', alignItems: 'center', minHeight: 41, boxSizing: 'border-box' }}>
+            <ListHeader mode={listMode} sort={listSort} onToggleSort={toggleListSort} />
+          </div>
+        )}
+        {/* 행 2: 하위 폴더 칩 (카드 모드) — 가로 스크롤, 드롭 타깃 */}
+        {viewMode === 'card' && childFolders.length > 0 && (
           <div style={{
             display: 'flex', flexWrap: 'nowrap', gap: 8,
             padding: '0',
@@ -470,6 +492,11 @@ export default function FolderView({
         flex: 1, minHeight: 0, width: '100%',
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
+        // Phase 63 D3 — 리스트 모드만 행 단위 스냅(proximity — mandatory는 트랙패드 관성을
+        // 붙잡는다). 카드 모드·드래그 중엔 'none'을 **명시**한다(조건부 longhand 함정 방지,
+        // 드래그 중 스냅은 dnd-kit 자동 스크롤과 싸워 떨림을 만든다).
+        scrollSnapType: viewMode === 'list' && !dragKind ? 'y proximity' : 'none',
+        scrollPaddingTop: 8,
       }}>
         {/* 개선묶음 M2 E — 카드보기의 열수 제한을 푼다.
             2열 제한의 진범은 grid가 아니라 이 래퍼의 maxWidth:1200이었다
@@ -495,7 +522,8 @@ export default function FolderView({
           <ListView
             problems={folderProblems}
             scopeKey={folder.id}
-            mode={isTrash ? 'trash' : listContext?.mode ?? 'my'}
+            mode={listMode}
+            sort={listSort}
             recipientUid={listContext?.recipientUid}
             profiles={listContext?.profiles}
             onView={onView}

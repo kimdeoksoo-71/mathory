@@ -18,6 +18,8 @@ interface ListViewProps {
   problems: Problem[];
   scopeKey: string;
   mode: ListMode;
+  /** Phase 63 S2 — 정렬은 FolderView 소유(헤더가 스크롤 밖 행 2에 살기 때문) */
+  sort: ListSortState;
   /** sent 모드: 이 뷰가 묶인 수신자 uid (권한 변경·공유 중단 대상) */
   recipientUid?: string;
   /** received 모드: 소유자 프로필 (uid → profile) */
@@ -27,8 +29,23 @@ interface ListViewProps {
   onChanged: () => void;
 }
 
-type SortKey = 'title' | 'updated';
-interface SortState { key: SortKey; dir: 'asc' | 'desc'; }
+/* Phase 63 S2(D42) — 리스트 정렬 상태는 FolderView가 든다: 칼럼 헤더(ListHeader)가
+   제목바 행 2(스크롤 밖)로 올라가 헤더와 본문이 다른 부모가 됐기 때문이다.
+   토글 규칙은 toggledSort 하나가 소유한다(사본 금지). S4에서 listPrefs로 승격 예정. */
+export type ListSortKey = 'title' | 'updated';
+export interface ListSortState { key: ListSortKey; dir: 'asc' | 'desc'; }
+
+export function toggledSort(prev: ListSortState, key: ListSortKey): ListSortState {
+  return prev.key === key
+    ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: key === 'title' ? 'asc' : 'desc' };
+}
+
+/** 폴더 진입 시 기본 정렬 — 휴지통만 수정일 내림차순(D41: 이동은 updated_at을 안 찍고
+ *  moveToTrash만 찍으므로(Q14) 휴지통에서 updated_at은 사실상 "버린 시각"이다 — 최근 버린 순). */
+export function defaultListSort(mode: ListMode): ListSortState {
+  return mode === 'trash' ? { key: 'updated', dir: 'desc' } : { key: 'title', dir: 'asc' };
+}
 
 function fmtDate(d?: Date): string {
   if (!d) return '';
@@ -70,13 +87,9 @@ function UpdatedCell({ d }: { d?: Date }) {
 }
 
 export default function ListView({
-  problems, scopeKey, mode, recipientUid, profiles, onView, onProblemAction, onChanged,
+  problems, scopeKey, mode, sort, recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
-  // 정렬 개선(2026-09-04): 기본 = 제목 오름차순. "수정하면 맨 위로 튀는" 자동 정렬을 없앴다 —
-  // 최근 수정 신호는 UpdatedCell(구름+체크 + 상대 시각)이 자리 이동 없이 낸다.
-  // 헤더 클릭으로 수정일 정렬을 고르는 것은 그대로 된다(자동이 아니라 수동이므로).
-  const [sort, setSort] = useState<SortState>({ key: 'title', dir: 'asc' });
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -86,12 +99,6 @@ export default function ListView({
     if (sort.key === 'title') return mul * (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });
     return mul * ((a.updated_at?.getTime() || 0) - (b.updated_at?.getTime() || 0));
   });
-
-  const toggleSort = (key: SortKey) => {
-    setSort((prev) => prev.key === key
-      ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-      : { key, dir: key === 'title' ? 'asc' : 'desc' });
-  };
 
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
     if (mode === 'trash') return [
@@ -139,33 +146,12 @@ export default function ListView({
   const showPerm = mode === 'sent';
 
   return (
-    /* Phase 62 D8 — 좌우 인셋 0. 행 폭 = 1136px = 제목바·하위폴더 행과 같은 컨테이너 폭이라
-       문항 제목이 폴더 제목과 세로로 정렬된다. 상단 8px은 아래 sticky 래퍼가 갖는다. */
-    <div style={{ padding: '0 0 32px', fontFamily: 'var(--font-ui)' }}>
-      {/* 제목행 — sticky (Phase 62 D7).
-          ⚠ 래퍼가 필요하다: 루트 상단 패딩을 제목행 '바깥'에 두면 스크롤된 행이 그 띠를 통과하며 보인다.
-             래퍼가 아이보리를 칠해 위 8px과 라운드 모서리 바깥까지 덮는다.
-          ⚠ 배경색은 --bg-hover가 아니라 --block-bg다 — --bg-hover(0.8349)는 클레이(0.8674)보다
-             오히려 어둡고 hover 전용 토큰이라 의미가 꼬인다. 휘도 순서는
-             아이보리 0.9829 > 행(클레이) 0.8674 > 제목행 0.8276 > hover 0.7439로 단조롭다. */}
-      <div style={{
-        position: 'sticky', top: 0, zIndex: 2,
-        background: 'var(--bg-functional)',
-        padding: '8px 0 4px',
-      }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px',
-        fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
-        background: 'var(--block-bg)', borderRadius: 8,
-      }}>
-        <HeaderCell label="제목" active={sort.key === 'title'} dir={sort.dir} onClick={() => toggleSort('title')} style={{ flex: 1, minWidth: 0 }} />
-        {showOwner && <div style={{ width: 120, flexShrink: 0 }}>소유자</div>}
-        {showPerm && <div style={{ width: 64, flexShrink: 0 }}>권한</div>}
-        <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => toggleSort('updated')} style={{ width: 86, flexShrink: 0 }} />
-        <div style={{ width: 28, flexShrink: 0 }} />
-      </div>
-      </div>
-
+    /* Phase 62 D8 — 좌우 인셋 0. 행 폭 = 1136px = 제목바와 같은 컨테이너 폭이라 문항 제목이
+       폴더 제목과 세로로 정렬된다.
+       Phase 63 S2(D42) — 칼럼 헤더는 제목바 행 2(ListHeader, 스크롤 밖)로 올라갔다.
+       sticky 래퍼는 철거 — 행이 헤더 위로 비칠 통로 자체가 없다(스크롤 영역 상단이 곧 클립선).
+       상단 8px은 헤더 카드와 첫 행 사이 간격이며 스크롤 영역 안쪽 몫이다(scrollPaddingTop 8과 짝). */
+    <div style={{ padding: '8px 0 32px', fontFamily: 'var(--font-ui)' }}>
       {/* 행 */}
       {sorted.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
@@ -193,6 +179,7 @@ export default function ListView({
               background: 'var(--card-surface, var(--bg-content))',
               border: '0.5px solid var(--border-content)',
               borderRadius: 8, marginBottom: 4,
+              scrollSnapAlign: 'start', // Phase 63 D3 — 행 단위 스냅(컨테이너는 FolderView 소유)
               cursor: 'pointer',
               opacity: busyId === p.id ? 0.5 : 1,
               transition: 'background .15s, box-shadow .15s',
@@ -293,6 +280,35 @@ const badgeStyle: React.CSSProperties = {
   display: 'inline-flex', alignItems: 'center', gap: 2,
   fontSize: 11, color: 'var(--text-muted)', lineHeight: 1, flexShrink: 0,
 };
+
+/* ═══ Phase 63 S2(D42) — 칼럼 헤더 카드 ═══
+   FolderView 제목바 행 2(리스트 모드)에서 렌더된다 — 스크롤 밖이라 트랙패드 고무줄
+   오버스크롤에도 밀리지 않는다. 시각은 Phase 62 D7 그대로(--block-bg · radius 8 · 6/14).
+   ⚠ 헤더가 본문과 다른 부모이므로 열 폭 상수(120·64·86·28)는 행 쪽과 사본이다(A-8) —
+   S4의 칼럼 레지스트리 + 트랙 동기화(D43)가 이 사본을 없앤다. */
+export function ListHeader({ mode, sort, onToggleSort }: {
+  mode: ListMode;
+  sort: ListSortState;
+  onToggleSort: (key: ListSortKey) => void;
+}) {
+  const showOwner = mode === 'received';
+  const showPerm = mode === 'sent';
+  return (
+    <div style={{
+      flex: 1, minWidth: 0,
+      display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px',
+      fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
+      background: 'var(--block-bg)', borderRadius: 8,
+      fontFamily: 'var(--font-ui)',
+    }}>
+      <HeaderCell label="제목" active={sort.key === 'title'} dir={sort.dir} onClick={() => onToggleSort('title')} style={{ flex: 1, minWidth: 0 }} />
+      {showOwner && <div style={{ width: 120, flexShrink: 0 }}>소유자</div>}
+      {showPerm && <div style={{ width: 64, flexShrink: 0 }}>권한</div>}
+      <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => onToggleSort('updated')} style={{ width: 86, flexShrink: 0 }} />
+      <div style={{ width: 28, flexShrink: 0 }} />
+    </div>
+  );
+}
 
 function HeaderCell({
   label, active, dir, onClick, style,
