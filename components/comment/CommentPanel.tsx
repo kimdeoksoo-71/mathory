@@ -937,7 +937,7 @@ export default function CommentPanel({
           display: 'flex', alignItems: 'center', gap: 6,
         }}>
           {isCommentsMode && <IconComment size={16} />}
-          {isCommentsMode ? '댓글' : 'AI agent'}
+          {isCommentsMode ? '댓글' : 'Agent'}
         </div>
         <div style={{ flex: 1 }} />
         {isAISession && sessionCostUsd > 0 && (
