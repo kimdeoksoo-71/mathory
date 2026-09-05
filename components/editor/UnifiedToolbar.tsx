@@ -13,33 +13,14 @@ import { MathSnippet } from '../../types/snippet';
 import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader } from '../ui/Icons';
+import { ICON_SIZE, SVG_PROPS, CORNER_BRACKETS } from './toolbarIcons';
 import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from './EmojiPickerPanel';
 
 // ═══════════════════════════════════════════════
 // SVG 아이콘 (viewBox 64×64, stroke=currentColor)
+// 규격(SVG_PROPS·CORNER_BRACKETS)은 toolbarIcons.tsx가 소유한다 —
+// MathSymbolPalette의 SigmaIcon과 공유(M3 D12, 순환 import 회피)
 // ═══════════════════════════════════════════════
-
-const ICON_SIZE = 22;
-const SVG_PROPS = {
-  width: ICON_SIZE,
-  height: ICON_SIZE,
-  viewBox: '0 0 64 64',
-  fill: 'none' as const,
-  stroke: 'currentColor',
-  strokeWidth: 3.5,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  'aria-hidden': true,
-};
-
-const CORNER_BRACKETS = (
-  <>
-    <path d="M8 20 L8 8 L20 8" />
-    <path d="M44 8 L56 8 L56 20" />
-    <path d="M56 44 L56 56 L44 56" />
-    <path d="M20 56 L8 56 L8 44" />
-  </>
-);
 
 function InlineMathIcon() {
   return (
@@ -848,14 +829,6 @@ export default function UnifiedToolbar({
         </IconButton>
       ),
     },
-    {
-      key: 'ocr',
-      node: (
-        <IconButton title="수식 읽기" onClick={onOcrClick} disabled={ocrLoading}>
-          {ocrLoading ? <IconLoader size={14} /> : <OcrIcon />}
-        </IconButton>
-      ),
-    },
     { key: 'd1', node: divider('d1') },
     {
       key: 'proofread',
@@ -926,6 +899,13 @@ export default function UnifiedToolbar({
             </IconButton>
             <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
               <BlockMathIcon />
+            </IconButton>
+            {/* M3 A3 — 표 삽입 뒤에 있던 OCR을 컨텍스트 영역으로. 커서가 수식 안이면
+                인라인·블록 수식과 함께 사라지고 팔레트가 그 자리에 온다(덕수 메모 그대로).
+                수식 안에서 OCR 접근 불가는 수용된 사양(D5). ocrLoading 중 스왑돼도
+                진행은 계속된다 — 결과 삽입은 커서 위치 기준. */}
+            <IconButton title="수식 읽기" onClick={onOcrClick} disabled={ocrLoading}>
+              {ocrLoading ? <IconLoader size={14} /> : <OcrIcon />}
             </IconButton>
           </>
         )}

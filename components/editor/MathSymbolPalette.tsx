@@ -9,7 +9,7 @@
  */
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { renderKatexCached } from '../../lib/katex-render';
+import { SigmaIcon } from './toolbarIcons';
 import { CURATED_SYMBOLS, ALL_SYMBOLS, DEFAULT_CATEGORIES } from '../../lib/math-symbols';
 import useToolbarConfig from '../../hooks/useToolbarConfig';
 import SymbolSettingsModal from './settings/SymbolSettingsModal';
@@ -107,21 +107,27 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
 
   return (
     <div ref={rootRef} style={{ position: 'relative' }}>
+      {/* M3 A4 — 트리거 재디자인(D2·D3): KaTeX \sum(세리프·획 대비) → SigmaIcon(균일 획),
+          하드코딩 파랑(#f0f3fb/#e0e7ff/#ccc) → --accent-primary 틴트(옅게, open 한 단 진하게).
+          외곽선 1.2px = 2행 브라켓의 시각 두께 · height 32 = 이웃 ICON_BTN_BASE 정렬. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="수식 기호 팔레트"
         style={{
-          display: 'flex', alignItems: 'center', gap: 4,
-          height: 28, padding: '0 10px',
-          fontSize: 13, fontFamily: 'var(--font-mono)',
-          background: open ? '#e0e7ff' : '#f0f3fb',
-          border: '1px solid #ccc', borderRadius: 4,
+          display: 'flex', alignItems: 'center', gap: 3,
+          height: 32, padding: '0 7px',
+          color: 'var(--accent-primary)',
+          background: open
+            ? 'color-mix(in srgb, var(--accent-primary) 16%, transparent)'
+            : 'color-mix(in srgb, var(--accent-primary) 9%, transparent)',
+          border: '1.2px solid color-mix(in srgb, var(--accent-primary) 50%, transparent)',
+          borderRadius: 6,
           cursor: 'pointer', whiteSpace: 'nowrap',
         }}
       >
-        <span dangerouslySetInnerHTML={{ __html: renderKatexCached('\\sum') }} />
-        <span style={{ fontSize: 9, opacity: 0.5 }}>▼</span>
+        <SigmaIcon />
+        <span style={{ fontSize: 9, opacity: 0.6 }}>▼</span>
       </button>
 
       {open && (
