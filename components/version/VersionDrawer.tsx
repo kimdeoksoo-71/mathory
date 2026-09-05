@@ -6,7 +6,7 @@ import { useVersionHistory } from '../../hooks/useVersionHistory';
 import { loadContent, resolveLivingParent } from '../../lib/version/read';
 import { diffContent } from '../../lib/version/diff';
 import { setVersionName, setVersionPinned, setVersionExport } from '../../lib/version/meta';
-import { IconTag, IconPin, IconRename, IconClose, IconGithub } from '../ui/Icons';
+import { IconTag, IconPin, IconRename, IconClose, IconGithub, IconRestore } from '../ui/Icons';
 import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
@@ -313,7 +313,12 @@ export default function VersionDrawer({
         borderBottom: '1px solid var(--border-light, #eee)',
         flexShrink: 0,
       }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          {/* 검수 12차 — 댓글 드로어와 같은 방식: 제목 왼쪽에 해당 기능 아이콘 16 */}
+          <IconRestore size={16} />
           버전 기록
         </div>
         <div style={{ flex: 1 }} />
