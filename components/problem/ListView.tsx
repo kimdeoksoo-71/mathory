@@ -1,6 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+/**
+ * Phase 62 D6~D8 — 행 = 가로로 긴 클레이 카드, 행 폭 = 제목바 컨테이너 폭(1136).
+ * Phase 63 S2(D42) — 칼럼 헤더(ListHeader)는 제목바 행 2(스크롤 밖)에서 렌더된다.
+ * Phase 63 S4(D5) — 본문은 grid + subgrid 행: 열 폭의 진실은 본문 grid 루트 하나이고
+ *   헤더는 실측 템플릿(D43, FolderView가 getComputedStyle로 읽어 내림)을 받는다.
+ *   좌우 인셋 14 = 가장자리 2px 스페이서 트랙 + columnGap 12 (subgrid에 컨테이너 패딩을
+ *   주면 첫·끝 트랙이 부모와 어긋난다 — buildGridTemplate 주석 참조).
+ */
+
+import { useRef, useState } from 'react';
 import { Problem, Folder, UserProfile, MemberRole } from '../../types/problem';
 import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
@@ -11,6 +20,11 @@ import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
+import {
+  type ListPrefs, LIST_COLUMNS, MIN_COL_WIDTH,
+  columnLabel, visibleColumns, buildGridTemplate,
+  movedOrder, verifyRank, blockchainRank,
+} from '../../lib/listColumns';
 
 /* Phase 63 D2 — 'trash' 추가: 휴지통도 리스트가 기본이 되면서 전용 메뉴(복원·영구 삭제)를
    ListView가 흡수했다(카드 메뉴 FolderView cardMenuItems의 isTrash 갈래와 동일 구성). */
@@ -28,8 +42,10 @@ interface ListViewProps {
   problems: Problem[];
   scopeKey: string;
   mode: ListMode;
-  /** Phase 63 S2 — 정렬은 FolderView 소유(헤더가 스크롤 밖 행 2에 살기 때문) */
-  sort: ListSortState;
+  /** Phase 63 S4(D9) — 칼럼·정렬 prefs. FolderView 소유(useListPrefs — 폴더별 저장) */
+  prefs: ListPrefs;
+  /** Phase 63 D43 — 본문 grid 루트 ref. FolderView가 실측해 헤더 템플릿으로 쓴다 */
+  bodyGridRef?: React.Ref<HTMLDivElement>;
   /** Phase 63 D11 — 문항 행 위에 그릴 하위 폴더 행(일반 폴더 리스트 전용) */
   folderRows?: FolderRowData[];
   onSelectFolder?: (f: Folder) => void;
@@ -42,24 +58,6 @@ interface ListViewProps {
   onView: (p: Problem) => void;
   onProblemAction: (action: string, p: Problem) => void;
   onChanged: () => void;
-}
-
-/* Phase 63 S2(D42) — 리스트 정렬 상태는 FolderView가 든다: 칼럼 헤더(ListHeader)가
-   제목바 행 2(스크롤 밖)로 올라가 헤더와 본문이 다른 부모가 됐기 때문이다.
-   토글 규칙은 toggledSort 하나가 소유한다(사본 금지). S4에서 listPrefs로 승격 예정. */
-export type ListSortKey = 'title' | 'updated';
-export interface ListSortState { key: ListSortKey; dir: 'asc' | 'desc'; }
-
-export function toggledSort(prev: ListSortState, key: ListSortKey): ListSortState {
-  return prev.key === key
-    ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' }
-    : { key, dir: key === 'title' ? 'asc' : 'desc' };
-}
-
-/** 폴더 진입 시 기본 정렬 — 휴지통만 수정일 내림차순(D41: 이동은 updated_at을 안 찍고
- *  moveToTrash만 찍으므로(Q14) 휴지통에서 updated_at은 사실상 "버린 시각"이다 — 최근 버린 순). */
-export function defaultListSort(mode: ListMode): ListSortState {
-  return mode === 'trash' ? { key: 'updated', dir: 'desc' } : { key: 'title', dir: 'asc' };
 }
 
 function fmtDate(d?: Date): string {
@@ -82,17 +80,16 @@ function recentLabel(d?: Date): string | null {
 }
 
 /** 수정일 칸 — 최근 24시간 안에 저장된 문항은 날짜 대신 저장 아이콘(구름+체크) + 상대 시각.
- *  정렬 기본값이 수정일 내림차순 → 제목 오름차순으로 바뀌면서(정렬 개선 메모 2-1) "방금 만진
- *  문항이 맨 위"라는 신호가 사라졌다 — 그 신호를 자리 이동 없이 이 칸이 대신 낸다.
- *  ⚠ 아이콘 색은 상태 표시기 3:1 규약(Phase 59 G1)에 맞는 --mathory-red-dark. 텍스트는 본문색. */
+ *  ⚠ 아이콘 색은 상태 표시기 3:1 규약(Phase 59 G1)에 맞는 --mathory-red-dark. 텍스트는 본문색.
+ *  Phase 63 S4 — 고정 폭 86 삭제: 폭은 grid 트랙(max-content)이 소유한다(A-8 사본 해소). */
 function UpdatedCell({ d }: { d?: Date }) {
   const recent = recentLabel(d);
   if (!recent) {
-    return <div style={{ width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(d)}</div>;
+    return <div style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{fmtDate(d)}</div>;
   }
   return (
     <div style={{
-      width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-primary)',
+      fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap',
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
       <IconSave size={13} color="var(--mathory-red-dark, #BC5F3F)" />
@@ -102,25 +99,56 @@ function UpdatedCell({ d }: { d?: Date }) {
 }
 
 export default function ListView({
-  problems, scopeKey, mode, sort, folderRows = [], onSelectFolder, dragUid = null,
+  problems, scopeKey, mode, prefs, bodyGridRef, folderRows = [], onSelectFolder, dragUid = null,
   recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const sort = prefs.sort;
+  const visible = visibleColumns(prefs, mode);
+  const template = buildGridTemplate(visible, prefs.widths);
+  // 트랙 번호: 1 = 좌 스페이서, 2+i = visible[i], len+2 = ⋮/설정, len+3 = 우 스페이서
+  const trackOf = (id: string) => 2 + visible.indexOf(id);
+
+  /** 서열 칼럼의 정렬 값(D4 — 규칙은 listColumns, 필드 접근은 여기) */
+  const rankOf = (p: Problem, key: string): number => {
+    switch (key) {
+      case 'blockchain': {
+        const latest = p.blockchain?.latest;
+        const hasTx = !!latest?.txHash;
+        const modified = hasTx && !!p.copyright?.contentHash && p.copyright.contentHash !== latest!.contentHash;
+        return blockchainRank(hasTx, modified);
+      }
+      case 'verify_problem': return verifyRank(p.verification?.problem?.verdict, p.verification?.problem?.stale);
+      case 'verify_solution': return verifyRank(p.verification?.solution?.verdict, p.verification?.solution?.stale);
+      case 'agent': return agentCounts[p.id] ?? 0;
+      case 'comments': return commentCounts[p.id] ?? 0;
+      default: return 0;
+    }
+  };
+
+  const byTitle = (a: Problem, b: Problem) =>
+    // numeric — "문제2"가 "문제10" 앞에 오게 (GAS 파일명 정렬과 같은 옵션)
+    (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });
+
   const sorted = [...problems].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
-    // numeric — "문제2"가 "문제10" 앞에 오게 (GAS 파일명 정렬과 같은 옵션)
-    if (sort.key === 'title') return mul * (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });
-    return mul * ((a.updated_at?.getTime() || 0) - (b.updated_at?.getTime() || 0));
+    let v: number;
+    if (sort.key === 'title') v = byTitle(a, b);
+    else if (sort.key === 'updated') v = (a.updated_at?.getTime() || 0) - (b.updated_at?.getTime() || 0);
+    else v = rankOf(a, sort.key) - rankOf(b, sort.key);
+    // D10 — 동률은 제목 오름차순 tie-break(서열 칼럼이 사실상 무순서가 되는 것 방지)
+    return mul * v || byTitle(a, b);
   });
 
-  // Phase 63 D14 — 폴더 정렬은 폴더끼리만(문항과 섞이지 않는다). 같은 키·방향에 반응.
+  // Phase 63 D14 — 폴더 정렬은 폴더끼리만(문항과 섞이지 않는다). title·updated에만 반응.
   const sortedFolders = [...folderRows].sort((a, b) => {
     const mul = sort.dir === 'asc' ? 1 : -1;
-    if (sort.key === 'title') return mul * a.folder.name.localeCompare(b.folder.name, 'ko', { numeric: true, sensitivity: 'base' });
-    return mul * ((a.updated?.getTime() || 0) - (b.updated?.getTime() || 0));
+    if (sort.key === 'updated') return mul * ((a.updated?.getTime() || 0) - (b.updated?.getTime() || 0));
+    const v = a.folder.name.localeCompare(b.folder.name, 'ko', { numeric: true, sensitivity: 'base' });
+    return sort.key === 'title' ? mul * v : v; // 그 외 키면 이름순(order 대신 — 이름이 곧 안정 기준)
   });
 
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
@@ -165,24 +193,112 @@ export default function ListView({
     finally { setBusyId(null); }
   };
 
-  const showOwner = mode === 'received';
-  const showPerm = mode === 'sent';
+  /** 문항 행의 칼럼별 셀 내용. 값이 없으면 빈 셀(배지 컴포넌트가 null 반환) */
+  const cellFor = (id: string, p: Problem) => {
+    switch (id) {
+      case 'title':
+        return (
+          <span style={{
+            fontSize: 13.5, color: 'var(--text-primary)', fontWeight: 500,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block',
+          }}>
+            {p.title || '(제목 없음)'}
+          </span>
+        );
+      case 'blockchain':
+        return <BlockchainBadge problem={p} size={12} />;
+      case 'verify_problem':
+        return <VerifyBadge problem={p} kinds={['problem']} size={11} />;
+      case 'verify_solution':
+        return <VerifyBadge problem={p} kinds={['solution']} size={11} />;
+      case 'agent': {
+        const ac = agentCounts[p.id] ?? 0;
+        return ac > 0 ? (
+          <span title="AI agent 대화" style={badgeStyle}>
+            <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
+            <span style={{ marginLeft: 1 }}>{ac}</span>
+          </span>
+        ) : null;
+      }
+      case 'comments': {
+        const cc = commentCounts[p.id] ?? 0;
+        return cc > 0 ? (
+          <span title="미해결 댓글" style={badgeStyle}><IconComment size={12} /><span style={{ marginLeft: 1 }}>{cc}</span></span>
+        ) : null;
+      }
+      case 'owner': {
+        const owner = profiles?.[p.authorUid || ''];
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+            <Avatar photoURL={owner?.photoURL} name={owner?.nickname || owner?.displayName || '?'} size={20} />
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {owner?.nickname || owner?.displayName || '사용자'}
+            </span>
+          </div>
+        );
+      }
+      case 'perm': {
+        const role = recipientUid ? p.members?.[recipientUid] : undefined;
+        return (
+          <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+            {role ? (
+              <select
+                value={role}
+                disabled={busyId === p.id}
+                onChange={(e) => handleRoleChange(p, e.target.value as MemberRole)}
+                style={{
+                  width: '100%', padding: '2px 4px', fontSize: 11,
+                  border: '1px solid var(--border-light, #ddd)', borderRadius: 5,
+                  background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)',
+                }}
+              >
+                <option value="commenter">댓글</option>
+                <option value="viewer">보기</option>
+              </select>
+            ) : (
+              <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>—</span>
+            )}
+          </div>
+        );
+      }
+      case 'updated':
+        return <UpdatedCell d={p.updated_at} />;
+      default:
+        return null;
+    }
+  };
 
   return (
-    /* Phase 62 D8 — 좌우 인셋 0. 행 폭 = 1136px = 제목바와 같은 컨테이너 폭이라 문항 제목이
-       폴더 제목과 세로로 정렬된다.
-       Phase 63 S2(D42) — 칼럼 헤더는 제목바 행 2(ListHeader, 스크롤 밖)로 올라갔다.
-       paddingBottom 72 = 정렬 슬랙: 맨 아래에서 위로 당겨 정렬할 때(최대 한 행 피치 ≈ 44px)
-       마지막 행이 바닥에 잘리지 않을 여유 — 한 행 피치보다 커야 한다. */
-    <div style={{ padding: '0 0 72px', fontFamily: 'var(--font-ui)' }}>
+    <div
+      ref={bodyGridRef}
+      style={{
+        display: 'grid',
+        gridTemplateColumns: template,
+        columnGap: 12,
+        padding: '0 0 72px', // 하단 72 = 바닥 정렬 슬랙(한 행 피치 이상 — FolderView 정렬 주석 참조)
+        fontFamily: 'var(--font-ui)',
+      }}
+    >
       {/* 상단 8px 아이보리 마스크(sticky) — 행 간격(4px)보다 넓은 정렬 여백(8px) 틈으로
-          이전 행 꼬리가 비치는 것을 가린다(T3 검수 3회차: 정렬 후에도 윗행 끝이 잘려 보임).
-          Phase 62 D7 래퍼의 "위 8px 덮기"를 헤더 없이 띠만 되살린 것. 흐름 높이 8이
-          paddingTop 8을 대체하므로 첫 행 위치·JS 정렬 목표선(SNAP_TOP_GAP 8)은 불변이다. */}
-      <div aria-hidden style={{ position: 'sticky', top: 0, height: 8, background: 'var(--bg-functional)', zIndex: 1 }} />
-      {/* ═══ 폴더 행 (Phase 63 D11~D13) — 문항 행 위. 테두리·클레이 없음(아이보리 바탕 =
-          "문항 밖"), 클릭 = 진입, 펼치기 없음. hover 이름 밑줄은 globals.css `.list-folder-row`.
-          드롭 타깃(D25)이며 [data-snap-row]로 스냅 정렬에도 낀다(D15′). */}
+          이전 행 꼬리가 비치는 것을 가린다(Phase 62 D7 래퍼의 "위 8px 덮기"를 띠만 되살림).
+          흐름 높이 8이 첫 행 위치·JS 정렬 목표선(SNAP_TOP_GAP 8)을 공급한다. */}
+      <div aria-hidden style={{ gridColumn: '1 / -1', position: 'sticky', top: 0, height: 8, background: 'var(--bg-functional)', zIndex: 1 }} />
+
+      {/* 유령 라벨 행(D5) — 자동폭(max-content) 트랙이 "헤더 라벨 폭"까지 포함하게 한다.
+          헤더는 별도 grid(실측 템플릿 소비자)라, 이 장치가 없으면 본문 트랙이 라벨보다
+          좁게 실측돼 헤더 라벨이 잘린다. 높이 0·불가시 — 화면·스냅·간격에 영향 없음.
+          ' ▲'는 정렬 화살표 자리 몫. 사용자 지정 px 트랙에는 영향 없다(고정 트랙이 이긴다). */}
+      <div aria-hidden style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12, height: 0, overflow: 'hidden', visibility: 'hidden' }}>
+        {visible.map((id, i) => (id === 'title' ? null : (
+          <span key={id} style={{ gridColumn: 2 + i, fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'var(--font-ui)' }}>
+            {columnLabel(id)} ▲
+          </span>
+        )))}
+      </div>
+
+      {/* ═══ 폴더 행 (Phase 63 D11~D13) — 문항 행 위. 테두리·클레이 없음(아이보리 = "문항 밖"),
+          클릭 = 진입, hover 이름 밑줄은 globals.css `.list-folder-row`. 드롭 타깃(D25) +
+          [data-snap-row] 스냅 참여(D15′). 셀은 제목·수정일 두 트랙에만 명시 배치(D12). */}
       {sortedFolders.map(({ folder: f, count, updated }) => (
         <Droppable key={f.id} id={dndId.folderRow(f.id)} data={{ type: 'folder', folder: f }}>
           {({ setNodeRef, isOver }) => (
@@ -192,13 +308,14 @@ export default function ListView({
               data-snap-row=""
               onClick={() => onSelectFolder?.(f)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
-                borderRadius: 8, marginBottom: 4, cursor: 'pointer',
+                gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12,
+                alignItems: 'center',
+                padding: '9px 0', borderRadius: 8, marginBottom: 4, cursor: 'pointer',
                 background: isOver ? DROP_TINT : 'transparent',
                 boxShadow: isOver ? DROP_RING : 'none',
               }}
             >
-              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ gridColumn: trackOf('title'), minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
                   {f.icon ? <TwemojiImg emoji={f.icon} label={f.name} size={16} /> : <IconFolder size={16} />}
                 </span>
@@ -210,10 +327,9 @@ export default function ListView({
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>({count})</span>
               </div>
-              {mode === 'received' && <div style={{ width: 120, flexShrink: 0 }} />}
-              {mode === 'sent' && <div style={{ width: 64, flexShrink: 0 }} />}
-              <div style={{ width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(updated)}</div>
-              <div style={{ width: 28, flexShrink: 0 }} />
+              <div style={{ gridColumn: trackOf('updated'), fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                {fmtDate(updated)}
+              </div>
             </div>
           )}
         </Droppable>
@@ -221,24 +337,19 @@ export default function ListView({
 
       {/* 행 */}
       {sorted.length === 0 && sortedFolders.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+        <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
           {/* D2 — 카드 빈 상태(FolderView)와 같은 문구 체계 */}
           {mode === 'trash' ? '휴지통이 비어 있습니다.'
             : mode === 'received' ? '공유 받은 문항이 없습니다.'
             : mode === 'sent' ? '문항이 없습니다.'
             : '이 폴더에 문항이 없습니다.'}
         </div>
-      ) : sorted.map((p) => {
-        const owner = profiles?.[p.authorUid || ''];
-        const role = recipientUid ? p.members?.[recipientUid] : undefined;
-        const cc = commentCounts[p.id] ?? 0;
-        const ac = agentCounts[p.id] ?? 0;
+      ) : sorted.map((p, i) => {
         return (
-          /* Phase 62 D6 — 행 = 가로로 긴 클레이 카드. 세로 두께는 현행 유지(라운드 때문에 좌우만 +4).
-             hover는 globals.css `.folder-row:hover`가 담당한다(인라인 핸들러 제거).
-             ⚠ `problem-card` 클래스를 붙이지 말 것 — Phase 59a Q5 예외(content:none)가 딸려온다.
-             Phase 63 D24 — 행 = 드래그 소스(내 소유·비공유 뷰만). 클릭이 1차 동작이라
-             커서는 pointer 유지, 드래그는 PointerSensor distance 8 뒤에만 시작된다. */
+          /* Phase 62 D6 — 행 = 가로로 긴 클레이 카드. hover는 globals.css `.folder-row:hover`.
+             ⚠ `problem-card` 클래스 금지 — Phase 59a Q5 예외(content:none)가 딸려온다.
+             Phase 63 D24 — 드래그 소스(내 소유·비공유 뷰). 클릭 우선이라 커서 pointer 유지.
+             Phase 63 D33 — zebra는 렌더 인덱스 홀짝(폴더 행·마스크는 세지 않는다). */
           <Draggable
             key={p.id}
             id={dndId.problemRow(p.id)}
@@ -253,11 +364,13 @@ export default function ListView({
             ref={setNodeRef}
             {...attributes}
             {...pointerListeners}
-            className="folder-row"
+            className={`folder-row${i % 2 === 1 ? ' is-alt' : ''}`}
             data-snap-row=""
             onClick={() => onView(p)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
+              gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12,
+              alignItems: 'center',
+              padding: '9px 0',
               background: 'var(--card-surface, var(--bg-content))',
               border: '0.5px solid var(--border-content)',
               borderRadius: 8, marginBottom: 4,
@@ -266,64 +379,14 @@ export default function ListView({
               transition: 'background .15s, box-shadow .15s',
             }}
           >
-            {/* 제목 + 배지 */}
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
-                fontSize: 13.5, color: 'var(--text-primary)', fontWeight: 500,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
-              }}>
-                {p.title || '(제목 없음)'}
-              </span>
-              {cc > 0 && (
-                <span title="미해결 댓글" style={badgeStyle}><IconComment size={12} /><span style={{ marginLeft: 1 }}>{cc}</span></span>
-              )}
-              {ac > 0 && (
-                <span title="AI agent 대화" style={badgeStyle}>
-                  <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
-                  <span style={{ marginLeft: 1 }}>{ac}</span>
-                </span>
-              )}
-              <VerifyBadge problem={p} size={11} />
-              <BlockchainBadge problem={p} size={12} />
-            </div>
-
-            {/* 소유자 (received) */}
-            {showOwner && (
-              <div style={{ width: 120, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                <Avatar photoURL={owner?.photoURL} name={owner?.nickname || owner?.displayName || '?'} size={20} />
-                <span style={{ fontSize: 12, color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {owner?.nickname || owner?.displayName || '사용자'}
-                </span>
+            {visible.map((id) => (
+              /* overflow hidden — 사용자가 트랙을 좁혔을 때 셀 내용이 옆 칸으로 넘치지 않게 */
+              <div key={id} style={{ gridColumn: trackOf(id), minWidth: 0, overflow: 'hidden' }}>
+                {cellFor(id, p)}
               </div>
-            )}
+            ))}
 
-            {/* 권한 (sent: 사람별 변경) */}
-            {showPerm && (
-              <div style={{ width: 64, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
-                {role ? (
-                  <select
-                    value={role}
-                    disabled={busyId === p.id}
-                    onChange={(e) => handleRoleChange(p, e.target.value as MemberRole)}
-                    style={{
-                      width: '100%', padding: '2px 4px', fontSize: 11,
-                      border: '1px solid var(--border-light, #ddd)', borderRadius: 5,
-                      background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)',
-                    }}
-                  >
-                    <option value="commenter">댓글</option>
-                    <option value="viewer">보기</option>
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>—</span>
-                )}
-              </div>
-            )}
-
-            {/* 수정일 — 최근 24시간은 저장 아이콘 + 상대 시각 (정렬 개선 2-1-③) */}
-            <UpdatedCell d={p.updated_at} />
-
-            {/* 액션 */}
+            {/* 액션 — ⋮ 트랙 */}
             <button
               onPointerDown={(e) => e.stopPropagation()}
               onClick={(e) => {
@@ -333,7 +396,8 @@ export default function ListView({
               }}
               title="더보기"
               style={{
-                width: 28, flexShrink: 0, border: 'none', background: 'transparent',
+                gridColumn: visible.length + 2,
+                border: 'none', background: 'transparent',
                 cursor: 'pointer', color: 'var(--text-muted)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', padding: 0,
               }}
@@ -365,49 +429,188 @@ const badgeStyle: React.CSSProperties = {
   fontSize: 11, color: 'var(--text-muted)', lineHeight: 1, flexShrink: 0,
 };
 
-/* ═══ Phase 63 S2(D42) — 칼럼 헤더 카드 ═══
-   FolderView 제목바 행 2(리스트 모드)에서 렌더된다 — 스크롤 밖이라 트랙패드 고무줄
-   오버스크롤에도 밀리지 않는다. 시각은 Phase 62 D7 그대로(--block-bg · radius 8 · 6/14).
-   ⚠ 헤더가 본문과 다른 부모이므로 열 폭 상수(120·64·86·28)는 행 쪽과 사본이다(A-8) —
-   S4의 칼럼 레지스트리 + 트랙 동기화(D43)가 이 사본을 없앤다. */
-export function ListHeader({ mode, sort, onToggleSort }: {
+/* ═══ Phase 63 S2(D42)·S4 — 칼럼 헤더 카드 ═══
+   FolderView 제목바 행 2(리스트 모드)에서 렌더 — 스크롤 밖이라 고무줄 오버스크롤에 부동.
+   시각은 Phase 62 D7 그대로(--block-bg · radius 8). 템플릿은 본문 실측값(D43)을 받고,
+   도착 전 한 프레임은 같은 산식(buildGridTemplate)의 폴백이라 어긋나도 즉시 수렴한다. */
+export function ListHeader({ mode, prefs, template, onToggleSort, onPrefsChange }: {
   mode: ListMode;
-  sort: ListSortState;
-  onToggleSort: (key: ListSortKey) => void;
+  prefs: ListPrefs;
+  /** 본문 grid의 실측 gridTemplateColumns(px 목록). null이면 자체 산식 폴백 */
+  template: string | null;
+  onToggleSort: (key: string) => void;
+  onPrefsChange: (mutate: (p: ListPrefs) => ListPrefs) => void;
 }) {
-  const showOwner = mode === 'received';
-  const showPerm = mode === 'sent';
+  const visible = visibleColumns(prefs, mode);
+  const sortableIds = new Set(['title', 'updated', ...LIST_COLUMNS.filter((c) => c.kind === 'optional').map((c) => c.id)]);
+  const adjustable = new Set([...LIST_COLUMNS.filter((c) => c.kind === 'optional').map((c) => c.id), 'updated']);
+
+  const resize = (id: string, w: number) => onPrefsChange((p) => ({ ...p, widths: { ...p.widths, [id]: w } }));
+  const resetWidth = (id: string) => onPrefsChange((p) => {
+    const widths = { ...p.widths };
+    delete widths[id];
+    return { ...p, widths };
+  });
+
   return (
     <div style={{
       flex: 1, minWidth: 0,
-      display: 'flex', alignItems: 'center', gap: 12, padding: '6px 14px',
+      display: 'grid',
+      gridTemplateColumns: template ?? buildGridTemplate(visible, prefs.widths),
+      columnGap: 12, alignItems: 'center',
+      padding: '6px 0',
       fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
       background: 'var(--block-bg)', borderRadius: 8,
       fontFamily: 'var(--font-ui)',
     }}>
-      <HeaderCell label="제목" active={sort.key === 'title'} dir={sort.dir} onClick={() => onToggleSort('title')} style={{ flex: 1, minWidth: 0 }} />
-      {showOwner && <div style={{ width: 120, flexShrink: 0 }}>소유자</div>}
-      {showPerm && <div style={{ width: 64, flexShrink: 0 }}>권한</div>}
-      <HeaderCell label="수정일" active={sort.key === 'updated'} dir={sort.dir} onClick={() => onToggleSort('updated')} style={{ width: 86, flexShrink: 0 }} />
-      <div style={{ width: 28, flexShrink: 0 }} />
+      {visible.map((id, i) => (
+        <div key={id} style={{ gridColumn: 2 + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+          {sortableIds.has(id) ? (
+            <button
+              onClick={() => onToggleSort(id)}
+              style={{
+                border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+                fontSize: 11.5, fontWeight: 600,
+                color: prefs.sort.key === id ? 'var(--text-secondary)' : 'var(--text-muted)',
+                fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 3, padding: 0,
+                minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap',
+              }}
+            >
+              {columnLabel(id)}
+              {prefs.sort.key === id && <span style={{ fontSize: 9 }}>{prefs.sort.dir === 'asc' ? '▲' : '▼'}</span>}
+            </button>
+          ) : (
+            <span style={{ whiteSpace: 'nowrap' }}>{columnLabel(id)}</span>
+          )}
+          {adjustable.has(id) && (
+            <ColResizeHandle id={id} onResize={resize} onReset={resetWidth} />
+          )}
+        </div>
+      ))}
+      {/* ⋮ 트랙 = 칼럼 설정(D8 — 헤더 드래그 재배열 대신 팝오버 체크박스 + ▲▼) */}
+      <ColumnSettings gridColumn={visible.length + 2} prefs={prefs} onPrefsChange={onPrefsChange} />
     </div>
   );
 }
 
-function HeaderCell({
-  label, active, dir, onClick, style,
-}: { label: string; active: boolean; dir: 'asc' | 'desc'; onClick: () => void; style?: React.CSSProperties }) {
+/** 폭 조절 핸들(D7) — 시각 1px 선 + 히트 ±4px. setPointerCapture(P7)·touchAction none.
+ *  더블클릭 = 자동폭 복귀(Q3). 헤더 셀(position:relative)의 우변에 겹친다. */
+function ColResizeHandle({ id, onResize, onReset }: {
+  id: string;
+  onResize: (id: string, w: number) => void;
+  onReset: (id: string) => void;
+}) {
+  const dragRef = useRef<{ startX: number; startW: number } | null>(null);
   return (
-    <button
-      onClick={onClick}
+    <span
+      onPointerDown={(e) => {
+        e.stopPropagation(); e.preventDefault();
+        const cell = (e.currentTarget as HTMLElement).parentElement;
+        if (!cell) return;
+        dragRef.current = { startX: e.clientX, startW: cell.getBoundingClientRect().width };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current;
+        if (!d) return;
+        onResize(id, Math.max(MIN_COL_WIDTH, Math.round(d.startW + (e.clientX - d.startX))));
+      }}
+      onPointerUp={(e) => {
+        dragRef.current = null;
+        try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+      }}
+      onPointerCancel={() => { dragRef.current = null; }}
+      onDoubleClick={(e) => { e.stopPropagation(); onReset(id); }}
+      title="드래그: 폭 조절 · 더블클릭: 자동 폭"
       style={{
-        ...style, border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
-        fontSize: 11.5, fontWeight: 600, color: active ? 'var(--text-secondary)' : 'var(--text-muted)',
-        fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 3, padding: 0,
+        position: 'absolute', top: -6, bottom: -6, right: -10, width: 9,
+        cursor: 'col-resize', touchAction: 'none', zIndex: 1,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}
     >
-      {label}{active && <span style={{ fontSize: 9 }}>{dir === 'asc' ? '▲' : '▼'}</span>}
-    </button>
+      <span style={{ width: 1, alignSelf: 'stretch', margin: '2px 0', background: 'var(--border-light)' }} />
+    </span>
+  );
+}
+
+/** 칼럼 설정 팝오버(D8) — optional 5개 체크박스 + ▲▼. FolderIconPicker의 fixed 팝오버 문법. */
+function ColumnSettings({ gridColumn, prefs, onPrefsChange }: {
+  gridColumn: number;
+  prefs: ListPrefs;
+  onPrefsChange: (mutate: (p: ListPrefs) => ListPrefs) => void;
+}) {
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  const open = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setPos((prev) => (prev ? null : { x: r.right, y: r.bottom + 4 }));
+  };
+
+  const toggleHidden = (id: string) => onPrefsChange((p) => ({
+    ...p,
+    hidden: p.hidden.includes(id) ? p.hidden.filter((x) => x !== id) : [...p.hidden, id],
+  }));
+  const move = (id: string, delta: -1 | 1) => onPrefsChange((p) => ({ ...p, order: movedOrder(p.order, id, delta) }));
+
+  const WIDTH = 210;
+  const left = pos ? Math.max(8, Math.min(pos.x - WIDTH, (typeof window !== 'undefined' ? window.innerWidth : 9999) - WIDTH - 8)) : 0;
+
+  return (
+    <>
+      <button
+        onClick={open}
+        title="칼럼 설정"
+        style={{
+          gridColumn,
+          border: 'none', background: 'transparent', cursor: 'pointer',
+          color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+        }}
+      >
+        <IconDotsVertical size={14} />
+      </button>
+      {pos && (
+        <>
+          {/* 바깥 클릭 닫기 — fixed 덮개(팝오버 아래) */}
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999 }} onMouseDown={() => setPos(null)} />
+          <div
+            ref={panelRef}
+            style={{
+              position: 'fixed', left, top: pos.y, zIndex: 10000, width: WIDTH,
+              background: 'var(--bg-card, #fff)', border: '1px solid var(--border-primary, #ddd)',
+              borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '6px 0',
+              fontFamily: 'var(--font-ui)',
+            }}
+          >
+            <div style={{ padding: '2px 12px 6px', fontSize: 11, fontWeight: 600, color: 'var(--text-muted)' }}>
+              칼럼 보이기 · 순서
+            </div>
+            {prefs.order.map((id, i) => (
+              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 12px' }}>
+                <label style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, color: 'var(--text-primary)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={!prefs.hidden.includes(id)}
+                    onChange={() => toggleHidden(id)}
+                  />
+                  {columnLabel(id)}
+                </label>
+                <button
+                  onClick={() => move(id, -1)}
+                  disabled={i === 0}
+                  style={{ border: 'none', background: 'none', cursor: i === 0 ? 'default' : 'pointer', color: i === 0 ? 'var(--text-faint)' : 'var(--text-muted)', padding: '0 2px', fontSize: 11 }}
+                >▲</button>
+                <button
+                  onClick={() => move(id, 1)}
+                  disabled={i === prefs.order.length - 1}
+                  style={{ border: 'none', background: 'none', cursor: i === prefs.order.length - 1 ? 'default' : 'pointer', color: i === prefs.order.length - 1 ? 'var(--text-faint)' : 'var(--text-muted)', padding: '0 2px', fontSize: 11 }}
+                >▼</button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </>
   );
 }
 

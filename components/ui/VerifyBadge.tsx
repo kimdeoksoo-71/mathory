@@ -20,11 +20,16 @@ export const VERIFY_VERDICT_META: Record<VerifyVerdict, { icon: string; color: s
 
 const KIND_LABEL: Record<string, string> = { problem: '문제', solution: '풀이' };
 
-export default function VerifyBadge({ problem, size = 11 }: { problem: Problem; size?: number }) {
+export default function VerifyBadge({ problem, size = 11, kinds }: {
+  problem: Problem;
+  size?: number;
+  /** Phase 63 S4(Q2) — 리스트 칼럼용: 종류 하나만 그리기. 생략하면 카드처럼 둘 다 */
+  kinds?: readonly ('problem' | 'solution')[];
+}) {
   const v = problem.verification;
   if (!v) return null;
 
-  const entries = (['problem', 'solution'] as const)
+  const entries = (kinds ?? (['problem', 'solution'] as const))
     .map((kind) => ({ kind, state: v[kind] }))
     .filter((e): e is { kind: 'problem' | 'solution'; state: NonNullable<typeof e.state> } => !!e.state);
   if (entries.length === 0) return null;

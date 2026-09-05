@@ -98,6 +98,7 @@
   --bg-panel-agent:   var(--bg-functional);  /* agent 패널 = 기존 아이보리 키 유지 */
   --bg-panel-comment: #F6F3EE;               /* 댓글 패널 전용 틴트 — 클레이와 구별이 흐려 폐기(덕수). 현재 소비처 없음 */
   /* 블록 */
+  --row-alt:         #F8F4EE;            /* Phase 63 D33(Q13=C) — 리스트 zebra 밝은 단. 사다리: 바탕 0.9572 > alt 0.9083 > 클레이 0.8674 > 헤더 0.8275 > hover 0.7439 (ΔL* 2.0/1.7/1.7/3.8) */
   --block-bg:        #F0EAE0;            /* Phase 62부터 폴더뷰 리스트 제목행 배경도 이 토큰. 비활성 블록: 컨텐츠(#F4EFE7)와 활성(#EDE6DA) 사이 중간 톤 → 3단계 구별 */
   --block-bg-active: #E8DFCE;            /* 활성: 비활성보다 두 단계 진하게 (3단계 구분 강조) */
   --block-shadow-active: 0 4px 16px rgba(0, 0, 0, 0.14); /* 활성 떠오름 그림자 — Phase 45a에서 편집창은 사용 중지(덕수: 구분선이 2줄로 보임). 현재 소비처 없음 */
@@ -861,6 +862,9 @@ p:has(.marker-circled) {
      Phase 58·59·59a의 명암비 계산(--case-dot 3.28 / --tone-dim 4.76)이 전부 무너진다. */
 .problem-card,
 .folder-row         { --card-surface: var(--bg-content); }
+/* Phase 63 D33 — zebra는 문항 행만, 렌더 인덱스로 부여(:nth-child 금지 — 마스크·폴더 행이
+   형제로 섞여 패리티가 어긋난다). 순서 규칙: alt → hover → (S5) selected — 뒤가 이긴다. */
+.folder-row.is-alt  { --card-surface: var(--row-alt); }
 .problem-card:hover { --card-surface: var(--block-bg-active); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
 .folder-row:hover   { --card-surface: var(--block-bg-active); box-shadow: 0 2px 8px  rgba(0, 0, 0, 0.06); }
 

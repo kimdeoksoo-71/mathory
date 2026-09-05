@@ -9,10 +9,9 @@ import type { User } from 'firebase/auth';
 import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
-import ListView, {
-  ListMode, ListHeader, toggledSort, defaultListSort,
-  type ListSortState, type ListSortKey, type FolderRowData,
-} from './ListView';
+import ListView, { ListMode, ListHeader, type FolderRowData } from './ListView';
+import { toggledListSort } from '../../lib/listColumns';
+import { useListPrefs } from '../../hooks/useListPrefs';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
@@ -154,12 +153,35 @@ export default function FolderView({
   // ListView mode:'trash'가 흡수했다(미지정 메뉴는 원래 기본 메뉴와 같았다 — A-2).
   const listMode: ListMode = isTrash ? 'trash' : listContext?.mode ?? 'my';
 
-  // Phase 63 S2(D42) — 리스트 정렬은 FolderView 소유(헤더가 제목바 행 2에 살기 때문).
-  // 폴더가 바뀌면 기본으로 리셋 — 휴지통만 수정일 내림차순(D41 "최근 버린 순").
-  // S4에서 listPrefs(폴더별 저장)로 승격 예정.
-  const [listSort, setListSort] = useState<ListSortState>(() => defaultListSort(listMode));
-  useEffect(() => { setListSort(defaultListSort(listMode)); }, [folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const toggleListSort = (key: ListSortKey) => setListSort((prev) => toggledSort(prev, key));
+  // Phase 63 S4(D9) — 칼럼·정렬 prefs. 폴더별 localStorage 영속(useListPrefs), 헤더가
+  // 제목바 행 2에 살아 FolderView가 소유한다. 휴지통 기본 정렬만 수정일 내림차순(D41).
+  const { prefs, updatePrefs } = useListPrefs(folder.id, isTrash);
+  const toggleListSort = (key: string) => updatePrefs((p) => ({ ...p, sort: toggledListSort(p.sort, key) }));
+
+  /* Phase 63 D43 — 헤더↔행 트랙 동기화: 본문 grid 루트의 사용된 트랙 폭을
+     getComputedStyle로 읽어(px 목록 — H3 실측, ⚠ subgrid 행이 아니라 루트에서만) 헤더
+     템플릿으로 내린다. 갱신 = 본문 ResizeObserver + prefs 변경 effect. 스크롤바 "항상
+     표시" 환경은 헤더 래퍼 paddingRight로 보정(중앙정렬 어긋남 방지). */
+  const bodyGridRef = useRef<HTMLDivElement | null>(null);
+  const [headerTemplate, setHeaderTemplate] = useState<string | null>(null);
+  const [headerPadRight, setHeaderPadRight] = useState(0);
+  useEffect(() => {
+    if (viewMode !== 'list') return;
+    const body = bodyGridRef.current;
+    const scrollEl = scrollRef.current;
+    if (!body || !scrollEl) return;
+    const measure = () => {
+      const t = getComputedStyle(body).gridTemplateColumns;
+      setHeaderTemplate((prev) => (prev === t ? prev : t));
+      const pad = scrollEl.offsetWidth - scrollEl.clientWidth;
+      setHeaderPadRight((prev) => (prev === pad ? prev : pad));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(body);
+    return () => ro.disconnect();
+    // prefs(숨김·순서·폭)·행 수 변화는 루트 폭을 안 바꿔 ResizeObserver가 못 본다 — deps로 재측정
+  }, [viewMode, prefs, problems.length]);
 
   // Phase 63 D3 — 드래그 중에는 행 정렬을 꺼야 dnd-kit 자동 스크롤과 싸우지 않는다.
   // DragKindContext는 드래그 시작·끝에만 바뀐다(F7) — 매 move 리렌더가 아니다.
@@ -521,8 +543,14 @@ export default function FolderView({
             오버스크롤에도 밀리지 않는다. 하위 폴더 칩은 카드 모드 전용이 됐고,
             리스트의 하위 폴더 접근은 S3(D11)의 폴더 행이 잇는다. */}
         {viewMode === 'list' && (
-          <div style={{ display: 'flex', alignItems: 'center', minHeight: 41, boxSizing: 'border-box' }}>
-            <ListHeader mode={listMode} sort={listSort} onToggleSort={toggleListSort} />
+          <div style={{ display: 'flex', alignItems: 'center', minHeight: 41, boxSizing: 'border-box', paddingRight: headerPadRight }}>
+            <ListHeader
+              mode={listMode}
+              prefs={prefs}
+              template={headerTemplate}
+              onToggleSort={toggleListSort}
+              onPrefsChange={updatePrefs}
+            />
           </div>
         )}
         {/* 행 2: 하위 폴더 칩 (카드 모드) — 가로 스크롤, 드롭 타깃 */}
@@ -609,7 +637,8 @@ export default function FolderView({
             problems={folderProblems}
             scopeKey={folder.id}
             mode={listMode}
-            sort={listSort}
+            prefs={prefs}
+            bodyGridRef={bodyGridRef}
             folderRows={folderRowsData}
             onSelectFolder={onSelectFolder}
             dragUid={dragUid}
