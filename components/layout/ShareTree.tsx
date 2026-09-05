@@ -27,7 +27,8 @@ interface ShareTreeProps {
 export default function ShareTree({
   receivedTotal, receivedGroups, sentGroups, profiles, activeScopeKey, onSelectScope,
 }: ShareTreeProps) {
-  const [open, setOpen] = useState(true);
+  // Phase 63 D32 — 기본 접힘(세션 내 상태, 영속 없음). 하위 Bazaar·받은·보낸의 펼침은 현행 유지.
+  const [open, setOpen] = useState(false);
   const [bazaarOpen, setBazaarOpen] = useState(true);
   const [receivedOpen, setReceivedOpen] = useState(true);
   const [sentOpen, setSentOpen] = useState(true);

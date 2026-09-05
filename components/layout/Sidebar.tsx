@@ -14,15 +14,14 @@ import {
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
 import { buildFolderTree, flattenVisible, getDescendantIds } from '../../lib/folder-tree';
+import { useDraggable } from '@dnd-kit/core';
 import {
-  DndContext, closestCenter, PointerSensor, KeyboardSensor,
-  useSensor, useSensors, DragEndEvent, DragOverEvent, DragStartEvent,
-  DragOverlay, useDraggable,
-} from '@dnd-kit/core';
-import {
-  arrayMove, SortableContext, useSortable, verticalListSortingStrategy,
+  SortableContext, useSortable, verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+/* Phase 63 S0 — DndContext·센서·핸들러·오버레이는 AppShell로 이관(D21).
+   여기 남는 것은 useSortable(폴더)·useDraggable(최근 문항)·SortableContext뿐이다. */
+import { useDragKind, isProblemDrag, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
 
 // ─── Sidebar Item (일반용) ───
 function SidebarItem({
@@ -202,7 +201,6 @@ function SortableFolderItem({
   folder,
   count,
   active,
-  isDropTarget,
   depth,
   hasChildren,
   expanded,
@@ -217,7 +215,6 @@ function SortableFolderItem({
   folder: Folder;
   count: number;
   active: boolean;
-  isDropTarget: boolean;
   depth: number;
   hasChildren: boolean;
   expanded: boolean;
@@ -236,11 +233,17 @@ function SortableFolderItem({
 
   const {
     attributes, listeners, setNodeRef,
-    transform, transition, isDragging,
+    transform, transition, isDragging, isOver,
   } = useSortable({
+    /* ⚠ D34 — 사이드바 폴더 sortable만 맨 folder.id를 쓴다(SortableContext items의 앵커).
+       다른 모든 드래그·드롭 id는 dndId 프리픽스 필수 — 전역 컨텍스트에서 id가 겹치면
+       dnd-kit 레지스트리(Map)가 조용히 덮어쓴다. */
     id: folder.id,
     data: { type: 'folder', folder },
   });
+  /* Phase 63 S0 (F7·D27) — 드롭 하이라이트는 자체 isOver + 드래그 종류로 판정.
+     AppShell의 dragOverFolderId 같은 전역 상태는 매 move마다 앱 전체를 리렌더시키므로 금지. */
+  const isDropTarget = isOver && isProblemDrag(useDragKind());
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -281,11 +284,14 @@ function SortableFolderItem({
             width: '100%',
             padding: '8px 12px',
             paddingLeft: 12 + depth * 16,
-            border: isDropTarget ? '2px solid var(--accent-primary, #5b6abf)' : 'none',
+            /* D27·F6 — 하이라이트는 링+틴트, border 불변. 조건부 2px border는 over 순간
+               행이 자라던 결함이었다(레이아웃을 흔드는 조건부 스타일 — Phase 45a 함정). */
+            border: 'none',
             borderRadius: 8,
             cursor: 'pointer',
+            boxShadow: isDropTarget ? DROP_RING : 'none',
             background: isDropTarget
-              ? 'rgba(91, 106, 191, 0.1)'
+              ? DROP_TINT
               : active ? 'var(--bg-active)' : hovered ? 'var(--bg-hover)' : 'transparent',
             color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
             fontSize: 13.5,
@@ -539,7 +545,7 @@ function DraggableProblemItem({
   const {
     attributes, listeners, setNodeRef, transform, isDragging,
   } = useDraggable({
-    id: `problem-${problem.id}`,
+    id: dndId.recentProblem(problem.id),
     data: { type: 'problem', problem },
   });
 
@@ -651,8 +657,6 @@ export interface SidebarProps {
   onSetFolderIcon: (folder: Folder, emoji: string | null) => void;
   onNewSubfolder: (parent: Folder) => void;
   onMoveFolder: (folder: Folder, newParentId: string | null) => void;
-  onFolderReorder: (reorderedFolders: Folder[]) => void;
-  onMoveProblemToFolder: (problem: Problem, folder: Folder) => void;
   onViewProblem: (problem: Problem) => void;
   onEditProblem: (problem: Problem) => void;
   onProblemAction: (action: string, problem: Problem) => void;
@@ -691,8 +695,6 @@ export default function Sidebar({
   onSetFolderIcon,
   onNewSubfolder,
   onMoveFolder,
-  onFolderReorder,
-  onMoveProblemToFolder,
   onViewProblem,
   onEditProblem,
   onProblemAction,
@@ -731,87 +733,6 @@ export default function Sidebar({
       try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify([...next])); } catch {}
       return next;
     });
-  };
-
-  // DnD 상태
-  const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
-  const [activeDragItem, setActiveDragItem] = useState<{ type: string; label: string } | null>(null);
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor)
-  );
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const { active } = event;
-    const type = active.data.current?.type;
-    if (type === 'problem') {
-      const problem = active.data.current?.problem as Problem;
-      setActiveDragItem({ type: 'problem', label: problem.title });
-    } else if (type === 'folder') {
-      setActiveDragItem({ type: 'folder', label: '' });
-    }
-  };
-
-  const handleDragOver = (event: DragOverEvent) => {
-    const { active, over } = event;
-    if (!over) {
-      setDragOverFolderId(null);
-      return;
-    }
-    // 문항을 폴더 위에 드래그 중일 때 하이라이트
-    if (active.data.current?.type === 'problem' && over.data.current?.type === 'folder') {
-      setDragOverFolderId(over.id as string);
-    } else {
-      setDragOverFolderId(null);
-    }
-  };
-
-  const handleDragEnd = (event: DragEndEvent) => {
-    setDragOverFolderId(null);
-    setActiveDragItem(null);
-
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeType = active.data.current?.type;
-    const overType = over.data.current?.type;
-
-    if (activeType === 'folder' && overType === 'folder' && active.id !== over.id) {
-      // 폴더 순서 변경 — 같은 부모(형제) 안에서만 (드래그 중첩/재부모화는 1단계 제외)
-      const activeFolder = folders.find((f) => f.id === active.id);
-      const overFolder = folders.find((f) => f.id === over.id);
-      if (!activeFolder || !overFolder) return;
-      const ap = activeFolder.parent_id || null;
-      const op = overFolder.parent_id || null;
-      if (ap !== op) return; // 다른 그룹으로 드래그 → 무시 (이동은 ⋯ 메뉴 사용)
-
-      const siblings = folders
-        .filter((f) => (f.parent_id || null) === ap)
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-      const oldIdx = siblings.findIndex((f) => f.id === active.id);
-      const newIdx = siblings.findIndex((f) => f.id === over.id);
-      if (oldIdx === -1 || newIdx === -1) return;
-      const reorderedSiblings = arrayMove(siblings, oldIdx, newIdx);
-      // 형제 그룹 안에서만 order 재부여, 나머지 폴더는 그대로
-      const orderById = new Map(reorderedSiblings.map((f, i) => [f.id, i]));
-      const next = folders.map((f) =>
-        orderById.has(f.id) ? { ...f, order: orderById.get(f.id)! } : f
-      );
-      onFolderReorder(next);
-    } else if (activeType === 'problem' && overType === 'folder') {
-      // 문항을 폴더로 이동
-      const problem = active.data.current?.problem as Problem;
-      const folder = over.data.current?.folder as Folder;
-      if (problem && folder) {
-        onMoveProblemToFolder(problem, folder);
-      }
-    }
-  };
-
-  const handleDragCancel = () => {
-    setDragOverFolderId(null);
-    setActiveDragItem(null);
   };
 
   return (
@@ -868,15 +789,7 @@ export default function Sidebar({
         <SidebarItem icon={<IconDownload />} label="시트 가져오기" collapsed={collapsed} onClick={onSheetImport} />
       </div>
 
-      {/* ═══ Single DndContext: Folders + Recent Problems ═══ */}
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={handleDragCancel}
-      >
+      {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
         {/* ═══ Section 2: Folders ═══ */}
         <div
           style={{ padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}
@@ -950,7 +863,6 @@ export default function Sidebar({
                     folder={n.folder}
                     count={folderCounts[n.folder.id] ?? 0}
                     active={activeFolderId === n.folder.id}
-                    isDropTarget={dragOverFolderId === n.folder.id}
                     depth={n.depth}
                     hasChildren={n.children.length > 0}
                     expanded={!collapsedFolders.has(n.folder.id)}
@@ -1097,28 +1009,6 @@ export default function Sidebar({
             />
           ))}
         </div>
-
-        {/* DragOverlay: 드래그 중 플로팅 라벨 */}
-        <DragOverlay>
-          {activeDragItem?.type === 'problem' && (
-            <div style={{
-              padding: '6px 14px',
-              background: 'var(--bg-card, #fff)',
-              borderRadius: 8,
-              boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
-              fontSize: 13,
-              fontFamily: 'var(--font-ui)',
-              color: 'var(--text-primary)',
-              whiteSpace: 'nowrap',
-              maxWidth: 200,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-            }}>
-              📄 {activeDragItem.label}
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
 
       {/* ═══ Footer: Auth ═══ */}
       <div style={{

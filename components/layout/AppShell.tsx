@@ -27,6 +27,12 @@ import ShareTargetModal from '../share/ShareTargetModal';
 import SheetImportModal from '../import/SheetImportModal';
 import { getDescendantIds, getChildren } from '../../lib/folder-tree';
 import { claimSession, watchSession, releaseSession } from '../../lib/session';
+import {
+  DndContext, DragOverlay, PointerSensor, KeyboardSensor, useSensor, useSensors,
+  type DragStartEvent, type DragEndEvent,
+} from '@dnd-kit/core';
+import { arrayMove } from '@dnd-kit/sortable';
+import { DragKindContext, appCollisionDetection, type DragKind } from '../ui/dnd';
 
 import Sidebar, { SIDEBAR_WIDTH_DEFAULT } from '../layout/Sidebar';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
@@ -499,6 +505,73 @@ export default function AppShell() {
     }
   };
 
+  /* ═══ Phase 63 S0 — 앱 전역 DnD 컨텍스트 (D21) ═══
+     사이드바·FolderView의 두 컨텍스트를 여기 하나로 합쳤다. AppShell이 드는 상태는
+     activeDragItem(오버레이 라벨 + DragKindContext 값, start/end 2회 변화)뿐이다 —
+     onDragOver 핸들러·dragOverFolderId를 두지 말 것: over는 드래그 내내 바뀌므로
+     여기서 setState하면 매 move마다 앱 전체가 리렌더된다(F7). 타깃 하이라이트는
+     각 타깃이 자기 isOver + DragKindContext로 판정한다. */
+  const [activeDragItem, setActiveDragItem] = useState<{ kind: DragKind; label: string } | null>(null);
+  const dndSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  const handleAppDragStart = (e: DragStartEvent) => {
+    const d = e.active.data.current;
+    if (d?.type === 'problem') {
+      setActiveDragItem({ kind: 'problem', label: (d.problem as Problem).title || '제목 없음' });
+    } else if (d?.type === 'problems') {
+      setActiveDragItem({ kind: 'problems', label: `문항 ${(d.problems as Problem[]).length}개` });
+    } else if (d?.type === 'folder') {
+      // folder는 오버레이 없음(D28) — sortable 변형이 제자리에서 움직인다
+      setActiveDragItem({ kind: 'folder', label: '' });
+    }
+  };
+
+  const handleAppDragEnd = (e: DragEndEvent) => {
+    setActiveDragItem(null);
+    const { active, over } = e;
+    if (!over) return;
+    const activeType = active.data.current?.type;
+    const overData = over.data.current;
+
+    if (activeType === 'folder') {
+      // 폴더 순서 변경 — 같은 부모(형제) 안에서만 (재부모화는 ⋯ 메뉴. Sidebar에서 이관)
+      if (overData?.type !== 'folder' || active.id === over.id) return;
+      const activeFolder = folders.find((f) => f.id === active.id);
+      const overFolder = folders.find((f) => f.id === over.id);
+      if (!activeFolder || !overFolder) return;
+      const ap = activeFolder.parent_id || null;
+      const op = overFolder.parent_id || null;
+      if (ap !== op) return; // 다른 그룹으로 드래그 → 무시
+
+      const siblings = folders
+        .filter((f) => (f.parent_id || null) === ap)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+      const oldIdx = siblings.findIndex((f) => f.id === active.id);
+      const newIdx = siblings.findIndex((f) => f.id === over.id);
+      if (oldIdx === -1 || newIdx === -1) return;
+      const reorderedSiblings = arrayMove(siblings, oldIdx, newIdx);
+      // 형제 그룹 안에서만 order 재부여, 나머지 폴더는 그대로
+      const orderById = new Map(reorderedSiblings.map((f, i) => [f.id, i]));
+      const next = folders.map((f) =>
+        orderById.has(f.id) ? { ...f, order: orderById.get(f.id)! } : f
+      );
+      handleFolderReorder(next);
+    } else if (activeType === 'problem') {
+      const problem = active.data.current?.problem as Problem | undefined;
+      if (!problem || overData?.type !== 'folder') return;
+      const folder = overData.folder as Folder;
+      // 같은 폴더 무시 — null 정규화 비교(미지정은 null·'' 공존, D26)
+      if ((problem.folder_id || null) === folder.id) return;
+      handleMoveProblemToFolder(problem, folder);
+    }
+    // 'problems'(다중)·unassigned/trash 타깃은 S3·S5에서
+  };
+
+  const handleAppDragCancel = () => setActiveDragItem(null);
+
   const handleProblemAction = async (action: string, problem: Problem) => {
     switch (action) {
       case 'rename': {
@@ -662,8 +735,19 @@ export default function AppShell() {
   const isProblemMode = view.type === 'problem';
 
   return (
-    /* Phase 62 D18 — 사이드바 리사이즈 핸들의 기준 상자. AppShell 안에는 절대배치 요소가 없어
-       position:relative를 줘도 파급이 없다. ⚠ 핸들을 <aside> 안에 두면 overflow:hidden에 잘린다. */
+    /* Phase 63 S0 — DndContext는 앱 루트 하나(D21). 사이드바(소스·타깃)와 main(FolderView의
+       카드·칩)이 형제라 둘을 모두 품는 자리는 여기뿐이다. EditorView·UserGroupEditor의
+       자체 DndContext는 중첩이어도 무해하다 — 센서가 각자의 draggable 노드에 바인딩된다(A-25). */
+    <DndContext
+      sensors={dndSensors}
+      collisionDetection={appCollisionDetection}
+      onDragStart={handleAppDragStart}
+      onDragEnd={handleAppDragEnd}
+      onDragCancel={handleAppDragCancel}
+    >
+    <DragKindContext.Provider value={activeDragItem?.kind ?? null}>
+    {/* Phase 62 D18 — 사이드바 리사이즈 핸들의 기준 상자. AppShell 안에는 절대배치 요소가 없어
+        position:relative를 줘도 파급이 없다. ⚠ 핸들을 <aside> 안에 두면 overflow:hidden에 잘린다. */}
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
       <Sidebar
         collapsed={collapsed}
@@ -689,8 +773,6 @@ export default function AppShell() {
         onSetFolderIcon={handleSetFolderIcon}
         onNewSubfolder={handleNewSubfolder}
         onMoveFolder={handleMoveFolder}
-        onFolderReorder={handleFolderReorder}
-        onMoveProblemToFolder={handleMoveProblemToFolder}
         onViewProblem={handleViewProblem}
         onEditProblem={handleEditProblem}
         onProblemAction={handleProblemAction}
@@ -913,6 +995,25 @@ export default function AppShell() {
         />
       )}
     </div>
+
+    {/* Phase 63 S0 — 오버레이 한 벌(D28): problem 계열 = 액센트 알약(구 FolderView 디자인),
+        folder = null(sortable이 제자리에서 움직인다). 사이드바 흰 카드 📄 오버레이는 제거됐다. */}
+    <DragOverlay dropAnimation={null}>
+      {activeDragItem && activeDragItem.kind !== 'folder' ? (
+        <div style={{
+          padding: '8px 14px', borderRadius: 8,
+          background: 'var(--accent-primary, #5b6abf)', color: '#fff',
+          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
+          boxShadow: '0 6px 20px rgba(0,0,0,0.25)', maxWidth: 280,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          cursor: 'grabbing',
+        }}>
+          {activeDragItem.label}
+        </div>
+      ) : null}
+    </DragOverlay>
+    </DragKindContext.Provider>
+    </DndContext>
   );
 }
 

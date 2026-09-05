@@ -1,11 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import {
-  DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
-  useDraggable, useDroppable, closestCenter,
-  type DragStartEvent, type DragEndEvent,
-} from '@dnd-kit/core';
+/* Phase 63 S0 — DndContext·센서·오버레이·드롭 핸들러는 AppShell로 이관(D21).
+   여기 남는 것은 Draggable(카드)·Droppable(칩) 등록뿐이고, id는 dndId 프리픽스(D34),
+   data에는 type이 필수다(D23 — 전역 핸들러가 type으로 분기한다). */
+import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
 import type { User } from 'firebase/auth';
 import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
@@ -83,27 +82,6 @@ interface FolderViewProps {
   listContext?: { mode: ListMode; recipientUid?: string; profiles?: Record<string, UserProfile> };
 }
 
-// ─── DnD 렌더프롭 래퍼 (문항 카드 드래그 / 하위 폴더 드롭) ───
-function Draggable({ id, data, disabled, children }: {
-  id: string;
-  data: Record<string, unknown>;
-  disabled?: boolean;
-  // attributes/listeners는 dnd-kit 내부 타입 → 스프레드용으로 느슨하게 받음
-  children: (p: { setNodeRef: (el: HTMLElement | null) => void; attributes: any; listeners: any; isDragging: boolean }) => React.ReactNode;
-}) {
-  const { setNodeRef, attributes, listeners, isDragging } = useDraggable({ id, data, disabled });
-  return <>{children({ setNodeRef, attributes, listeners, isDragging })}</>;
-}
-
-function Droppable({ id, data, children }: {
-  id: string;
-  data: Record<string, unknown>;
-  children: (p: { setNodeRef: (el: HTMLElement | null) => void; isOver: boolean }) => React.ReactNode;
-}) {
-  const { setNodeRef, isOver } = useDroppable({ id, data });
-  return <>{children({ setNodeRef, isOver })}</>;
-}
-
 function formatDate(d?: Date): string {
   if (!d) return '';
   const yy = String(d.getFullYear()).slice(-2);
@@ -149,10 +127,6 @@ export default function FolderView({
     try { localStorage.setItem(VIEWMODE_KEY, m); } catch {}
   };
 
-  // Phase 40: 문항 → 하위 폴더 드래그
-  const [draggingProblem, setDraggingProblem] = useState<Problem | null>(null);
-  const dndSensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
-
   useEffect(() => { setSort(loadSort()); }, []);
 
   const updateSort = (next: SortState) => {
@@ -172,20 +146,10 @@ export default function FolderView({
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
   const breadcrumb = isSpecial ? [] : getFolderPath(folders, folder.id);
 
-  // 문항을 하위 폴더로 끌어 넣기: 하위 폴더가 있고, 이동 핸들러가 있을 때만 활성
+  // 문항을 하위 폴더로 끌어 넣기: 하위 폴더가 있고, 이동 핸들러가 있을 때만 활성.
+  // ⚠ 드롭 처리는 AppShell 전역 핸들러가 한다(S0) — onMoveProblemToFolder는 여기선
+  //   "이동 가능한 화면인가"의 게이트로만 남았고, 조건 자체는 S3(D24)에서 재정의된다.
   const dndEnabled = !isSpecial && childFolders.length > 0 && !!onMoveProblemToFolder;
-
-  const handleDndStart = (e: DragStartEvent) => {
-    setDraggingProblem((e.active.data.current?.problem as Problem) ?? null);
-  };
-  const handleDndEnd = (e: DragEndEvent) => {
-    setDraggingProblem(null);
-    const problem = e.active.data.current?.problem as Problem | undefined;
-    const target = e.over?.data.current?.folder as Folder | undefined;
-    if (problem && target && problem.folder_id !== target.id) {
-      onMoveProblemToFolder?.(problem, target);
-    }
-  };
 
   const folderProblems = problems
     .filter((p) => {
@@ -367,13 +331,6 @@ export default function FolderView({
   };
 
   return (
-    <DndContext
-      sensors={dndSensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDndStart}
-      onDragEnd={handleDndEnd}
-      onDragCancel={() => setDraggingProblem(null)}
-    >
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, width: '100%', background: 'var(--bg-functional)' }}>
       {/* ─── 제목바: 전체폭 아이보리 chrome (U자 밖) — 하위폴더 유무와 무관하게 높이 일정(가로 경계선 Y 통일) ─── */}
       <div style={{ flexShrink: 0, background: 'var(--bg-functional)', minHeight: 98, boxSizing: 'border-box' }}>
@@ -458,7 +415,7 @@ export default function FolderView({
             {childFolders.map((cf) => {
               const cfCount = problems.filter((p) => p.folder_id === cf.id).length;
               return (
-                <Droppable key={cf.id} id={cf.id} data={{ folder: cf }}>
+                <Droppable key={cf.id} id={dndId.chip(cf.id)} data={{ type: 'folder', folder: cf }}>
                   {({ setNodeRef, isOver }) => (
                     <button
                       ref={setNodeRef}
@@ -466,9 +423,10 @@ export default function FolderView({
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0,
                         padding: '4px 10px', borderRadius: 6,
-                        border: isOver ? '1px solid var(--accent-primary, #5b6abf)' : '1px solid var(--border-light)',
-                        background: isOver ? 'rgba(91, 106, 191, 0.12)' : 'var(--bg-card, #fff)',
-                        boxShadow: isOver ? '0 0 0 2px rgba(91,106,191,0.25)' : 'none',
+                        // D27 — 링+틴트, border 불변(하이라이트 한 문법)
+                        border: '1px solid var(--border-light)',
+                        background: isOver ? DROP_TINT : 'var(--bg-card, #fff)',
+                        boxShadow: isOver ? DROP_RING : 'none',
                         cursor: 'pointer', fontSize: 12.5, color: 'var(--text-primary)',
                         fontFamily: 'var(--font-ui)', maxWidth: 220,
                         transition: 'background 0.12s, border-color 0.12s',
@@ -550,12 +508,17 @@ export default function FolderView({
             {folderProblems.map((problem) => {
               const blocks = questionBlocksMap[problem.id] || [];
               return (
-                <Draggable key={problem.id} id={problem.id} data={{ problem }} disabled={!dndEnabled}>
-                  {({ setNodeRef, attributes, listeners, isDragging }) => (
+                <Draggable key={problem.id} id={dndId.card(problem.id)} data={{ type: 'problem', problem }} disabled={!dndEnabled}>
+                  {({ setNodeRef, attributes, listeners, isDragging }) => {
+                  /* D30 — 전역 KeyboardSensor의 onKeyDown 활성자는 스프레드에서 제외한다:
+                     카드는 attributes로 tabIndex를 받으므로, 빼지 않으면 포커스된 카드에서
+                     Space/Enter가 드래그를 시작한다(포인터 전용 소스). */
+                  const { onKeyDown: _kbdActivator, ...pointerListeners } = (listeners ?? {}) as Record<string, unknown>;
+                  return (
                 <div
                   ref={setNodeRef}
                   {...attributes}
-                  {...listeners}
+                  {...pointerListeners}
                   onClick={() => onView(problem)}
                   className="problem-card"
                   style={{
@@ -655,7 +618,8 @@ export default function FolderView({
                     }} />
                   </div>
                 </div>
-                  )}
+                  );
+                  }}
                 </Draggable>
               );
             })}
@@ -690,22 +654,6 @@ export default function FolderView({
       )}
     </div>
     </div>
-
-    <DragOverlay dropAnimation={null}>
-      {draggingProblem ? (
-        <div style={{
-          padding: '8px 14px', borderRadius: 8,
-          background: 'var(--accent-primary, #5b6abf)', color: '#fff',
-          fontSize: 13, fontWeight: 600, fontFamily: 'var(--font-ui)',
-          boxShadow: '0 6px 20px rgba(0,0,0,0.25)', maxWidth: 280,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          cursor: 'grabbing',
-        }}>
-          {draggingProblem.title || '제목 없음'}
-        </div>
-      ) : null}
-    </DragOverlay>
-    </DndContext>
   );
 }
 
