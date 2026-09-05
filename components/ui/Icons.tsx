@@ -517,14 +517,18 @@ export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
  *    24 viewBox를 축소 렌더하면 획이 1.1px대로 가늘어져 어긋난다. */
 export function IconTextWidth({ size = 27, color = 'currentColor' }: { size?: number; color?: string }) {
   const h = Math.round(size * 15 / 27);
+  /* 검수 2차(2026-09-05): 화살표만 획 1.4로 한 단 가늘게(세로바는 꺾쇠와 같은 1.8 유지) ·
+     가로선을 세로바에 바짝 — 스트로크 엣지 간 틈 ≈1px(미세한 틈만). */
   return (
     <svg width={size} height={h} viewBox="0 0 27 15" fill="none" stroke={color}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <line x1="1.2" y1="0.9" x2="1.2" y2="14.1" />
       <line x1="25.8" y1="0.9" x2="25.8" y2="14.1" />
-      <line x1="6" y1="7.5" x2="21" y2="7.5" />
-      <path d="M9 4.7 6 7.5l3 2.8" />
-      <path d="M18 4.7 21 7.5l-3 2.8" />
+      <g strokeWidth="1.4">
+        <line x1="3.8" y1="7.5" x2="23.2" y2="7.5" />
+        <path d="M6.8 4.7 3.8 7.5l3 2.8" />
+        <path d="M20.2 4.7 23.2 7.5l-3 2.8" />
+      </g>
     </svg>
   );
 }

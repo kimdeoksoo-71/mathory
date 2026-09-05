@@ -3342,7 +3342,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           paddingLeft: 8,
         }}>
           <SizeStepper
-            icon={<IconTextWidth size={27} />}
+            icon={<IconTextWidth size={27} color="var(--text-muted)" />}
             value={widthEm} min={WIDTH_EM_MIN} max={WIDTH_EM_MAX}
             onStep={(d) => handleWidthChange(d)}
             titleUp="본문 넓히기" titleDown="본문 좁히기" title="본문 가로폭(em)"
