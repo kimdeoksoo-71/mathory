@@ -148,10 +148,13 @@ export default function ListView({
   return (
     /* Phase 62 D8 — 좌우 인셋 0. 행 폭 = 1136px = 제목바와 같은 컨테이너 폭이라 문항 제목이
        폴더 제목과 세로로 정렬된다.
-       Phase 63 S2(D42) — 칼럼 헤더는 제목바 행 2(ListHeader, 스크롤 밖)로 올라갔다.
-       sticky 래퍼는 철거 — 행이 헤더 위로 비칠 통로 자체가 없다(스크롤 영역 상단이 곧 클립선).
-       상단 8px은 헤더 카드와 첫 행 사이 간격이며 스크롤 영역 안쪽 몫이다(scrollPaddingTop 8과 짝). */
-    <div style={{ padding: '8px 0 32px', fontFamily: 'var(--font-ui)' }}>
+       Phase 63 S2(D42) — 칼럼 헤더는 제목바 행 2(ListHeader, 스크롤 밖)로 올라갔다. */
+    <div style={{ padding: '0 0 32px', fontFamily: 'var(--font-ui)' }}>
+      {/* 상단 8px 아이보리 마스크(sticky) — 행 간격(4px)보다 넓은 정렬 여백(8px) 틈으로
+          이전 행 꼬리가 비치는 것을 가린다(T3 검수 3회차: 정렬 후에도 윗행 끝이 잘려 보임).
+          Phase 62 D7 래퍼의 "위 8px 덮기"를 헤더 없이 띠만 되살린 것. 흐름 높이 8이
+          paddingTop 8을 대체하므로 첫 행 위치·JS 정렬 목표선(SNAP_TOP_GAP 8)은 불변이다. */}
+      <div aria-hidden style={{ position: 'sticky', top: 0, height: 8, background: 'var(--bg-functional)', zIndex: 1 }} />
       {/* 행 */}
       {sorted.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
