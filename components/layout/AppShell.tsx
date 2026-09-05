@@ -495,13 +495,14 @@ export default function AppShell() {
     }
   };
 
-  // Phase 10: 문항을 폴더로 드래그 이동
-  const handleMoveProblemToFolder = async (problem: Problem, folder: Folder) => {
+  // Phase 10: 문항을 폴더로 드래그 이동 (Phase 63 D26 — 실패는 alertDialog)
+  const moveProblemTo = async (problem: Problem, folderId: string | null) => {
     try {
-      await moveProblemToFolder(problem.id, folder.id);
+      await moveProblemToFolder(problem.id, folderId);
       await loadData();
     } catch (error) {
       console.error('문항 이동 에러:', error);
+      await alertDialog('문항 이동에 실패했습니다.');
     }
   };
 
@@ -561,13 +562,32 @@ export default function AppShell() {
       handleFolderReorder(next);
     } else if (activeType === 'problem') {
       const problem = active.data.current?.problem as Problem | undefined;
-      if (!problem || overData?.type !== 'folder') return;
-      const folder = overData.folder as Folder;
-      // 같은 폴더 무시 — null 정규화 비교(미지정은 null·'' 공존, D26)
-      if ((problem.folder_id || null) === folder.id) return;
-      handleMoveProblemToFolder(problem, folder);
+      if (!problem || !overData) return;
+      if (overData.type === 'folder') {
+        const folder = overData.folder as Folder;
+        // 같은 폴더 무시 — null 정규화 비교(미지정은 null·'' 공존, D26).
+        // 휴지통 문항 → 폴더 드롭 = 그 폴더로 복원(Q10)이 이 경로에서 자연 성립한다.
+        if ((problem.folder_id || null) === folder.id) return;
+        moveProblemTo(problem, folder.id);
+      } else if (overData.type === 'unassigned') {
+        if ((problem.folder_id || null) === null) return;
+        moveProblemTo(problem, null);
+      } else if (overData.type === 'trash') {
+        if (problem.folder_id === TRASH_FOLDER_ID) return;
+        // 단건 드래그는 무확인(D35 — ⋮ 휴지통과 동일). moveToTrash만 updated_at을 찍는다(Q14).
+        (async () => {
+          try {
+            await moveToTrash(problem.id);
+            if (view.type === 'problem' && view.problemId === problem.id) setView({ type: 'home' });
+            await loadData();
+          } catch (error) {
+            console.error('휴지통 이동 에러:', error);
+            await alertDialog('휴지통 이동에 실패했습니다.');
+          }
+        })();
+      }
     }
-    // 'problems'(다중)·unassigned/trash 타깃은 S3·S5에서
+    // 'problems'(다중 선택 드래그)는 S5에서
   };
 
   const handleAppDragCancel = () => setActiveDragItem(null);
@@ -851,8 +871,7 @@ export default function AppShell() {
             onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
             onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
             onSelectFolder={handleSelectFolder}
-            user={user}
-            onMoveProblemToFolder={handleMoveProblemToFolder} />
+            user={user} />
         )}
         {view.type === 'share' && (() => {
           const scope = view.scope;
@@ -901,8 +920,7 @@ export default function AppShell() {
               onEdit={handleEditProblem} onView={handleViewProblem} onProblemAction={handleProblemAction}
               onEmptyTrash={handleEmptyTrash} onUpdated={() => loadData()}
               onSelectFolder={handleSelectFolder}
-              user={user}
-              onMoveProblemToFolder={handleMoveProblemToFolder} />
+              user={user} />
           );
         })()}
         {view.type === 'problem' && (

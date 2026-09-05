@@ -1,18 +1,28 @@
 'use client';
 
 import { useState } from 'react';
-import { Problem, UserProfile, MemberRole } from '../../types/problem';
+import { Problem, Folder, UserProfile, MemberRole } from '../../types/problem';
 import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment } from '../ui/Icons';
+import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolder } from '../ui/Icons';
+import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
+import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
 
 /* Phase 63 D2 — 'trash' 추가: 휴지통도 리스트가 기본이 되면서 전용 메뉴(복원·영구 삭제)를
    ListView가 흡수했다(카드 메뉴 FolderView cardMenuItems의 isTrash 갈래와 동일 구성). */
 export type ListMode = 'my' | 'received' | 'sent' | 'trash';
+
+/** Phase 63 D11·D15 — 폴더 행 데이터. count는 직속 문항 수, updated는 하위 트리 문항의
+ *  max(updated_at)(비면 폴더 문서의 updated_at → created_at) — 계산은 FolderView가 한다. */
+export interface FolderRowData {
+  folder: Folder;
+  count: number;
+  updated?: Date;
+}
 
 interface ListViewProps {
   problems: Problem[];
@@ -20,6 +30,11 @@ interface ListViewProps {
   mode: ListMode;
   /** Phase 63 S2 — 정렬은 FolderView 소유(헤더가 스크롤 밖 행 2에 살기 때문) */
   sort: ListSortState;
+  /** Phase 63 D11 — 문항 행 위에 그릴 하위 폴더 행(일반 폴더 리스트 전용) */
+  folderRows?: FolderRowData[];
+  onSelectFolder?: (f: Folder) => void;
+  /** Phase 63 D24 — 이 uid 소유 문항만 드래그 가능. null이면 드래그 전부 비활성(공유 뷰) */
+  dragUid?: string | null;
   /** sent 모드: 이 뷰가 묶인 수신자 uid (권한 변경·공유 중단 대상) */
   recipientUid?: string;
   /** received 모드: 소유자 프로필 (uid → profile) */
@@ -87,7 +102,8 @@ function UpdatedCell({ d }: { d?: Date }) {
 }
 
 export default function ListView({
-  problems, scopeKey, mode, sort, recipientUid, profiles, onView, onProblemAction, onChanged,
+  problems, scopeKey, mode, sort, folderRows = [], onSelectFolder, dragUid = null,
+  recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
@@ -98,6 +114,13 @@ export default function ListView({
     // numeric — "문제2"가 "문제10" 앞에 오게 (GAS 파일명 정렬과 같은 옵션)
     if (sort.key === 'title') return mul * (a.title || '').localeCompare(b.title || '', 'ko', { numeric: true, sensitivity: 'base' });
     return mul * ((a.updated_at?.getTime() || 0) - (b.updated_at?.getTime() || 0));
+  });
+
+  // Phase 63 D14 — 폴더 정렬은 폴더끼리만(문항과 섞이지 않는다). 같은 키·방향에 반응.
+  const sortedFolders = [...folderRows].sort((a, b) => {
+    const mul = sort.dir === 'asc' ? 1 : -1;
+    if (sort.key === 'title') return mul * a.folder.name.localeCompare(b.folder.name, 'ko', { numeric: true, sensitivity: 'base' });
+    return mul * ((a.updated?.getTime() || 0) - (b.updated?.getTime() || 0));
   });
 
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
@@ -157,8 +180,47 @@ export default function ListView({
           Phase 62 D7 래퍼의 "위 8px 덮기"를 헤더 없이 띠만 되살린 것. 흐름 높이 8이
           paddingTop 8을 대체하므로 첫 행 위치·JS 정렬 목표선(SNAP_TOP_GAP 8)은 불변이다. */}
       <div aria-hidden style={{ position: 'sticky', top: 0, height: 8, background: 'var(--bg-functional)', zIndex: 1 }} />
+      {/* ═══ 폴더 행 (Phase 63 D11~D13) — 문항 행 위. 테두리·클레이 없음(아이보리 바탕 =
+          "문항 밖"), 클릭 = 진입, 펼치기 없음. hover 이름 밑줄은 globals.css `.list-folder-row`.
+          드롭 타깃(D25)이며 [data-snap-row]로 스냅 정렬에도 낀다(D15′). */}
+      {sortedFolders.map(({ folder: f, count, updated }) => (
+        <Droppable key={f.id} id={dndId.folderRow(f.id)} data={{ type: 'folder', folder: f }}>
+          {({ setNodeRef, isOver }) => (
+            <div
+              ref={setNodeRef}
+              className="list-folder-row"
+              data-snap-row=""
+              onClick={() => onSelectFolder?.(f)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
+                borderRadius: 8, marginBottom: 4, cursor: 'pointer',
+                background: isOver ? DROP_TINT : 'transparent',
+                boxShadow: isOver ? DROP_RING : 'none',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {f.icon ? <TwemojiImg emoji={f.icon} label={f.name} size={16} /> : <IconFolder size={16} />}
+                </span>
+                <span className="list-folder-name" style={{
+                  fontSize: 13.5, color: 'var(--text-primary)', fontWeight: 500,
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
+                }}>
+                  {f.name}
+                </span>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>({count})</span>
+              </div>
+              {mode === 'received' && <div style={{ width: 120, flexShrink: 0 }} />}
+              {mode === 'sent' && <div style={{ width: 64, flexShrink: 0 }} />}
+              <div style={{ width: 86, flexShrink: 0, fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(updated)}</div>
+              <div style={{ width: 28, flexShrink: 0 }} />
+            </div>
+          )}
+        </Droppable>
+      ))}
+
       {/* 행 */}
-      {sorted.length === 0 ? (
+      {sorted.length === 0 && sortedFolders.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
           {/* D2 — 카드 빈 상태(FolderView)와 같은 문구 체계 */}
           {mode === 'trash' ? '휴지통이 비어 있습니다.'
@@ -174,9 +236,23 @@ export default function ListView({
         return (
           /* Phase 62 D6 — 행 = 가로로 긴 클레이 카드. 세로 두께는 현행 유지(라운드 때문에 좌우만 +4).
              hover는 globals.css `.folder-row:hover`가 담당한다(인라인 핸들러 제거).
-             ⚠ `problem-card` 클래스를 붙이지 말 것 — Phase 59a Q5 예외(content:none)가 딸려온다. */
-          <div
+             ⚠ `problem-card` 클래스를 붙이지 말 것 — Phase 59a Q5 예외(content:none)가 딸려온다.
+             Phase 63 D24 — 행 = 드래그 소스(내 소유·비공유 뷰만). 클릭이 1차 동작이라
+             커서는 pointer 유지, 드래그는 PointerSensor distance 8 뒤에만 시작된다. */
+          <Draggable
             key={p.id}
+            id={dndId.problemRow(p.id)}
+            data={{ type: 'problem', problem: p }}
+            disabled={!dragUid || p.authorUid !== dragUid}
+          >
+            {({ setNodeRef, attributes, listeners, isDragging }) => {
+            // D30 — 전역 KeyboardSensor의 onKeyDown 활성자는 제외(카드와 같은 규약)
+            const { onKeyDown: _kbdActivator, ...pointerListeners } = (listeners ?? {}) as Record<string, unknown>;
+            return (
+          <div
+            ref={setNodeRef}
+            {...attributes}
+            {...pointerListeners}
             className="folder-row"
             data-snap-row=""
             onClick={() => onView(p)}
@@ -186,7 +262,7 @@ export default function ListView({
               border: '0.5px solid var(--border-content)',
               borderRadius: 8, marginBottom: 4,
               cursor: 'pointer',
-              opacity: busyId === p.id ? 0.5 : 1,
+              opacity: isDragging ? 0.4 : busyId === p.id ? 0.5 : 1,
               transition: 'background .15s, box-shadow .15s',
             }}
           >
@@ -265,6 +341,9 @@ export default function ListView({
               <IconDotsVertical size={16} />
             </button>
           </div>
+            );
+            }}
+          </Draggable>
         );
       })}
 

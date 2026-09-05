@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 /* Phase 63 S0 — DndContext·센서·오버레이·드롭 핸들러는 AppShell로 이관(D21).
    여기 남는 것은 Draggable(카드)·Droppable(칩) 등록뿐이고, id는 dndId 프리픽스(D34),
    data에는 type이 필수다(D23 — 전역 핸들러가 type으로 분기한다). */
@@ -10,7 +10,8 @@ import { Problem, Block, Folder, UserProfile } from '../../types/problem';
 import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import ListView, {
-  ListMode, ListHeader, toggledSort, defaultListSort, type ListSortState, type ListSortKey,
+  ListMode, ListHeader, toggledSort, defaultListSort,
+  type ListSortState, type ListSortKey, type FolderRowData,
 } from './ListView';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import EditorPreview from '../editor/EditorPreview';
@@ -80,7 +81,6 @@ interface FolderViewProps {
    *  onAuthStateChanged 구독과 users 프로필 upsert가 한 번 더 돈다) */
   user?: User | null;
   onSelectFolder?: (folder: Folder) => void;
-  onMoveProblemToFolder?: (problem: Problem, folder: Folder) => void;
   // Phase 49: problems prop을 folder_id 필터 없이 그대로 사용(공유 보낸 뷰 등)
   passthrough?: boolean;
   // Phase 49: 공유 뷰 리스트 컨텍스트 (받은=소유자 컬럼, 보낸=권한/공유중단)
@@ -118,7 +118,7 @@ function formatDateTime(d?: Date): string {
 }
 
 export default function FolderView({
-  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder, onMoveProblemToFolder,
+  folder, problems, folders, onEdit, onView, onProblemAction, onEmptyTrash, onUpdated, onSelectFolder,
   user,
   passthrough = false, listContext,
 }: FolderViewProps) {
@@ -221,10 +221,35 @@ export default function FolderView({
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
   const breadcrumb = isSpecial ? [] : getFolderPath(folders, folder.id);
 
-  // 문항을 하위 폴더로 끌어 넣기: 하위 폴더가 있고, 이동 핸들러가 있을 때만 활성.
-  // ⚠ 드롭 처리는 AppShell 전역 핸들러가 한다(S0) — onMoveProblemToFolder는 여기선
-  //   "이동 가능한 화면인가"의 게이트로만 남았고, 조건 자체는 S3(D24)에서 재정의된다.
-  const dndEnabled = !isSpecial && childFolders.length > 0 && !!onMoveProblemToFolder;
+  // Phase 63 D24 — 드래그 소스 조건 재정의: 내 소유 문항·비공유 뷰. 휴지통·미지정 포함
+  // (휴지통 문항 → 폴더 드롭 = 그 폴더로 복원, Q10). "하위 폴더 있을 때" 조건은 삭제 —
+  // 타깃이 사이드바 트리·미지정·휴지통에 항상 있다. 드롭 처리는 AppShell 전역 핸들러(S0).
+  const dragUid = user && !passthrough && !listContext && !isSharedWithMe ? user.uid : null;
+
+  /* Phase 63 D15 — 폴더 행 데이터: 직속 문항 수 + 수정일(하위 트리 문항 max(updated_at) →
+     비면 폴더 문서 updated_at → created_at). 계산은 한 패스 O(P×depth) — 각 문항의 폴더에서
+     조상으로 걸어 올라가며 max 갱신(하위 폴더마다 getDescendantIds를 도는 O(F·P) 금지). */
+  const folderRowsData = useMemo<FolderRowData[]>(() => {
+    if (childFolders.length === 0) return [];
+    const parentOf = new Map(folders.map((f) => [f.id, f.parent_id || null]));
+    const maxByFolder = new Map<string, number>();
+    for (const p of problems) {
+      if (!p.folder_id || p.folder_id === TRASH_FOLDER_ID) continue;
+      const t = p.updated_at?.getTime() ?? 0;
+      let cur: string | null = p.folder_id;
+      const guard = new Set<string>(); // 순환 방어(getFolderPath와 같은 규약)
+      while (cur && !guard.has(cur)) {
+        guard.add(cur);
+        if ((maxByFolder.get(cur) ?? 0) < t) maxByFolder.set(cur, t);
+        cur = parentOf.get(cur) ?? null;
+      }
+    }
+    return childFolders.map((cf) => ({
+      folder: cf,
+      count: problems.filter((p) => p.folder_id === cf.id).length,
+      updated: maxByFolder.has(cf.id) ? new Date(maxByFolder.get(cf.id)!) : cf.updated_at ?? cf.created_at,
+    }));
+  }, [childFolders, folders, problems]);
 
   const folderProblems = problems
     .filter((p) => {
@@ -433,21 +458,30 @@ export default function FolderView({
           </span>
           {breadcrumb.length > 1 && onSelectFolder && (
             <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>
+              {/* Phase 63 D25(Q6) — 브레드크럼 상위 폴더 = 드롭 타깃. 현재 폴더는 slice(0,-1)로
+                  이미 제외돼 있다(같은 폴더 드롭은 어차피 무시). 하이라이트는 링+틴트 한 문법(D27). */}
               {breadcrumb.slice(0, -1).map((f) => (
                 <span key={f.id} style={{ display: 'inline-flex', alignItems: 'center' }}>
-                  <button
-                    onClick={() => onSelectFolder(f)}
-                    style={{
-                      border: 'none', background: 'none', cursor: 'pointer', padding: 0,
-                      fontSize: 14, fontWeight: 500, color: 'var(--text-muted)',
-                      fontFamily: 'var(--font-ui)', maxWidth: 160,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.textDecoration = 'underline'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.textDecoration = 'none'; }}
-                  >
-                    {f.name}
-                  </button>
+                  <Droppable id={dndId.crumb(f.id)} data={{ type: 'folder', folder: f }}>
+                    {({ setNodeRef, isOver }) => (
+                      <button
+                        ref={setNodeRef}
+                        onClick={() => onSelectFolder(f)}
+                        style={{
+                          border: 'none', cursor: 'pointer', padding: '0 2px', borderRadius: 4,
+                          background: isOver ? DROP_TINT : 'none',
+                          boxShadow: isOver ? DROP_RING : 'none',
+                          fontSize: 14, fontWeight: 500, color: 'var(--text-muted)',
+                          fontFamily: 'var(--font-ui)', maxWidth: 160,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.textDecoration = 'underline'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-muted)'; e.currentTarget.style.textDecoration = 'none'; }}
+                      >
+                        {f.name}
+                      </button>
+                    )}
+                  </Droppable>
                   <span style={{ margin: '0 4px' }}>/</span>
                 </span>
               ))}
@@ -576,6 +610,9 @@ export default function FolderView({
             scopeKey={folder.id}
             mode={listMode}
             sort={listSort}
+            folderRows={folderRowsData}
+            onSelectFolder={onSelectFolder}
+            dragUid={dragUid}
             recipientUid={listContext?.recipientUid}
             profiles={listContext?.profiles}
             onView={onView}
@@ -600,8 +637,9 @@ export default function FolderView({
             {folderProblems.map((problem) => {
               const blocks = questionBlocksMap[problem.id] || [];
               return (
-                <Draggable key={problem.id} id={dndId.card(problem.id)} data={{ type: 'problem', problem }} disabled={!dndEnabled}>
+                <Draggable key={problem.id} id={dndId.card(problem.id)} data={{ type: 'problem', problem }} disabled={!dragUid || problem.authorUid !== dragUid}>
                   {({ setNodeRef, attributes, listeners, isDragging }) => {
+                  const canDrag = !!dragUid && problem.authorUid === dragUid;
                   /* D30 — 전역 KeyboardSensor의 onKeyDown 활성자는 스프레드에서 제외한다:
                      카드는 attributes로 tabIndex를 받으므로, 빼지 않으면 포커스된 카드에서
                      Space/Enter가 드래그를 시작한다(포인터 전용 소스). */
@@ -622,7 +660,7 @@ export default function FolderView({
                     padding: '18px 22px',
                     height: 320,
                     overflow: 'hidden',
-                    cursor: dndEnabled ? 'grab' : 'pointer',
+                    cursor: canDrag ? 'grab' : 'pointer',
                     opacity: isDragging ? 0.4 : 1,
                     position: 'relative',
                     transition: 'box-shadow 0.15s, transform 0.15s, background 0.15s',

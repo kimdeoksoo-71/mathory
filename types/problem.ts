@@ -279,6 +279,10 @@ export interface Folder {
   icon?: string;              // 폴더 아이콘 이모지(순수 유니코드). 비어있으면 기본 폴더 아이콘 (Phase 39)
   parent_id?: string | null;  // 상위 폴더 id. null/undefined/'' = 최상위 (Phase 40)
   created_at?: Date;
+  /** Phase 63 D15 — 폴더 문서의 이름·아이콘·순서 변경일. listFolders가 이미 파싱해 싣던 값을
+   *  타입에 노출만 한 것(런타임 변화 0). 폴더 행 수정일의 폴백으로 쓴다 —
+   *  1순위는 하위 트리 문항의 max(updated_at)이다(FolderView가 계산). */
+  updated_at?: Date;
 }
 
 // ═══ Stage 1: 공유 ═══

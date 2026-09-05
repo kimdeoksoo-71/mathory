@@ -200,10 +200,13 @@ export async function listRecentProblems(userId: string, maxCount: number = 10):
 }
 
 // Phase 6: 문항의 폴더 변경
+// Phase 63 D20′(Q14) — 이동은 편집이 아니다: updated_at을 찍지 않는다. 목록이 updated_at
+// 정렬이라 이동만으로 문항이 "최근 수정"으로 둔갑하던 것을 끊는다(61b가 검증에 내린 것과
+// 같은 판단). ⚠ 휴지통으로의 이동(moveToTrash)만 예외로 찍는다 — 휴지통에서 updated_at은
+// 사실상 "버린 시각"이고 휴지통 기본 정렬(최근 버린 순)이 그 값을 읽는다.
 export async function moveProblemToFolder(problemId: string, folderId: string | null): Promise<void> {
   await updateDoc(doc(db, 'problems', problemId), {
     folder_id: folderId,
-    updated_at: serverTimestamp(),
   });
 }
 
@@ -465,8 +468,9 @@ export async function deleteFolder(folderId: string, userId: string): Promise<vo
       where('folder_id', '==', id)
     );
     const snapshot = await getDocs(q);
+    // Phase 63 D20′ — 폴더 삭제로 인한 미분류 이동도 편집이 아니다: updated_at 미갱신
     await Promise.all(snapshot.docs.map((d) =>
-      updateDoc(d.ref, { folder_id: null, updated_at: serverTimestamp() })
+      updateDoc(d.ref, { folder_id: null })
     ));
   }));
 

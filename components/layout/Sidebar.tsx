@@ -21,7 +21,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 /* Phase 63 S0 — DndContext·센서·핸들러·오버레이는 AppShell로 이관(D21).
    여기 남는 것은 useSortable(폴더)·useDraggable(최근 문항)·SortableContext뿐이다. */
-import { useDragKind, isProblemDrag, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
+import { Droppable, useDragKind, isProblemDrag, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
 
 // ─── Sidebar Item (일반용) ───
 function SidebarItem({
@@ -879,22 +879,28 @@ export default function Sidebar({
             );
           })()}
 
-          {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위) */}
+          {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위)
+              Phase 63 D25 — 드롭 타깃(folder_id: null). 하이라이트는 링+틴트 한 문법(D27). */}
           {!collapsed && foldersOpen && (
+            <Droppable id={dndId.unassigned} data={{ type: 'unassigned' }}>
+              {({ setNodeRef, isOver }) => (
             <button
+              ref={setNodeRef}
               onClick={onSelectUnassigned}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10,
                 width: '100%', padding: '8px 12px',
                 border: 'none', borderRadius: 8, cursor: 'pointer',
-                background: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                boxShadow: isOver ? DROP_RING : 'none',
+                background: isOver ? DROP_TINT
+                  : activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
                 color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontSize: 13.5,
                 fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 700 : 500,
                 fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
               }}
-              onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID) e.currentTarget.style.background = 'transparent'; }}
+              onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+              onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent'; }}
             >
               <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === UNASSIGNED_FOLDER_ID ? 1 : 0.75 }}>
                 <IconInbox size={16} />
@@ -908,11 +914,18 @@ export default function Sidebar({
                 </span>
               )}
             </button>
+              )}
+            </Droppable>
           )}
 
-          {/* 휴지통 (항상 맨 아래, 드래그 불가) */}
+          {/* 휴지통 (항상 맨 아래, 드래그 소스는 아님)
+              Phase 63 D25(Q9) — 드롭 타깃 = trash 액션(moveToTrash — 이 경로만 updated_at을
+              찍어 "버린 시각"이 된다, Q14). */}
           {!collapsed && foldersOpen && (
+            <Droppable id={dndId.trash} data={{ type: 'trash' }}>
+              {({ setNodeRef, isOver }) => (
             <button
+              ref={setNodeRef}
               onClick={onSelectTrash}
               style={{
                 display: 'flex',
@@ -924,7 +937,9 @@ export default function Sidebar({
                 border: 'none',
                 borderRadius: 8,
                 cursor: 'pointer',
-                background: activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                boxShadow: isOver ? DROP_RING : 'none',
+                background: isOver ? DROP_TINT
+                  : activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
                 color: activeFolderId === TRASH_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                 fontSize: 13.5,
                 fontWeight: activeFolderId === TRASH_FOLDER_ID ? 700 : 500,
@@ -933,10 +948,10 @@ export default function Sidebar({
                 marginTop: 4,
               }}
               onMouseEnter={(e) => {
-                if (activeFolderId !== TRASH_FOLDER_ID) e.currentTarget.style.background = 'var(--bg-hover)';
+                if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)';
               }}
               onMouseLeave={(e) => {
-                if (activeFolderId !== TRASH_FOLDER_ID) e.currentTarget.style.background = 'transparent';
+                if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent';
               }}
             >
               <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === TRASH_FOLDER_ID ? 1 : 0.75 }}>
@@ -957,6 +972,8 @@ export default function Sidebar({
                 </span>
               )}
             </button>
+              )}
+            </Droppable>
           )}
         </div>
 

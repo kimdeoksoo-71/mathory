@@ -864,6 +864,11 @@ p:has(.marker-circled) {
 .problem-card:hover { --card-surface: var(--block-bg-active); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
 .folder-row:hover   { --card-surface: var(--block-bg-active); box-shadow: 0 2px 8px  rgba(0, 0, 0, 0.06); }
 
+/* Phase 63 D13 — 리스트 하위 폴더 행: 배경 채움 없이 이름 밑줄만(브레드크럼 문법).
+   행 배경 hover를 주지 않는 이유 — --bg-hover(0.8349)는 클레이(0.8674)보다 어두워
+   아이보리 무테두리 행에 채우면 문항 행보다 무거워진다(Phase 62 F1). */
+.list-folder-row:hover .list-folder-name { text-decoration: underline; color: var(--text-primary); }
+
 .problem-card .case-block::before,
 .problem-card .case-gap::before,
 .problem-card .case-block::after { content: none; }
