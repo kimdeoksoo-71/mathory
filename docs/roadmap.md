@@ -1874,7 +1874,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수 완료 2026-09-06 · 브랜치 `m4-icons` 병합·배포 대기)
+## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수·**배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/개선묶음 M4 아이콘 체계 Phosphor 전환 Final_V4 실행판.md`
 (덕수 결정 메모 → v1 web → v2 CLI 실측 → v3 web 재검증·덕수 확정 → **Final_V4 실행판**. §10이 구현·검수 기록, §9가 판본 정정 요약)
@@ -1894,7 +1894,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
   IconTextWidth 27×15 예외 폐기 → 24 정방 · IconDots=세로점 통합(D22) · IconExit=`sign-out`(D23)
 - ⚠ **교훈 — JSX grep 미사용 판정이 두 판본 연속 틀렸다**: `IconExit`는 `TRIGGER_ICON` 맵이
   컴포넌트 값으로 참조 중이었다. 판별은 `grep -rnw` 단어 경계로(N8, CLAUDE.md 명문화)
-- 잔여 1: Q7 — m4 첫 Vercel 배포 빌드 로그에서 `> icons:check` 실행 확인
+- Q7 확인 완료: 배포 빌드 로그에 `[icons:check] OK — 49종` 실측(prebuild가 Vercel에서 돈다)
 
 ---
 

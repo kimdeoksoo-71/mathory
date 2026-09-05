@@ -371,7 +371,7 @@ M3의 27×15 예외는 스테퍼 꺾쇠(1.8)와 물리 획을 맞추기 위한 �
 | Q4 `split-vertical`·`rows` 은유 | 통과 |
 | Q5 블록 수식 | **비등방 x0.62 채택**(등방+겹침 기각) |
 | Q6 IconTextWidth 24 정방 | 통과(스테퍼 슬롯·Row 1 수용) |
-| Q7 Vercel prebuild | **유일한 잔여** — m4 첫 배포 빌드 로그의 `> icons:check` 줄로 확인 |
+| Q7 Vercel prebuild | **확인 완료(2026-09-06)** — 배포 빌드 로그에 `[icons:check] OK — 49종 · core@2.1.1` 실측. `prebuild` 발동 = `npm run build` 경로 증명 |
 
 ### 10-3. 문서 마감 (2026-09-06)
 

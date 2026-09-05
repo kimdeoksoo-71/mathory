@@ -287,7 +287,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M4 — 아이콘 체계 Phosphor 전환** — 구현·검수 완료(2026-09-06) · 브랜치 `m4-icons` 병합·배포 대기
+## 현재 Phase: **개선묶음 M4 — 아이콘 체계 Phosphor 전환** — 구현·검수·**배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/개선묶음 M4 아이콘 체계 Phosphor 전환 Final_V4 실행판.md`
 (계보: 덕수 결정 메모 → v1 web → v2 CLI 실측 → v3 web 재검증·덕수 확정 → **Final_V4 = 실행판**(§10이 구현·검수 기록, §9가 판본 정정 요약). 결정 D1~D23·N1~N8 전항 닫힘)
@@ -306,7 +306,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - 덕수 실물 검수(2026-09-06) 전항 통과: † 잔존 8곳 regular 유지(bold 예외 0) · Σ=`sigma` 채택
   (M3 자체 Σ 폐기) · 블록 수식 = 비등방 x0.62 채택 · `split-vertical`(블록 분할)·`rows`(수식행 분할) ·
   Row 2 20px · IconTextWidth 24 정방
-- Q7(Vercel `prebuild` 실행 여부)만 m4 첫 배포의 빌드 로그에서 확인(`> icons:check` 줄)
+- Q7 확인 완료(2026-09-06): 배포 빌드 로그에 `[icons:check] OK — 49종` 실측 — `prebuild` 배선이 Vercel에서 실제로 돈다(드리프트는 이제 빌드 실패다)
 
 ### 이전: **Phase 63 — FolderView 리스트·칼럼 체계 · 앱 전역 DnD** — 구현·검수 완료 · **배포 완료(2026-09-06)**
 
