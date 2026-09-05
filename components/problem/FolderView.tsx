@@ -182,18 +182,26 @@ export default function FolderView({
       if (!gate.list || gate.dragging) return;
       const rows = el.querySelectorAll<HTMLElement>('[data-snap-row]');
       if (rows.length === 0) return;
-      // 목표선 = 컨테이너 상단 + 8(ListView 루트 paddingTop 8과 짝 — 첫 행이 무이동으로 정렬)
+      // 목표선 = 컨테이너 상단 + 8(ListView 마스크 띠 높이와 짝 — 첫 행이 무이동으로 정렬)
       const target = el.getBoundingClientRect().top + SNAP_TOP_GAP;
-      let best = 0;
-      let bestAbs = Infinity;
+      // 목표선 바로 위 행(dPrev ≤ 0)과 바로 아래 행(dNext > 0) 두 후보를 잡는다(문서 순서)
+      let dPrev = -Infinity;
+      let dNext = Infinity;
       for (const row of rows) {
         const d = row.getBoundingClientRect().top - target;
-        const a = Math.abs(d);
-        if (a < bestAbs) { bestAbs = a; best = d; }
-        else if (d > 0) break; // 문서 순서라 가장 가까운 행을 지나면 멀어지기만 한다
+        if (d <= 0) dPrev = d;
+        else { dNext = d; break; }
       }
-      // 스크롤 한계로 클램프 — 맨 아래 여백에서 억지로 끌어올리지 않는다
-      const delta = Math.max(Math.min(best, el.scrollHeight - el.clientHeight - el.scrollTop), -el.scrollTop);
+      // 도달 가능한 후보 중 가까운 쪽. ⚠ 맨 아래에서는 아래(dNext)로 못 가므로 위(dPrev)로
+      // 당겨 정렬한다(T3 4회차 — 바닥 클램프로 포기하면 역방향 끝에서 윗행이 걸친다).
+      // 그때 마지막 행이 바닥에 잘리지 않는 것은 ListView paddingBottom(한 행 피치 이상)이 보장.
+      const maxDown = el.scrollHeight - el.clientHeight - el.scrollTop;
+      const canDown = dNext <= maxDown + 0.5;
+      const canUp = dPrev >= -el.scrollTop - 0.5;
+      let delta: number;
+      if (canDown && (!canUp || dNext < -dPrev)) delta = dNext;
+      else if (canUp) delta = dPrev;
+      else return;
       if (Math.abs(delta) < 1) return; // 이미 정렬(자기 정렬 스크롤의 재발화 포함 — 루프 없음)
       el.scrollBy({ top: delta, behavior: 'smooth' });
     };
