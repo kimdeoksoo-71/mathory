@@ -6,7 +6,7 @@ import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave } from '../ui/Icons';
+import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment } from '../ui/Icons';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
@@ -197,7 +197,7 @@ export default function ListView({
                 {p.title || '(제목 없음)'}
               </span>
               {cc > 0 && (
-                <span title="미해결 댓글" style={badgeStyle}>💬<span style={{ marginLeft: 1 }}>{cc}</span></span>
+                <span title="미해결 댓글" style={badgeStyle}><IconComment size={12} /><span style={{ marginLeft: 1 }}>{cc}</span></span>
               )}
               {ac > 0 && (
                 <span title="AI agent 대화" style={badgeStyle}>

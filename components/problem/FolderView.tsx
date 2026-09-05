@@ -20,7 +20,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
-  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare,
+  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare, IconComment,
 } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
@@ -598,7 +598,7 @@ export default function FolderView({
                           flexShrink: 0,
                         }}
                       >
-                        💬<span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
+                        <IconComment size={12} /><span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
                       </span>
                     )}
                     {(agentCountsMap[problem.id] ?? 0) > 0 && (

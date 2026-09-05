@@ -505,6 +505,23 @@ export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
    ⚠ 느낌표의 점은 길이 0에 가까운 선 + strokeLinecap="round"로 만든다(원을 따로 그리면
      stroke 기반인 다른 획과 굵기가 어긋난다). */
 
+/** 댓글 — 둥근 말풍선 + 점 3개 (M3 A2 · D1).
+ *  💬 이모지 5곳을 대체한다(단색 stroke 아이콘들 사이에서 컬러 면 채움이 혼자 튀었다).
+ *  ⚠ 둥근 윤곽이 구분점이다 — IconCoachImportant(코칭)가 **네모** 말풍선+느낌표라
+ *    같은 네모로 그리면 둘이 혼동된다.
+ *  ⚠ 점은 길이 0 선 + strokeLinecap="round"(:505 규약) — 원을 따로 그리면 굵기가 어긋난다. */
+export function IconComment({ size = 14, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+      <line x1="8.2" y1="11.5" x2="8.3" y2="11.5" />
+      <line x1="11.95" y1="11.5" x2="12.05" y2="11.5" />
+      <line x1="15.7" y1="11.5" x2="15.8" y2="11.5" />
+    </svg>
+  );
+}
+
 export function IconCoachImportant({ size = 14, color = 'currentColor' }: IconProps) {
   // 말풍선 + 느낌표 — "이건 알고 가라"
   return (

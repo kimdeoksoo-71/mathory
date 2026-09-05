@@ -65,7 +65,7 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconRestore, IconSave, IconUndo, IconRedo,
+  IconRestore, IconSave, IconUndo, IconRedo, IconComment,
 } from '../ui/Icons';
 import { splitDisplayMathToRows } from '../../lib/mathSplit';
 import { isInsideMath } from '../../lib/latex-completions';
@@ -3309,7 +3309,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   if (panelMode !== 'comments') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                 }}
               >
-                💬{commentCount ? ` ${commentCount}` : ''}
+                <IconComment size={13} />{commentCount ? ` ${commentCount}` : ''}
               </button>
               <button
                 onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}

@@ -33,7 +33,7 @@ import { UserProfile, ProblemComment, DiscussionSession, VerifyKind } from '../.
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconDownload, IconShare,
   IconDocLines,
-  IconChevron, IconChevronLeft,
+  IconChevron, IconChevronLeft, IconComment,
 } from '../ui/Icons';
 import { alertDialog } from '../../lib/dialogs';
 
@@ -872,7 +872,7 @@ export default function ProblemView({
                   color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                💬{commentCount ? ` ${commentCount}` : ''}
+                <IconComment size={13} />{commentCount ? ` ${commentCount}` : ''}
               </button>
             )}
             {/* Phase 47: agent 버튼 — 오너 전용 */}
