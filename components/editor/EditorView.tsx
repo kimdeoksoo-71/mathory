@@ -65,9 +65,10 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconRestore, IconSave, IconUndo, IconRedo, IconComment,
+  IconRestore, IconSave, IconUndo, IconRedo, IconComment, IconTextWidth,
 } from '../ui/Icons';
 import { splitDisplayMathToRows } from '../../lib/mathSplit';
+import SizeStepper, { FontSizeGlyph } from '../ui/SizeStepper';
 import { isInsideMath } from '../../lib/latex-completions';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -3332,111 +3333,35 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           )}
         </div>
 
-        {/* ─── 가로폭 조절(em): 숫자 + 위/아래 꺾쇠 (덕수 요청) ───
-            ⚠ 우측 패널이 열리면 Row1 우측 끝이 패널에 덮인다 — 그 설정은 그대로 둔다.
-              (Row1·Row2는 패널 유무와 무관하게 같은 자리를 유지하는 것이 이 행의 규약) */}
+        {/* ─── 가로폭·글꼴 스테퍼 — SizeStepper 공용 (M3 A5·D14).
+            'em' 단위 제거 · 아이콘 신설. borderLeft 구분선은 이 래퍼들 소유다. ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           marginLeft: 4,
           borderLeft: '1px solid var(--border-light, #ddd)',
           paddingLeft: 8,
         }}>
-          <span style={{
-            fontSize: 13.5, fontFamily: 'var(--font-ui)', fontWeight: 500,
-            color: 'var(--text-secondary)', minWidth: 30, textAlign: 'right', userSelect: 'none',
-          }} title="본문 가로폭(em)">{widthEm}em</span>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <button
-              onClick={() => handleWidthChange(1)}
-              disabled={widthEm >= WIDTH_EM_MAX}
-              title="본문 넓히기"
-              style={{
-                border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: widthEm >= WIDTH_EM_MAX ? 'not-allowed' : 'pointer',
-                color: 'var(--text-muted)', opacity: widthEm >= WIDTH_EM_MAX ? 0.3 : 1,
-              }}
-            >
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M1 5 L5 1 L9 5" />
-              </svg>
-            </button>
-            <button
-              onClick={() => handleWidthChange(-1)}
-              disabled={widthEm <= WIDTH_EM_MIN}
-              title="본문 좁히기"
-              style={{
-                border: 'none', background: 'transparent', padding: 0, width: 14, height: 11,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: widthEm <= WIDTH_EM_MIN ? 'not-allowed' : 'pointer',
-                color: 'var(--text-muted)', opacity: widthEm <= WIDTH_EM_MIN ? 0.3 : 1,
-              }}
-            >
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M1 1 L5 5 L9 1" />
-              </svg>
-            </button>
-          </div>
+          <SizeStepper
+            icon={<IconTextWidth size={15} />}
+            value={widthEm} min={WIDTH_EM_MIN} max={WIDTH_EM_MAX}
+            onStep={(d) => handleWidthChange(d)}
+            titleUp="본문 넓히기" titleDown="본문 좁히기" title="본문 가로폭(em)"
+            numberStyle={{ fontSize: 13.5, minWidth: 22 }}
+          />
         </div>
-
-        {/* ─── 글꼴 크기 조절: 숫자 + 위/아래 꺾쇠 ─── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           marginLeft: 4,
           borderLeft: '1px solid var(--border-light, #ddd)',
           paddingLeft: 8,
         }}>
-          <span style={{
-            fontSize: 13.5,
-            fontFamily: 'var(--font-ui)',
-            fontWeight: 500,
-            color: 'var(--text-secondary)',
-            minWidth: 22,
-            textAlign: 'right',
-            userSelect: 'none',
-          }}>
-            {contentFontSize}
-          </span>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <button
-              onClick={() => handleFontSizeChange(FONT_SIZE_STEP)}
-              disabled={contentFontSize >= FONT_SIZE_MAX}
-              title="글꼴 확대"
-              style={{
-                border: 'none', background: 'transparent', padding: 0,
-                width: 14, height: 11,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: contentFontSize >= FONT_SIZE_MAX ? 'not-allowed' : 'pointer',
-                color: 'var(--text-muted)',
-                opacity: contentFontSize >= FONT_SIZE_MAX ? 0.3 : 1,
-              }}
-            >
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M1 5 L5 1 L9 5" />
-              </svg>
-            </button>
-            <button
-              onClick={() => handleFontSizeChange(-FONT_SIZE_STEP)}
-              disabled={contentFontSize <= FONT_SIZE_MIN}
-              title="글꼴 축소"
-              style={{
-                border: 'none', background: 'transparent', padding: 0,
-                width: 14, height: 11,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: contentFontSize <= FONT_SIZE_MIN ? 'not-allowed' : 'pointer',
-                color: 'var(--text-muted)',
-                opacity: contentFontSize <= FONT_SIZE_MIN ? 0.3 : 1,
-              }}
-            >
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none" stroke="currentColor"
-                strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                <path d="M1 1 L5 5 L9 1" />
-              </svg>
-            </button>
-          </div>
+          <SizeStepper
+            icon={<FontSizeGlyph />}
+            value={contentFontSize} min={FONT_SIZE_MIN} max={FONT_SIZE_MAX}
+            onStep={(d) => handleFontSizeChange(d * FONT_SIZE_STEP)}
+            titleUp="글꼴 확대" titleDown="글꼴 축소" title="본문 글자 크기(px)"
+            numberStyle={{ fontSize: 13.5, minWidth: 22 }}
+          />
         </div>
       </div>
 

@@ -510,6 +510,20 @@ export function IconRestore({ size = 14, color = 'currentColor' }: IconProps) {
  *  ⚠ 둥근 윤곽이 구분점이다 — IconCoachImportant(코칭)가 **네모** 말풍선+느낌표라
  *    같은 네모로 그리면 둘이 혼동된다.
  *  ⚠ 점은 길이 0 선 + strokeLinecap="round"(:505 규약) — 원을 따로 그리면 굵기가 어긋난다. */
+/** 문단 가로폭 — 좌우 세로바 + 양방향 화살표 (M3 A5). */
+export function IconTextWidth({ size = 15, color = 'currentColor' }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
+      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <line x1="3.5" y1="5" x2="3.5" y2="19" />
+      <line x1="20.5" y1="5" x2="20.5" y2="19" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+      <path d="M9.5 9.5 7 12l2.5 2.5" />
+      <path d="M14.5 9.5 17 12l-2.5 2.5" />
+    </svg>
+  );
+}
+
 export function IconComment({ size = 14, color = 'currentColor' }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
