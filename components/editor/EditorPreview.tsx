@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
+import { katexMacros } from '../../lib/katexMacros';
 import rehypeRaw from 'rehype-raw';
 import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
 import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
@@ -313,7 +314,8 @@ export default function EditorPreview({
       remarkPlugins={[remarkMath, remarkGfm]}
       rehypePlugins={[
         rehypeRaw,
-        [rehypeKatex, { strict: false, trust: true, macros: { "\\arraystretch": "1.8" } }],
+        // M3 B2 — 매크로는 katexMacros() 팩토리 한 벌(인쇄와 공유). 렌더마다 새 객체 = \gdef 오염 격리(D13)
+        [rehypeKatex, { strict: false, trust: true, macros: katexMacros() }],
         [rehypeTwemoji, {
           format: 'svg',
           source: TWEMOJI_BASE,

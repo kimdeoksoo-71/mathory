@@ -1104,3 +1104,24 @@ img.twemoji {
   border-radius: 50%;
   background: var(--mathory-red);
 }
+
+/* ═══ M3 B2 — 분수 가로바 길이 연장 · 번분수 단계 구분 ═══
+   정의 원천: docs/phaseSketch/katex-frac-bar-and-vgap-v1.md (KaTeX 0.16 검증 · 0.16.28 DOM 재확인).
+   세로 여백(글자↔가로바 최소 0.32em)은 lib/katexMacros.ts의 팬텀 매크로가 담당한다 — 짝으로 움직인다.
+   ⚠ 의도적으로 .preview-content로 좁히지 않는다 — 검증 카드·폴더뷰 카드의 분수도 가로바 연장을
+     받아야 화면 간 조판이 갈리지 않는다. 인쇄는 같은 document라 이 규칙이 그대로 적용된다.
+   ⚠ 선택자는 KaTeX 0.16 DOM(mfrac > vlist-t > vlist-r > vlist > span > mord) 기준 —
+     KaTeX 버전을 크게 올릴 때 재확인할 것. :has()는 팬텀 삽입 후 분자가 [분수, .rlap]
+     두 요소가 되는 구조 대응이다. */
+.katex { --frac-ext: .25em;   /* 가로바를 분자·분모 내용보다 좌우 각각 이만큼 연장 */
+         --frac-nest: .3em; } /* 번분수: 바깥 가로바를 한 단계 더 길게 */
+
+/* ① 모든 분수: 분자·분모 좌우 여백 → 가로바 연장 */
+.katex .mfrac > .vlist-t > .vlist-r > .vlist > span > .mord {
+  padding-left: var(--frac-ext); padding-right: var(--frac-ext);
+}
+/* ② 분자 또는 분모 전체가 하나의 분수일 때만 추가 여백 (다른 항이 있으면 적용 안 함) */
+.katex .mfrac > .vlist-t > .vlist-r > .vlist > span > .mord > .mord:first-child:nth-last-child(2):has(+ .rlap) > .mfrac,
+.katex .mfrac > .vlist-t > .vlist-r > .vlist > span > .mord > .mord:only-child > .mfrac {
+  padding-left: var(--frac-nest); padding-right: var(--frac-nest);
+}
