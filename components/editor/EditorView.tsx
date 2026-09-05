@@ -3311,7 +3311,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 }}
               >
                 {/* 크기 17 = 왼쪽 버전 기록(IconRestore 17)과 동일 — 검수 요청 2026-09-05 */}
-                <IconComment size={17} />{commentCount ? ` ${commentCount}` : ''}
+                <IconComment size={17} />{commentCount ? <span style={{ fontWeight: 500 }}>{' '}{commentCount}</span> : ''}
               </button>
               <button
                 onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
@@ -3330,7 +3330,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               >
                 {/* 검수 6·8·9차: "AI" → "Agent". 최종 A 15/500 · gent 12/400(덕수 확정).
                     숫자는 버튼 기본 13 그대로 */}
-                <span style={{ fontWeight: 500, letterSpacing: 0.3, fontSize: 15 }}>A<span style={{ fontSize: 12, fontWeight: 400 }}>gent</span></span>{agentCount ? ` ${agentCount}` : ''}
+                <span style={{ fontWeight: 500, letterSpacing: 0.3, fontSize: 15 }}>A<span style={{ fontSize: 12, fontWeight: 400 }}>gent</span></span>{agentCount ? <span style={{ fontWeight: 500 }}>{' '}{agentCount}</span> : ''}
               </button>
             </>
           )}
