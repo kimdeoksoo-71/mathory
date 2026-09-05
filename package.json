@@ -3,8 +3,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "npm run icons:check",
     "build": "next build",
     "start": "next start",
+    "icons:gen": "node scripts/gen-phosphor-paths.mjs",
+    "icons:check": "node scripts/gen-phosphor-paths.mjs --check",
+    "icons:sheet": "node scripts/gen-phosphor-paths.mjs --sheet",
     "test:rules": "firebase emulators:exec --only firestore \"node --test tests/firestore.rules.test.mjs\"",
     "test:export": "tsc lib/version/exportMd.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportMd.test.mjs",
     "test:case": "tsc lib/solutionOutline.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/caseBlock.test.mjs",
@@ -54,6 +58,7 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
+    "@phosphor-icons/core": "^2.1.1",
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
