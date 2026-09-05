@@ -492,10 +492,13 @@ export default function FolderView({
         flex: 1, minHeight: 0, width: '100%',
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
-        // Phase 63 D3 — 리스트 모드만 행 단위 스냅(proximity — mandatory는 트랙패드 관성을
-        // 붙잡는다). 카드 모드·드래그 중엔 'none'을 **명시**한다(조건부 longhand 함정 방지,
+        // Phase 63 D3(개정) — 리스트 모드만 행 단위 스냅. 계획은 proximity였으나 실기기
+        // macOS 트랙패드 관성 끝에서 Chrome이 proximity 스냅을 걸어 주지 않았다(T3 검수).
+        // CDP 합성 휠에서는 proximity도 스냅했으므로(프로브 실측) 구조 문제가 아니라
+        // 트랙패드 모멘텀 경로의 브라우저 동작이다 → mandatory로 전환(= "줄 단위" 의미 그대로).
+        // 카드 모드·드래그 중엔 'none'을 **명시**한다(조건부 longhand 함정 방지,
         // 드래그 중 스냅은 dnd-kit 자동 스크롤과 싸워 떨림을 만든다).
-        scrollSnapType: viewMode === 'list' && !dragKind ? 'y proximity' : 'none',
+        scrollSnapType: viewMode === 'list' && !dragKind ? 'y mandatory' : 'none',
         scrollPaddingTop: 8,
       }}>
         {/* 개선묶음 M2 E — 카드보기의 열수 제한을 푼다.
