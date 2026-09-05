@@ -8,7 +8,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildCaseLabels, buildCaseGapKeys, injectCaseLabel, splitCaseTitle, letters, caseClassName, convertCaseRefs } from '../.test-build/lib/caseBlock.js';
-import { buildOutline, hasOutlineContent } from '../.test-build/lib/solutionOutline.js';
+import { buildOutline, hasOutlineContent, needsPrefaceToggle } from '../.test-build/lib/solutionOutline.js';
 
 let seq = 0;
 const B = (type, raw_text) => ({ id: `b${seq++}`, block_key: `k${seq}`, type, raw_text, order: seq });
@@ -372,4 +372,47 @@ test('라벨 span 뒤 본문의 참조는 그대로 잡힌다', () => {
 test('C+숫자가 없으면 원문 그대로 (빠른 통과)', () => {
   const src = '경우를 나누어 생각하자';
   assert.equal(convertCaseRefs(src), src);
+});
+
+/* ═══ M3 B3 — 전문(前文) 여닫이 판정 needsPrefaceToggle (D9=(b)) ═══
+ *
+ * 버그: 여닫이가 `items.length > 0`만 보고 그려져, 요약 항목 앞에 숨은 내용이
+ * 없어도 '앞부분 펼치기'가 나오고 눌러도 아무것도 변하지 않았다.
+ * 명세: 여닫이는 ①전문 섹션이고 ②요약 항목이 있고 ③**요약 항목으로 닿을 수 없는
+ * 블록**이 있을 때만. items가 비면 숨은 블록이 있어도 false(덕수 확정 —
+ * "요약은 요약일 뿐, 전문은 요약 보기를 나가면 된다"). */
+
+test('M3-B3 ① pinned 블록으로 시작하는 풀이 — 숨은 내용이 없으면 여닫이 없음', () => {
+  const [sec] = buildOutline([{ ...B('text', '핵심 정리'), showInSummary: true }]);
+  assert.equal(sec.hasHiddenBlocks, false);
+  assert.equal(needsPrefaceToggle(sec), false);
+});
+
+test('M3-B3 ② 요약 항목 앞에 일반 텍스트가 있으면 여닫이 있음', () => {
+  const [sec] = buildOutline([
+    B('text', '서론'),
+    { ...B('text', '핵심'), showInSummary: true },
+  ]);
+  assert.equal(needsPrefaceToggle(sec), true);
+});
+
+test('M3-B3 ③ 레거시 라벨 블록은 라벨 줄만 노출 — 나머지가 숨어 여닫이 있음', () => {
+  const [sec] = buildOutline([B('text', '**Case 1.** 조건\n뒤따르는 본문')]);
+  assert.ok(sec.items.length > 0, '라벨이 항목으로 승격됐다');
+  assert.equal(needsPrefaceToggle(sec), true);
+});
+
+test('M3-B3 ④ 제목행 있는 경우로만 시작 — 구역이 경우 클릭 담당이라 여닫이 없음', () => {
+  const [sec] = buildOutline([
+    B('case', '$a>1$인 경우\n본문'),
+    B('text', '경우가 거느리는 후속'),
+  ]);
+  assert.equal(sec.hasHiddenBlocks, false);
+  assert.equal(needsPrefaceToggle(sec), false);
+});
+
+test('M3-B3 ⑤ 요약 항목이 없는 전문은 숨은 블록이 있어도 조용 — D9=(b) 명세 고정', () => {
+  const [sec] = buildOutline([B('text', '요약에 아무것도 안 남는 일반 풀이')]);
+  assert.equal(sec.hasHiddenBlocks, true);
+  assert.equal(needsPrefaceToggle(sec), false);
 });

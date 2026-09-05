@@ -66,6 +66,22 @@ export interface OutlineSection {
   items: OutlineItem[];
   /** 펼침 상태 원본 (heading 제외) */
   blocks: Block[];
+  /** M3 B3 — **요약 항목으로 닿을 수 없는** 블록이 하나라도 있는가.
+   *  닿을 수 있는 것: kind:'block'으로 통째 노출 · 제목행 있는 경우 블록 자신(head 노출,
+   *  body는 경우 클릭 담당) · 경우 구역(segment)에 딸린 블록(역시 경우 클릭 담당).
+   *  닿을 수 없는 것: 그 밖의 전부 — 일반 텍스트, 레거시 라벨 블록(라벨 **줄만** 노출),
+   *  경우 밖 이미지·선택지, curCase 없는 이어짓기(항목도 구역도 못 되는 채 숨는다). */
+  hasHiddenBlocks: boolean;
+}
+
+/** M3 B3(D9=(b)) — 전문(前文) 섹션의 여닫이를 그릴 것인가.
+ *  ⚠ 판정이 이 파일에 있어야 `test:case`가 덮는다 — JSX 안 조건은 어떤 테스트도 못 본다.
+ *  ⚠ `items`가 비면 숨은 블록이 있어도 false다(덕수 확정): "요약은 요약일 뿐 —
+ *    전문은 요약 보기를 나가면 된다." 여닫이 없던 조용한 전문은 계속 조용해야 한다.
+ *  호출부(OutlineSections)는 `needsPrefaceToggle(sec) || (open && …)`로 쓴다 —
+ *  둘째 항은 이미 열린 전문을 닫는 길이므로 반드시 유지할 것. */
+export function needsPrefaceToggle(sec: OutlineSection): boolean {
+  return sec.heading === null && sec.items.length > 0 && sec.hasHiddenBlocks;
 }
 
 /** 텍스트 계열 — 여기서만 Phase 54 레거시 라벨을 찾는다.
@@ -82,7 +98,7 @@ export function buildOutline(blocks: Block[]): OutlineSection[] {
   let cur: OutlineSection | null = null;
 
   function open(heading: Block | null, key: string): OutlineSection {
-    const s: OutlineSection = { key, heading, items: [], blocks: [] };
+    const s: OutlineSection = { key, heading, items: [], blocks: [], hasHiddenBlocks: false };
     sections.push(s);
     cur = s;
     return s;
@@ -121,6 +137,9 @@ export function buildOutline(blocks: Block[]): OutlineSection[] {
         // 이어짓기 — 경계가 아니라 직전 경우의 연속이다. 구역에 딸려 들어간다.
         curCase.segment!.push(b);
         if (b.showInSummary) curCase.pinned!.push(b);
+      } else {
+        // 제목도 없고 이어받을 경우도 없다 — 항목도 구역도 못 되는 채 숨는다 (M3 B3)
+        sec.hasHiddenBlocks = true;
       }
       continue;
     }
@@ -140,6 +159,10 @@ export function buildOutline(blocks: Block[]): OutlineSection[] {
       sec.items.push({ kind: 'block', itemKey: key, head: '', block: b });
       continue;
     }
+
+    // 여기 도달 = 스켈레톤에 통째로 노출되지 않는 블록이다 (M3 B3).
+    // 레거시 라벨이 아래에서 항목으로 승격되더라도 그 블록의 **나머지 줄**은 숨은 채다.
+    sec.hasHiddenBlocks = true;
 
     if (!SCANNED_TYPES.has(b.type)) continue;
 

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { Block } from '../../types/problem';
-import type { OutlineItem, OutlineSection } from '../../lib/solutionOutline';
+import { needsPrefaceToggle, type OutlineItem, type OutlineSection } from '../../lib/solutionOutline';
 import { caseClassName } from '../../lib/caseBlock';
 import EditorPreview from '../editor/EditorPreview';
 
@@ -149,7 +149,9 @@ export default function OutlineSections({
               <Toggler open={open} onToggle={(el) => onToggleSection(sec.key, el)} controls={bodyId} className="section-head">
                 {renderBlock(sec.heading, 0)}
               </Toggler>
-            ) : sec.items.length > 0 || (open && sec.blocks.length > 0) ? (
+            ) : needsPrefaceToggle(sec) || (open && sec.blocks.length > 0) ? (
+              /* M3 B3(D9=(b)) — 여닫이는 숨은 블록이 있을 때만. 판정은 lib이 소유한다.
+                 둘째 항은 이미 열린 전문을 닫는 길 — 지우면 한 번 열면 못 닫는다. */
               /* 전문(前文) 섹션 — 클릭할 제목이 없으므로 여닫이 줄을 따로 둔다 (Q4) */
               <Toggler open={open} onToggle={(el) => onToggleSection(sec.key, el)} controls={bodyId} className="section-head is-preface">
                 <span>{open ? '앞부분 접기' : '앞부분 펼치기'}</span>
