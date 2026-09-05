@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { IconShare } from '../ui/Icons';
 
 /**
  * Phase 52 5단계(O1): SNS 공유 버튼 v1. 셋업 0(키·도메인 등록 불필요).
@@ -49,7 +50,7 @@ export default function ShareButton({
   return (
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <button onClick={onShare} style={triggerStyle(compact)} title="공유">
-        <ShareIcon />
+        <IconShare size={14} />
         {!compact && <span>공유</span>}
       </button>
       {open && (
@@ -62,15 +63,6 @@ export default function ShareButton({
         </>
       )}
     </div>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
-      <line x1="8.6" y1="13.5" x2="15.4" y2="17.5" /><line x1="15.4" y1="6.5" x2="8.6" y2="10.5" />
-    </svg>
   );
 }
 

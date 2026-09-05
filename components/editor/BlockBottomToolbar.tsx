@@ -5,57 +5,31 @@
  *
  * 통합툴바에서 옮겨온 3개 버튼(블록 추가 / 블록 분할 / 수식행 분할)을
  * 블록 본문 아래에 배치한다. 상단바와 동일한 모양(세로폭·색·구분선).
- * 아이콘은 통합툴바 아이콘에서 사각 귀퉁이 브라켓을 제외한 글리프만 사용.
+ * M4: 글리프를 Phosphor로 — plus · split-vertical(블록을 위아래로 가른다, D16·N1)
+ * · rows(수식행 분할). 15px 유지.
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { PhIcon } from '../ui/Icons';
+import { PH } from '../ui/phosphorPaths';
 
 export interface BottomToolbarBlockType {
   type: string;
   label: string;
 }
 
-// ── 브라켓 없는 글리프 아이콘 (viewBox 64×64) ──
-const ICON_PROPS = {
-  width: 15,
-  height: 15,
-  viewBox: '0 0 64 64',
-  fill: 'none' as const,
-  stroke: 'currentColor',
-  strokeWidth: 4,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  'aria-hidden': true,
-};
+const GLYPH_SIZE = 15;
 
 function PlusGlyph() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M32 16 L32 48" />
-      <path d="M16 32 L48 32" />
-    </svg>
-  );
+  return <PhIcon d={PH.plus} size={GLYPH_SIZE} />;
 }
 
 function SplitGlyph() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M12 32 L52 32" />
-      <path d="M22 22 L12 32 L22 42" />
-      <path d="M42 22 L52 32 L42 42" />
-    </svg>
-  );
+  return <PhIcon d={PH.splitBlock} size={GLYPH_SIZE} />;
 }
 
 function MathSplitGlyph() {
-  return (
-    <svg {...ICON_PROPS}>
-      <path d="M14 25 L36 25" />
-      <path d="M14 39 L36 39" />
-      <circle cx="46" cy="25" r="3.2" fill="currentColor" stroke="none" />
-      <circle cx="46" cy="39" r="3.2" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <PhIcon d={PH.rows} size={GLYPH_SIZE} />;
 }
 
 const BAR_BTN: React.CSSProperties = {

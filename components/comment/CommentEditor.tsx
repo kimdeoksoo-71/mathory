@@ -9,6 +9,9 @@ import {
 } from '../../lib/ocr';
 import { uploadImage } from '../../lib/storage';
 import { alertDialog } from '../../lib/dialogs';
+import { OcrIcon } from '../editor/UnifiedToolbar';
+import { PhIcon } from '../ui/Icons';
+import { PH } from '../ui/phosphorPaths';
 
 export interface CommentEditorHandle {
   focus(): void;
@@ -167,31 +170,8 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}
           >
-            {/* 편집창 툴바와 동일한 OCR 아이콘 (UnifiedToolbar.tsx 참조) */}
-            <svg
-              width="18" height="18" viewBox="0 0 64 64"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={3.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M8 20 L8 8 L20 8" />
-              <path d="M44 8 L56 8 L56 20" />
-              <path d="M56 44 L56 56 L44 56" />
-              <path d="M20 56 L8 56 L8 44" />
-              <text
-                x="32" y="38"
-                textAnchor="middle"
-                fontFamily="Arial, Helvetica, sans-serif"
-                fontWeight="700"
-                fontSize="18"
-                fill="currentColor"
-                stroke="none"
-                letterSpacing="1"
-              >OCR</text>
-            </svg>
+            {/* 편집창 툴바와 동일한 OCR 아이콘 — 같은 컴포넌트 import (M4 D9, 사본 금지) */}
+            <OcrIcon size={18} />
           </button>
           <input
             ref={ocrInputRef}
@@ -217,22 +197,8 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                {/* 그림 삽입 아이콘 — 액자 + 산봉우리 + 해 (회색 모노톤) */}
-                <svg
-                  width="18" height="18" viewBox="0 0 64 64"
-                  fill="none"
-                  stroke="#888"
-                  strokeWidth={3.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <rect x="8" y="12" width="48" height="40" rx="3" />
-                  <circle cx="22" cy="24" r="3.5" fill="#888" stroke="none" />
-                  <path d="M8 44 L24 30 L36 40 L46 32 L56 42 L56 52 L8 52 Z"
-                    fill="#ccc" />
-                  <path d="M8 44 L24 30 L36 40 L46 32 L56 42" stroke="#888" />
-                </svg>
+                {/* 그림 삽입 — Phosphor image · currentColor (M4 — #888/#ccc 하드코딩 제거) */}
+                <PhIcon d={PH.image} size={18} />
               </button>
               <input
                 ref={imageInputRef}
