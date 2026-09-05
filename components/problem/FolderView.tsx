@@ -611,7 +611,7 @@ export default function FolderView({
                           flexShrink: 0,
                         }}
                       >
-                        <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>
+                        <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
                         <span style={{ marginLeft: 1 }}>{agentCountsMap[problem.id]}</span>
                       </span>
                     )}

@@ -201,7 +201,7 @@ export default function ListView({
               )}
               {ac > 0 && (
                 <span title="AI agent 대화" style={badgeStyle}>
-                  <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>
+                  <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
                   <span style={{ marginLeft: 1 }}>{ac}</span>
                 </span>
               )}

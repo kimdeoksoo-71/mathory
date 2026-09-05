@@ -829,7 +829,7 @@ export default function ProblemView({
                   color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>AI</span>{agentCount ? ` ${agentCount}` : ''}
+                <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>{agentCount ? ` ${agentCount}` : ''}
               </button>
             )}
           </h1>
