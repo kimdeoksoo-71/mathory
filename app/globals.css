@@ -688,6 +688,7 @@ p:has(.marker-circled) {
 .coach-block .coach-label .coach-toggle {
   display: inline-flex;
   align-items: center;
+  gap: 0.35em;               /* M3 A1 — 라벨이 토글 안으로 들어와 부모 gap을 못 받는다 */
   padding: 3px 5px;
   margin: -3px -5px;
   border-radius: 4px;

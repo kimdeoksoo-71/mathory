@@ -27,22 +27,36 @@ export default function CoachLabel({
   onToggle?: () => void;
 }) {
   const interactive = !!onToggle;
+  /* M3 A1 — 아이콘 14 → 17(덕수: "약간만, 20%") · 클릭 범위 = 아이콘+라벨.
+     토글 스팬이 라벨까지 감싼다 — 접히면 라벨이 사라져 자연히 아이콘만 남는다.
+     ⚠ 비인터랙티브(인쇄·편집 미리보기·폴더뷰)는 옛 구조(형제) 그대로다:
+       아이콘↔라벨 간격을 부모 .coach-label의 gap이 공급하는 관계를 안 깨기 위해서다.
+       인터랙티브 쪽 간격은 .coach-toggle의 gap(globals)이 같은 값으로 공급한다. */
+  const icon = <IconCoachImportant size={17} />;
+  const label = !collapsed ? <span>{COACH_LABELS[type] ?? 'Tip'}</span> : null;
   return (
     <div className="coach-label">
-      <span
-        className={interactive ? 'coach-toggle' : undefined}
-        role={interactive ? 'button' : undefined}
-        tabIndex={interactive ? 0 : undefined}
-        aria-expanded={interactive ? !collapsed : undefined}
-        aria-label={interactive ? (collapsed ? 'Tip 펼치기' : 'Tip 접기') : undefined}
-        onClick={interactive ? (e) => { e.stopPropagation(); onToggle!(); } : undefined}
-        onKeyDown={interactive ? (e) => {
-          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onToggle!(); }
-        } : undefined}
-      >
-        <IconCoachImportant size={14} />
-      </span>
-      {!collapsed && <span>{COACH_LABELS[type] ?? 'Tip'}</span>}
+      {interactive ? (
+        <span
+          className="coach-toggle"
+          role="button"
+          tabIndex={0}
+          aria-expanded={!collapsed}
+          aria-label={collapsed ? 'Tip 펼치기' : 'Tip 접기'}
+          onClick={(e) => { e.stopPropagation(); onToggle!(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onToggle!(); }
+          }}
+        >
+          {icon}
+          {label}
+        </span>
+      ) : (
+        <>
+          {icon}
+          {label}
+        </>
+      )}
     </div>
   );
 }
