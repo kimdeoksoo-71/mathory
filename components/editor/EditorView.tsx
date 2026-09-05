@@ -3328,9 +3328,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                 }}
               >
-                {/* 검수 6·8·9차: "AI" → "Agent". 최종 A 15/500 · gent 12/400(덕수 확정).
-                    숫자는 버튼 기본 13 그대로 */}
-                <span style={{ fontWeight: 500, letterSpacing: 0.3, fontSize: 15 }}>A<span style={{ fontSize: 12, fontWeight: 400 }}>gent</span></span>{agentCount ? <span style={{ fontWeight: 500 }}>{' '}{agentCount}</span> : ''}
+                {/* 검수 13차 최종: "Agent" 통짜 13/500 — 2단 조판(A 15 + gent 12)은 부자연(덕수).
+                    숫자(13/500)와 같은 값이라 시각적으로 한 덩어리다 */}
+                <span style={{ fontWeight: 500, letterSpacing: 0.3, fontSize: 13 }}>Agent</span>{agentCount ? <span style={{ fontWeight: 500 }}>{' '}{agentCount}</span> : ''}
               </button>
             </>
           )}
