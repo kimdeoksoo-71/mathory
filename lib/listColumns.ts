@@ -135,15 +135,15 @@ const MODE_COLUMN_TRACK: Record<string, string> = { owner: '120px', perm: '64px'
  * grid-template-columns 문자열(D5).
  * 좌우 가장자리는 2px 스페이서 트랙 — columnGap 12와 합쳐 기존 좌우 인셋 14를 만든다
  * (subgrid에 컨테이너 패딩을 주면 첫·끝 트랙이 부모와 어긋난다 — 스페이서가 정답).
- * 마지막 28px = ⋮/칼럼 설정 트랙.
+ * checkbox(D16 — 다중 선택 열 24px)는 좌 스페이서 다음. 마지막 28px = ⋮/칼럼 설정 트랙.
  */
-export function buildGridTemplate(visible: string[], widths: Record<string, number>): string {
+export function buildGridTemplate(visible: string[], widths: Record<string, number>, checkbox = false): string {
   const tracks = visible.map((id) => {
     if (id === 'title') return 'minmax(0, 1fr)';
     if (widths[id]) return `${widths[id]}px`;
     return MODE_COLUMN_TRACK[id] ?? 'max-content';
   });
-  return ['2px', ...tracks, '28px', '2px'].join(' ');
+  return ['2px', ...(checkbox ? ['24px'] : []), ...tracks, '28px', '2px'].join(' ');
 }
 
 /* ═══ 정렬 서열 ═══ */

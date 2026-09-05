@@ -13,6 +13,7 @@ import {
   Timestamp,
   limit,
   onSnapshot,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import { deleteAllVersions } from './version/prune';
@@ -208,6 +209,23 @@ export async function moveProblemToFolder(problemId: string, folderId: string | 
   await updateDoc(doc(db, 'problems', problemId), {
     folder_id: folderId,
   });
+}
+
+/** Phase 63 D19 — 다중 선택 일괄 이동. writeBatch 500 한도는 청크 루프로.
+ *  스탬프 규칙은 함수 내부에(호출부 분기 금지 — 갈래 방지): 휴지통 타깃만 updated_at을
+ *  찍는다(Q14 — 휴지통에서 그 값은 "버린 시각"이고 기본 정렬이 읽는다). */
+export async function moveProblemsToFolder(problemIds: string[], folderId: string | null): Promise<void> {
+  for (let i = 0; i < problemIds.length; i += 500) {
+    const chunk = problemIds.slice(i, i + 500);
+    const batch = writeBatch(db);
+    for (const id of chunk) {
+      batch.update(doc(db, 'problems', id),
+        folderId === TRASH_FOLDER_ID
+          ? { folder_id: folderId, updated_at: serverTimestamp() }
+          : { folder_id: folderId });
+    }
+    await batch.commit();
+  }
 }
 
 // ===== Block CRUD =====

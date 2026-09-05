@@ -9,7 +9,7 @@ import { DIFFICULTIES } from '../../lib/constants';
 import {
   listProblems, listRecentProblems, listFolders,
   createFolder, updateFolder, deleteFolder, updateFolderOrders,
-  moveProblemToFolder,
+  moveProblemToFolder, moveProblemsToFolder,
   getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
   getProblemWithBlocks,
   duplicateProblem, moveToTrash, emptyTrash,
@@ -586,8 +586,33 @@ export default function AppShell() {
           }
         })();
       }
+    } else if (activeType === 'problems') {
+      // Phase 63 S5(D18·D19) — 다중 선택 드래그: 같은 타깃에 이미 있는 문항은 거른다
+      const list = active.data.current?.problems as Problem[] | undefined;
+      if (!list?.length || !overData) return;
+      const targetId: string | null | undefined =
+        overData.type === 'folder' ? (overData.folder as Folder).id
+        : overData.type === 'unassigned' ? null
+        : overData.type === 'trash' ? TRASH_FOLDER_ID
+        : undefined;
+      if (targetId === undefined) return;
+      const ids = list.filter((p) => (p.folder_id || null) !== targetId).map((p) => p.id);
+      if (ids.length === 0) return;
+      (async () => {
+        // D35 — 다중 → 휴지통만 확인
+        if (targetId === TRASH_FOLDER_ID && !await confirmDialog({
+          title: '휴지통으로 이동', message: `${ids.length}개 문항을 휴지통으로 이동하시겠습니까?`,
+          danger: true, confirmLabel: '이동',
+        })) return;
+        try {
+          await moveProblemsToFolder(ids, targetId); // writeBatch 청크 · TRASH만 스탬프(D19·Q14)
+          await loadData();
+        } catch (error) {
+          console.error('일괄 이동 에러:', error);
+          await alertDialog('문항 이동에 실패했습니다.');
+        }
+      })();
     }
-    // 'problems'(다중 선택 드래그)는 S5에서
   };
 
   const handleAppDragCancel = () => setActiveDragItem(null);

@@ -7,7 +7,12 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Draggable, Droppable, dndId, useDragKind, DROP_RING, DROP_TINT } from '../ui/dnd';
 import type { User } from 'firebase/auth';
 import { Problem, Block, Folder, UserProfile } from '../../types/problem';
-import { getPreviewBlocks, TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
+import {
+  getPreviewBlocks, moveProblemsToFolder, deleteProblem,
+  TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID,
+} from '../../lib/firestore';
+import FolderPickerDialog from '../ui/FolderPickerDialog';
+import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import ListView, { ListMode, ListHeader, type FolderRowData } from './ListView';
 import { toggledListSort } from '../../lib/listColumns';
@@ -21,7 +26,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
-  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare, IconComment,
+  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove,
 } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
@@ -136,7 +141,10 @@ export default function FolderView({
   const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
   useEffect(() => { setViewMode('list'); }, [folder.id]);
   useEffect(() => { sweepLegacyViewModeKeys(); }, []);
-  const changeViewMode = (m: 'card' | 'list') => setViewMode(m);
+  const changeViewMode = (m: 'card' | 'list') => {
+    setViewMode(m);
+    setSelectedIds(new Set()); // D20 — 보기 전환은 선택 해제
+  };
 
   useEffect(() => { setSort(loadSort()); }, []);
 
@@ -282,6 +290,72 @@ export default function FolderView({
     })
     .sort((a, b) => compareBySort(a, b, sort));
 
+  /* ═══ Phase 63 S5(D16~D20·D35) — 다중 선택 ═══
+     상태는 FolderView 소유(선택 바가 행 1에 산다). 해제 = 폴더 변경·보기 전환·이동 완료·
+     Escape — 정렬 변경엔 유지(헤더가 행 2에 남아 성립, D20). 선택 = 이동 목적이라
+     드래그 소스 조건(dragUid — 내 소유·비공유 뷰)과 같은 게이트다. */
+  const selectable = !!dragUid;
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchMoveOpen, setBatchMoveOpen] = useState(false);
+  useEffect(() => { setSelectedIds(new Set()); setBatchMoveOpen(false); }, [folder.id]);
+  // 목록 갱신 시 사라진 문항을 선택에서 정리 — 이동·삭제 완료 해제가 여기서 성립한다
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      if (prev.size === 0) return prev;
+      const alive = new Set(folderProblems.map((p) => p.id));
+      const next = new Set([...prev].filter((id) => alive.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [problems]);
+  // Escape 해제(D20)
+  useEffect(() => {
+    if (selectedIds.size === 0) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedIds(new Set()); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds.size]);
+
+  const clearSelection = () => setSelectedIds(new Set());
+  const runBatchMove = async (folderId: string | null) => {
+    const ids = [...selectedIds];
+    setBatchMoveOpen(false);
+    if (ids.length === 0) return;
+    try {
+      await moveProblemsToFolder(ids, folderId); // D19 — writeBatch 청크, TRASH만 스탬프
+      onUpdated?.();
+    } catch (e) {
+      console.error('일괄 이동 에러:', e);
+      await alertDialog('문항 이동에 실패했습니다.');
+    }
+    clearSelection();
+  };
+  const runBatchTrash = async () => {
+    // D35 — 다중 → 휴지통만 확인(단건 드래그·⋮는 무확인)
+    if (!await confirmDialog({
+      title: '휴지통으로 이동', message: `${selectedIds.size}개 문항을 휴지통으로 이동하시겠습니까?`,
+      danger: true, confirmLabel: '이동',
+    })) return;
+    await runBatchMove(TRASH_FOLDER_ID);
+  };
+  const runBatchRestore = () => runBatchMove(null); // 복원처는 미지정(A-18)
+  const runBatchDelete = async () => {
+    if (!await confirmDialog({
+      title: '영구 삭제',
+      message: [`${selectedIds.size}개 문항을 영구 삭제하시겠습니까?`, '이 작업은 되돌릴 수 없습니다.'],
+      danger: true, confirmLabel: '영구 삭제',
+    })) return;
+    const ids = [...selectedIds];
+    try {
+      await Promise.all(ids.map((id) => deleteProblem(id)));
+      onUpdated?.();
+    } catch (e) {
+      console.error('영구 삭제 에러:', e);
+      await alertDialog('영구 삭제에 실패했습니다.');
+    }
+    clearSelection();
+  };
+
   /* ═══ Phase 61d: 일괄 검증 게이트 ═══
      대상은 **폴더 직속 + 내 소유** 문항뿐이다. 휴지통·공유받음·공유보낸(passthrough·listContext)은
      제외하고 미지정은 포함한다(그 문항도 내 소유고 folderProblems 필터가 이미 걸러 준다).
@@ -353,6 +427,8 @@ export default function FolderView({
     return [
       { label: '공유', icon: <IconShare size={14} />, action: 'share' },
       { label: '사본 만들기', icon: <IconCopy size={14} />, action: 'duplicate' },
+      // Phase 63 D17(A-21) — 기본 메뉴엔 있던 '폴더 변경'이 이 자체 메뉴에서 빠져 있었다
+      { label: '폴더 변경', icon: <IconFolderMove size={14} />, action: 'move' },
       { label: '휴지통', icon: <IconTrash size={14} />, action: 'trash', danger: true },
     ];
   })();
@@ -514,6 +590,29 @@ export default function FolderView({
             ({folderProblems.length})
           </span>
           <div style={{ flex: 1 }} />
+          {/* Phase 63 D17·D44 — 선택 ≥1이면 행 1 우측 컨트롤 자리를 선택 바가 대체한다.
+              행 2 칼럼 헤더는 그대로라 선택 중 정렬 변경이 가능하고 선택도 유지된다(D20).
+              높이 변화 0 — 행 1은 minHeight 57 고정. */}
+          {viewMode === 'list' && selectedIds.size > 0 ? (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
+                {selectedIds.size}개 선택
+              </span>
+              {isTrash ? (
+                <>
+                  <button onClick={runBatchRestore} style={selectionBarBtn}>복원</button>
+                  <button onClick={runBatchDelete} style={{ ...selectionBarBtn, color: 'var(--accent-danger)' }}>영구 삭제</button>
+                </>
+              ) : (
+                <>
+                  <button onClick={() => setBatchMoveOpen(true)} style={selectionBarBtn}>폴더 변경…</button>
+                  <button onClick={runBatchTrash} style={{ ...selectionBarBtn, color: 'var(--accent-danger)' }}>휴지통</button>
+                </>
+              )}
+              <button onClick={clearSelection} style={{ ...selectionBarBtn, color: 'var(--text-muted)' }}>해제</button>
+            </div>
+          ) : (
+          <>
           <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
           {viewMode === 'card' && <SortControls sort={sort} onChange={updateSort} />}
           {batchButtonVisible && (
@@ -538,6 +637,8 @@ export default function FolderView({
               휴지통 비우기
             </button>
           )}
+          </>
+          )}
         </div>
         {/* 행 2 (Phase 63 D42): 리스트 모드 = 칼럼 헤더 — 스크롤 밖이라 트랙패드 고무줄
             오버스크롤에도 밀리지 않는다. 하위 폴더 칩은 카드 모드 전용이 됐고,
@@ -548,6 +649,7 @@ export default function FolderView({
               mode={listMode}
               prefs={prefs}
               template={headerTemplate}
+              checkbox={selectable}
               onToggleSort={toggleListSort}
               onPrefsChange={updatePrefs}
             />
@@ -642,6 +744,8 @@ export default function FolderView({
             folderRows={folderRowsData}
             onSelectFolder={onSelectFolder}
             dragUid={dragUid}
+            selectedIds={selectable ? selectedIds : undefined}
+            onSelectionChange={selectable ? setSelectedIds : undefined}
             recipientUid={listContext?.recipientUid}
             profiles={listContext?.profiles}
             onView={onView}
@@ -797,6 +901,17 @@ export default function FolderView({
         />
       )}
 
+      {/* Phase 63 S5(D17) — 다중 선택 폴더 변경 픽커(M2 A-4의 FolderPickerDialog 재사용) */}
+      {batchMoveOpen && (
+        <FolderPickerDialog
+          folders={folders}
+          currentFolderId={isSpecial ? null : folder.id}
+          title={`${selectedIds.size}개 문항 이동`}
+          onCancel={() => setBatchMoveOpen(false)}
+          onPick={runBatchMove}
+        />
+      )}
+
       {/* Phase 61d: 일괄 검증. ⚠ 전체 뷰포트 모달이라 이 위치에 두어도 사이드바까지 덮는다
           (main은 z-index 없는 position:relative라 스태킹 컨텍스트를 만들지 않는다) */}
       {batchOpen && user && (
@@ -815,6 +930,13 @@ export default function FolderView({
     </div>
   );
 }
+
+/* Phase 63 D17 — 선택 바 버튼 문법(행 1의 기존 텍스트 버튼들과 동일) */
+const selectionBarBtn: React.CSSProperties = {
+  border: 'none', background: 'none', cursor: 'pointer',
+  color: 'var(--text-secondary)', fontSize: 12, fontWeight: 500,
+  fontFamily: 'var(--font-ui)', padding: 0,
+};
 
 /* ═══ 카드/리스트 토글 (Phase 49) ═══ */
 function ViewModeToggle({ mode, onChange }: { mode: 'card' | 'list'; onChange: (m: 'card' | 'list') => void }) {

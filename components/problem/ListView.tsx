@@ -15,7 +15,7 @@ import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolder } from '../ui/Icons';
+import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolder, IconFolderMove } from '../ui/Icons';
 import { TwemojiImg } from '../editor/EmojiPickerPanel';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
@@ -51,6 +51,10 @@ interface ListViewProps {
   onSelectFolder?: (f: Folder) => void;
   /** Phase 63 D24 — 이 uid 소유 문항만 드래그 가능. null이면 드래그 전부 비활성(공유 뷰) */
   dragUid?: string | null;
+  /** Phase 63 D16(S5) — 다중 선택. 상태는 FolderView 소유(선택 바가 행 1에 살기 때문).
+   *  onSelectionChange가 없으면 체크박스 열 자체가 없다(공유 뷰) */
+  selectedIds?: Set<string>;
+  onSelectionChange?: (next: Set<string>) => void;
   /** sent 모드: 이 뷰가 묶인 수신자 uid (권한 변경·공유 중단 대상) */
   recipientUid?: string;
   /** received 모드: 소유자 프로필 (uid → profile) */
@@ -100,17 +104,23 @@ function UpdatedCell({ d }: { d?: Date }) {
 
 export default function ListView({
   problems, scopeKey, mode, prefs, bodyGridRef, folderRows = [], onSelectFolder, dragUid = null,
+  selectedIds, onSelectionChange,
   recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Shift-클릭 범위 앵커(D16 — 범위는 체크박스 위에서만)
+  const lastCheckRef = useRef<string | null>(null);
 
+  const selectable = !!onSelectionChange;
   const sort = prefs.sort;
   const visible = visibleColumns(prefs, mode);
-  const template = buildGridTemplate(visible, prefs.widths);
-  // 트랙 번호: 1 = 좌 스페이서, 2+i = visible[i], len+2 = ⋮/설정, len+3 = 우 스페이서
-  const trackOf = (id: string) => 2 + visible.indexOf(id);
+  const template = buildGridTemplate(visible, prefs.widths, selectable);
+  // 트랙 번호: 1 = 좌 스페이서, (선택 시 2 = 체크박스), lead+2+i = visible[i],
+  // lead+len+2 = ⋮/설정, 마지막 = 우 스페이서
+  const lead = selectable ? 1 : 0;
+  const trackOf = (id: string) => 2 + lead + visible.indexOf(id);
 
   /** 서열 칼럼의 정렬 값(D4 — 규칙은 listColumns, 필드 접근은 여기) */
   const rankOf = (p: Problem, key: string): number => {
@@ -151,6 +161,28 @@ export default function ListView({
     return sort.key === 'title' ? mul * v : v; // 그 외 키면 이름순(order 대신 — 이름이 곧 안정 기준)
   });
 
+  /** 체크박스 토글(D16) — Shift면 마지막 체크 앵커와의 범위를 클릭 대상의 새 상태로 통일 */
+  const handleCheck = (id: string, shift: boolean) => {
+    if (!onSelectionChange) return;
+    const prev = selectedIds ?? new Set<string>();
+    const next = new Set(prev);
+    const anchor = lastCheckRef.current;
+    if (shift && anchor && anchor !== id) {
+      const ids = sorted.map((p) => p.id);
+      const a = ids.indexOf(anchor);
+      const b = ids.indexOf(id);
+      if (a !== -1 && b !== -1) {
+        const on = !prev.has(id);
+        for (let k = Math.min(a, b); k <= Math.max(a, b); k++) {
+          if (on) next.add(ids[k]); else next.delete(ids[k]);
+        }
+      }
+    } else if (next.has(id)) next.delete(id);
+    else next.add(id);
+    lastCheckRef.current = id;
+    onSelectionChange(next);
+  };
+
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
     if (mode === 'trash') return [
       { label: '복원', icon: <IconCopy size={14} />, action: 'restore' },
@@ -165,6 +197,9 @@ export default function ListView({
     return [
       { label: '공유', icon: <IconShare size={14} />, action: 'share' },
       { label: '사본 만들기', icon: <IconCopy size={14} />, action: 'duplicate' },
+      // Phase 63 D17(A-21) — '폴더 변경'은 ContextMenu 기본 메뉴엔 있었는데 이 자체 메뉴가
+      // 덮어써 빠져 있었다(사이드바 최근 문항 ⋮에만 노출되던 것을 여기도)
+      { label: '폴더 변경', icon: <IconFolderMove size={14} />, action: 'move' },
       { label: '휴지통', icon: <IconTrash size={14} />, action: 'trash', danger: true },
     ];
   };
@@ -212,13 +247,9 @@ export default function ListView({
       case 'verify_solution':
         return <VerifyBadge problem={p} kinds={['solution']} size={11} />;
       case 'agent': {
+        // 덕수 지시(T5 후속) — 셀에는 숫자만("Agent" 라벨은 헤더가 이미 말한다)
         const ac = agentCounts[p.id] ?? 0;
-        return ac > 0 ? (
-          <span title="AI agent 대화" style={badgeStyle}>
-            <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
-            <span style={{ marginLeft: 1 }}>{ac}</span>
-          </span>
-        ) : null;
+        return ac > 0 ? <span title="AI agent 대화" style={badgeStyle}>{ac}</span> : null;
       }
       case 'comments': {
         const cc = commentCounts[p.id] ?? 0;
@@ -289,8 +320,8 @@ export default function ListView({
           좁게 실측돼 헤더 라벨이 잘린다. 높이 0·불가시 — 화면·스냅·간격에 영향 없음.
           ' ▲'는 정렬 화살표 자리 몫. 사용자 지정 px 트랙에는 영향 없다(고정 트랙이 이긴다). */}
       <div aria-hidden style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12, height: 0, overflow: 'hidden', visibility: 'hidden' }}>
-        {visible.map((id, i) => (id === 'title' ? null : (
-          <span key={id} style={{ gridColumn: 2 + i, fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'var(--font-ui)' }}>
+        {visible.map((id) => (id === 'title' ? null : (
+          <span key={id} style={{ gridColumn: trackOf(id), fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'var(--font-ui)' }}>
             {columnLabel(id)} ▲
           </span>
         )))}
@@ -353,7 +384,10 @@ export default function ListView({
           <Draggable
             key={p.id}
             id={dndId.problemRow(p.id)}
-            data={{ type: 'problem', problem: p }}
+            // D18 Finder 의미론 — 끌기 시작한 행이 선택에 있으면 선택 전체, 아니면 그 한 건
+            data={selectedIds?.has(p.id) && selectedIds.size > 1
+              ? { type: 'problems', problems: problems.filter((x) => selectedIds.has(x.id)) }
+              : { type: 'problem', problem: p }}
             disabled={!dragUid || p.authorUid !== dragUid}
           >
             {({ setNodeRef, attributes, listeners, isDragging }) => {
@@ -379,6 +413,23 @@ export default function ListView({
               transition: 'background .15s, box-shadow .15s',
             }}
           >
+            {/* 체크박스 열(D16) — 행 클릭(onView)·드래그 시작과 분리(전파 차단) */}
+            {selectable && (
+              <div
+                style={{ gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds?.has(p.id) ?? false}
+                  onClick={(e) => handleCheck(p.id, e.shiftKey)}
+                  onChange={() => {}}
+                  style={{ accentColor: 'var(--mathory-red, #D97757)', cursor: 'pointer' }}
+                />
+              </div>
+            )}
+
             {visible.map((id) => (
               /* overflow hidden — 사용자가 트랙을 좁혔을 때 셀 내용이 옆 칸으로 넘치지 않게 */
               <div key={id} style={{ gridColumn: trackOf(id), minWidth: 0, overflow: 'hidden' }}>
@@ -396,7 +447,7 @@ export default function ListView({
               }}
               title="더보기"
               style={{
-                gridColumn: visible.length + 2,
+                gridColumn: visible.length + lead + 2,
                 border: 'none', background: 'transparent',
                 cursor: 'pointer', color: 'var(--text-muted)', display: 'flex',
                 alignItems: 'center', justifyContent: 'center', padding: 0,
@@ -433,15 +484,18 @@ const badgeStyle: React.CSSProperties = {
    FolderView 제목바 행 2(리스트 모드)에서 렌더 — 스크롤 밖이라 고무줄 오버스크롤에 부동.
    시각은 Phase 62 D7 그대로(--block-bg · radius 8). 템플릿은 본문 실측값(D43)을 받고,
    도착 전 한 프레임은 같은 산식(buildGridTemplate)의 폴백이라 어긋나도 즉시 수렴한다. */
-export function ListHeader({ mode, prefs, template, onToggleSort, onPrefsChange }: {
+export function ListHeader({ mode, prefs, template, checkbox = false, onToggleSort, onPrefsChange }: {
   mode: ListMode;
   prefs: ListPrefs;
   /** 본문 grid의 실측 gridTemplateColumns(px 목록). null이면 자체 산식 폴백 */
   template: string | null;
+  /** 본문에 체크박스 열(D16)이 있는가 — 트랙 오프셋을 맞춘다(헤더 칸은 빈 채) */
+  checkbox?: boolean;
   onToggleSort: (key: string) => void;
   onPrefsChange: (mutate: (p: ListPrefs) => ListPrefs) => void;
 }) {
   const visible = visibleColumns(prefs, mode);
+  const lead = checkbox ? 1 : 0;
   const sortableIds = new Set(['title', 'updated', ...LIST_COLUMNS.filter((c) => c.kind === 'optional').map((c) => c.id)]);
   const adjustable = new Set([...LIST_COLUMNS.filter((c) => c.kind === 'optional').map((c) => c.id), 'updated']);
 
@@ -456,7 +510,7 @@ export function ListHeader({ mode, prefs, template, onToggleSort, onPrefsChange 
     <div style={{
       flex: 1, minWidth: 0,
       display: 'grid',
-      gridTemplateColumns: template ?? buildGridTemplate(visible, prefs.widths),
+      gridTemplateColumns: template ?? buildGridTemplate(visible, prefs.widths, checkbox),
       columnGap: 12, alignItems: 'center',
       padding: '6px 0',
       fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
@@ -464,7 +518,7 @@ export function ListHeader({ mode, prefs, template, onToggleSort, onPrefsChange 
       fontFamily: 'var(--font-ui)',
     }}>
       {visible.map((id, i) => (
-        <div key={id} style={{ gridColumn: 2 + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+        <div key={id} style={{ gridColumn: 2 + lead + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
           {sortableIds.has(id) ? (
             <button
               onClick={() => onToggleSort(id)}
@@ -488,7 +542,7 @@ export function ListHeader({ mode, prefs, template, onToggleSort, onPrefsChange 
         </div>
       ))}
       {/* ⋮ 트랙 = 칼럼 설정(D8 — 헤더 드래그 재배열 대신 팝오버 체크박스 + ▲▼) */}
-      <ColumnSettings gridColumn={visible.length + 2} prefs={prefs} onPrefsChange={onPrefsChange} />
+      <ColumnSettings gridColumn={visible.length + lead + 2} prefs={prefs} onPrefsChange={onPrefsChange} />
     </div>
   );
 }
@@ -592,6 +646,8 @@ function ColumnSettings({ gridColumn, prefs, onPrefsChange }: {
                     type="checkbox"
                     checked={!prefs.hidden.includes(id)}
                     onChange={() => toggleHidden(id)}
+                    // T5 검수 반영 — 브라우저 기본 파랑 대신 Mathory 로고 레드(덕수 지정)
+                    style={{ accentColor: 'var(--mathory-red, #D97757)' }}
                   />
                   {columnLabel(id)}
                 </label>

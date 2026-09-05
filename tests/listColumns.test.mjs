@@ -89,6 +89,11 @@ test('buildGridTemplate: 스페이서 2px + 제목 1fr + 자동/지정 폭 + mod
   assert.equal(t, '2px minmax(0, 1fr) 64px 120px max-content 28px 2px');
 });
 
+test('buildGridTemplate: checkbox 트랙(D16)은 좌 스페이서 다음 24px', () => {
+  const t = buildGridTemplate(['title', 'updated'], {}, true);
+  assert.equal(t, '2px 24px minmax(0, 1fr) max-content 28px 2px');
+});
+
 /* ─── 서열 ─── */
 test('verifyRank: 없음 < skip < ok < check < fail, stale은 한 단 아래(D4)', () => {
   const seq = [
