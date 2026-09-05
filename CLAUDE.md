@@ -221,7 +221,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
-- **툴바 아이콘은 `UnifiedToolbar.tsx` 안의 인라인 SVG 컴포넌트 계열**: `SVG_PROPS`(viewBox 64, stroke 3.5) + `CORNER_BRACKETS` 공유, `stroke="currentColor"`. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다 (Phase 58 P3)
+- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(49종 · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
 - **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
   같은 처방을 받았다 — `globals.css`의 `.preview-content .marker-*  { font-weight: inherit }`가
   PrintStyles에서 새어 드는 600을 화면에서만 되돌린다. **인쇄가 굵은 것은 의도된 예외다.**
@@ -287,7 +287,28 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 63 — FolderView 리스트·칼럼 체계 · 앱 전역 DnD** — 구현·검수 완료(2026-09-06) · 배포 대기
+## 현재 Phase: **개선묶음 M4 — 아이콘 체계 Phosphor 전환** — 구현·검수 완료(2026-09-06) · 브랜치 `m4-icons` 병합·배포 대기
+
+문서: `docs/phasedocs/개선묶음 M4 아이콘 체계 Phosphor 전환 Final_V4 실행판.md`
+(계보: 덕수 결정 메모 → v1 web → v2 CLI 실측 → v3 web 재검증·덕수 확정 → **Final_V4 = 실행판**(§10이 구현·검수 기록, §9가 판본 정정 요약). 결정 D1~D23·N1~N8 전항 닫힘)
+
+`Icons.tsx` 38종 Phosphor regular 전환(미사용 10종 삭제) · Row 2 브라켓 폐기·전 버튼 20px ·
+라이브러리 밖 사본 정리(ContextMenu·ShareButton·CommentEditor OCR/그림·BlockBottomToolbar) ·
+12~13px 22곳 → 14 상향. **서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · 로직 테스트 356건 무접촉.**
+신규 2(`scripts/gen-phosphor-paths.mjs` · `components/ui/phosphorPaths.ts` 생성물) · 커밋 6(S1~S6) ·
+전체 707+/812−. **규약은 위 "아이콘 체계는 Phosphor regular 단일이다" 절이 소유한다.**
+
+- ⚠ 판본 왕복 최대 수확: **JSX grep 미사용 판정이 두 판본 연속 틀렸다**(`IconExit` —
+  `VersionTimeline.TRIGGER_ICON` 맵이 컴포넌트 **값**으로 참조). 단어 경계 grep 규약(N8)의 출처이고,
+  실행했으면 컴파일이 깨졌다. `IconExit`는 삭제 대신 `sign-out`으로 전환(D23)
+- ⚠ **`IconDots`는 이름과 달리 도안이 세로 점이었다**(D22) — `dots-three`(가로)로 잘못 대응할 뻔한
+  자리. `dots-three-vertical`로 통합하고 별칭만 남겼다
+- 덕수 실물 검수(2026-09-06) 전항 통과: † 잔존 8곳 regular 유지(bold 예외 0) · Σ=`sigma` 채택
+  (M3 자체 Σ 폐기) · 블록 수식 = 비등방 x0.62 채택 · `split-vertical`(블록 분할)·`rows`(수식행 분할) ·
+  Row 2 20px · IconTextWidth 24 정방
+- Q7(Vercel `prebuild` 실행 여부)만 m4 첫 배포의 빌드 로그에서 확인(`> icons:check` 줄)
+
+### 이전: **Phase 63 — FolderView 리스트·칼럼 체계 · 앱 전역 DnD** — 구현·검수 완료 · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/Phase63 FolderView 리스트·칼럼·앱 전역 DnD Final_V4 실행판.md`
 (계보: 덕수 구상 → v1 web → v2 CLI 실측 → v3 web 재검증 → **Final_V4 = 실행판**(§8이 구현·검수 기록, 계획 개정 G1~G7). Q1~Q18 전항 판정 완료)
@@ -333,7 +354,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   Agent 칼럼 셀은 숫자만(라벨은 헤더 몫). zebra는 `--row-alt`(#F8F4EE, Q13=C) — 렌더 인덱스로
   `.is-alt` 부여(`:nth-child` 금지 — 마스크·폴더 행이 형제로 섞여 패리티가 어긋난다)
 
-### 이전: **개선묶음 M3 — 아이콘 정비 · 버그 수정 · 기능 개선** — 구현·검수 완료(2026-09-05) · 배포 대기
+### 이전: **개선묶음 M3 — 아이콘 정비 · 버그 수정 · 기능 개선** — 구현·검수 완료(2026-09-05) · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/개선묶음 M3 아이콘 정비·버그 수정 Final_V4 실행판.md`
 (계보: 덕수 메모 → v1 CLI 실측 → v2 CLI 확정 → v3 web 검증 → **Final_V4 = 실행판**(§4가 구현·검수 기록). §4-2의 시각 최종값이 계획서 수치를 이긴다)
@@ -359,16 +380,17 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   세로 여백은 `lib/katexMacros.ts` 팬텀. `\cfrac`는 자체 strut라 매크로 의도적 제외,
   검증 카드(`katex-render`)도 제외(\displaystyle 주입이 없어 이미 조판이 다른 자리).
   KaTeX 버전을 크게 올리면 선택자(`.mfrac > .vlist-t …`·`:has()`) 재확인
-- **툴바 아이콘 규격(`SVG_PROPS`·`CORNER_BRACKETS`)은 `toolbarIcons.tsx`가 소유한다** —
-  UnifiedToolbar→MathSymbolPalette 방향 import가 있어 역방향은 순환이라 셋째 파일로 뺐다.
-  시각 획 두께 = 3.5 × 렌더px/64 (22px에서 ≈1.2px)
-- **`IconTextWidth`는 Icons.tsx 정사각(viewBox 24) 규격의 유일한 예외**(27×15, viewBox=렌더
-  1:1) — 스테퍼 꺾쇠와 획 두께를 **물리적으로** 맞추기 위해서다(24 viewBox를 축소 렌더하면
-  1.1px대로 가늘어진다). 두께를 이 파일 규격으로 "통일"하지 말 것
-- **아이콘 시각 수치의 진실은 실행판 §4-2 표다** — 검수 5차 왕복으로 확정된 값(시그마 획 5 ·
-  세로바 0.9 · AA 19.5/500·11.5/600 등)이라 계획서 본문의 출발값과 다르다
+- ~~**툴바 아이콘 규격(`SVG_PROPS`·`CORNER_BRACKETS`)은 `toolbarIcons.tsx`가 소유한다**~~
+  ⚠ **M4에서 규격이 Phosphor(256·fill)로 바뀌고 `CORNER_BRACKETS`·자체 Σ(획 5)는 삭제됐다** —
+  파일 분리 이유(UnifiedToolbar→MathSymbolPalette 방향 import라 역방향은 순환)와 SigmaIcon
+  소유는 그대로다. 현행 규약은 위 "아이콘 체계는 Phosphor regular 단일이다" 절
+- ~~**`IconTextWidth`는 Icons.tsx 정사각 규격의 유일한 예외**(27×15)~~ ⚠ **M4에서 폐기 — 정방 24**.
+  "꺾쇠와 물리 획 맞추기"는 stroke 전제라 fill 기반 Phosphor에서 성립하지 않는다
+- **아이콘 시각 수치의 진실은 실행판 §4-2 표다** — 검수 5차 왕복 확정값. ⚠ 단 **아이콘 도안
+  수치(시그마 획 5 · 세로바 0.9 · 27×15)는 M4가 대체**했고, 텍스트 라벨 수치(AA 19.5/500 ·
+  Agent 13/500 등)만 유효하다
 
-### 이전: **Phase 61f — 정밀 검증·agent 토론 그림 첨부** — 구현·검수 완료(2026-09-04) · 배포 대기
+### 이전: **Phase 61f — 정밀 검증·agent 토론 그림 첨부** — 구현·검수 완료(2026-09-04) · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/Phase61f 정밀 검증·토론 그림 첨부 v3 실행판.md`
 (계보: v1 web → v2 CLI 실측 교차검토 → **v3 착수판 = 실행판**(§9가 구현 기록·검수). web v3 재검증은 생략 — 덕수 판정)
@@ -378,7 +400,7 @@ GAS 패치 12·13 이식으로 고쳤다 — 서버가 Storage 그림을 받아 
 Claude `image` · OpenAI `input_image`로 첨부하고, 본문엔 `[그림 k]`, 꼬리말에 첨부·누락 목록.
 **신규 2(`lib/verify/figures.ts` 순수 · `lib/figureFetch.ts` 서버) · 수정 8 · GAS/규칙/스키마/렌더 0.**
 로직 검증 305 → **336건**. 덕수 검수 5항 전항 통과(그림 검증 실판정 · 3사 그림 기반 답 ·
-메시지 그림 · 무회귀 · 61d empty_question 해소). ⚠ 61e·61e-2차와 함께 **아직 배포 전**.
+메시지 그림 · 무회귀 · 61d empty_question 해소). 61e·61e-2차와 함께 **배포 완료(2026-09-06)**.
 
 - **⚠ 핵심 불변식(D10): `images`가 비면 provider 요청 바디는 바이트 단위로 기존과 같다** —
   proofread·ai-complete·그림 없는 토론/검증이 전부 이 뒤에 있고 `aiProviderParams` 스냅샷이
@@ -403,7 +425,7 @@ Claude `image` · OpenAI `input_image`로 첨부하고, 본문엔 `[그림 k]`, 
 - **svg·ggb는 첨부하지 않는다(D5)** — `[그림 k — 첨부되지 않음: SVG/GeoGebra]` 자리표시자만.
   래스터화는 후속. `FIG_MIME_OK`에 gif가 없는 것은 Gemini 최소공통분모(Claude·GPT는 받는다)
 
-### 이전: **Phase 61e-2차 — 그림 링크 이관(GAS 패치 11) 대응** — 구현·검수 완료(2026-09-04) · 배포 대기
+### 이전: **Phase 61e-2차 — 그림 링크 이관(GAS 패치 11) 대응** — 구현·검수 완료(2026-09-04) · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/Phase61e-2차 그림 링크 이관 대응 v5 실행판.md`
 (계보: v1 web → v2 web·GAS 재검토 → v3 CLI 원본 대조 → v4 web 검증 턴 → **v5 CLI 최종**. §10이 구현 기록)
@@ -411,7 +433,7 @@ Claude `image` · OpenAI `input_image`로 첨부하고, 본문엔 `[그림 k]`, 
 Data_DS 본문의 그림 표기가 **`\includegraphics{파일명}` → `![파일명](Drive링크)`** 로 바뀐 것
 (GAS 패치 11)에 따라간다. **두 형식 모두**를 그림 경계로 인식하고, 프록시는 **NFC/NFD 두 정규형**으로
 Drive를 찾는다. **수정 3파일 · 신규 0 · 서버 신규 0 · Storage 규칙 0 · 나머지 전부 0.**
-로직 검증 289 → **305건**. ⚠ 61e 본체와 함께 **아직 배포 전이라 dev에서만 돈다.**
+로직 검증 289 → **305건**. 61e 본체와 함께 **배포 완료(2026-09-06)**.
 덕수 검수 완료(2026-09-04): 미리보기=저장본 · 구형 세트 무회귀 · 자동 수정 토글↔중복 배지 무관 **전항 통과**.
 두 형식이 한 셀에 섞인 행은 **실데이터에 없었다**(논리는 테스트 F10이 고정한다 — 아래 ⚠ 참조).
 
@@ -428,7 +450,7 @@ Drive를 찾는다. **수정 3파일 · 신규 0 · 서버 신규 0 · Storage �
   이 경우의 등장 순서라, 두 정규식을 따로 돌리는 형태로 되돌리지 말 것 — 테스트 F10만이 이 계약을
   지키고 있다
 
-### 이전: **Phase 61e — 시트 가져오기 × 그림 블록 · 교정 연동** — 구현·검수 완료(2026-08-30) · 배포 대기
+### 이전: **Phase 61e — 시트 가져오기 × 그림 블록 · 교정 연동** — 구현·검수 완료(2026-08-30) · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/Phase61e 시트 그림 블록·교정 연동 v5 실행판.md`
 (계보: v1 web 타당성 → v2 CLI 실측 → v3 web 재검증 → v4 CLI 착수판 → **v5 실행판**. v5만 볼 것)
@@ -453,7 +475,7 @@ Data_DS 본문에 **파일명 문자열로만** 있던 `\includegraphics{<stem>_
   전 문항에 박혔다. ⚠ 대괄호 안 공백은 허용하지 않는다(실데이터가 전부 `[4점]` 붙여쓰기) —
   넓히면 구간 표기 `[3, 5]`까지 먹는다(테스트 P-12가 그 경계를 고정한다)
 
-### 이전: **ProblemView 디자인 개선(5건)** — 구현·검수 완료(2026-08-30) · 배포 대기
+### 이전: **ProblemView 디자인 개선(5건)** — 구현·검수 완료(2026-08-30) · **배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/ProblemView 디자인 개선 v4 실행판.md`
 (계보: 덕수 메모 → v1 CLI → v2 **두 판**(web 계획서 · CLI 교차검토판) → v3 착수판 **3회 개정**

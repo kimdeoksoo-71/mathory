@@ -1874,7 +1874,31 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## Phase 63: FolderView 리스트·칼럼 체계 · 앱 전역 DnD ✅ (구현·검수 완료 2026-09-06 · 배포 대기)
+## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수 완료 2026-09-06 · 브랜치 `m4-icons` 병합·배포 대기)
+
+계획서: `docs/phasedocs/개선묶음 M4 아이콘 체계 Phosphor 전환 Final_V4 실행판.md`
+(덕수 결정 메모 → v1 web → v2 CLI 실측 → v3 web 재검증·덕수 확정 → **Final_V4 실행판**. §10이 구현·검수 기록, §9가 판본 정정 요약)
+
+**서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · 로직 테스트 356건 무접촉.** 순수 프런트 시각 변경.
+신규 2(`scripts/gen-phosphor-paths.mjs` · `components/ui/phosphorPaths.ts` 생성물 49종) ·
+커밋 6(S1~S6) · 전체 707+/812−. 덕수 검수 전항 통과("모두 정상") — 추가 반영 커밋 0.
+
+- **아이콘 4계열(Icons.tsx 24·stroke / 브라켓 64 / 무브라켓 64 / 로컬 사본)을 Phosphor regular
+  하나로** — 도입은 `@phosphor-icons/core@2.1.1` devDependency + 생성 스크립트(런타임 의존 0 ·
+  `currentColor` 유지 · 컴포넌트 이름·props 불변). `prebuild`의 `icons:check`가 드리프트를 빌드 실패로
+- **Row 2 코너 브라켓 폐기(D19)** — 12종×8획=96개 회색 선 제거, 전 버튼 20px(획 1.25px ≈ 옛 브라켓),
+  active 배경 구글 파랑 하드코딩 → accent 틴트(D18). 브랜드 모티프는 로고·favicon·빈 화면에만
+- **대안 도안 6종(덕수 확정)** + 유지 4(IconSave·Google·Github·AI 로고) + 블록 수식 자체 도안
+  (`currency-dollar-simple` 비등방 x0.62 ×2) + Σ=`sigma`(M3 자체 Σ 폐기) + OCR=`scan`(글자 아이콘 제거)
+- **미사용 10종 삭제 · 크기 상향 22곳(12~13→14)** · † 잔존 8곳은 검수로 regular 유지 ·
+  IconTextWidth 27×15 예외 폐기 → 24 정방 · IconDots=세로점 통합(D22) · IconExit=`sign-out`(D23)
+- ⚠ **교훈 — JSX grep 미사용 판정이 두 판본 연속 틀렸다**: `IconExit`는 `TRIGGER_ICON` 맵이
+  컴포넌트 값으로 참조 중이었다. 판별은 `grep -rnw` 단어 경계로(N8, CLAUDE.md 명문화)
+- 잔여 1: Q7 — m4 첫 Vercel 배포 빌드 로그에서 `> icons:check` 실행 확인
+
+---
+
+## Phase 63: FolderView 리스트·칼럼 체계 · 앱 전역 DnD ✅ (구현·검수 완료 2026-09-06 · **배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/Phase63 FolderView 리스트·칼럼·앱 전역 DnD Final_V4 실행판.md`
 (덕수 구상 → v1 web → v2 CLI 실측 → v3 web 재검증 → **Final_V4 실행판**. §8이 구현·검수 기록 — 계획 개정 G1~G7)
@@ -1905,7 +1929,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## 개선묶음 M3: 아이콘 정비 · 버그 수정 · 기능 개선 ✅ (구현·검수 완료 2026-09-05 · 배포 대기)
+## 개선묶음 M3: 아이콘 정비 · 버그 수정 · 기능 개선 ✅ (구현·검수 완료 2026-09-05 · **배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/개선묶음 M3 아이콘 정비·버그 수정 Final_V4 실행판.md`
 (덕수 메모 → v1 CLI → v2 CLI → v3 web → **Final_V4 실행판**. §4가 구현·검수 기록 — 시각 최종값은 §4-2)
@@ -1931,7 +1955,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## Phase 61f: 정밀 검증·agent 토론 그림 첨부 ✅ (구현·검수 완료 2026-09-04 · 배포 대기)
+## Phase 61f: 정밀 검증·agent 토론 그림 첨부 ✅ (구현·검수 완료 2026-09-04 · **배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/Phase61f 정밀 검증·토론 그림 첨부 v3 실행판.md`
 (v1 web → v2 CLI 실측 교차검토 → **v3 착수판 = 실행판**. §9가 구현 기록 — 이탈 7건(R-1~R-7) 포함)
@@ -1957,7 +1981,7 @@ Storage 그림을 base64로 받아 3사 이미지 파트로 첨부한다. 본문
 
 ---
 
-## Phase 61e-2차: 그림 링크 이관(GAS 패치 11) 대응 ✅ (구현·검수 완료 2026-09-04 · 배포 대기)
+## Phase 61e-2차: 그림 링크 이관(GAS 패치 11) 대응 ✅ (구현·검수 완료 2026-09-04 · **배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/Phase61e-2차 그림 링크 이관 대응 v5 실행판.md`
 (v1 web → v2 web·GAS 재검토 → v3 CLI 원본 대조 → v4 web 검증 턴 → **v5 CLI 최종**. §10이 구현 기록)
@@ -1990,7 +2014,7 @@ TDZ `ReferenceError`가 될 뻔했다(컴파일은 통과한다) → `containsFi
 
 ---
 
-## Phase 61e: 시트 가져오기 × 그림 블록 · 교정 연동 ✅ (구현·검수 완료 2026-08-30 · 배포 대기)
+## Phase 61e: 시트 가져오기 × 그림 블록 · 교정 연동 ✅ (구현·검수 완료 2026-08-30 · **배포 완료 2026-09-06**)
 
 계획서: `docs/phasedocs/Phase61e 시트 그림 블록·교정 연동 v5 실행판.md`
 (v1 web 타당성 → v2 CLI 실측 → v3 web 재검증 → v4 CLI 착수판 → **v5 실행판**. v5만 볼 것)

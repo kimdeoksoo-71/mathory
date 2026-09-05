@@ -135,13 +135,12 @@ frontmatter가 문서 제목을 따로 갖고 있어 h1 충돌도 없다.
 새 파일의 헤딩 레벨이 달라진다. Phase 58의 범위(표시 계층)를 벗어나므로 덕수 판단으로 남긴다.
 착수하면 한 줄 + 기존 아카이브와의 불일치 수용 여부 결정이 전부다.
 
-## 7. 아이콘 시스템 잔여 부채 (Phase 55b I8·J4)
+## 7. 아이콘 시스템 잔여 부채 (Phase 55b I8·J4 → **개선묶음 M4가 대부분 해소, 2026-09-06**)
 
-- `components/ui/ContextMenu.tsx:7`에 `IconDownload`가 **로컬 중복 정의**돼 있다
-  (`Icons.tsx:329`와 별개 구현) → `Icons.tsx` 것으로 통일
-- `Icons.tsx`의 `strokeWidth`가 1.8(9곳)/2(25곳)로 혼재. Phase 55b 신규 4종은 인접
-  아이콘(`IconSave`·`IconExit`)에 맞춰 1.8로 넣었으나 전면 통일은 미착수
-- `components/viewer/SvgViewer.tsx:286`·`GgbViewer.tsx:407`의 📌 이모지("초기뷰 저장"
-  버튼 라벨) → `IconPin`으로 교체 가능
-- `IconGithub`은 공식 마크라 유일하게 stroke가 아니라 fill이다. 의도된 예외이므로
-  "굵기 통일" 작업에서 제외할 것. 마크를 변형하거나 GitHub 아닌 대상에 돌려쓰지 말 것
+- ~~`ContextMenu.tsx`의 `IconDownload` 로컬 중복 정의~~ → **M4 D15가 해소**(ShareButton
+  `ShareIcon` 사본 포함, `Icons.tsx` import로 통일)
+- ~~`Icons.tsx` `strokeWidth` 1.8/2 혼재~~ → **M4가 해소** — Phosphor regular 단일 계열
+  (fill 기반이라 굵기 축 자체가 사라졌다). 유지 예외는 `IconSave`(1.8)·브랜드 마크뿐
+- `components/viewer/SvgViewer.tsx`·`GgbViewer.tsx`의 📌 이모지("초기뷰 저장" 버튼 라벨)
+  → `IconPin` 교체 가능. **M4 범위 밖이라 잔존 — 유일하게 남은 항목**
+- `IconGithub`은 공식 마크(fill). 의도된 예외 — 변형·GitHub 아닌 대상 돌려쓰기 금지(M4 D17 재확인)
