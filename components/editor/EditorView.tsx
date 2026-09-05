@@ -3328,8 +3328,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                 }}
               >
-                {/* 검수 6차: "AI" → "Agent", fontSize 16 = 왼쪽 댓글·VCS 아이콘(17px 박스)과 시각 정렬. 숫자는 버튼 기본 13 그대로 */}
-                <span style={{ fontWeight: 600, letterSpacing: 0.3, fontSize: 16 }}>Agent</span>{agentCount ? ` ${agentCount}` : ''}
+                {/* 검수 6·8차: "AI" → "Agent". A만 16/600(왼쪽 17px 아이콘들과 시각 정렬),
+                    gent는 13/500으로 한 단 작고 가늘게 — 통짜 16은 부담(덕수). 숫자는 버튼 기본 13 */}
+                <span style={{ fontWeight: 600, letterSpacing: 0.3, fontSize: 16 }}>A<span style={{ fontSize: 13, fontWeight: 500 }}>gent</span></span>{agentCount ? ` ${agentCount}` : ''}
               </button>
             </>
           )}
