@@ -522,8 +522,9 @@ export function IconTextWidth({ size = 27, color = 'currentColor' }: { size?: nu
   return (
     <svg width={size} height={h} viewBox="0 0 27 15" fill="none" stroke={color}
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      <line x1="1.2" y1="0.9" x2="1.2" y2="14.1" />
-      <line x1="25.8" y1="0.9" x2="25.8" y2="14.1" />
+      {/* 검수 4차: 세로바만 획 절반(1.8→0.9) — 화살표 1.4, 꺾쇠 1.8과 별개 */}
+      <line x1="1.2" y1="0.9" x2="1.2" y2="14.1" strokeWidth="0.9" />
+      <line x1="25.8" y1="0.9" x2="25.8" y2="14.1" strokeWidth="0.9" />
       <g strokeWidth="1.4">
         <line x1="3.8" y1="7.5" x2="23.2" y2="7.5" />
         <path d="M6.8 4.7 3.8 7.5l3 2.8" />
