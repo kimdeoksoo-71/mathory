@@ -276,7 +276,7 @@ function SortableFolderItem({
           }}
           title="드래그하여 순서 변경"
         >
-          <IconGrip size={12} />
+          <IconGrip size={14} />
         </span>
         <button
           onClick={onSelect}
@@ -322,7 +322,7 @@ function SortableFolderItem({
               transform: expanded ? 'rotate(90deg)' : 'rotate(0)',
               transition: 'transform var(--transition-fast)',
             }}>
-              <IconChevron size={12} />
+              <IconChevron size={14} />
             </span>
           </span>
           <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', opacity: active ? 1 : 0.75 }}>

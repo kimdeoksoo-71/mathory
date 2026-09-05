@@ -51,7 +51,7 @@ export default function ProofreadResultBox({ data, onDismiss, onDismissIssue, on
         borderRadius: 8, fontSize: 12, color: 'var(--text-muted)',
         display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-ui)',
       }}>
-        <IconLoader size={12} /> 검토 중…
+        <IconLoader size={14} /> 검토 중…
       </div>
     );
   }

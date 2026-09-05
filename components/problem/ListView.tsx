@@ -254,7 +254,7 @@ export default function ListView({
       case 'comments': {
         const cc = commentCounts[p.id] ?? 0;
         return cc > 0 ? (
-          <span title="미해결 댓글" style={badgeStyle}><IconComment size={12} /><span style={{ marginLeft: 1 }}>{cc}</span></span>
+          <span title="미해결 댓글" style={badgeStyle}><IconComment size={14} /><span style={{ marginLeft: 1 }}>{cc}</span></span>
         ) : null;
       }
       case 'owner': {

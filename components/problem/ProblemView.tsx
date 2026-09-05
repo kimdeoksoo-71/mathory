@@ -654,7 +654,7 @@ export default function ProblemView({
             의미는 아이콘(IconTextWidth · 큰A작은A)과 title 툴팁이 나른다.
             ⚠ 최소 폭 35em = 기본값과 같다 — "현재 폭을 최소 한계로"(D24′ 메모) 불변. */}
         <SizeStepper
-          icon={<IconTextWidth size={27} color="var(--text-muted)" />}
+          icon={<IconTextWidth size={24} color="var(--text-muted)" />}
           value={widthEm} min={WIDTH_EM_MIN} max={WIDTH_EM_MAX}
           onStep={(d) => handleWidthChange(d)}
           titleUp="본문 넓히기" titleDown="본문 좁히기" title="본문 가로폭(em)"
@@ -813,7 +813,7 @@ export default function ProblemView({
                   color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                <IconComment size={13} />{commentCount ? ` ${commentCount}` : ''}
+                <IconComment size={14} />{commentCount ? ` ${commentCount}` : ''}
               </button>
             )}
             {/* Phase 47: agent 버튼 — 오너 전용 */}
@@ -1105,7 +1105,7 @@ export default function ProblemView({
                       transition: 'transform 0.15s',
                       transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
                     }}>
-                      <IconChevron size={12} />
+                      <IconChevron size={14} />
                     </span>
                   )}
                 </button>
@@ -1146,7 +1146,7 @@ export default function ProblemView({
               transition: 'transform 0.15s',
               transform: problemInfoOpen ? 'rotate(90deg)' : 'rotate(0deg)',
             }}>
-              <IconChevron size={12} />
+              <IconChevron size={14} />
             </span>
           </button>
 

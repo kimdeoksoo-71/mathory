@@ -354,7 +354,7 @@ export default function VersionDrawer({
               background: 'transparent', color: 'var(--text-secondary)',
               cursor: metaBusy ? 'wait' : 'pointer', fontSize: 11, fontWeight: 600,
             }}
-          ><IconTag size={13} />이름 저장</button>
+          ><IconTag size={14} />이름 저장</button>
         )}
       </div>
 
@@ -405,7 +405,7 @@ export default function VersionDrawer({
                   disabled={metaBusy}
                   title="이 버전의 이름 변경" aria-label="이 버전의 이름 변경"
                   style={iconBtn(!!sel.name)}
-                ><IconRename size={13} /></button>
+                ><IconRename size={14} /></button>
 
                 <button
                   onClick={togglePin}
@@ -413,7 +413,7 @@ export default function VersionDrawer({
                   title={sel.pinned ? '고정 해제' : '이 버전 고정'}
                   aria-label={sel.pinned ? '고정 해제' : '이 버전 고정'}
                   style={iconBtn(sel.pinned)}
-                ><IconPin size={13} filled={!!sel.pinned} /></button>
+                ><IconPin size={14} filled={!!sel.pinned} /></button>
 
                 <button
                   onClick={doExport}

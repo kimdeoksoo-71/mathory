@@ -64,7 +64,7 @@ export default function ShareTree({
             transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s',
           }}
         >
-          <IconChevron size={12} />
+          <IconChevron size={14} />
         </button>
       </div>
 

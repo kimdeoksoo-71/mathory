@@ -162,7 +162,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
               if (span) (span as HTMLElement).style.textDecoration = 'none';
             }}
           >
-            <IconBlockchain size={13} />
+            <IconBlockchain size={14} />
             <span style={{ fontWeight: 500 }}>
               {isModified ? '블록체인 원본인증완료 (수정됨)' : '블록체인 원본인증완료'}
             </span>
@@ -177,13 +177,13 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
           </div>
           {isOwner && isModified && (
             <button onClick={handleRegister} disabled={registering} style={{ ...btnStyle, marginTop: 10 }}>
-              {registering ? '기록 중...' : (<><IconBlockchain size={12} /> 변경사항 재인증</>)}
+              {registering ? '기록 중...' : (<><IconBlockchain size={14} /> 변경사항 재인증</>)}
             </button>
           )}
         </>
       ) : isOwner ? (
         <button onClick={handleRegister} disabled={registering} style={btnStyle}>
-          {registering ? '원본인증 중...' : (<><IconBlockchain size={12} /> 원본인증</>)}
+          {registering ? '원본인증 중...' : (<><IconBlockchain size={14} /> 원본인증</>)}
         </button>
       ) : null}
 

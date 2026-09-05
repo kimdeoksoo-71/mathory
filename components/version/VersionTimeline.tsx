@@ -100,7 +100,7 @@ export default function VersionTimeline({
               {v.pinned && (
                 <span title="고정" style={{
                   display: 'inline-flex', alignItems: 'center', color: 'var(--accent-primary, #e53935)',
-                }}><IconPin size={12} filled /></span>
+                }}><IconPin size={14} filled /></span>
               )}
               {/* Phase 55b: 내보냄 표시(표시 전용 — 조작은 선택 버전 툴바에서) */}
               {v.github_export && (

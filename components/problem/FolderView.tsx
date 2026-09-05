@@ -834,7 +834,7 @@ export default function FolderView({
                           flexShrink: 0,
                         }}
                       >
-                        <IconComment size={12} /><span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
+                        <IconComment size={14} /><span style={{ marginLeft: 1 }}>{commentCountsMap[problem.id]}</span>
                       </span>
                     )}
                     {(agentCountsMap[problem.id] ?? 0) > 0 && (

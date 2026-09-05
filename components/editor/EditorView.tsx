@@ -815,7 +815,7 @@ function SortableEditorBlock({
       }}
       title="블록 삭제"
     >
-      <IconTrash size={12} />
+      <IconTrash size={14} />
     </button>
   ) : null;
 
@@ -882,7 +882,7 @@ function SortableEditorBlock({
           title="드래그하여 이동"
           style={{ cursor: 'grab', display: 'flex', alignItems: 'center', padding: '2px 2px' }}
         >
-          <IconGrip size={12} />
+          <IconGrip size={14} />
         </span>
 
         {block.collapsed ? (
@@ -3224,7 +3224,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-hover)'; }}
           onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--accent-primary)'; }}
         >
-          <IconChevronLeft size={13} color="#fff" />
+          <IconChevronLeft size={14} color="#fff" />
           <span>보기</span>
         </button>
 
@@ -3345,7 +3345,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           paddingLeft: 8,
         }}>
           <SizeStepper
-            icon={<IconTextWidth size={27} color="var(--text-muted)" />}
+            icon={<IconTextWidth size={24} color="var(--text-muted)" />}
             value={widthEm} min={WIDTH_EM_MIN} max={WIDTH_EM_MAX}
             onStep={(d) => handleWidthChange(d)}
             titleUp="본문 넓히기" titleDown="본문 좁히기" title="본문 가로폭(em)"

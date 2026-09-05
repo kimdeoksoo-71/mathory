@@ -1878,7 +1878,7 @@ function CommentItem({
               title="GGB 파일 다운로드"
               style={{ ...miniLinkStyle, display: 'inline-flex', alignItems: 'center' }}
             >
-              {graphBusy === 'download' ? '…' : <IconDownload size={12} />}
+              {graphBusy === 'download' ? '…' : <IconDownload size={14} />}
             </button>
           )}
           {graphStatus && (
