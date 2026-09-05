@@ -143,7 +143,7 @@ export default function ShareTree({
                 />
               ))}
               {sentGroups.length === 0 && (
-                <div style={{ padding: '4px 12px 4px 58px', fontSize: 11.5, color: 'var(--text-muted)' }}>
+                <div style={{ padding: '4px 12px 4px 46px', fontSize: 11.5, color: 'var(--text-muted)' }}>
                   공유한 문항이 없습니다
                 </div>
               )}
@@ -166,7 +166,9 @@ function ParentRow({
   expandable: boolean; expanded: boolean; onToggleExpand: () => void; onClick: () => void;
 }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 12 }}>
+    /* Phase 63 D37 — 직속 들여쓰기 12 제거(공유 헤더와 같은 좌단). chevron 16 + 버튼 padL 4
+       → 아이콘 x20 = My 트리 depth-0 폴더 아이콘과 일치 */
+    <div style={{ display: 'flex', alignItems: 'center' }}>
       <button
         onClick={(e) => { e.stopPropagation(); onToggleExpand(); }}
         style={{
@@ -206,7 +208,7 @@ function SubRow({ label, active, muted, onClick }: { label: string; active?: boo
       disabled={!onClick}
       style={{
         display: 'flex', alignItems: 'center', width: '100%',
-        padding: '6px 12px 6px 46px', border: 'none', borderRadius: 8,
+        padding: '6px 12px 6px 34px', border: 'none', borderRadius: 8, /* D40 — 12px 당김(상대 단차 보존) */
         cursor: onClick ? 'pointer' : 'default', background: rowBg(!!active),
         color: muted ? 'var(--text-muted)' : active ? 'var(--text-primary)' : 'var(--text-secondary)',
         fontSize: 12.5, fontWeight: active ? 700 : muted ? 600 : 500, fontFamily: 'var(--font-ui)',
@@ -229,7 +231,7 @@ function PersonRow({
       onClick={onClick}
       style={{
         display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-        padding: `5px 12px 5px ${indent === 2 ? 58 : 34}px`, border: 'none', borderRadius: 8,
+        padding: `5px 12px 5px ${indent === 2 ? 46 : 22}px`, border: 'none', borderRadius: 8, /* D40 — 12px 당김 */
         cursor: 'pointer', background: rowBg(active),
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
         fontSize: 12.5, fontWeight: active ? 700 : 500, fontFamily: 'var(--font-ui)',

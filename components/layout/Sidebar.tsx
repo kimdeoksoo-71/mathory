@@ -259,13 +259,16 @@ function SortableFolderItem({
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {/* 드래그 핸들 — position:absolute로 흐름에서 빼서 들여쓰기 영향 제거 */}
+        {/* 드래그 핸들 — position:absolute로 흐름에서 빼서 들여쓰기 영향 제거.
+            Phase 63 D39 — left -12: 행 콘텐츠가 x0에서 시작하므로(D37) 그립은 섹션 좌패딩
+            12px 거터로 이사(폭 12가 정확히 들어찬다). ⚠ -13이면 overflow:auto가 패딩 박스
+            밖 1px을 자른다(v3 F4 실측) */}
         <span
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
           style={{
-            position: 'absolute', left: -2, top: '50%', transform: 'translateY(-50%)',
+            position: 'absolute', left: -12, top: '50%', transform: 'translateY(-50%)',
             cursor: 'grab', display: 'flex', padding: '2px 0',
             opacity: hovered ? 0.6 : 0,
             transition: 'opacity 0.15s',
@@ -278,12 +281,16 @@ function SortableFolderItem({
         <button
           onClick={onSelect}
           style={{
+            /* Phase 63 D37(Q17=B) — depth-0 들여쓰기 12 제거: My 헤더와 같은 좌단에서 시작.
+               marginLeft -8 / paddingLeft +8 = 콘텐츠 x는 depth×16 그대로, active/hover
+               알약만 거터로 8px 확장(왼쪽 벽 밀착 방지). 위계는 굵기 + chevron 슬롯이 담당 */
             display: 'flex',
             alignItems: 'center',
             gap: 6,
-            width: '100%',
+            width: 'calc(100% + 8px)',
+            marginLeft: -8,
             padding: '8px 12px',
-            paddingLeft: 12 + depth * 16,
+            paddingLeft: 8 + depth * 16,
             /* D27·F6 — 하이라이트는 링+틴트, border 불변. 조건부 2px border는 over 순간
                행이 자라던 결함이었다(레이아웃을 흔드는 조건부 스타일 — Phase 45a 함정). */
             border: 'none',
@@ -888,8 +895,11 @@ export default function Sidebar({
               ref={setNodeRef}
               onClick={onSelectUnassigned}
               style={{
+                /* Phase 63 D38(Q17=B) — 좌측 붙임: 아이콘 x0. chevron 슬롯이 없어 일반
+                   폴더(아이콘 x20)보다 왼쪽 = 의도된 구별(슬롯을 채워 맞추지 말 것) */
                 display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '8px 12px',
+                width: 'calc(100% + 8px)', marginLeft: -8,
+                padding: '8px 12px', paddingLeft: 8,
                 border: 'none', borderRadius: 8, cursor: 'pointer',
                 boxShadow: isOver ? DROP_RING : 'none',
                 background: isOver ? DROP_TINT
@@ -928,12 +938,15 @@ export default function Sidebar({
               ref={setNodeRef}
               onClick={onSelectTrash}
               style={{
+                /* Phase 63 D38 — 미지정과 아이콘 위치 통일(옛 paddingLeft 34는 일관성 없는
+                   여백이라 삭제 — 덕수 지시) */
                 display: 'flex',
                 alignItems: 'center',
                 gap: 10,
-                width: '100%',
+                width: 'calc(100% + 8px)',
+                marginLeft: -8,
                 padding: '8px 12px',
-                paddingLeft: 34,
+                paddingLeft: 8,
                 border: 'none',
                 borderRadius: 8,
                 cursor: 'pointer',
