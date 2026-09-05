@@ -952,21 +952,30 @@ p:has(.marker-circled) {
      과하면 이 규칙 블록의 background 한 줄만 지우면 hover 전용으로 되돌아간다. */
 /* ⚠ 좌우 음수 마진 + 패딩은 **열림과 무관하게 상시**다. is-open일 때만 주면
      닫힌 섹션의 여닫이 줄이 전폭이 될 수 없고(보정할 패딩이 없어 카드 밖으로 넘친다),
-     열고 닫을 때마다 좌우가 미세하게 움직인다. 상쇄되므로 본문 좌단은 그대로 0이다. */
+     열고 닫을 때마다 좌우가 미세하게 움직인다. 상쇄되므로 본문 좌단은 그대로 0이다.
+   ⚠ M3 D7′ — **상하 패딩·섹션 간 마진도 같은 이유로 상시**다. is-open에만 주면
+     여는 순간 섹션이 0.6em 자라고, 상하 패딩이 마지막 자식의 bottom margin을
+     안에 가둬(마진 붕괴 반전) 성장량이 0.6em조차 아니게 된다 — 그 밀림을
+     useOutlineState의 스크롤 앵커가 보정하면서 "위쪽 내용이 밀리는" 떨림이 됐다.
+     상시로 두면 여닫아도 박스·마진·붕괴 조건이 전부 불변이라 떨림이 구조적으로 0이다.
+     음수 마진 상쇄(구 D7)로 되돌리지 말 것 — 마진 붕괴 반전은 상쇄로 안 돌아온다. */
 .outline-section {
   margin-left: calc(-1 * var(--card-pad-l, 0px));
   margin-right: calc(-1 * var(--card-pad-r, 0px));
   padding-left: var(--card-pad-l, 0px);
   padding-right: var(--card-pad-r, 0px);
+  padding-top: 0.3em;
+  padding-bottom: 0.3em;
 }
 .outline-section.is-open {
   background: var(--block-bg);
   --case-dot-fill: var(--block-bg);
   border-radius: 6px;
-  padding-top: 0.3em;
-  padding-bottom: 0.3em;
 }
-.outline-section.is-open + .outline-section.is-open { margin-top: 0.4em; }
+/* 섹션 사이 간격도 무조건 — 옛 `.is-open + .is-open` 조건은 인접 두 섹션이 "둘 다 열린
+   순간"에만 0.4em이 생겨 그 자체가 밀림원이었다. 닫힌 목록의 리듬이 과하게 벌어지면
+   이 값(0.4em)만 0.2em으로 낮춘다 — 조정 범위는 이 한 줄뿐이다(Final_V4 스텝 1). */
+.outline-section + .outline-section { margin-top: 0.4em; }
 
 /* 여닫이 줄도 같은 식으로 카드 전폭 — hover 띠가 섹션 톤과 같은 폭이라야
    "행 하나"와 "섹션 전체"의 관계가 읽힌다.
