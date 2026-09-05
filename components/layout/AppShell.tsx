@@ -617,7 +617,11 @@ export default function AppShell() {
         })) {
           const { deleteProblem } = await import('../../lib/firestore');
           await deleteProblem(problem.id);
-          setView({ type: 'home' });
+          // Phase 63 T2 검수 반영 — 휴지통 목록에서 지웠으면 휴지통에 머문다.
+          // 홈 강제 이동은 그 문항을 열어 보고 있던 경우에만(휴지통 이동 케이스와 같은 규약).
+          if (view.type === 'problem' && view.problemId === problem.id) {
+            setView({ type: 'home' });
+          }
           await loadData();
         }
         break;
@@ -626,6 +630,9 @@ export default function AppShell() {
         try {
           await moveProblemToFolder(problem.id, null);
           await loadData();
+          // Phase 63 T2 검수 반영 — 복원 후 문항이 돌아간 곳(미지정)으로 이동해 결과를 보여 준다.
+          // (복원 대상 폴더를 따로 저장하지 않으므로 복원처는 항상 미지정이다 — A-18)
+          setView({ type: 'folder', folder: { id: UNASSIGNED_FOLDER_ID, name: '미지정', user_id: '', order: 99998 } });
         } catch (error) {
           console.error('복원 에러:', error);
         }
