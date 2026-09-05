@@ -90,7 +90,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **마커 뒤 공백은 정규식이 흡수한다** — 간격은 입력 공백이 아니라 CSS 고정폭이 공급
 - `Fig.N` → `[그림N]`, `Table N` → `[표N]`
 - **인라인 수식에는 `\displaystyle`이 자동 주입된다 — 덕수 확정 원칙(2026-09-05), 흔들지 말 것**:
-  `preprocessMath`(`lib/preprocess.ts:168-175`)가 `$…$` 안에 주입한다(이미 있으면 중복 없음).
+  주입은 **사본 2벌**이다 — 인쇄 `lib/preprocess.ts:168-175` · 화면 `EditorPreview.tsx:230-235`
+  (preprocess.ts 헤더가 명시하듯 그 파일은 PrintableContent 전용이다). 한쪽만 고치면 화면·인쇄
+  조판이 갈린다. 이미 있으면 중복 주입하지 않는다.
   이 원칙 위에 서 있는 것들 — ① **강조 규약의 전제**: display `$$…$$`는 `**`로 못 감싸므로
   "인라인으로 바꿔 `**$…$**`"가 성립하는 근거가 곧 이 주입(조판 불변)이다 ② **M3 B2의 전제**:
   KaTeX `\frac` 매크로를 "인라인 제외" 갈래 없이 3종 전부에 적용하는 근거 ③ 조판 품질:
