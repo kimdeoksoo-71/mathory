@@ -109,14 +109,16 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
     <div ref={rootRef} style={{ position: 'relative' }}>
       {/* M3 A4 — 트리거 재디자인(D2·D3): KaTeX \sum(세리프·획 대비) → SigmaIcon(균일 획),
           하드코딩 파랑(#f0f3fb/#e0e7ff/#ccc) → --accent-primary 틴트(옅게, open 한 단 진하게).
-          외곽선 1.2px = 2행 브라켓의 시각 두께 · height 32 = 이웃 ICON_BTN_BASE 정렬. */}
+          외곽선 1.2px = 2행 브라켓의 시각 두께.
+          검수 반영(2026-09-05): 버튼 32 → 26(80%) · 내부 여백 대폭 축소 — 이웃 ICON_BTN_BASE
+          정렬보다 덕수 지시가 우선이다. */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         title="수식 기호 팔레트"
         style={{
-          display: 'flex', alignItems: 'center', gap: 3,
-          height: 32, padding: '0 7px',
+          display: 'flex', alignItems: 'center', gap: 2,
+          height: 26, padding: '0 3px',
           color: 'var(--accent-primary)',
           background: open
             ? 'color-mix(in srgb, var(--accent-primary) 16%, transparent)'

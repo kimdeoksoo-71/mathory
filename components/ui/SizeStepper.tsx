@@ -31,14 +31,17 @@ function Chevron({ up }: { up: boolean }) {
  *  M3 D4: stroke SVG가 아니라 **글자 그 자체**다(덕수 지정: "글꼴은 기본글꼴인
  *  Pretendard 사용") — SVG <text>는 폰트 로딩·baseline 관리만 늘린다. 색만 이웃과 통일. */
 export function FontSizeGlyph() {
+  /* 검수 반영(2026-09-05): 큰A 13→19.5(1.5배) · 작은A 9.5→11.5(1.2배) ·
+     숫자와의 간격은 루트 gap 4의 절반 — marginRight -2로 상쇄해 유효 2px. */
   return (
     <span aria-hidden style={{
       display: 'inline-flex', alignItems: 'baseline', gap: 1,
       fontFamily: 'var(--font-ui)', fontWeight: 600, lineHeight: 1,
       color: 'var(--text-muted)', userSelect: 'none',
+      marginRight: -2,
     }}>
-      <span style={{ fontSize: 13 }}>A</span>
-      <span style={{ fontSize: 9.5 }}>A</span>
+      <span style={{ fontSize: 19.5 }}>A</span>
+      <span style={{ fontSize: 11.5 }}>A</span>
     </span>
   );
 }

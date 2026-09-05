@@ -10,7 +10,8 @@ import { COACH_LABELS } from '../../lib/coachBlock';
 
    개선묶음 M2 G — 종류가 'Tip' 하나로 단일화됐다.
    - 아이콘은 타입 무관 IconCoachImportant(네모 말풍선 + 느낌표) 하나다.
-   - collapsible 사이트에서는 아이콘이 토글 버튼이 되고, 접히면 라벨 어절이 사라진다.
+   - collapsible 사이트에서는 아이콘+라벨이 토글 버튼이다. 라벨은 접힘 상태에도
+     보인다(M3 검수 반영 — 옛 "접히면 라벨이 사라진다" 동작은 폐기).
 
    ⚠ 색은 CSS(.coach-block .coach-label)가 --coach-accent로 준다. 여기서 색을 주지 말 것 —
      인쇄는 같은 자리를 #000으로 덮어써야 하는데 인라인 style이면 못 이긴다.
@@ -28,12 +29,13 @@ export default function CoachLabel({
 }) {
   const interactive = !!onToggle;
   /* M3 A1 — 아이콘 14 → 17(덕수: "약간만, 20%") · 클릭 범위 = 아이콘+라벨.
-     토글 스팬이 라벨까지 감싼다 — 접히면 라벨이 사라져 자연히 아이콘만 남는다.
+     검수 반영(2026-09-05): 라벨 'Tip'은 **접힘 상태에도 항상 보인다** — collapsed는
+     이제 라벨 표시가 아니라 aria-expanded(본문 접힘)만 나른다.
      ⚠ 비인터랙티브(인쇄·편집 미리보기·폴더뷰)는 옛 구조(형제) 그대로다:
        아이콘↔라벨 간격을 부모 .coach-label의 gap이 공급하는 관계를 안 깨기 위해서다.
        인터랙티브 쪽 간격은 .coach-toggle의 gap(globals)이 같은 값으로 공급한다. */
   const icon = <IconCoachImportant size={17} />;
-  const label = !collapsed ? <span>{COACH_LABELS[type] ?? 'Tip'}</span> : null;
+  const label = <span>{COACH_LABELS[type] ?? 'Tip'}</span>;
   return (
     <div className="coach-label">
       {interactive ? (
