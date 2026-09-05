@@ -317,6 +317,11 @@ export default function FolderView({
   }, [selectedIds.size]);
 
   const clearSelection = () => setSelectedIds(new Set());
+  // T6 검수 반영(덕수) — 헤더 전체선택: 전부 선택이면 해제, 아니면 현재 목록 전부
+  const allSelected = folderProblems.length > 0 && folderProblems.every((p) => selectedIds.has(p.id));
+  const toggleSelectAll = () => {
+    setSelectedIds(allSelected ? new Set() : new Set(folderProblems.map((p) => p.id)));
+  };
   const runBatchMove = async (folderId: string | null) => {
     const ids = [...selectedIds];
     setBatchMoveOpen(false);
@@ -650,6 +655,11 @@ export default function FolderView({
               prefs={prefs}
               template={headerTemplate}
               checkbox={selectable}
+              selectAll={selectable ? {
+                checked: allSelected,
+                indeterminate: selectedIds.size > 0 && !allSelected,
+                onToggle: toggleSelectAll,
+              } : undefined}
               onToggleSort={toggleListSort}
               onPrefsChange={updatePrefs}
             />

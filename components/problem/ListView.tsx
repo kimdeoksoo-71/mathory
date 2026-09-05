@@ -484,13 +484,15 @@ const badgeStyle: React.CSSProperties = {
    FolderView 제목바 행 2(리스트 모드)에서 렌더 — 스크롤 밖이라 고무줄 오버스크롤에 부동.
    시각은 Phase 62 D7 그대로(--block-bg · radius 8). 템플릿은 본문 실측값(D43)을 받고,
    도착 전 한 프레임은 같은 산식(buildGridTemplate)의 폴백이라 어긋나도 즉시 수렴한다. */
-export function ListHeader({ mode, prefs, template, checkbox = false, onToggleSort, onPrefsChange }: {
+export function ListHeader({ mode, prefs, template, checkbox = false, selectAll, onToggleSort, onPrefsChange }: {
   mode: ListMode;
   prefs: ListPrefs;
   /** 본문 grid의 실측 gridTemplateColumns(px 목록). null이면 자체 산식 폴백 */
   template: string | null;
-  /** 본문에 체크박스 열(D16)이 있는가 — 트랙 오프셋을 맞춘다(헤더 칸은 빈 채) */
+  /** 본문에 체크박스 열(D16)이 있는가 — 트랙 오프셋을 맞춘다 */
   checkbox?: boolean;
+  /** T6 검수 반영(덕수) — 체크박스 트랙의 전체선택. 일부 선택이면 중간 상태 */
+  selectAll?: { checked: boolean; indeterminate: boolean; onToggle: () => void };
   onToggleSort: (key: string) => void;
   onPrefsChange: (mutate: (p: ListPrefs) => ListPrefs) => void;
 }) {
@@ -517,6 +519,19 @@ export function ListHeader({ mode, prefs, template, checkbox = false, onToggleSo
       background: 'var(--block-bg)', borderRadius: 8,
       fontFamily: 'var(--font-ui)',
     }}>
+      {/* 전체선택(T6 검수 반영) — 체크박스 트랙(2번). 일부 선택 = 중간 상태(indeterminate) */}
+      {checkbox && selectAll && (
+        <div style={{ gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <input
+            type="checkbox"
+            ref={(el) => { if (el) el.indeterminate = selectAll.indeterminate; }}
+            checked={selectAll.checked}
+            onChange={selectAll.onToggle}
+            title="전체 선택"
+            style={{ accentColor: 'var(--mathory-red, #D97757)', cursor: 'pointer' }}
+          />
+        </div>
+      )}
       {visible.map((id, i) => (
         <div key={id} style={{ gridColumn: 2 + lead + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
           {sortableIds.has(id) ? (
