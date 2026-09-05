@@ -106,7 +106,10 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 2. **완전한 파일 교체 선호** — diff/patch보다 전체 파일 교체가 안전
 3. **git push는 덕수가 직접 수행** — Claude Code는 커밋까지만
 4. **Vercel 배포 후 Cmd+Shift+R로 하드 리프레시** — CDN 캐시 제거
-5. **`.next` 캐시 삭제**: 빌드 문제 시 `rm -rf .next` 후 재빌드
+5. **`.next` 캐시 삭제**: 빌드 문제 시 `rm -rf .next` 후 재빌드.
+   ⚠ **dev 서버가 도는 동안 `npm run build` 금지** — 같은 `.next`를 공유해 dev의 라우트
+   매니페스트를 덮어쓰고, **다음 핫 리로드 때** `/`가 404가 된다(즉시가 아니라서 원인 연결이
+   어렵다 — 2026-09-05 M3에서 실증). 빌드 검증은 dev를 끄고 → build → dev 재시작 순서로
 6. **roadmap.md 업데이트**: 각 Phase 완료 시
 7. **Phase 완료 시 최종 계획서를 `docs/phasedocs/`에 등록할 것** — 폴더 둘의 역할이 다르다.
    `docs/phaseSketch/`는 **작업물**(구상 · 계획 v1~vN)이라 정리 대상이고,
@@ -280,7 +283,42 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61f — 정밀 검증·agent 토론 그림 첨부** — 구현·검수 완료(2026-09-04) · 배포 대기
+## 현재 Phase: **개선묶음 M3 — 아이콘 정비 · 버그 수정 · 기능 개선** — 구현·검수 완료(2026-09-05) · 배포 대기
+
+문서: `docs/phasedocs/개선묶음 M3 아이콘 정비·버그 수정 Final_V4 실행판.md`
+(계보: 덕수 메모 → v1 CLI 실측 → v2 CLI 확정 → v3 web 검증 → **Final_V4 = 실행판**(§4가 구현·검수 기록). §4-2의 시각 최종값이 계획서 수치를 이긴다)
+
+버그 2(요약보기 여닫이 떨림·'앞부분 펼치기' 헛표시) + 아이콘·컨트롤 5 + KaTeX 분수 조판 1.
+**서버 0 · 규칙 0 · 스키마 0 · 전처리 파이프라인 0.** 신규 3(`lib/katexMacros.ts` ·
+`components/editor/toolbarIcons.tsx` · `components/ui/SizeStepper.tsx`) · 커밋 12(구현 7 + 검수 5).
+로직 검증 336 → **341건**. `\[..\]→$$` 통일 항목은 **이미 구현돼 있어 작업 0**(정규화·[교정]·렌더 세 겹).
+
+- **⚠ `.outline-section`의 상하 패딩·섹션 간 마진은 상시다(D7′)** — is-open 조건부로 되돌리지
+  말 것. 조건부면 여는 순간 섹션이 자라는데, 상하 패딩이 마지막 자식의 bottom margin을 안에
+  가둬(**마진 붕괴 반전**) 성장량이 일정하지도 않고, 그 밀림을 `useOutlineState`의 스크롤 앵커가
+  보정하며 "위쪽 내용이 밀리는" 떨림이 된다. 음수 마진 상쇄로는 붕괴 반전이 안 돌아온다(web v3 검증)
+- **⚠ 전문(前文) 여닫이 판정은 `needsPrefaceToggle`(lib/solutionOutline)이 소유한다** —
+  JSX 안 조건은 어떤 테스트도 못 본다. 명세(D9=(b), 덕수): 요약 항목이 있고 **항목으로 닿을 수
+  없는 블록**이 있을 때만. items 없는 전문은 숨은 블록이 있어도 조용("요약은 요약일 뿐").
+  경우 구역·경우 body는 경우 클릭 담당이라 숨은 것으로 치지 않는다
+- **⚠ KaTeX `macros`는 팩토리(`katexMacros()`)로만 넘길 것** — KaTeX는 macros 객체를
+  **in-place 수정**한다. `\gdef` 렌더 후 객체에 정의가 실제로 잔류하는 것을 프로브로 증명했다.
+  모듈 상수로 바꾸면 콘텐츠의 `\gdef`가 문항 사이로 샌다
+- **분수 조판은 CSS·매크로가 짝이다**: 가로바 연장은 `globals.css`(`--frac-ext`/`--frac-nest`,
+  의도적으로 `.preview-content`로 안 좁힘 — 검증 카드·폴더뷰 분수도 받아야 조판이 안 갈린다) ·
+  세로 여백은 `lib/katexMacros.ts` 팬텀. `\cfrac`는 자체 strut라 매크로 의도적 제외,
+  검증 카드(`katex-render`)도 제외(\displaystyle 주입이 없어 이미 조판이 다른 자리).
+  KaTeX 버전을 크게 올리면 선택자(`.mfrac > .vlist-t …`·`:has()`) 재확인
+- **툴바 아이콘 규격(`SVG_PROPS`·`CORNER_BRACKETS`)은 `toolbarIcons.tsx`가 소유한다** —
+  UnifiedToolbar→MathSymbolPalette 방향 import가 있어 역방향은 순환이라 셋째 파일로 뺐다.
+  시각 획 두께 = 3.5 × 렌더px/64 (22px에서 ≈1.2px)
+- **`IconTextWidth`는 Icons.tsx 정사각(viewBox 24) 규격의 유일한 예외**(27×15, viewBox=렌더
+  1:1) — 스테퍼 꺾쇠와 획 두께를 **물리적으로** 맞추기 위해서다(24 viewBox를 축소 렌더하면
+  1.1px대로 가늘어진다). 두께를 이 파일 규격으로 "통일"하지 말 것
+- **아이콘 시각 수치의 진실은 실행판 §4-2 표다** — 검수 5차 왕복으로 확정된 값(시그마 획 5 ·
+  세로바 0.9 · AA 19.5/500·11.5/600 등)이라 계획서 본문의 출발값과 다르다
+
+### 이전: **Phase 61f — 정밀 검증·agent 토론 그림 첨부** — 구현·검수 완료(2026-09-04) · 배포 대기
 
 문서: `docs/phasedocs/Phase61f 정밀 검증·토론 그림 첨부 v3 실행판.md`
 (계보: v1 web → v2 CLI 실측 교차검토 → **v3 착수판 = 실행판**(§9가 구현 기록·검수). web v3 재검증은 생략 — 덕수 판정)
