@@ -40,7 +40,8 @@ export function FontSizeGlyph() {
       color: 'var(--text-muted)', userSelect: 'none',
       marginRight: -3,
     }}>
-      <span style={{ fontSize: 19.5 }}>A</span>
+      {/* 검수 5차: 큰 A만 굵기 한 단계 다운(600→500) — 커진 크기(19.5)에서 600은 과하다 */}
+      <span style={{ fontSize: 19.5, fontWeight: 500 }}>A</span>
       <span style={{ fontSize: 11.5 }}>A</span>
     </span>
   );
