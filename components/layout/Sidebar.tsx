@@ -9,7 +9,7 @@ import ShareTree, { ShareGroup } from './ShareTree';
 import { ShareScope } from '../../lib/share-scope';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
-  IconUser, IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
+  IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
 import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
