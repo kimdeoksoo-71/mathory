@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 /* Phase 63 S0 — DndContext·센서·오버레이·드롭 핸들러는 AppShell로 이관(D21).
    여기 남는 것은 Draggable(카드)·Droppable(칩) 등록뿐이고, id는 dndId 프리픽스(D34),
    data에는 type이 필수다(D23 — 전역 핸들러가 type으로 분기한다). */
@@ -31,6 +31,9 @@ import BatchVerifyDialog from './BatchVerifyDialog';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
+/** Phase 63 D3 — 정렬 목표선의 상단 간격. ListView 루트 paddingTop 8과 짝이다(어긋나면
+ *  맨 위에서 첫 행이 밀리거나 당겨진다). */
+const SNAP_TOP_GAP = 8;
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
 /* ═══ 정렬 ═══ */
@@ -158,9 +161,53 @@ export default function FolderView({
   useEffect(() => { setListSort(defaultListSort(listMode)); }, [folder.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const toggleListSort = (key: ListSortKey) => setListSort((prev) => toggledSort(prev, key));
 
-  // Phase 63 D3 — 드래그 중에는 스냅을 꺼야 dnd-kit 자동 스크롤과 스냅 보정이 싸우지 않는다.
+  // Phase 63 D3 — 드래그 중에는 행 정렬을 꺼야 dnd-kit 자동 스크롤과 싸우지 않는다.
   // DragKindContext는 드래그 시작·끝에만 바뀐다(F7) — 매 move 리렌더가 아니다.
   const dragKind = useDragKind();
+
+  /* ═══ Phase 63 D3(재개정) — 행 단위 정렬은 CSS 스냅이 아니라 JS다 ═══
+     CSS scroll-snap은 proximity·mandatory 둘 다 실기기(macOS 트랙패드)에서 무동작이었다
+     (T3 검수 2회 — CDP 합성 휠 프로브에서는 둘 다 스냅했으므로 구조 문제가 아니라
+     실기기 스크롤 경로의 브라우저 동작). → 스크롤이 완전히 멈춘 순간(scrollend, 미지원이면
+     scroll 디바운스 140ms)에만 가까운 행 상단으로 부드럽게 정렬한다. 스크롤 중 저항 0.
+     대상 행은 [data-snap-row] 마크(ListView 문항 행 — S3의 폴더 행도 이 마크를 단다). */
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const alignGateRef = useRef<{ list: boolean; dragging: boolean }>({ list: true, dragging: false });
+  alignGateRef.current = { list: viewMode === 'list', dragging: dragKind !== null };
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const align = () => {
+      const gate = alignGateRef.current;
+      if (!gate.list || gate.dragging) return;
+      const rows = el.querySelectorAll<HTMLElement>('[data-snap-row]');
+      if (rows.length === 0) return;
+      // 목표선 = 컨테이너 상단 + 8(ListView 루트 paddingTop 8과 짝 — 첫 행이 무이동으로 정렬)
+      const target = el.getBoundingClientRect().top + SNAP_TOP_GAP;
+      let best = 0;
+      let bestAbs = Infinity;
+      for (const row of rows) {
+        const d = row.getBoundingClientRect().top - target;
+        const a = Math.abs(d);
+        if (a < bestAbs) { bestAbs = a; best = d; }
+        else if (d > 0) break; // 문서 순서라 가장 가까운 행을 지나면 멀어지기만 한다
+      }
+      // 스크롤 한계로 클램프 — 맨 아래 여백에서 억지로 끌어올리지 않는다
+      const delta = Math.max(Math.min(best, el.scrollHeight - el.clientHeight - el.scrollTop), -el.scrollTop);
+      if (Math.abs(delta) < 1) return; // 이미 정렬(자기 정렬 스크롤의 재발화 포함 — 루프 없음)
+      el.scrollBy({ top: delta, behavior: 'smooth' });
+    };
+    // ⚠ 'onscrollend' in el 가드는 lib.dom에 선언이 없어 el을 never로 좁힌다(별칭 내로잉 포함)
+    //   → 검사는 window에(의미 동일 — scrollend 지원은 브라우저 전역), el은 좁히지 않는다
+    if ('onscrollend' in window) {
+      el.addEventListener('scrollend', align);
+      return () => el.removeEventListener('scrollend', align);
+    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = () => { if (timer) clearTimeout(timer); timer = setTimeout(align, 140); };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => { el.removeEventListener('scroll', onScroll); if (timer) clearTimeout(timer); };
+  }, []);
 
   // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
@@ -488,18 +535,12 @@ export default function FolderView({
           아이보리 = "문항 밖". 이제 클레이는 카드·리스트 행이 담당한다.
           ⚠ U자 프레임은 EditorView·ProblemView 2곳이 공유한다 — FolderView에 되살리지 말 것.
           overflow/position/fontSize는 유지한다(스크롤·sticky·DnD의 기준). */}
-      <div style={{
+      <div ref={scrollRef} style={{
         flex: 1, minHeight: 0, width: '100%',
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
-        // Phase 63 D3(개정) — 리스트 모드만 행 단위 스냅. 계획은 proximity였으나 실기기
-        // macOS 트랙패드 관성 끝에서 Chrome이 proximity 스냅을 걸어 주지 않았다(T3 검수).
-        // CDP 합성 휠에서는 proximity도 스냅했으므로(프로브 실측) 구조 문제가 아니라
-        // 트랙패드 모멘텀 경로의 브라우저 동작이다 → mandatory로 전환(= "줄 단위" 의미 그대로).
-        // 카드 모드·드래그 중엔 'none'을 **명시**한다(조건부 longhand 함정 방지,
-        // 드래그 중 스냅은 dnd-kit 자동 스크롤과 싸워 떨림을 만든다).
-        scrollSnapType: viewMode === 'list' && !dragKind ? 'y mandatory' : 'none',
-        scrollPaddingTop: 8,
+        // Phase 63 D3(재개정) — 행 정렬은 위의 scrollend JS가 담당한다. CSS scroll-snap은
+        // 실기기에서 무동작이라 철거했다(두 기계장치를 겹치지 않는다).
       }}>
         {/* 개선묶음 M2 E — 카드보기의 열수 제한을 푼다.
             2열 제한의 진범은 grid가 아니라 이 래퍼의 maxWidth:1200이었다

@@ -173,13 +173,13 @@ export default function ListView({
           <div
             key={p.id}
             className="folder-row"
+            data-snap-row=""
             onClick={() => onView(p)}
             style={{
               display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px',
               background: 'var(--card-surface, var(--bg-content))',
               border: '0.5px solid var(--border-content)',
               borderRadius: 8, marginBottom: 4,
-              scrollSnapAlign: 'start', // Phase 63 D3 — 행 단위 스냅(컨테이너는 FolderView 소유)
               cursor: 'pointer',
               opacity: busyId === p.id ? 0.5 : 1,
               transition: 'background .15s, box-shadow .15s',
