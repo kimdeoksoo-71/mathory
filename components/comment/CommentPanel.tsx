@@ -25,7 +25,7 @@ import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
 import SelectionInsertPopup from './SelectionInsertPopup';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
-import { IconDownload } from '../ui/Icons';
+import { IconDownload, IconComment } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H } from '../ui/dialogStyles';
 
@@ -932,7 +932,11 @@ export default function CommentPanel({
         minHeight: DRAWER_ROW1_H, boxSizing: 'border-box',   // 중앙 컨텐츠의 첫 가로선(y=57)과 정렬
         borderBottom: '1px solid var(--border-light, #eee)',
       }}>
-        <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: 'var(--text-primary)',
+          display: 'flex', alignItems: 'center', gap: 6,
+        }}>
+          {isCommentsMode && <IconComment size={16} />}
           {isCommentsMode ? '댓글' : 'AI agent'}
         </div>
         <div style={{ flex: 1 }} />

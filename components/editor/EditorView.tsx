@@ -3310,7 +3310,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   if (panelMode !== 'comments') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                 }}
               >
-                <IconComment size={13} />{commentCount ? ` ${commentCount}` : ''}
+                {/* 크기 17 = 왼쪽 버전 기록(IconRestore 17)과 동일 — 검수 요청 2026-09-05 */}
+                <IconComment size={17} />{commentCount ? ` ${commentCount}` : ''}
               </button>
               <button
                 onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
