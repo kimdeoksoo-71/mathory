@@ -12,182 +12,75 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MathSnippet } from '../../types/snippet';
 import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
-import { IconLoader } from '../ui/Icons';
-import { ICON_SIZE, SVG_PROPS, CORNER_BRACKETS } from './toolbarIcons';
+import { IconLoader, PhIcon } from '../ui/Icons';
+import { PH } from '../ui/phosphorPaths';
+import { ICON_SIZE, SVG_PROPS } from './toolbarIcons';
 import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from './EmojiPickerPanel';
 
 // ═══════════════════════════════════════════════
-// SVG 아이콘 (viewBox 64×64, stroke=currentColor)
-// 규격(SVG_PROPS·CORNER_BRACKETS)은 toolbarIcons.tsx가 소유한다 —
-// MathSymbolPalette의 SigmaIcon과 공유(M3 D12, 순환 import 회피)
+// Row 2 아이콘 — Phosphor regular · ICON_SIZE 20 (M4 · Final_V4 §3-1).
+// 규격은 toolbarIcons.tsx가 소유(SigmaIcon과 공유 — 순환 import 회피).
+// 브라켓(CORNER_BRACKETS)은 M4에서 폐기 — 켜짐 프레임은 IconButton의 active 테두리 하나다.
 // ═══════════════════════════════════════════════
 
 function InlineMathIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M32 16 L32 48" />
-      <path d="M38 22 C38 22 36 19 32 19 C28 19 25 21 25 24.5 C25 28 28 29.5 32 31 C36 32.5 39 34.5 39 38.5 C39 42 36 45 32 45 C28 45 26 42 26 42" />
-    </svg>
-  );
+  return <PhIcon d={PH.dollarSimple} size={ICON_SIZE} />;
 }
 
+/** 블록 수식 $$ — currency-dollar-simple을 x 0.62배로 눌러 좌·우 배치 (D7 · Final_V4 §4-3).
+ *  비등방 scale은 fill path의 세로 획을 가늘게 한다(20px에서 1.25→0.78px) — 흐리면
+ *  대안은 0.8배 등방 축소+겹침(Q5, 컨택트시트 판정).
+ *  좌표: path x 56~200(폭 144) → 0.62배 폭 89.3 · 간격 12 → tx −2 / 99. */
 function BlockMathIcon() {
   return (
     <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M23 16 L23 48" />
-      <path d="M29 22 C29 22 27.5 19 23 19 C19 19 17 21.5 17 24.5 C17 28 19.5 29.5 23 31 C26.5 32.5 29 34.5 29 38.5 C29 42 27 45 23 45 C19 45 17 42 17 42" />
-      <path d="M41 16 L41 48" />
-      <path d="M47 22 C47 22 45.5 19 41 19 C37 19 35 21.5 35 24.5 C35 28 37.5 29.5 41 31 C44.5 32.5 47 34.5 47 38.5 C47 42 45 45 41 45 C37 45 35 42 35 42" />
+      <g transform="translate(-2 0) scale(0.62 1)"><path d={PH.dollarSimple} /></g>
+      <g transform="translate(99 0) scale(0.62 1)"><path d={PH.dollarSimple} /></g>
     </svg>
   );
 }
 
 function SearchReplaceIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <circle cx="29" cy="28" r="11" />
-      <path d="M37 36 L44 43" />
-    </svg>
-  );
+  return <PhIcon d={PH.magnifyingGlass} size={ICON_SIZE} />;
 }
 
 function SnippetIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M25 20 C25 20 22 20 22 24 L22 29 C22 32 18 32 18 32 C18 32 22 32 22 35 L22 40 C22 44 25 44 25 44" />
-      <path d="M39 20 C39 20 42 20 42 24 L42 29 C42 32 46 32 46 32 C46 32 42 32 42 35 L42 40 C42 44 39 44 39 44" />
-      <circle cx="27" cy="32" r="1.8" fill="currentColor" stroke="none" />
-      <circle cx="32" cy="32" r="1.8" fill="currentColor" stroke="none" />
-      <circle cx="37" cy="32" r="1.8" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <PhIcon d={PH.bracketsCurly} size={ICON_SIZE} />;
 }
 
-function OcrIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <text
-        x="32" y="38"
-        textAnchor="middle"
-        fontFamily="Arial, Helvetica, sans-serif"
-        fontWeight="700"
-        fontSize="18"
-        fill="currentColor"
-        stroke="none"
-        letterSpacing="1"
-      >OCR</text>
-    </svg>
-  );
+/** 수식 읽기(OCR) — scan (D9). CommentEditor도 이 컴포넌트를 import한다(사본 금지). */
+export function OcrIcon({ size = ICON_SIZE }: { size?: number }) {
+  return <PhIcon d={PH.scan} size={size} />;
 }
 
 function ProofreadIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M18 20 L46 20" />
-      <path d="M18 28 L44 28" />
-      <path d="M18 36 L40 36" />
-      <path d="M18 44 L34 44" />
-      <path d="M38 42 L43 48 L52 36" />
-    </svg>
-  );
+  return <PhIcon d={PH.listChecks} size={ICON_SIZE} />;
 }
 
 function SpecialCharIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <circle cx="32" cy="32" r="14" />
-      <text
-        x="32" y="38"
-        textAnchor="middle"
-        fontFamily="Arial, Helvetica, sans-serif"
-        fontWeight="700"
-        fontSize="20"
-        fill="currentColor"
-        stroke="none"
-      >1</text>
-    </svg>
-  );
+  return <PhIcon d={PH.numberCircleOne} size={ICON_SIZE} />;
 }
 
 function EmojiIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <circle cx="32" cy="32" r="14" />
-      <circle cx="27" cy="28" r="1.6" fill="currentColor" stroke="none" />
-      <circle cx="37" cy="28" r="1.6" fill="currentColor" stroke="none" />
-      <path d="M25 37 C27.5 41 36.5 41 39 37" />
-    </svg>
-  );
+  return <PhIcon d={PH.smiley} size={ICON_SIZE} />;
 }
 
 function TableAddIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <rect x="20" y="20" width="24" height="24" rx="1" />
-      <path d="M32 20 L32 44" />
-      <path d="M20 32 L44 32" />
-    </svg>
-  );
+  return <PhIcon d={PH.table} size={ICON_SIZE} />;
 }
 
-/** 전체 접기/펼치기 토글 — collapsed=true면 펼치기(바깥쪽 화살표), false면 접기(안쪽 화살표) */
+/** 전체 접기/펼치기 토글 — collapsed=true면 펼치기(바깥쪽), false면 접기(안쪽) (D10) */
 function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M20 32 L44 32" />
-      {collapsed ? (
-        <>
-          {/* 펼치기: 위·아래로 벌어지는 화살표 */}
-          <path d="M26 24 L32 18 L38 24" />
-          <path d="M26 40 L32 46 L38 40" />
-        </>
-      ) : (
-        <>
-          {/* 접기: 가운데로 모이는 화살표 */}
-          <path d="M26 19 L32 25 L38 19" />
-          <path d="M26 45 L32 39 L38 45" />
-        </>
-      )}
-    </svg>
-  );
+  return <PhIcon d={collapsed ? PH.collapseOut : PH.collapseIn} size={ICON_SIZE} />;
 }
 
-/** 핵심문장 (Phase 58 P3) — 보통 행 2개 사이에 칠해진 강조 행 1개.
- *  기능(주변은 물러나고 key 한 줄만 앞으로)을 그대로 그린 것이고, 계열의 idiom만 쓴다:
- *  선은 currentColor stroke, 면은 fill="currentColor" stroke="none"(SnippetIcon 점 선례).
- *  ProofreadIcon(4행 + 체크)과 혼동되지 않도록 3행 + 가운데를 면으로 처리했다. */
+/** 강조(핵심문장) — highlighter */
 function KeySentenceIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path d="M18 22 L46 22" />
-      <rect x="18" y="27.5" width="26" height="9" rx="2" fill="currentColor" stroke="none" />
-      <path d="M18 42 L38 42" />
-    </svg>
-  );
+  return <PhIcon d={PH.highlighter} size={ICON_SIZE} />;
 }
 
 function AiMathGenIcon() {
-  return (
-    <svg {...SVG_PROPS}>
-      {CORNER_BRACKETS}
-      <path
-        d="M32 16 C32 16 34 28 44 32 C34 36 32 48 32 48 C32 48 30 36 20 32 C30 28 32 16 32 16Z"
-        fill="currentColor"
-        stroke="none"
-      />
-    </svg>
-  );
+  return <PhIcon d={PH.sparkle} size={ICON_SIZE} />;
 }
 
 // ═══════════════════════════════════════════════
@@ -265,6 +158,14 @@ interface UnifiedToolbarProps {
   keyToggleRejected: boolean;
 }
 
+/** D18 — active 배경: 구글 파랑 하드코딩을 accent 틴트로. 브라켓이 사라져 active 프레임이
+ *  유일한 사각이 되므로 색이 그대로 드러난다. color-mix 미지원 브라우저만 리터럴 폴백
+ *  (= --accent-primary #c96442의 8%). */
+const ACTIVE_BG =
+  typeof CSS !== 'undefined' && CSS.supports?.('color', 'color-mix(in srgb, red 8%, transparent)')
+    ? 'color-mix(in srgb, var(--accent-primary) 8%, transparent)'
+    : 'rgba(201, 100, 66, 0.08)';
+
 const ICON_BTN_BASE: React.CSSProperties = {
   width: 32, height: 32,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -329,7 +230,7 @@ function IconButton({
         style={{
           ...ICON_BTN_BASE,
           border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
-          background: active ? 'rgba(66, 133, 244, 0.08)' : 'transparent',
+          background: active ? ACTIVE_BG : 'transparent',
           color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
           cursor: disabled ? 'wait' : 'pointer',
         }}

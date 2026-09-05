@@ -3384,13 +3384,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           background: 'transparent', border: 'none', padding: 4,
           cursor: canUndo ? 'pointer' : 'default',
           color: canUndo ? 'var(--text-secondary)' : 'var(--text-faint)',
-        }}><IconUndo size={17} /></button>
+        }}><IconUndo size={20} /></button>
         <button onClick={redoBlocks} disabled={!canRedo} title="다시실행 (⌘⇧Z)" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'transparent', border: 'none', padding: 4,
           cursor: canRedo ? 'pointer' : 'default',
           color: canRedo ? 'var(--text-secondary)' : 'var(--text-faint)',
-        }}><IconRedo size={17} /></button>
+        }}><IconRedo size={20} /></button>
         <div style={{ width: 1, height: 18, background: 'var(--border-light)', margin: '0 4px' }} />
 
         <UnifiedToolbar

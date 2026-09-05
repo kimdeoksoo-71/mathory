@@ -1,46 +1,31 @@
 /**
- * M3 D12 — 툴바 아이콘 공용 규격.
+ * M4 — 툴바 아이콘 공용 규격 (Phosphor 전환 · Final_V4 §4-4).
  *
- * `SVG_PROPS`·`CORNER_BRACKETS`는 UnifiedToolbar가 갖고 있었지만, 팔레트 트리거의
- * `SigmaIcon`(M3 A4)이 같은 규격을 써야 하는데 **UnifiedToolbar → MathSymbolPalette**
- * 방향으로 import가 이미 있어 역방향은 순환이다 → 규격을 셋째 파일로 내렸다.
+ * M3까지의 규격(viewBox 64 · stroke 3.5 · CORNER_BRACKETS)은 M4에서 폐기됐다 —
+ * 브라켓은 브랜드 모티프로 로고·favicon·빈 화면에만 남는다(D19).
+ * 현행: Phosphor regular · viewBox 256 · fill currentColor · ICON_SIZE 20
+ * (20px에서 시각 획 20/256×16 = 1.25px — 옛 브라켓 1.2px과 같은 무게, D8).
  *
+ * 이 파일이 셋째 파일인 이유(M3 D12 그대로): UnifiedToolbar → MathSymbolPalette 방향
+ * import가 있어 SigmaIcon 규격을 UnifiedToolbar에 두면 역방향 순환이 된다.
  * ⚠ 별도 `.svg` 파일로 빼지 말 것 — `currentColor`가 끊긴다(Phase 58 P3 규약).
- * ⚠ 시각 획 두께 = 3.5 × (렌더 px / 64). ICON_SIZE 22에서 ≈1.2px — 이 값이
- *   "2행 버튼들의 브라켓 두께"이고 팔레트 트리거의 외곽선 두께 기준이다(D3).
  */
+import { PhIcon } from '../ui/Icons';
+import { PH } from '../ui/phosphorPaths';
 
-export const ICON_SIZE = 22;
+export const ICON_SIZE = 20;
 
+/** 브라켓 없는 커스텀 도안(BlockMathIcon 등)이 쓰는 공통 svg props. */
 export const SVG_PROPS = {
   width: ICON_SIZE,
   height: ICON_SIZE,
-  viewBox: '0 0 64 64',
-  fill: 'none' as const,
-  stroke: 'currentColor',
-  strokeWidth: 3.5,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
+  viewBox: '0 0 256 256',
+  fill: 'currentColor',
   'aria-hidden': true,
-};
+} as const;
 
-export const CORNER_BRACKETS = (
-  <>
-    <path d="M8 20 L8 8 L20 8" />
-    <path d="M44 8 L56 8 L56 20" />
-    <path d="M56 44 L56 56 L44 56" />
-    <path d="M20 56 L8 56 L8 44" />
-  </>
-);
-
-/** 수식 기호 팔레트 트리거의 시그마 (M3 A4 · 검수 반영 2026-09-05).
- *  KaTeX `\sum` 렌더(세리프·획 대비)를 버리고 균일 획 고딕으로.
- *  덕수 검수: "세로로 너무 길고 획이 너무 가늘다" → 가로폭은 그대로, **세로만 80%**
- *  (36 → 29유닛), 획은 3.5 → **5**(시각 ≈1.7px — 브라켓 1.2px보다 의도적으로 두껍다). */
+/** 수식 기호 팔레트 트리거 (D12) — M3 자체 Σ(획 5)를 Phosphor sigma로 교체.
+ *  자체 Σ의 존재 이유였던 "브라켓 1.2px 기준 굵기"가 브라켓과 함께 사라졌다. */
 export function SigmaIcon() {
-  return (
-    <svg {...SVG_PROPS} strokeWidth={5}>
-      <path d="M45 17.5 H19 L34 32 L19 46.5 H45" />
-    </svg>
-  );
+  return <PhIcon d={PH.sigma} size={ICON_SIZE} />;
 }
