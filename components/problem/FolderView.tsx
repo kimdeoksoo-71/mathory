@@ -82,6 +82,21 @@ interface FolderViewProps {
   listContext?: { mode: ListMode; recipientUid?: string; profiles?: Record<string, UserProfile> };
 }
 
+/* Phase 63 D1 — 폐기된 폴더별 보기 모드 키 소거(1회). 모듈 플래그라 폴더를 오가도 한 번만 돈다. */
+let viewModeKeysSwept = false;
+function sweepLegacyViewModeKeys() {
+  if (viewModeKeysSwept || typeof window === 'undefined') return;
+  viewModeKeysSwept = true;
+  try {
+    const stale: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith('mathory.viewMode.')) stale.push(key);
+    }
+    stale.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+
 function formatDate(d?: Date): string {
   if (!d) return '';
   const yy = String(d.getFullYear()).slice(-2);
@@ -111,21 +126,13 @@ export default function FolderView({
   // Phase 61d: 일괄 검증 다이얼로그
   const [batchOpen, setBatchOpen] = useState(false);
 
-  // Phase 49: 카드/리스트 보기 — 공유 뷰는 리스트 기본, 그 외 카드 기본. localStorage 영속.
-  const VIEWMODE_KEY = `mathory.viewMode.${folder.id}`;
-  const [viewMode, setViewMode] = useState<'card' | 'list'>(listContext ? 'list' : 'card');
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(VIEWMODE_KEY);
-      if (stored === 'card' || stored === 'list') setViewMode(stored);
-      else setViewMode(listContext ? 'list' : 'card');
-    } catch { setViewMode(listContext ? 'list' : 'card'); }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [folder.id]);
-  const changeViewMode = (m: 'card' | 'list') => {
-    setViewMode(m);
-    try { localStorage.setItem(VIEWMODE_KEY, m); } catch {}
-  };
+  // Phase 63 D1 — 보기 모드는 비영속·기본 리스트. 카드는 버튼으로만, 폴더를 바꾸면 리스트로 리셋.
+  // (Phase 49의 폴더별 localStorage 영속을 폐기 — 두 폴더만 다른 모드로 열리면 보기 모드가
+  //  저절로 바뀌는 듯 보였다. 옛 mathory.viewMode.* 키는 첫 마운트에서 한 번 소거한다.)
+  const [viewMode, setViewMode] = useState<'card' | 'list'>('list');
+  useEffect(() => { setViewMode('list'); }, [folder.id]);
+  useEffect(() => { sweepLegacyViewModeKeys(); }, []);
+  const changeViewMode = (m: 'card' | 'list') => setViewMode(m);
 
   useEffect(() => { setSort(loadSort()); }, []);
 
@@ -138,9 +145,8 @@ export default function FolderView({
   const isUnassigned = folder.id === UNASSIGNED_FOLDER_ID;
   const isSharedWithMe = folder.id === SHARED_WITH_ME_FOLDER_ID;
   const isSpecial = isTrash || isUnassigned || isSharedWithMe;
-  // 휴지통/미지정은 리스트 보기 비허용(전용 메뉴가 달라서) → 카드 고정
-  const listAllowed = !isTrash && !isUnassigned;
-  const effectiveViewMode: 'card' | 'list' = listAllowed ? viewMode : 'card';
+  // Phase 63 D2 — listAllowed 폐지: 휴지통·미지정도 리스트가 기본이다. "전용 메뉴" 사유는
+  // ListView mode:'trash'가 흡수했다(미지정 메뉴는 원래 기본 메뉴와 같았다 — A-2).
 
   // Phase 40: 하위 폴더 + 브레드크럼 (일반 폴더에서만)
   const childFolders = isSpecial ? [] : getChildren(folders, folder.id);
@@ -170,14 +176,20 @@ export default function FolderView({
   const batchAllowed = !!user && !isTrash && !isSharedWithMe && !passthrough && !listContext
     && batchOwnedCount > 0;
 
+  // Phase 63 D45 — 일괄 검증 버튼은 리스트 모드에서만(카드는 편집·열람용이라 짝이 아니다).
+  // batchAllowed 자체·다이얼로그·게이트는 61d 그대로다.
+  const batchButtonVisible = batchAllowed && viewMode === 'list';
+
   // 조용히 사라진 컨트롤은 "구현이 안 됐다"와 구별되지 않는다 — 개발 중에만 이유를 남긴다(61b 관례)
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production' || batchAllowed) return;
+    if (process.env.NODE_ENV === 'production' || batchButtonVisible) return;
     if (!user) console.info('[Phase61d] 일괄 검증 버튼 숨김: 로그인 정보 없음');
     else if (isTrash || isSharedWithMe || passthrough || listContext) {
       console.info('[Phase61d] 일괄 검증 버튼 숨김: 대상 아닌 폴더(휴지통·공유 계열)');
+    } else if (batchAllowed) {
+      console.info('[Phase61d] 일괄 검증 버튼 숨김: 카드 보기(리스트에서만 노출)');
     } else console.info('[Phase61d] 일괄 검증 버튼 숨김: 내 소유 직속 문항 0건');
-  }, [batchAllowed, user, isTrash, isSharedWithMe, passthrough, listContext]);
+  }, [batchButtonVisible, batchAllowed, user, isTrash, isSharedWithMe, passthrough, listContext]);
 
   useEffect(() => {
     const stored = localStorage.getItem(FONT_SIZE_KEY);
@@ -188,7 +200,7 @@ export default function FolderView({
   }, []);
 
   useEffect(() => {
-    if (effectiveViewMode !== 'card') { setBlocksLoading(false); return; } // 리스트 모드는 카드 프리뷰 불필요
+    if (viewMode !== 'card') { setBlocksLoading(false); return; } // 리스트 모드는 카드 프리뷰 불필요
     if (folderProblems.length === 0) { setBlocksLoading(false); return; }
     setBlocksLoading(true);
     const loadBlocks = async () => {
@@ -202,7 +214,7 @@ export default function FolderView({
       setBlocksLoading(false);
     };
     loadBlocks();
-  }, [folder.id, problems.length, effectiveViewMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [folder.id, problems.length, viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 49: 미해결 댓글 수 + agent 세션 수 (ListView와 공유하는 훅)
   const { commentCounts: commentCountsMap, agentCounts: agentCountsMap } = useCommentCounts(folderProblems, folder.id);
@@ -377,9 +389,9 @@ export default function FolderView({
             ({folderProblems.length})
           </span>
           <div style={{ flex: 1 }} />
-          {listAllowed && <ViewModeToggle mode={effectiveViewMode} onChange={changeViewMode} />}
-          {effectiveViewMode === 'card' && <SortControls sort={sort} onChange={updateSort} />}
-          {batchAllowed && (
+          <ViewModeToggle mode={viewMode} onChange={changeViewMode} />
+          {viewMode === 'card' && <SortControls sort={sort} onChange={updateSort} />}
+          {batchButtonVisible && (
             <button
               onClick={() => setBatchOpen(true)}
               title="이 폴더의 문항을 골라 AI 교차검증합니다 (API 비용 발생)"
@@ -465,25 +477,25 @@ export default function FolderView({
             리스트보기는 Phase 62 D8의 "행 폭 = 제목바 폭(1136)" 정렬 기준선이 걸려 있다.
             ⚠ longhand는 키를 빼지 말고 항상 값을 줄 것(조건부 style 함정). */}
         <div style={{
-          maxWidth: effectiveViewMode === 'card' ? 'none' : 1200,
+          maxWidth: viewMode === 'card' ? 'none' : 1200,
           margin: '0 auto', padding: '0 32px', boxSizing: 'border-box',
         }}>
 
         {blocksLoading && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>로딩 중...</div>
         )}
-        {effectiveViewMode === 'card' && !blocksLoading && folderProblems.length === 0 && childFolders.length === 0 && (
+        {viewMode === 'card' && !blocksLoading && folderProblems.length === 0 && childFolders.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 32 }}>
             {isTrash ? '휴지통이 비어 있습니다.' : isSharedWithMe ? '공유 받은 문항이 없습니다.' : '이 폴더에 문항이 없습니다.'}
           </div>
         )}
 
         {/* ═══ 리스트 보기 (Phase 49) ═══ */}
-        {effectiveViewMode === 'list' && (
+        {viewMode === 'list' && (
           <ListView
             problems={folderProblems}
             scopeKey={folder.id}
-            mode={listContext?.mode ?? 'my'}
+            mode={isTrash ? 'trash' : listContext?.mode ?? 'my'}
             recipientUid={listContext?.recipientUid}
             profiles={listContext?.profiles}
             onView={onView}
@@ -493,7 +505,7 @@ export default function FolderView({
         )}
 
         {/* ═══ 카드 그리드 — 카드 폭 고정(35em), 브라우저 폭에 따라 1~2열 자동 ═══ */}
-        {effectiveViewMode === 'card' && !blocksLoading && folderProblems.length > 0 && (
+        {viewMode === 'card' && !blocksLoading && folderProblems.length > 0 && (
           <div style={{
             display: 'grid',
             // 카드 폭 고정 px → 컬럼 수가 글꼴 크기와 무관하게 '폭'에만 의존 (35em@15 ≈ 525 기준 520)

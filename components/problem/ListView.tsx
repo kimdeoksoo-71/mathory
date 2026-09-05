@@ -10,7 +10,9 @@ import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 
-export type ListMode = 'my' | 'received' | 'sent';
+/* Phase 63 D2 — 'trash' 추가: 휴지통도 리스트가 기본이 되면서 전용 메뉴(복원·영구 삭제)를
+   ListView가 흡수했다(카드 메뉴 FolderView cardMenuItems의 isTrash 갈래와 동일 구성). */
+export type ListMode = 'my' | 'received' | 'sent' | 'trash';
 
 interface ListViewProps {
   problems: Problem[];
@@ -92,6 +94,10 @@ export default function ListView({
   };
 
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
+    if (mode === 'trash') return [
+      { label: '복원', icon: <IconCopy size={14} />, action: 'restore' },
+      { label: '영구 삭제', icon: <IconTrash size={14} />, action: 'delete', danger: true },
+    ];
     if (mode === 'received') return [
       { label: '공유 받기 해제', icon: <IconShare size={14} />, action: 'leave_shared', danger: true },
     ];
@@ -163,7 +169,11 @@ export default function ListView({
       {/* 행 */}
       {sorted.length === 0 ? (
         <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
-          문항이 없습니다.
+          {/* D2 — 카드 빈 상태(FolderView)와 같은 문구 체계 */}
+          {mode === 'trash' ? '휴지통이 비어 있습니다.'
+            : mode === 'received' ? '공유 받은 문항이 없습니다.'
+            : mode === 'sent' ? '문항이 없습니다.'
+            : '이 폴더에 문항이 없습니다.'}
         </div>
       ) : sorted.map((p) => {
         const owner = profiles?.[p.authorUid || ''];
