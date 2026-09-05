@@ -1874,6 +1874,37 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 63: FolderView 리스트·칼럼 체계 · 앱 전역 DnD ✅ (구현·검수 완료 2026-09-06 · 배포 대기)
+
+계획서: `docs/phasedocs/Phase63 FolderView 리스트·칼럼·앱 전역 DnD Final_V4 실행판.md`
+(덕수 구상 → v1 web → v2 CLI 실측 → v3 web 재검증 → **Final_V4 실행판**. §8이 구현·검수 기록 — 계획 개정 G1~G7)
+
+**서버 0 · Firestore 규칙 0 · 스키마 0 · 마이그레이션 0 · 전처리 0 · 렌더 5사이트 0.**
+신규 3(`lib/listColumns.ts` import 0 · `hooks/useListPrefs.ts` · `components/ui/dnd.tsx`) ·
+커밋 13(S0~S6 + 검수 반영 6건). 로직 검증 341 → **356건**(`test:list` 15 신설). 단계별 즉시 검수 T1~T9 전항 통과.
+
+- **DnD 컨텍스트 1개화(S0)**: 사이드바·FolderView의 두 컨텍스트를 AppShell 하나로 —
+  데이터 계약(`type` 필수)·id 네임스페이스(`dndId`)·충돌 판정(folder=sortable 필터 closestCenter /
+  problem=pointerWithin, 키보드만 rectIntersection)·`DragKindContext`(매 move 리렌더 차단)·
+  링+틴트 하이라이트(border 불변 — 사이드바 2px 성장 결함 수정). **빈 곳 드롭 = 무동작**(기존 결함 수정)
+- **기본 리스트·비영속(S1)** + 휴지통·미지정 리스트(mode:'trash') + [일괄 검증] 리스트 전용.
+  영구 삭제 후 휴지통 유지·복원 후 미지정 이동(검수 반영)
+- **칼럼 헤더 = 제목바 행 2(S2)** — 스크롤 밖 고정(고무줄 오버스크롤 부동), ListView sticky 래퍼 철거.
+  행 정렬은 **scrollend JS**(CSS 스냅은 실기기 트랙패드에서 proximity·mandatory 모두 무동작 — G1) +
+  상단 8px sticky 마스크(G2) + 바닥에서 위로 당김·하단 슬랙 72(G3)
+- **폴더 행(S3)**: 리스트 상단 아이보리 무테두리 행(아이콘+이름+(n)+수정일 = 하위 트리 max, 한 패스 계산).
+  드래그 소스 확장(내 소유·비공유 — 휴지통 포함) · 타깃 확장(브레드크럼·미지정·휴지통) ·
+  **updated_at 경계(Q14): 이동 무스탬프, moveToTrash만 "버린 시각"**
+- **칼럼 체계(S4)**: 레지스트리(고정 2+선택 5) · grid+subgrid(열 폭 진실 = 본문 루트 하나, 헤더는 실측
+  템플릿 소비 — `getComputedStyle`는 루트에서만) · 유령 라벨 행(G4) · 폭 핸들·칼럼 설정 팝오버 ·
+  `mathory.listPrefs.<folderId>` 폴더별 저장 · zebra(`--row-alt` #F8F4EE, Q13=C)
+- **다중 선택(S5)**: 체크박스 열(+헤더 전체선택)·Shift 범위·선택 바(행 1)·Finder 드래그 의미론·
+  `moveProblemsToFolder`(writeBatch 청크·TRASH만 스탬프)·다중→휴지통만 확인(Q15)
+- **사이드바 들여쓰기(S6)**: depth-0 좌단 정렬(두 트리 아이콘 x20 일치)·미지정=휴지통 x0 통일·
+  그립 −12 이사·하위 단 12px 당김(Q17=B)
+
+---
+
 ## 개선묶음 M3: 아이콘 정비 · 버그 수정 · 기능 개선 ✅ (구현·검수 완료 2026-09-05 · 배포 대기)
 
 계획서: `docs/phasedocs/개선묶음 M3 아이콘 정비·버그 수정 Final_V4 실행판.md`

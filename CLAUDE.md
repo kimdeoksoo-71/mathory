@@ -55,6 +55,10 @@ lib/verify/batchPlan.ts   — 일괄 검증 판정 (Phase 61d, import 0 순수 �
 lib/batchVerify.ts        — 일괄 검증 오케스트레이터 (Phase 61d, firestore 접촉)
 components/problem/
   BatchVerifyDialog.tsx    — 일괄 검증 선택→진행→요약 (Phase 61d)
+  ListView.tsx             — 리스트 본문(grid+subgrid) · ListHeader(칼럼 헤더, FolderView 행 2에서 렌더) (Phase 63)
+lib/listColumns.ts        — 칼럼 레지스트리·prefs 검증·정렬 서열 (Phase 63, import 0)
+hooks/useListPrefs.ts     — 칼럼 prefs 폴더별 localStorage 영속 (Phase 63)
+components/ui/dnd.tsx     — 전역 DnD 공용: 계약·id 네임스페이스·충돌 판정·DragKindContext (Phase 63)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -283,7 +287,53 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M3 — 아이콘 정비 · 버그 수정 · 기능 개선** — 구현·검수 완료(2026-09-05) · 배포 대기
+## 현재 Phase: **Phase 63 — FolderView 리스트·칼럼 체계 · 앱 전역 DnD** — 구현·검수 완료(2026-09-06) · 배포 대기
+
+문서: `docs/phasedocs/Phase63 FolderView 리스트·칼럼·앱 전역 DnD Final_V4 실행판.md`
+(계보: 덕수 구상 → v1 web → v2 CLI 실측 → v3 web 재검증 → **Final_V4 = 실행판**(§8이 구현·검수 기록, 계획 개정 G1~G7). Q1~Q18 전항 판정 완료)
+
+기본 보기 리스트(비영속) · 칼럼 체계(고정 2+선택 5, 폴더별 저장) · 하위 폴더 행 · 헤더를
+제목바 행 2로 · 앱 전역 DnD 1컨텍스트 · 다중 선택 일괄 이동 · 사이드바 들여쓰기 정리.
+**서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0.** 신규 3(`lib/listColumns.ts` ·
+`hooks/useListPrefs.ts` · `components/ui/dnd.tsx`) · 커밋 13. 로직 검증 341 → **356건**(`test:list` 신설).
+
+- **⚠ DnD 컨텍스트는 AppShell 하나뿐이다** — Sidebar·FolderView에 DndContext를 되살리지 말 것
+  (EditorView 블록·UserGroupEditor는 별개 중첩 컨텍스트로 무해). 규약 4종: ① 소스·타깃 data에
+  **`type` 필수**(problem/problems/folder/unassigned/trash — 핸들러가 type으로만 분기, id 파싱 금지)
+  ② id는 `dndId` 네임스페이스(사이드바 폴더 sortable만 맨 folder.id — SortableContext items 앵커)
+  ③ 충돌 판정 분기 기준은 "결과가 비었나"가 아니라 **`pointerCoordinates` 유무**(포인터=pointerWithin만
+  → 빈 곳 드롭 무동작 / 키보드=rectIntersection). folder 드래그는 `data.sortable` 필터 closestCenter
+  ④ 드래그 종류는 `DragKindContext`로 읽을 것 — **`useDndContext()` 금지**(매 move 리렌더 = 61c
+  "리렌더 자체가 버그"의 드래그판). `onDragOver`·전역 over 상태도 같은 이유로 금지
+- **⚠ 드롭 하이라이트는 링+틴트, border 불변**(`DROP_RING`/`DROP_TINT`) — 조건부 border는 over
+  순간 행이 자란다(실제 결함이었다). 드래그 소스 스프레드에서 **`onKeyDown` 활성자 제외**(전역
+  KeyboardSensor가 포커스된 카드에서 Space 드래그를 시작한다)
+- **⚠ 이동은 `updated_at`을 찍지 않는다(Q14)** — `moveProblemToFolder`·`moveProblemsToFolder`·
+  `deleteFolder`의 미분류 이동 전부. **예외는 휴지통행뿐**(`moveToTrash` · `moveProblemsToFolder`의
+  TRASH 타깃 — 함수 내부 규칙, 호출부 분기 금지): 휴지통에서 updated_at은 "버린 시각"이고
+  휴지통 기본 정렬(updated desc, D41)이 그 값을 읽는다
+- **⚠ 리스트 행 정렬은 CSS scroll-snap이 아니라 scrollend JS다(G1)** — proximity·mandatory 둘 다
+  실기기 macOS 트랙패드에서 **완전 무동작**이었다(CDP 합성 휠 프로브에서는 정상 — 실기기 스크롤
+  경로의 브라우저 동작). FolderView의 scrollend 핸들러가 `[data-snap-row]`의 가까운 행으로 smooth
+  정렬(바닥에서는 위로 당김 — ListView paddingBottom 72가 그 슬랙). **CSS 스냅 재시도 금지.**
+  상단 8px sticky 마스크가 이전 행 꼬리를 가린다(Phase 62 D7 함정의 재확인 — 패딩 띠로 되돌리지 말 것)
+- **⚠ 칼럼 폭의 진실은 본문 grid 루트 하나다(D43)** — 헤더(제목바 행 2의 `ListHeader`)는
+  `getComputedStyle(루트).gridTemplateColumns` 실측값(px 목록)을 소비한다. **subgrid 행에서 읽으면
+  `"subgrid …"`가 온다 — 루트에서만.** 자동폭이 헤더 라벨 폭을 포함하는 것은 본문의 **유령 라벨
+  행**(높이 0·불가시) 덕이다 — 지우면 헤더가 잘린다. 좌우 인셋 14 = 가장자리 2px 스페이서 트랙 +
+  columnGap 12(subgrid에 컨테이너 패딩 금지 — 첫·끝 트랙이 부모와 어긋난다)
+- **⚠ 칼럼 규칙은 `lib/listColumns.ts`(import 0 · `npm run test:list`)가 소유** — prefs 스키마는
+  "모르는 id 무시, 새 id 뒤에 붙임"(후속 칼럼이 저장값을 깨지 않는다). verifyRank의 verdict 순서는
+  `VERIFY_VERDICT_META`와 의도적 이중(import 0) — **어휘 추가 시 양쪽 함께**. prefs 저장 키
+  `mathory.listPrefs.<folder.id>`(공유 뷰는 `__shared_with_me__`/`__sent__` 단위 병합 — Q16)
+- **⚠ 제목행 sticky 래퍼는 철거됐다(D42)** — 헤더가 스크롤 밖(제목바 행 2)이라 "행이 헤더 위로
+  비칠 통로" 자체가 없다. 아래 Phase 62 A축의 sticky 래퍼 서술은 옛 기록. 하위 폴더 칩은 카드 모드
+  전용이 됐고, 리스트의 하위 폴더는 폴더 행(아이보리 무테두리 — "클레이 = 문항"의 귀결)이 담당
+- **체크박스류 accentColor는 로고 레드**(`--mathory-red`, 덕수 지정 — 칼럼 설정·선택·전체선택).
+  Agent 칼럼 셀은 숫자만(라벨은 헤더 몫). zebra는 `--row-alt`(#F8F4EE, Q13=C) — 렌더 인덱스로
+  `.is-alt` 부여(`:nth-child` 금지 — 마스크·폴더 행이 형제로 섞여 패리티가 어긋난다)
+
+### 이전: **개선묶음 M3 — 아이콘 정비 · 버그 수정 · 기능 개선** — 구현·검수 완료(2026-09-05) · 배포 대기
 
 문서: `docs/phasedocs/개선묶음 M3 아이콘 정비·버그 수정 Final_V4 실행판.md`
 (계보: 덕수 메모 → v1 CLI 실측 → v2 CLI 확정 → v3 web 검증 → **Final_V4 = 실행판**(§4가 구현·검수 기록). §4-2의 시각 최종값이 계획서 수치를 이긴다)
@@ -470,8 +520,10 @@ v1~v3을 인용하기 전에 v4 §3을 볼 것.
 **신규 색 토큰 0**, 신규 CSS 변수 1(`--card-surface` — `:root` 미등록, 컴포넌트 지역), **삭제 토큰 2**(`--sidebar-expanded`·`--sidebar-collapsed`).
 
 - **A축**: FolderView U자 프레임 철거 → 바탕 아이보리 / 카드·리스트 행이 클레이 카드(§위 U자 프레임 항목·명암비 항목 개정 참조).
-  리스트 행은 `folder-row`(⚠ `problem-card`를 붙이면 Phase 59a Q5 예외가 딸려온다), 제목행은 **sticky 래퍼 안의 카드**다
-  — 래퍼 없이 루트 상단 패딩을 제목행 밖에 두면 스크롤된 행이 그 틈을 통과해 보인다
+  리스트 행은 `folder-row`(⚠ `problem-card`를 붙이면 Phase 59a Q5 예외가 딸려온다), ~~제목행은 **sticky 래퍼 안의 카드**다
+  — 래퍼 없이 루트 상단 패딩을 제목행 밖에 두면 스크롤된 행이 그 틈을 통과해 보인다~~
+  ⚠ **sticky 래퍼는 Phase 63 D42가 철거했다**(헤더가 제목바 행 2 = 스크롤 밖으로) — 단 "패딩 띠를
+  행이 통과해 보인다"는 함정 자체는 실재해서, 행 위 8px은 sticky 마스크 띠가 덮는다(위 현재 Phase 절)
 - **`--card-surface` 하나가 카드 배경·hover·페이드를 함께 움직인다**: 인라인 `background`가 `var(--card-surface, var(--bg-content))`를
   참조하므로 CSS `:hover`는 **변수만** 갈아끼우면 되고 `!important`가 **0건**이다(인라인을 리터럴 색으로 되돌리는 순간 hover가 죽는다).
   페이드도 같은 변수를 읽어 **hover용 페이드 규칙 자체가 사라졌다** — 하드코딩 rgba가 토큰과 어긋났던 `78a780f` 사고의 구조적 차단.
