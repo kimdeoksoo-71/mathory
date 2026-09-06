@@ -126,6 +126,9 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
 | S6 | `a8ab6e6` | Agent 라벨 3곳 → `IconAgent`(17/14/14) · AIBrandIcon 폴백 `IconRobot` · **ai-models 기본 avatarEmoji `''`(D15)** |
 | S7 | `6e984ba` | 문서(CLAUDE.md 규약 2절 신설 · roadmap M5 절+Phase 39 철거 표기 · types 주석 · Final_V3 §11) · 컨택트시트 M5-1~M5-5 절 |
 | S8 | `f2a5f3f` | 검수 반영 — agent 드로어 1행 제목 왼쪽 `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭) |
+| — | `e4af6f8` | docs — Final_V3 phasedocs 이관(규칙 7)·포인터 갱신·검수 결과 반영 |
+| S9 | `474e989` | 검수 반영 — Row 2 `$`·`$$`만 M3 stroke 도안 복원(M4 D7 뒤집힘)·크기 중간값(viewBox 52)·`$$` 내부 간격 1/3 |
+| S10 | `f1c610b` | 검수 반영 — `$`↔`$$` 버튼 짝 간격 축소(글리프 간격 ~28→~9px · 짝 묶음+viewBox 창 이동) |
 
 - 로직 검증 356 → **365건**. `tsc --noEmit` 3회 통과 · `test:extract` 42건 무회귀 확인.
 - 계획 대비 이탈 0. 사양 그대로 구현됨(v2 E1~E4·G1~G6·N9~N11 전항 반영).
@@ -149,5 +152,6 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
   구간은 글리프 없는 패딩이라 클릭·hover 무해) + viewBox 창 좌우 이동(±10유닛 =
   글리프가 서로에게 3.8px씩) → **글리프 간격 ≈9px**. 조절 레버는 겹침(marginLeft)과
   `legacyMathSvgProps(shift)` 둘
+- [x] **검수 종결(2026-09-06)** — 반영 3건(S8·S9·S10)까지 확인 후 덕수 판정 "다 만족"
 - [x] 이 문서 `docs/phasedocs/` 이관 완료(규칙 7 — M4 전례대로 검수 완료 시점에. v1·v2는 phaseSketch)
 - [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R → 배포 완료 표기

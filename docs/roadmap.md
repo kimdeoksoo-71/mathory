@@ -1887,8 +1887,9 @@ Twemoji 전면 철거(파일 3 삭제 · 렌더 플러그인 2 · CDN·CC BY 고
 폴더 아이콘 = Phosphor 카탈로그 피커(regular+bold 3,024 자산 self-host · CSS mask · 한글 검색 1,414종) ·
 Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-models 기본 avatarEmoji `''`).
 신규 4(`lib/folderIcon.ts` · `components/ui/FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json`) ·
-커밋 8(S1~S8) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설).
-덕수 검수 완료(2026-09-06): **Q1~Q7 전항 정상**, 반영 1건 = agent 드로어 1행 제목 `IconAgent 16`(S8).
+커밋 11(S1~S10 + docs 이관 1) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설).
+덕수 검수 종결(2026-09-06, 전항 만족): **Q1~Q7 전항 정상**, 반영 3건 — agent 드로어 제목
+`IconAgent 16`(S8) · Row 2 `$`·`$$` M3 도안 복원(S9, M4 D7 뒤집힘) · `$`↔`$$` 짝 간격 축소(S10).
 
 ## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수·**배포 완료 2026-09-06**)
 

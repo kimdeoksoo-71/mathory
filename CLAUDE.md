@@ -298,14 +298,16 @@ Twemoji 전면 철거(파일 3 삭제 · EditorPreview·PrintableContent 플러�
 globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈로그 피커 + Agent 라벨
 3곳 → `lego-smiley` + AIBrandIcon 폴백 `robot`(+ ai-models 기본 avatarEmoji `''` = D15).
 **서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · raw_text 0.** 신규 4(`lib/folderIcon.ts` ·
-`FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json` 1,414종) · 커밋 7(S1~S7) ·
-로직 검증 356 → **365건**(`test:foldericon` 신설). **규약은 위 "폴더 아이콘은 Phosphor
-카탈로그다" · "제3자 시각 자산 고지 준칙" 절이 소유한다.**
+`FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json` 1,414종) · 커밋 11
+(S1~S10 + docs 이관 1) · 로직 검증 356 → **365건**(`test:foldericon` 신설). **규약은 위
+"폴더 아이콘은 Phosphor 카탈로그다" · "제3자 시각 자산 고지 준칙" 절이 소유한다.**
 
-- 덕수 검수 완료(2026-09-06): Q1~Q7 전항 정상. 반영 2건 — ① agent 드로어 1행 제목에
-  `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭, S8) ② **Row 2 `$`·`$$`만 M3 자체
-  도안 복원**(S9 — M4 D7 뒤집힘, 위 규약 절 참조). 남은 것: git push(덕수) 후
-  Vercel 로그 `[icons:assets] OK — 3024개` 확인(phasedocs 이관은 완료)
+- 덕수 검수 **종결**(2026-09-06, "다 만족"): Q1~Q7 전항 정상. 반영 3건 — ① agent 드로어
+  1행 제목에 `IconAgent 16`(댓글 모드와 대칭, S8) ② **Row 2 `$`·`$$`만 M3 자체 도안
+  복원**(S9 — M4 D7 뒤집힘·크기 왕복 2회로 viewBox 52 확정, 위 규약 절 참조) ③ `$`↔`$$`
+  **짝 간격 축소**(S10 — 글리프 간격 ~28→~9px, 레버는 UnifiedToolbar의 marginLeft·
+  `legacyMathSvgProps(shift)`). 남은 것: git push(덕수) 후 Vercel 로그
+  `[icons:assets] OK — 3024개` 확인 → 배포 완료 표기(phasedocs 이관은 완료)
 - ⚠ v2 최대 수확: **D9가 죽은 코드였다(E1)** — `ai-models.ts`가 avatarEmoji를 `'🤖'`로
   기본 채움해 "없으면 IconRobot" 갈래가 절대 발화하지 않았다. 기본값 `''`(D15)이 전제
 - ⚠ v1이 놓친 세 번째 폴더 트리 `FolderPickerDialog`(아이콘 0) → N10으로 FolderGlyph 편입
