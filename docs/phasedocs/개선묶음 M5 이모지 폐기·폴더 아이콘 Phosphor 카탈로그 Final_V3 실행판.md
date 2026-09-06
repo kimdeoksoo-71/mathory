@@ -154,4 +154,7 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
   `legacyMathSvgProps(shift)` 둘
 - [x] **검수 종결(2026-09-06)** — 반영 3건(S8·S9·S10)까지 확인 후 덕수 판정 "다 만족"
 - [x] 이 문서 `docs/phasedocs/` 이관 완료(규칙 7 — M4 전례대로 검수 완료 시점에. v1·v2는 phaseSketch)
-- [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R → 배포 완료 표기
+- [x] **배포 완료(2026-09-06)** — push 후 Vercel 빌드 로그에 `[icons:check] OK — 55종` ·
+  `[icons:assets] OK — 3024개` 실측 확인(덕수). D12의 빌드 배선(명시 연결)이 프로덕션에서
+  실제로 돌았고, "Build Command 직접 지정 → 사용자 아이콘 전부 빈칸" 함정은 발동하지 않았다.
+  **M5 전항 종결**

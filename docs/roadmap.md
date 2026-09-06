@@ -1877,7 +1877,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 ✅ (구현·검수 완료 2026-09-06 · 배포 대기)
+## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 ✅ (구현·검수·**배포 완료 2026-09-06** — Vercel 로그 icons:check 55종·icons:assets 3024개 실측)
 
 계획서: `docs/phasedocs/개선묶음 M5 이모지 폐기·폴더 아이콘 Phosphor 카탈로그 Final_V3 실행판.md`
 (덕수 메모 → v1 web → 덕수 확정 N1~N8 → v2 CLI 실측(E1~E4·G1~G6·N9~N11) → **Final_V3 = 실행판**. §11이 구현·검수 기록)
