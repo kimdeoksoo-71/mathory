@@ -291,8 +291,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 현재 Phase: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현·**검수 완료(2026-09-06, Q1~Q7 전항 정상)** · 배포 대기(push는 덕수)
 
-문서: `docs/phaseSketch/M5-folder-icon-phosphor-plan-Final_V3.md`
-(계보: 덕수 메모 → v1 web → 덕수 확정 N1~N8 → **v2 CLI 실측**(정정 E1~E4 · 보완 G1~G6 · 덕수 확정 N9~N11) → **Final_V3 착수판**(§11 구현 기록). 검수 통과 후 phasedocs 이관)
+문서: `docs/phasedocs/개선묶음 M5 이모지 폐기·폴더 아이콘 Phosphor 카탈로그 Final_V3 실행판.md`
+(계보: 덕수 메모 → v1 web → 덕수 확정 N1~N8 → **v2 CLI 실측**(정정 E1~E4 · 보완 G1~G6 · 덕수 확정 N9~N11) → **Final_V3 = 실행판**(§11이 구현·검수 기록). 중간 판본 v1·v2는 phaseSketch)
 
 Twemoji 전면 철거(파일 3 삭제 · EditorPreview·PrintableContent 플러그인 · pdfPrint 대기 ·
 globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈로그 피커 + Agent 라벨

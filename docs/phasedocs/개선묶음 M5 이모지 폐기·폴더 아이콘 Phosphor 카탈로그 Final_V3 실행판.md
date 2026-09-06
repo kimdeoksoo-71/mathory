@@ -124,7 +124,8 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
 | S4 | `f00b9e6` | `PhosphorIconPicker`(`<select>` 17종·brands 제외·최근 24·10열 316) · Sidebar 패널 교체 · **`lib/phosphor-ko.json` 1,414/1,434 커버**(이름 구성어 사전 기반 1회 생성, 미커버 20종은 영문 폴백) |
 | S5 | `c782fb9` | Twemoji 전면 철거 — 파일 3 삭제 · 플러그인 2 · pdfPrint 대기 · globals.css · settings MIT 한 줄 · deps 2 제거(−12패키지·node_modules −49 MB) · ICONS `smiley` 삭제(**55종**) · grep 7키워드 0 · `npm run build` 통과 |
 | S6 | `a8ab6e6` | Agent 라벨 3곳 → `IconAgent`(17/14/14) · AIBrandIcon 폴백 `IconRobot` · **ai-models 기본 avatarEmoji `''`(D15)** |
-| S7 | — | 문서(CLAUDE.md 규약 2절 신설 · roadmap M5 절+Phase 39 철거 표기 · types 주석 · Final_V3 §11) · 컨택트시트 M5-1~M5-5 절 |
+| S7 | `6e984ba` | 문서(CLAUDE.md 규약 2절 신설 · roadmap M5 절+Phase 39 철거 표기 · types 주석 · Final_V3 §11) · 컨택트시트 M5-1~M5-5 절 |
+| S8 | `f2a5f3f` | 검수 반영 — agent 드로어 1행 제목 왼쪽 `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭) |
 
 - 로직 검증 356 → **365건**. `tsc --noEmit` 3회 통과 · `test:extract` 42건 무회귀 확인.
 - 계획 대비 이탈 0. 사양 그대로 구현됨(v2 E1~E4·G1~G6·N9~N11 전항 반영).
@@ -136,5 +137,5 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
 - [x] **Q1~Q7 전항 정상** — 덕수 판정. 후퇴 갈래(Q2 (b)·Q5 대안 도안) 발동 없음
 - [x] 검수 반영 1건: **agent 우측 드로어 1행 제목 왼쪽에 `IconAgent 16`**(S8) —
   댓글 모드의 `IconComment 16` + '댓글'과 대칭 구조라 삼항 한 줄
-- [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R
-- [ ] 배포 확인 후 이 문서를 `docs/phasedocs/`로 이관(규칙 7)
+- [x] 이 문서 `docs/phasedocs/` 이관 완료(규칙 7 — M4 전례대로 검수 완료 시점에. v1·v2는 phaseSketch)
+- [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R → 배포 완료 표기

@@ -1877,17 +1877,18 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 (구현 완료 2026-09-06 · 덕수 검수 대기)
+## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 ✅ (구현·검수 완료 2026-09-06 · 배포 대기)
 
-계획서: `docs/phaseSketch/M5-folder-icon-phosphor-plan-Final_V3.md`
-(덕수 메모 → v1 web → 덕수 확정 N1~N8 → v2 CLI 실측(E1~E4·G1~G6·N9~N11) → **Final_V3 착수판**. §11이 구현 기록)
+계획서: `docs/phasedocs/개선묶음 M5 이모지 폐기·폴더 아이콘 Phosphor 카탈로그 Final_V3 실행판.md`
+(덕수 메모 → v1 web → 덕수 확정 N1~N8 → v2 CLI 실측(E1~E4·G1~G6·N9~N11) → **Final_V3 = 실행판**. §11이 구현·검수 기록)
 
 **서버 0 · 규칙 0 · 스키마 0(`Folder.icon` string 그대로, 값만 Phosphor 이름) · 전처리 0 · raw_text 0.**
 Twemoji 전면 철거(파일 3 삭제 · 렌더 플러그인 2 · CDN·CC BY 고지·의존성 2 제거) ·
 폴더 아이콘 = Phosphor 카탈로그 피커(regular+bold 3,024 자산 self-host · CSS mask · 한글 검색 1,414종) ·
 Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-models 기본 avatarEmoji `''`).
 신규 4(`lib/folderIcon.ts` · `components/ui/FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json`) ·
-커밋 7(S1~S7) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설). 실물 판정 Q1~Q7 대기(컨택트시트 M5 절).
+커밋 8(S1~S8) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설).
+덕수 검수 완료(2026-09-06): **Q1~Q7 전항 정상**, 반영 1건 = agent 드로어 1행 제목 `IconAgent 16`(S8).
 
 ## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수·**배포 완료 2026-09-06**)
 
