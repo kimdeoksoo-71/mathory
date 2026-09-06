@@ -1,13 +1,16 @@
 #!/usr/bin/env node
 /**
- * M4 — Phosphor 아이콘 path 생성기.
+ * M4 — Phosphor 아이콘 path 생성기 (M5에서 --assets · 인덱스 확장).
  *
  * 진실은 아래 ICONS 표 하나다(Mathory 의미 이름 → phosphor 파일명 · weight).
- * 출력: components/ui/phosphorPaths.ts — 커밋 대상 · 수동 편집 금지.
+ * 출력: components/ui/phosphorPaths.ts · lib/phosphor-index.json — 커밋 대상 · 수동 편집 금지.
  *
- *   node scripts/gen-phosphor-paths.mjs           재생성 (icons:gen)
- *   node scripts/gen-phosphor-paths.mjs --check   재생성 결과 ↔ 커밋본 비교, 불일치면 exit 1 (prebuild)
+ *   node scripts/gen-phosphor-paths.mjs           재생성 (icons:gen — paths + 피커 인덱스)
+ *   node scripts/gen-phosphor-paths.mjs --check   재생성 결과 ↔ 커밋본 비교, 불일치면 exit 1 (build)
  *   node scripts/gen-phosphor-paths.mjs --sheet   docs/icons-contact-sheet.html 재생성 (실물 판정용)
+ *   node scripts/gen-phosphor-paths.mjs --assets  카탈로그 자산 3,024개 + LICENSE →
+ *                                                 public/icons/phosphor/<ver>/ 복사 (M5 D2 —
+ *                                                 gitignore 산출물 · predev·build에서 실행 · 멱등)
  *
  * 자산 경로는 require.resolve로 얻는다 — @phosphor-icons/core의 exports 맵이
  * ./assets/<weight>/*.svg 를 내보내므로(실측) pnpm·호이스팅 어디서든 재현된다.
@@ -49,7 +52,12 @@ const ICONS = {
   exit: ['sign-out', 'regular'],                           // IconExit (D23)
   fileText: ['file-text', 'regular'],                      // IconDocLines
   folder: ['folder', 'regular'],                           // IconFolder
+  folderBold: ['folder', 'bold'],                          // FolderGlyph 활성(M5 D3)
   folderMove: ['folder-simple-dashed', 'regular'],         // IconFolderMove
+  folderOpen: ['folder-open', 'regular'],                  // FolderGlyph 펼침(M5 D4)
+  folderOpenBold: ['folder-open', 'bold'],                 // FolderGlyph 펼침+활성(M5 D3)
+  folderSimple: ['folder-simple', 'regular'],              // FolderGlyph 하위 기본(M5 D4)
+  folderSimpleBold: ['folder-simple', 'bold'],             // FolderGlyph 하위+활성(M5 D3)
   graph: ['graph', 'regular'],                             // IconBlockchain (D5)
   magnifyingGlass: ['magnifying-glass', 'regular'],        // IconSearch·SearchReplaceIcon (D11)
   pencilSimple: ['pencil-simple', 'regular'],              // IconEdit
@@ -81,6 +89,9 @@ const ICONS = {
   image: ['image', 'regular'],                             // CommentEditor 그림 삽입
   rows: ['rows', 'regular'],                               // MathSplitGlyph (D16)
   splitBlock: ['split-vertical', 'regular'],               // SplitGlyph (D16·N1)
+  // ── M5 (Agent 라벨·AI 폴백) ──
+  legoSmiley: ['lego-smiley', 'regular'],                  // IconAgent (M5 D8)
+  robot: ['robot', 'regular'],                             // IconRobot — AIBrandIcon 폴백 (M5 D9)
 };
 
 const assetFile = (name, w) =>
@@ -114,7 +125,25 @@ function buildTs() {
 export const PH = {
 ${entries.join('\n')}
 } as const;
+
+/** 카탈로그 자산 URL의 버전 원소 — \`--assets\` 복사 디렉터리와 같은 값을 본다 (M5 D2·D13). */
+export const PH_CORE_VERSION = '${corePkg.version}';
 `;
+}
+
+// ───────────────────────── 피커 인덱스 (icons:gen · M5 D6) ─────────────────────────
+
+const INDEX_OUT = path.join(ROOT, 'lib', 'phosphor-index.json');
+
+function buildIndex() {
+  const { icons } = require('@phosphor-icons/core');
+  // [{ n:이름, c:[카테고리], t:[태그 — '*new*' 류 마커 제거] }] · 163 KB(gzip 27 KB) · 피커가 동적 import
+  const items = icons.map((i) => ({
+    n: i.name,
+    c: i.categories || [],
+    t: (i.tags || []).filter((t) => !t.startsWith('*')),
+  }));
+  return JSON.stringify(items);
 }
 
 // ───────────────────────── 컨택트시트 (--sheet · Final_V4 §4-6) ─────────────────────────
@@ -238,23 +267,82 @@ ${ph(PH_.dotsThreeVertical, 16)} <span class="lbl">Sidebar·FolderView·ListView
 `;
 }
 
+// ───────────────────────── 카탈로그 자산 복사 (--assets · M5 D2) ─────────────────────────
+
+const ASSETS_ROOT = path.join(ROOT, 'public', 'icons', 'phosphor');
+const ASSET_WEIGHTS = ['regular', 'bold'];
+
+function copyAssets() {
+  const srcRoot = path.join(path.dirname(assetFile('trash', 'regular')), '..');
+  const destRoot = path.join(ASSETS_ROOT, corePkg.version);
+
+  // G3 — 구 버전 디렉터리는 삭제하되, 사라진 이름을 먼저 알린다:
+  // 저장된 Folder.icon이 신 버전에 없으면 CSS mask 404 = 무이벤트 영구 빈칸이다.
+  const newNames = new Set(fs.readdirSync(path.join(srcRoot, 'regular')).map((f) => f.replace(/\.svg$/, '')));
+  for (const old of fs.existsSync(ASSETS_ROOT) ? fs.readdirSync(ASSETS_ROOT) : []) {
+    if (old === corePkg.version || old.startsWith('.')) continue;
+    const oldDir = path.join(ASSETS_ROOT, old, 'regular');
+    const removed = fs.existsSync(oldDir)
+      ? fs.readdirSync(oldDir).map((f) => f.replace(/\.svg$/, '')).filter((n) => !newNames.has(n))
+      : [];
+    if (removed.length) {
+      console.warn(`[icons:assets] ⚠ ${old} → ${corePkg.version}에서 사라진 아이콘 ${removed.length}종 — 저장된 Folder.icon이면 빈칸이 된다: ${removed.join(', ')}`);
+    }
+    fs.rmSync(path.join(ASSETS_ROOT, old), { recursive: true });
+    console.log(`[icons:assets] 구 버전 ${old} 디렉터리 삭제`);
+  }
+
+  let copied = 0;
+  let total = 0;
+  for (const w of ASSET_WEIGHTS) {
+    const srcDir = path.join(srcRoot, w);
+    const destDir = path.join(destRoot, w);
+    fs.mkdirSync(destDir, { recursive: true });
+    for (const f of fs.readdirSync(srcDir)) {
+      if (!f.endsWith('.svg')) continue;
+      total += 1;
+      const src = fs.readFileSync(path.join(srcDir, f));
+      const destPath = path.join(destDir, f);
+      if (fs.existsSync(destPath) && fs.readFileSync(destPath).equals(src)) continue; // 멱등
+      fs.writeFileSync(destPath, src);
+      copied += 1;
+    }
+  }
+  // 라이선스 동봉 (D11 — MIT 고지는 배포 산출물에 함께 실린다)
+  fs.copyFileSync(path.join(srcRoot, '..', 'LICENSE'), path.join(destRoot, 'LICENSE'));
+
+  if (total !== 3024) {
+    console.error(`[icons:assets] 파일 수 ${total} ≠ 3,024 — core 구성이 바뀌었다. D2 전제를 재확인할 것.`);
+    process.exit(1);
+  }
+  console.log(`[icons:assets] OK — ${total}개(신규 쓰기 ${copied}) → public/icons/phosphor/${corePkg.version}/ · LICENSE 동봉`);
+}
+
 // ───────────────────────── main ─────────────────────────
 
 const mode = process.argv[2] || '';
-const ts = buildTs();
 
-if (mode === '--check') {
-  const committed = fs.existsSync(OUT_TS) ? fs.readFileSync(OUT_TS, 'utf8') : '';
-  if (committed !== ts) {
-    console.error('[icons:check] phosphorPaths.ts가 생성 결과와 다르다 — `npm run icons:gen` 후 커밋할 것.');
-    process.exit(1);
-  }
-  console.log(`[icons:check] OK — ${Object.keys(ICONS).length}종 · core@${corePkg.version}`);
-} else if (mode === '--sheet') {
-  const PH_ = Object.fromEntries(Object.keys(ICONS).map((k) => [k, pathOf(...ICONS[k])]));
-  fs.writeFileSync(OUT_SHEET, buildSheet(PH_));
-  console.log(`[icons:sheet] ${path.relative(ROOT, OUT_SHEET)} 재생성`);
+if (mode === '--assets') {
+  copyAssets();
 } else {
-  fs.writeFileSync(OUT_TS, ts);
-  console.log(`[icons:gen] ${path.relative(ROOT, OUT_TS)} — ${Object.keys(ICONS).length}종 · core@${corePkg.version}`);
+  const ts = buildTs();
+  const index = buildIndex();
+
+  if (mode === '--check') {
+    const committedTs = fs.existsSync(OUT_TS) ? fs.readFileSync(OUT_TS, 'utf8') : '';
+    const committedIndex = fs.existsSync(INDEX_OUT) ? fs.readFileSync(INDEX_OUT, 'utf8') : '';
+    if (committedTs !== ts || committedIndex !== index) {
+      console.error('[icons:check] phosphorPaths.ts/phosphor-index.json이 생성 결과와 다르다 — `npm run icons:gen` 후 커밋할 것.');
+      process.exit(1);
+    }
+    console.log(`[icons:check] OK — ${Object.keys(ICONS).length}종 · core@${corePkg.version}`);
+  } else if (mode === '--sheet') {
+    const PH_ = Object.fromEntries(Object.keys(ICONS).map((k) => [k, pathOf(...ICONS[k])]));
+    fs.writeFileSync(OUT_SHEET, buildSheet(PH_));
+    console.log(`[icons:sheet] ${path.relative(ROOT, OUT_SHEET)} 재생성`);
+  } else {
+    fs.writeFileSync(OUT_TS, ts);
+    fs.writeFileSync(INDEX_OUT, index);
+    console.log(`[icons:gen] ${path.relative(ROOT, OUT_TS)} + ${path.relative(ROOT, INDEX_OUT)} — ${Object.keys(ICONS).length}종 · core@${corePkg.version}`);
+  }
 }

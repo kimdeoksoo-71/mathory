@@ -19,3 +19,6 @@ Thumbs.db
 
 # 단위 테스트 컴파일 산출물 (npm run test:export)
 .test-build/
+
+# M5 — Phosphor 카탈로그 자산 (icons:assets가 predev·build에서 생성 · 11.8 MB)
+public/icons/phosphor/
