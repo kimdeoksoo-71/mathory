@@ -112,4 +112,29 @@ N1 brands 설치·피커 제외 / N2 한글 표 (b) / N3 하위 펼침 `folder-o
 
 git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기록과 함께 phasedocs로 이관(규칙 7).
 
-## 11. 구현·검수 기록 (착수 후 기입)
+## 11. 구현·검수 기록
+
+### 11-1. 구현 완료 (2026-09-06 · 커밋 S1~S7)
+
+| # | 커밋 | 내용 |
+|---|---|---|
+| S1 | `80a3ab8` | 생성기 `--assets`(멱등·3,024 assert·LICENSE 동봉·G3 diff 경고)·`--index`(`lib/phosphor-index.json`) · `PH_CORE_VERSION` · ICONS +7(56종) · build 명시 연결·`prebuild` 삭제(E3)·`predev` · `.gitignore` |
+| S2 | `2d44325` | `lib/folderIcon.ts`(import 0) + `test:foldericon` **9건** |
+| S3 | `de78980` | `PhAsset`(mask·G4 a11y)·`phAssetUrl`·`IconAgent`·`IconRobot` · `FolderGlyph` · 소비처 8곳 교체(N10 포함 — FolderPickerDialog 미지정 행은 `IconInbox`, FolderView와 통일) · Sidebar bold 예열 fetch |
+| S4 | `f00b9e6` | `PhosphorIconPicker`(`<select>` 17종·brands 제외·최근 24·10열 316) · Sidebar 패널 교체 · **`lib/phosphor-ko.json` 1,414/1,434 커버**(이름 구성어 사전 기반 1회 생성, 미커버 20종은 영문 폴백) |
+| S5 | `c782fb9` | Twemoji 전면 철거 — 파일 3 삭제 · 플러그인 2 · pdfPrint 대기 · globals.css · settings MIT 한 줄 · deps 2 제거(−12패키지·node_modules −49 MB) · ICONS `smiley` 삭제(**55종**) · grep 7키워드 0 · `npm run build` 통과 |
+| S6 | `a8ab6e6` | Agent 라벨 3곳 → `IconAgent`(17/14/14) · AIBrandIcon 폴백 `IconRobot` · **ai-models 기본 avatarEmoji `''`(D15)** |
+| S7 | — | 문서(CLAUDE.md 규약 2절 신설 · roadmap M5 절+Phase 39 철거 표기 · types 주석 · Final_V3 §11) · 컨택트시트 M5-1~M5-5 절 |
+
+- 로직 검증 356 → **365건**. `tsc --noEmit` 3회 통과 · `test:extract` 42건 무회귀 확인.
+- 계획 대비 이탈 0. 사양 그대로 구현됨(v2 E1~E4·G1~G6·N9~N11 전항 반영).
+- ⚠ S5에서 `git add -A`가 기존 미추적 파일(덕수 개인 메모·m4 스케치·Phase62 HTML 백업)을
+  쓸어 담았다가 amend로 제거 — M5 문서 3개(v1·v2·Final_V3)만 커밋에 남겼다.
+
+### 11-2. 덕수 검수 (대기)
+
+- [ ] Q1~Q7 실물 판정 — `docs/icons-contact-sheet.html`(M5-1~M5-5) + 앱 실물(피커 Q4·bold 예열 Q3)
+- [ ] 폴더 아이콘 지정·변경·기본 복귀 / 옛 이모지 폴더의 기본 아이콘 표시(N4)
+- [ ] 본문 이모지 OS 글꼴 확인(N8 — 있던 문항 한정) · 인쇄 무회귀
+- [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R
+- [ ] 검수 통과 시 이 문서를 `docs/phasedocs/`로 이관(규칙 7)

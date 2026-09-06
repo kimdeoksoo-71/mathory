@@ -222,6 +222,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
 - **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(49종 · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
+- **폴더 아이콘은 Phosphor 카탈로그다 (M5)**: `Folder.icon` = Phosphor 이름(`^[a-z0-9-]+$` — 옛 유니코드 값은 기본 아이콘으로 표시, 데이터 무접촉 N4). 규칙은 `lib/folderIcon.ts`(import 0 · `test:foldericon`)가, 렌더는 `components/ui/FolderGlyph.tsx` 한 벌이 소유한다(소비처 8곳 — **삼항식 사본 금지**). 기본 3종: 최상위 `folder` · 하위 `folder-simple` · 펼침은 depth 무관 `folder-open`(`folder-simple-open`은 core에 **없다**). **활성 행만 bold** — 글자 700과 같은 조건. 카탈로그 자산은 `icons:assets`가 `public/icons/phosphor/<ver>/`에 3,024개 복사(gitignore · `predev`·`build`가 생성 — **Vercel Build Command가 `next build` 직접 지정이면 전부 빈칸**). 렌더는 `PhAsset`(CSS **mask** + `background-color: currentColor`) — "별도 `.svg`는 currentColor가 끊긴다"는 `<img>` 얘기이고 mask는 유지된다. 단 **UI 상시 아이콘에는 mask 금지**(그쪽은 인라인 path — 첫 페인트 fetch 0). mask 404는 무이벤트 빈칸 — 방어는 쓰기(피커가 인덱스 이름만)·읽기(정규식 불일치 → 기본)에서, core 버전업 시 `--assets`가 사라진 이름 diff를 경고한다. 피커(`PhosphorIconPicker`)는 regular만·brands 78종 제외(상표)·한글 검색은 `lib/phosphor-ko.json`(없어도 영문 동작). **본문(raw_text)에는 아이콘·이모지 렌더 계층이 없다** — M5가 Twemoji를 전면 철거해 이모지 문자는 OS 글꼴로 보인다(N8). Phosphor 코드포인트는 PUA라 본문 문법을 만들지 말 것
+- **제3자 시각 자산 고지 준칙 (M5 D11)**: ① 들일 때 `THIRD_PARTY_LICENSES.md`에 라이선스 전문 ② 배포 산출물에 고지 동봉(생성 파일 헤더 · 정적 디렉터리 `LICENSE`) ③ 설정 "정보/라이선스"에 한 줄 ④ 크레딧 의무형(CC BY 등)은 ③ 필수, MIT형은 ①②로 충족 ⑤ **상표(브랜드 로고)는 사용자 선택 목록에서 제외** ⑥ 버전은 lock 고정 + 경로에 버전 ⑦ **자산을 그만 쓰면 고지도 같이 거둔다**(Twemoji CC BY 문단을 M5에서 삭제한 근거)
 - **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
   같은 처방을 받았다 — `globals.css`의 `.preview-content .marker-*  { font-weight: inherit }`가
   PrintStyles에서 새어 드는 600을 화면에서만 되돌린다. **인쇄가 굵은 것은 의도된 예외다.**
@@ -287,7 +289,26 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M4 — 아이콘 체계 Phosphor 전환** — 구현·검수·**배포 완료(2026-09-06)**
+## 현재 Phase: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현 완료(2026-09-06) · **덕수 검수 대기**
+
+문서: `docs/phaseSketch/M5-folder-icon-phosphor-plan-Final_V3.md`
+(계보: 덕수 메모 → v1 web → 덕수 확정 N1~N8 → **v2 CLI 실측**(정정 E1~E4 · 보완 G1~G6 · 덕수 확정 N9~N11) → **Final_V3 착수판**(§11 구현 기록). 검수 통과 후 phasedocs 이관)
+
+Twemoji 전면 철거(파일 3 삭제 · EditorPreview·PrintableContent 플러그인 · pdfPrint 대기 ·
+globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈로그 피커 + Agent 라벨
+3곳 → `lego-smiley` + AIBrandIcon 폴백 `robot`(+ ai-models 기본 avatarEmoji `''` = D15).
+**서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · raw_text 0.** 신규 4(`lib/folderIcon.ts` ·
+`FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json` 1,414종) · 커밋 7(S1~S7) ·
+로직 검증 356 → **365건**(`test:foldericon` 신설). **규약은 위 "폴더 아이콘은 Phosphor
+카탈로그다" · "제3자 시각 자산 고지 준칙" 절이 소유한다.**
+
+- 남은 것: **덕수 실물 판정 Q1~Q7**(컨택트시트 M5 절 — `npm run icons:sheet` 후
+  `docs/icons-contact-sheet.html`) · 피커 실사용(Q4) · git push(덕수)
+- ⚠ v2 최대 수확: **D9가 죽은 코드였다(E1)** — `ai-models.ts`가 avatarEmoji를 `'🤖'`로
+  기본 채움해 "없으면 IconRobot" 갈래가 절대 발화하지 않았다. 기본값 `''`(D15)이 전제
+- ⚠ v1이 놓친 세 번째 폴더 트리 `FolderPickerDialog`(아이콘 0) → N10으로 FolderGlyph 편입
+
+### 이전: **개선묶음 M4 — 아이콘 체계 Phosphor 전환** — 구현·검수·**배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/개선묶음 M4 아이콘 체계 Phosphor 전환 Final_V4 실행판.md`
 (계보: 덕수 결정 메모 → v1 web → v2 CLI 실측 → v3 web 재검증·덕수 확정 → **Final_V4 = 실행판**(§10이 구현·검수 기록, §9가 판본 정정 요약). 결정 D1~D23·N1~N8 전항 닫힘)

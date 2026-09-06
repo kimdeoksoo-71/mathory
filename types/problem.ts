@@ -276,7 +276,7 @@ export interface Folder {
   name: string;
   user_id: string;
   order: number;
-  icon?: string;              // 폴더 아이콘 이모지(순수 유니코드). 비어있으면 기본 폴더 아이콘 (Phase 39)
+  icon?: string;              // 폴더 아이콘 — Phosphor 이름(^[a-z0-9-]+$, M5). 옛 유니코드 이모지 값은 기본 아이콘으로 보인다(N4). 비어있으면 기본 폴더 아이콘
   parent_id?: string | null;  // 상위 폴더 id. null/undefined/'' = 최상위 (Phase 40)
   created_at?: Date;
   /** Phase 63 D15 — 폴더 문서의 이름·아이콘·순서 변경일. listFolders가 이미 파싱해 싣던 값을

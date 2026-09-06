@@ -1023,7 +1023,10 @@ problems/{id}
 - GPT-5 계열은 `max_tokens` 미지원, `max_completion_tokens` 필수
 - 응답 1턴 5모델 비용 추정 ≈ $0.066. 컨텍스트 한도(1M 토큰)는 우리 사용량(0.3%)에 비해 실질적 제약 아님
 
-## Phase 39: 이모지(Twemoji) 입력 & 렌더 ✅
+## Phase 39: 이모지(Twemoji) 입력 & 렌더 ✅ → ⚠ **M5(2026-09-06)에서 전면 철거**
+
+> ⚠ **철거됨**: 툴바 이모지 버튼·피커·렌더 플러그인·CDN·CC BY 고지·의존성 전부 M5에서 제거.
+> raw_text의 이모지 문자는 데이터 무접촉으로 남아 **OS 글꼴**로 렌더된다(N8). 아래는 역사 기록.
 
 에디터에서 이모지를 입력하고, 미리보기·PDF에서 **OS 무관 컬러 SVG(Twemoji)** 로 렌더. 저장은 순수 유니코드만(데이터 불변), 렌더 시점에만 변환 — `preprocessLocale`/`\tag`와 동일 철학.
 
@@ -1873,6 +1876,18 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 **남은 것**: 배포(Phase 61b와 함께 push).
 
 ---
+
+## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 (구현 완료 2026-09-06 · 덕수 검수 대기)
+
+계획서: `docs/phaseSketch/M5-folder-icon-phosphor-plan-Final_V3.md`
+(덕수 메모 → v1 web → 덕수 확정 N1~N8 → v2 CLI 실측(E1~E4·G1~G6·N9~N11) → **Final_V3 착수판**. §11이 구현 기록)
+
+**서버 0 · 규칙 0 · 스키마 0(`Folder.icon` string 그대로, 값만 Phosphor 이름) · 전처리 0 · raw_text 0.**
+Twemoji 전면 철거(파일 3 삭제 · 렌더 플러그인 2 · CDN·CC BY 고지·의존성 2 제거) ·
+폴더 아이콘 = Phosphor 카탈로그 피커(regular+bold 3,024 자산 self-host · CSS mask · 한글 검색 1,414종) ·
+Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-models 기본 avatarEmoji `''`).
+신규 4(`lib/folderIcon.ts` · `components/ui/FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json`) ·
+커밋 7(S1~S7) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설). 실물 판정 Q1~Q7 대기(컨택트시트 M5 절).
 
 ## 개선묶음 M4: 아이콘 체계 Phosphor 전환 ✅ (구현·검수·**배포 완료 2026-09-06**)
 

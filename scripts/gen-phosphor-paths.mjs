@@ -262,6 +262,28 @@ ${ph(PH_.dotsThreeVertical, 16)} <span class="lbl">Sidebar·FolderView·ListView
 
 <h2>10. VersionTimeline 트리거 열 14px — 유지 IconSave + Phosphor 3종 혼합 자리 (B13)</h2>
 <div class="clay">${legacySave(14)} <span class="lbl">manual_save(유지·stroke)</span> ${ph(PH_.exit, 14)} <span class="lbl">editor_exit(sign-out)</span> ${ph(PH_.tag, 14)} <span class="lbl">named</span> ${ph(PH_.clockCounterClockwise, 14)} <span class="lbl">restore</span></div>
+
+<h2>M5-1. 기본 폴더 3종 × regular/bold × 14/15/16/18 — bold = 활성 행(글자 700과 짝) (Q1)</h2>
+<table class="ladder"><tr><th>도안</th><th colspan="4">regular</th><th colspan="4">bold</th></tr>
+${[['folder (최상위)', 'folder', 'folderBold'], ['folder-simple (하위)', 'folderSimple', 'folderSimpleBold'], ['folder-open (펼침)', 'folderOpen', 'folderOpenBold']].map(([label, r, b]) =>
+  `<tr><td>${label}</td>${[14, 15, 16, 18].map((s) => `<td>${ph(PH_[r], s)}</td>`).join('')}${[14, 15, 16, 18].map((s) => `<td>${ph(PH_[b], s)}</td>`).join('')}</tr>`).join('\n')}</table>
+<p class="muted">비활성 opacity 0.75 대비: <span style="opacity:.75">${ph(PH_.folderSimple, 18)}</span> ↔ 활성 ${ph(PH_.folderSimpleBold, 18)}</p>
+
+<h2>M5-2. 하위 폴더 펼침 — folder-simple → folder-open 전환(탭 유무 가족 점프) (Q2)</h2>
+<span class="row2">${ph(PH_.folderSimple, 16)}<span class="lbl">닫힘</span>${ph(PH_.folderOpen, 16)}<span class="lbl">펼침(N3 (a))</span>${ph(PH_.folder, 16)}<span class="lbl">참고: 최상위 닫힘</span></span>
+
+<h2>M5-3. IconAgent = lego-smiley — IconComment(chat-text) 옆 병렬 무게감, 대안 3종 (Q5)</h2>
+<table class="cmp"><tr>${[14, 17].map((s) =>
+  `<td>${ph(PH_.chatText, s)} ${ph(PH_.legoSmiley, s)} <span class="lbl">lego-smiley ${s}px</span></td>`).join('')}
+<td>${ph(PH_.robot, 17)} <span class="lbl">robot</span></td>
+<td>${ph(pathOf('user-focus', 'regular'), 17)} <span class="lbl">user-focus</span></td>
+<td>${ph(pathOf('chats-circle', 'regular'), 17)} <span class="lbl">chats-circle</span></td></tr></table>
+
+<h2>M5-4. AIBrandIcon 폴백 robot 14/16 — 참여자 칩 자리 (Q6)</h2>
+${ph(PH_.robot, 14)} ${ph(PH_.robot, 16)} <span class="lbl">provider 미상·avatarEmoji 없음일 때만 (D15)</span>
+
+<h2>M5-5. Row 2 — '이모지' 버튼 제거 후 특수문자·표 사이 간격 (Q7)</h2>
+<div><span class="row2">${row2Line(20)}</span><span class="lbl">20px (현행)</span></div>
 </body></html>
 `;
 }
