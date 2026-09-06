@@ -289,7 +289,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현 완료(2026-09-06) · **덕수 검수 대기**
+## 현재 Phase: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현·**검수 완료(2026-09-06, Q1~Q7 전항 정상)** · 배포 대기(push는 덕수)
 
 문서: `docs/phaseSketch/M5-folder-icon-phosphor-plan-Final_V3.md`
 (계보: 덕수 메모 → v1 web → 덕수 확정 N1~N8 → **v2 CLI 실측**(정정 E1~E4 · 보완 G1~G6 · 덕수 확정 N9~N11) → **Final_V3 착수판**(§11 구현 기록). 검수 통과 후 phasedocs 이관)
@@ -302,8 +302,9 @@ globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈�
 로직 검증 356 → **365건**(`test:foldericon` 신설). **규약은 위 "폴더 아이콘은 Phosphor
 카탈로그다" · "제3자 시각 자산 고지 준칙" 절이 소유한다.**
 
-- 남은 것: **덕수 실물 판정 Q1~Q7**(컨택트시트 M5 절 — `npm run icons:sheet` 후
-  `docs/icons-contact-sheet.html`) · 피커 실사용(Q4) · git push(덕수)
+- 덕수 검수 완료(2026-09-06): Q1~Q7 전항 정상. 반영 1건 = agent 드로어 1행 제목에
+  `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭, S8). 남은 것: git push(덕수) 후
+  Vercel 로그 `[icons:assets] OK — 3024개` 확인 · phasedocs 이관
 - ⚠ v2 최대 수확: **D9가 죽은 코드였다(E1)** — `ai-models.ts`가 avatarEmoji를 `'🤖'`로
   기본 채움해 "없으면 IconRobot" 갈래가 절대 발화하지 않았다. 기본값 `''`(D15)이 전제
 - ⚠ v1이 놓친 세 번째 폴더 트리 `FolderPickerDialog`(아이콘 0) → N10으로 FolderGlyph 편입
