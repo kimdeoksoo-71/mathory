@@ -26,7 +26,7 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
-  IconTrash, IconCopy, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove,
+  IconTrash, IconCopy, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove, IconAgent,
 } from '../ui/Icons';
 import FolderGlyph from '../ui/FolderGlyph';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
@@ -846,7 +846,8 @@ export default function FolderView({
                           flexShrink: 0,
                         }}
                       >
-                        <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>
+                        {/* M5 D8 — 옆 IconComment 14와 같은 규격 */}
+                        <IconAgent size={14} />
                         <span style={{ marginLeft: 1 }}>{agentCountsMap[problem.id]}</span>
                       </span>
                     )}

@@ -33,7 +33,7 @@ import { UserProfile, ProblemComment, DiscussionSession, VerifyKind } from '../.
 import {
   IconEdit, IconRename, IconFolderMove, IconTrash, IconCopy, IconDownload, IconShare,
   IconDocLines,
-  IconChevron, IconChevronLeft, IconComment, IconTextWidth,
+  IconChevron, IconChevronLeft, IconComment, IconTextWidth, IconAgent,
 } from '../ui/Icons';
 import { alertDialog } from '../../lib/dialogs';
 import SizeStepper, { FontSizeGlyph } from '../ui/SizeStepper';
@@ -829,7 +829,8 @@ export default function ProblemView({
                   color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
                 }}
               >
-                <span style={{ fontWeight: 600, letterSpacing: 0.3 }}>Agent</span>{agentCount ? ` ${agentCount}` : ''}
+                {/* M5 D8 — 옆 IconComment 14와 같은 규격 */}
+                <IconAgent size={14} />{agentCount ? ` ${agentCount}` : ''}
               </button>
             )}
           </h1>

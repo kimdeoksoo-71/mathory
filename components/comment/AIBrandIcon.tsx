@@ -9,7 +9,7 @@
  */
 
 import React from 'react';
-import { IconSearchPlain } from '../ui/Icons';
+import { IconSearchPlain, IconRobot } from '../ui/Icons';
 
 /**
  * Phase 61b — API 모델명 → provider.
@@ -59,9 +59,14 @@ export function AIBrandIcon({
       />
     );
   }
-  return (
-    <span style={{ fontSize: Math.round(size * 0.85), lineHeight: 1 }}>
-      {fallbackEmoji || '🤖'}
-    </span>
-  );
+  // M5 D9 — 이모지를 명시 지정한 데이터만 글자로, 나머지는 robot 아이콘.
+  // ai-models의 avatarEmoji 기본값이 ''가 된 것(D15)이 이 갈래가 실제로 사는 전제다.
+  if (fallbackEmoji) {
+    return (
+      <span style={{ fontSize: Math.round(size * 0.85), lineHeight: 1 }}>
+        {fallbackEmoji}
+      </span>
+    );
+  }
+  return <IconRobot size={size} />;
 }

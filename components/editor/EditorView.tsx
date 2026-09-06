@@ -65,7 +65,7 @@ import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
   IconRename, IconLoader,
-  IconRestore, IconSave, IconUndo, IconRedo, IconComment, IconTextWidth,
+  IconRestore, IconSave, IconUndo, IconRedo, IconComment, IconTextWidth, IconAgent,
 } from '../ui/Icons';
 import { splitDisplayMathToRows } from '../../lib/mathSplit';
 import SizeStepper, { FontSizeGlyph } from '../ui/SizeStepper';
@@ -3328,9 +3328,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                   if (panelMode !== 'agent') (e.currentTarget as HTMLElement).style.color = 'var(--text-faint)';
                 }}
               >
-                {/* 검수 13차 최종: "Agent" 통짜 13/500 — 2단 조판(A 15 + gent 12)은 부자연(덕수).
-                    숫자(13/500)와 같은 값이라 시각적으로 한 덩어리다 */}
-                <span style={{ fontWeight: 500, letterSpacing: 0.3, fontSize: 13 }}>Agent</span>{agentCount ? <span style={{ fontWeight: 500 }}>{' '}{agentCount}</span> : ''}
+                {/* M5 D8 — "Agent" 글자 라벨(검수 13차 확정)을 lego-smiley로 교체.
+                    크기 17 = 옆 IconComment 17과 같은 규격. 단어는 title="agent 열기"에 남는다 */}
+                <IconAgent size={17} />{agentCount ? <span style={{ fontWeight: 500 }}>{' '}{agentCount}</span> : ''}
               </button>
             </>
           )}

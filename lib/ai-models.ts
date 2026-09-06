@@ -24,7 +24,9 @@ function mapDoc(id: string, data: Record<string, unknown>): AIModelConfig {
     maxTokens: typeof data.maxTokens === 'number' ? data.maxTokens : 1024,
     appendPrompt: String(data.appendPrompt ?? ''),
     order: typeof data.order === 'number' ? data.order : 999,
-    avatarEmoji: String(data.avatarEmoji ?? '🤖'),
+    // M5 D15 — 기본값을 ''로: '🤖'를 기본 채움하면 AIBrandIcon의 IconRobot 폴백이
+    // 절대 발화하지 않는다(E1). 명시 저장된 avatarEmoji만 이모지로 남는다.
+    avatarEmoji: String(data.avatarEmoji ?? ''),
     inputCostPerMillion:
       typeof data.inputCostPerMillion === 'number' ? data.inputCostPerMillion : 0,
     outputCostPerMillion:
