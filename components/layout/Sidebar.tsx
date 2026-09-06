@@ -12,7 +12,7 @@ import {
   IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
-import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
+import { PhosphorIconPicker, PICKER_WIDTH } from '../ui/PhosphorIconPicker';
 import FolderGlyph from '../ui/FolderGlyph';
 import { phAssetUrl } from '../ui/Icons';
 import { isPhosphorIconName } from '../../lib/folderIcon';
@@ -509,7 +509,7 @@ function FolderIconPicker({
   }, [onClose]);
 
   // 화면 밖으로 넘치지 않게 우측/하단 보정
-  const PANEL = EMOJI_PANEL_WIDTH + 16;
+  const PANEL = PICKER_WIDTH + 16;
   const left = typeof window !== 'undefined' ? Math.min(x, window.innerWidth - PANEL - 8) : x;
 
   return (
@@ -527,7 +527,7 @@ function FolderIconPicker({
         padding: 8,
       }}
     >
-      <EmojiPickerPanel onSelect={onSelect} />
+      <PhosphorIconPicker onSelect={onSelect} />
     </div>
   );
 }
