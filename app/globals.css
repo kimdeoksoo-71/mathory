@@ -1037,16 +1037,6 @@ p:has(.marker-circled) {
 
 /* ═══ Heading Styles (Phase 14) ═══ */
 /* EditorPreview 내 제목: inline style이 우선, 여기는 fallback */
-/* ═══ Twemoji 인라인 이모지 (Phase 39) ═══ */
-/* 미리보기 + PDF/인쇄(동일 문서 window.print) 동시 적용 */
-img.twemoji {
-  height: 1em;
-  width: 1em;
-  margin: 0 0.05em;
-  vertical-align: -0.125em;
-  display: inline-block;
-}
-
 /* ═══ 수식·인용 하이라이트 (Phase 56 편집창 → Phase 61b 열람뷰 공용) ═══
    ⚠️ 이 클래스는 공용 컴포넌트 `EditorPreview`가 붙인다. 규칙을 소비처(EditorView) 안에만
       두면 다른 화면에서는 클래스가 붙어도 **아무 일도 일어나지 않는다** — 실제로 열람뷰가

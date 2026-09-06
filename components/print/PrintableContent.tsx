@@ -5,8 +5,6 @@ import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import { katexMacros } from '../../lib/katexMacros';
 import rehypeRaw from 'rehype-raw';
-import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
-import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import remarkGfm from 'remark-gfm';
 import 'katex/dist/katex.min.css';
@@ -137,13 +135,7 @@ function PrintBlockRenderer({ content, locale }: { content: string; locale: Loca
         rehypeRaw,
         // M3 B2 — 매크로는 katexMacros() 팩토리 한 벌(화면과 공유). 렌더마다 새 객체 = \gdef 오염 격리(D13)
         [rehypeKatex, { strict: false, trust: true, fleqn: true, macros: katexMacros() }],
-        [rehypeTwemoji, {
-          format: 'svg',
-          source: TWEMOJI_BASE,
-          className: 'twemoji',
-          draggable: false,
-          ignore: TWEMOJI_IGNORE,
-        }],
+        // M5 D14 — rehype-twemoji 철거: 이모지 문자는 OS 글꼴로 인쇄된다(N8)
       ]}
       components={{
         img: ({ src, alt, ...props }) => (

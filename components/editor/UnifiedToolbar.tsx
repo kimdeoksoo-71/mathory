@@ -15,7 +15,6 @@ import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader, PhIcon } from '../ui/Icons';
 import { PH } from '../ui/phosphorPaths';
 import { ICON_SIZE, SVG_PROPS } from './toolbarIcons';
-import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from './EmojiPickerPanel';
 
 // ═══════════════════════════════════════════════
 // Row 2 아이콘 — Phosphor regular · ICON_SIZE 20 (M4 · Final_V4 §3-1).
@@ -59,10 +58,6 @@ function ProofreadIcon() {
 
 function SpecialCharIcon() {
   return <PhIcon d={PH.numberCircleOne} size={ICON_SIZE} />;
-}
-
-function EmojiIcon() {
-  return <PhIcon d={PH.smiley} size={ICON_SIZE} />;
 }
 
 function TableAddIcon() {
@@ -356,59 +351,6 @@ function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursor
               </div>
             </div>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ═══════════════════════════════════════════════
-// 이모지 풀다운 (Twemoji) — Phase 39
-// 입력: 순수 유니코드만 삽입. 패널은 EmojiPickerPanel(재사용) 사용.
-// ═══════════════════════════════════════════════
-
-function EmojiPickerDropdown({ onInsert }: { onInsert: (template: string, cursorOffset: number) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // 외부 클릭 닫기 (SpecialChar와 동일)
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <IconButton title="이모지" onClick={() => setOpen((v) => !v)} active={open}>
-        <EmojiIcon />
-      </IconButton>
-
-      {open && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            marginTop: 4,
-            backgroundColor: '#fff',
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
-            zIndex: 1000,
-            padding: 8,
-            width: EMOJI_PANEL_WIDTH + 16,
-          }}
-        >
-          <EmojiPickerPanel
-            onSelect={(emoji) => {
-              onInsert(emoji, Array.from(emoji).length);
-              setOpen(false);
-            }}
-          />
         </div>
       )}
     </div>
@@ -721,7 +663,6 @@ export default function UnifiedToolbar({
       ),
     },
     { key: 'special', node: <SpecialCharDropdown onInsert={onInsert} /> },
-    { key: 'emoji', node: <EmojiPickerDropdown onInsert={onInsert} /> },
     {
       key: 'table',
       node: (

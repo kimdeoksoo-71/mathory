@@ -82,7 +82,6 @@ const ICONS = {
   numberCircleOne: ['number-circle-one', 'regular'],       // SpecialCharIcon
   scan: ['scan', 'regular'],                               // OcrIcon (D9)
   sigma: ['sigma', 'regular'],                             // SigmaIcon (D12)
-  smiley: ['smiley', 'regular'],                           // EmojiIcon
   sparkle: ['sparkle', 'regular'],                         // AiMathGenIcon
   table: ['table', 'regular'],                             // TableAddIcon
   // ── 라이브러리 밖 (BlockBottomToolbar·CommentEditor) ──
@@ -184,7 +183,7 @@ function buildSheet(PH_) {
   const row2 = [
     ['실행취소', 'arrowUUpLeft'], ['다시실행', 'arrowUUpRight'], ['인라인 수식', 'dollarSimple'],
     ['블록 수식', null], ['OCR', 'scan'], ['Σ', 'sigma'], ['강조', 'highlighter'], ['상용구', 'bracketsCurly'],
-    ['특수문자', 'numberCircleOne'], ['이모지', 'smiley'], ['표', 'table'], ['맞춤법', 'listChecks'],
+    ['특수문자', 'numberCircleOne'], ['표', 'table'], ['맞춤법', 'listChecks'],
     ['AI 완성', 'sparkle'], ['찾기', 'magnifyingGlass'], ['접기', 'collapseIn'], ['펼치기', 'collapseOut'],
   ];
   const row2Line = (size) => row2.map(([t, k]) =>

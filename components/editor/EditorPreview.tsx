@@ -7,8 +7,6 @@ import remarkGfm from 'remark-gfm';
 import rehypeKatex from 'rehype-katex';
 import { katexMacros } from '../../lib/katexMacros';
 import rehypeRaw from 'rehype-raw';
-import { rehypeTwemoji } from '@yuna0x0/rehype-twemoji';
-import { TWEMOJI_BASE, TWEMOJI_IGNORE } from '../../lib/twemoji-url';
 import {
   MARKER_LINE_RE, MATH_ONLY_LINE_RE, CIRCLED_NUM_LINE_RE, GANA_LITERAL_RE, GIYEOK_LITERAL_RE,
   // 개선묶음 M2 C — 참조 마크업은 사본을 만들지 않고 공용 함수를 그대로 쓴다
@@ -316,13 +314,7 @@ export default function EditorPreview({
         rehypeRaw,
         // M3 B2 — 매크로는 katexMacros() 팩토리 한 벌(인쇄와 공유). 렌더마다 새 객체 = \gdef 오염 격리(D13)
         [rehypeKatex, { strict: false, trust: true, macros: katexMacros() }],
-        [rehypeTwemoji, {
-          format: 'svg',
-          source: TWEMOJI_BASE,
-          className: 'twemoji',
-          draggable: false,
-          ignore: TWEMOJI_IGNORE,
-        }],
+        // M5 D14 — rehype-twemoji 철거: raw_text의 이모지 문자는 OS 글꼴로 렌더된다(N8)
       ]}
       components={{
         // Phase 42: mathory-graph 펜스 → GgbGraphView (pre 레벨에서 가로채야

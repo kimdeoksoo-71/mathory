@@ -383,7 +383,7 @@ function renderInto(b: Buf, n: SNode, ctx: Ctx, next?: SNode): void {
       return;
     }
     case 'img': {
-      const alt = n.attrs && n.attrs.alt;      // twemoji는 alt에 원래 이모지가 있다
+      const alt = n.attrs && n.attrs.alt;      // 이미지는 alt를 텍스트로 (M5 — 일반 규칙)
       const src = n.attrs && n.attrs.src;
       if (alt) b.text(alt);
       else if (src) b.text('![](' + src + ')');

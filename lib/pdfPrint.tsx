@@ -102,16 +102,6 @@ export async function printProblemPdf(params: {
 
   await new Promise((resolve) => setTimeout(resolve, 200));
 
-  // Phase 39: Twemoji SVG가 CDN에서 로드 완료될 때까지 대기 (PDF 빈칸 방지).
-  // 일부가 늦으면 최대 2초까지만 기다리고 진행.
-  const twemojiImgs = Array.from(printNode.querySelectorAll<HTMLImageElement>('img.twemoji'));
-  if (twemojiImgs.length) {
-    await Promise.race([
-      Promise.all(twemojiImgs.map((img) => img.decode().catch(() => {}))),
-      new Promise((resolve) => setTimeout(resolve, 2000)),
-    ]);
-  }
-
   // 폰트가 도착한 뒤에 스냅샷을 떠야 굵기가 제대로 인쇄된다 (위 주석 참조)
   await waitForPrintFonts();
 

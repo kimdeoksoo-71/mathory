@@ -172,25 +172,16 @@ export default function SettingsPage() {
       >
         <h2 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 8px' }}>정보 / 라이선스</h2>
         <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', margin: 0, lineHeight: 1.6 }}>
-          이모지 이미지는{' '}
+          아이콘은{' '}
           <a
-            href="https://github.com/jdecked/twemoji"
+            href="https://phosphoricons.com"
             target="_blank"
             rel="noopener noreferrer"
             style={{ color: 'var(--accent-primary)' }}
           >
-            Twemoji
+            Phosphor Icons
           </a>
-          {' '}(jdecked/twemoji)를 사용하며,{' '}
-          <a
-            href="https://creativecommons.org/licenses/by/4.0/"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'var(--accent-primary)' }}
-          >
-            CC BY 4.0
-          </a>
-          {' '}라이선스로 배포됩니다.
+          를 사용하며 MIT 라이선스로 배포됩니다.
         </p>
       </section>
     </main>
