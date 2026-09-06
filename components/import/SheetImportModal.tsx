@@ -42,6 +42,7 @@ import { buildFolderTree, flattenVisible, getChildren } from '../../lib/folder-t
 import EditorPreview from '../editor/EditorPreview';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import { IconClose, IconChevron, IconChevronDown, IconFolder, IconPlus } from '../ui/Icons';
+import FolderGlyph from '../ui/FolderGlyph';
 import { promptDialog } from '../../lib/dialogs';
 
 type SheetName = 'Data_DS' | 'Stack';
@@ -725,7 +726,7 @@ function FormPane({
           </button>
           {tree.map((n) => (
             <button key={n.folder.id} style={row(folderId === n.folder.id, n.depth + 1)} onClick={() => setFolderId(n.folder.id)}>
-              <IconFolder size={14} /> {n.folder.name}
+              <FolderGlyph folder={n.folder} size={14} /> {n.folder.name}
             </button>
           ))}
         </div>

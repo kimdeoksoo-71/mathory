@@ -13,14 +13,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Folder } from '../../types/problem';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
-import { IconFolder, IconChevron } from '../ui/Icons';
-import { TwemojiImg } from './EmojiPickerPanel';
-
-function FolderGlyph({ folder, size = 14 }: { folder: Folder; size?: number }) {
-  return folder.icon
-    ? <TwemojiImg emoji={folder.icon} label={folder.name} size={size} />
-    : <IconFolder size={size} />;
-}
+import { IconChevron } from '../ui/Icons';
+import FolderGlyph from '../ui/FolderGlyph';
 
 export default function FolderPathBar({
   folders,

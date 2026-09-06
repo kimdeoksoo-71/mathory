@@ -15,8 +15,8 @@ import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolder, IconFolderMove } from '../ui/Icons';
-import { TwemojiImg } from '../editor/EmojiPickerPanel';
+import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolderMove } from '../ui/Icons';
+import FolderGlyph from '../ui/FolderGlyph';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
@@ -348,7 +348,7 @@ export default function ListView({
             >
               <div style={{ gridColumn: trackOf('title'), minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)', flexShrink: 0 }}>
-                  {f.icon ? <TwemojiImg emoji={f.icon} label={f.name} size={16} /> : <IconFolder size={16} />}
+                  <FolderGlyph folder={f} size={16} />
                 </span>
                 <span className="list-folder-name" style={{
                   fontSize: 13.5, color: 'var(--text-primary)', fontWeight: 500,

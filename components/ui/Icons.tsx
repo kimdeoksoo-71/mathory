@@ -1,5 +1,5 @@
 import React from 'react';
-import { PH } from './phosphorPaths';
+import { PH, PH_CORE_VERSION } from './phosphorPaths';
 
 /**
  * M4 — 앱 전역 아이콘: Phosphor Icons regular 단일 계열 (Final_V4 D1~D5).
@@ -40,6 +40,34 @@ function phIcon(d: string, defaultSize: number) {
   };
 }
 
+/**
+ * M5 D2 — 카탈로그 아이콘: `public/icons/phosphor/<ver>/`의 정적 SVG를 CSS mask로 씌워
+ * `currentColor`를 유지한다("`.svg`로 빼면 currentColor가 끊긴다"는 `<img>` 얘기 — mask는
+ * alpha만 쓰고 색은 background-color가 공급). **사용자 선택 폴더 아이콘 전용** — UI 상시
+ * 아이콘은 계속 인라인 path(PhIcon: 첫 페인트 fetch 0). 404는 빈칸이 된다(mask엔 onError가
+ * 없다) — 방어는 쓰기(피커가 인덱스 이름만)·읽기(isPhosphorIconName 불일치 → 기본 아이콘)에서.
+ */
+export function PhAsset({ name, weight = 'regular', size = 16, title }: {
+  name: string; weight?: 'regular' | 'bold'; size?: number; title?: string;
+}) {
+  const url = `/icons/phosphor/${PH_CORE_VERSION}/${weight}/${name}${weight === 'bold' ? '-bold' : ''}.svg`;
+  const mask = `url("${url}") center / contain no-repeat`;
+  return (
+    <span
+      {...(title ? { role: 'img', 'aria-label': title, title } : { 'aria-hidden': true })}
+      style={{
+        display: 'inline-block', width: size, height: size, flexShrink: 0,
+        backgroundColor: 'currentColor', WebkitMask: mask, mask,
+      }}
+    />
+  );
+}
+
+/** 카탈로그 자산 URL — Sidebar의 bold 예열 fetch가 공유한다(M5 Q3). */
+export function phAssetUrl(name: string, weight: 'regular' | 'bold'): string {
+  return `/icons/phosphor/${PH_CORE_VERSION}/${weight}/${name}${weight === 'bold' ? '-bold' : ''}.svg`;
+}
+
 /* ═══ 내비게이션·셸 ═══ */
 export const IconSidebar = phIcon(PH.sidebarSimple, 20);
 export const IconSearch = phIcon(PH.magnifyingGlass, 18);
@@ -76,6 +104,10 @@ export const IconDocLines = phIcon(PH.fileText, 14);
 export const IconCoachImportant = phIcon(PH.chatCenteredText, 14);
 /** 문단 가로폭(SizeStepper 라벨). M3의 27×15 비정방 예외는 M4에서 폐기 — 정방 24(§4-5). */
 export const IconTextWidth = phIcon(PH.textWidth, 24);
+/** M5 D8 — "Agent" 글자 라벨(검수 13차 확정)을 대체한 아이콘. 옆 IconComment와 같은 크기로. */
+export const IconAgent = phIcon(PH.legoSmiley, 14);
+/** M5 D9 — AIBrandIcon의 '🤖' 글자 폴백 대체. */
+export const IconRobot = phIcon(PH.robot, 14);
 
 /** 로딩 스피너 — circle-notch 회전. animateTransform은 회전 대상(<path>)의 자식이어야 한다(D14). */
 export function IconLoader({ size = 14, color = 'currentColor', className }: IconProps) {

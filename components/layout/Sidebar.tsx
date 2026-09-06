@@ -12,7 +12,10 @@ import {
   IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
-import { EmojiPickerPanel, TwemojiImg, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
+import { EmojiPickerPanel, EMOJI_PANEL_WIDTH } from '../editor/EmojiPickerPanel';
+import FolderGlyph from '../ui/FolderGlyph';
+import { phAssetUrl } from '../ui/Icons';
+import { isPhosphorIconName } from '../../lib/folderIcon';
 import { buildFolderTree, flattenVisible, getDescendantIds } from '../../lib/folder-tree';
 import { useDraggable } from '@dnd-kit/core';
 import {
@@ -326,9 +329,8 @@ function SortableFolderItem({
             </span>
           </span>
           <span style={{ flexShrink: 0, display: 'flex', alignItems: 'center', opacity: active ? 1 : 0.75 }}>
-            {folder.icon
-              ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
-              : <IconFolder />}
+            {/* M5 D3·D4 — 활성 행만 bold(글자 700과 동일 조건) · 펼침이면 folder-open */}
+            <FolderGlyph folder={folder} size={18} active={active} expanded={hasChildren && expanded} />
           </span>
           <span style={{
             flex: 1, textAlign: 'left', overflow: 'hidden',
@@ -479,9 +481,7 @@ function FolderMovePicker({
           onClick={() => onMove(n.folder.id)}
           onMouseEnter={(e) => hover(e, true)} onMouseLeave={(e) => hover(e, false)}
         >
-          {n.folder.icon
-            ? <TwemojiImg emoji={n.folder.icon} label={n.folder.name} size={15} />
-            : <IconFolder size={15} />}
+          <FolderGlyph folder={n.folder} size={15} />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.folder.name}</span>
         </button>
       ))}
@@ -723,6 +723,13 @@ export default function Sidebar({
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [myHeaderHovered, setMyHeaderHovered] = useState(false);
   const [recentOpen, setRecentOpen] = useState(true);
+
+  // M5 Q3 — 사용자 아이콘의 bold 자산 예열: 활성 전환 순간 mask가 첫 요청이면 1프레임
+  // 빈칸이 될 수 있다. 마운트/폴더 변동 시 미리 받아 캐시에 둔다(실패는 무시 — 표시엔 무해).
+  useEffect(() => {
+    const names = new Set(folders.map((f) => f.icon).filter(isPhosphorIconName));
+    names.forEach((n) => { fetch(phAssetUrl(n, 'bold')).catch(() => {}); });
+  }, [folders]);
 
   // Phase 40: 폴더 트리 펼침/접힘 (collapsed 집합, localStorage 영속)
   const COLLAPSE_KEY = 'mathory:folder:collapsed';

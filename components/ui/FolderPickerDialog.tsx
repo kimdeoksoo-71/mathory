@@ -7,6 +7,8 @@ import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID } from '../../lib/firestore';
 import {
   dialogOverlay, dialogBody, dialogHead, dialogContent, dialogFoot, dialogBtn,
 } from './dialogStyles';
+import { IconInbox } from './Icons';
+import FolderGlyph from './FolderGlyph';
 
 /* ═══════════════════════════════════════════════════════════════
    개선묶음 M2 A-4 — 문항의 폴더 이동 픽커 (D6′ · Q2)
@@ -63,7 +65,9 @@ export default function FolderPickerDialog({
     cursor: disabled ? 'default' : 'pointer',
   });
 
-  const row = (id: string | null, name: string, depth: number) => {
+  // M5 N10 — 폴더 행에 FolderGlyph(사용자 아이콘 반영), 미지정 행은 IconInbox(FolderView와 동일)
+  const row = (folder: Folder | null, name: string, depth: number) => {
+    const id = folder ? folder.id : null;
     const isCurrent = id === cur;
     return (
       <button
@@ -72,6 +76,9 @@ export default function FolderPickerDialog({
         disabled={isCurrent}
         style={rowStyle(picked === id, isCurrent, depth)}
       >
+        <span style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+          {folder ? <FolderGlyph folder={folder} size={14} /> : <IconInbox size={14} />}
+        </span>
         <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {name}
         </span>
@@ -97,7 +104,7 @@ export default function FolderPickerDialog({
           {rows.length > 0 && (
             <div style={{ height: 1, background: 'var(--border-light, #eee)', margin: '6px 8px' }} />
           )}
-          {rows.map((n) => row(n.folder.id, n.folder.name, n.depth))}
+          {rows.map((n) => row(n.folder, n.folder.name, n.depth))}
           {rows.length === 0 && (
             <div style={{ padding: '10px 12px', fontSize: 12.5, color: 'var(--text-muted)' }}>
               만들어 둔 폴더가 없습니다.

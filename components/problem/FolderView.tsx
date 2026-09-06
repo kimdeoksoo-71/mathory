@@ -26,9 +26,9 @@ import BlockchainBadge from '../ui/BlockchainBadge';
 import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
-  IconTrash, IconCopy, IconFolder, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove,
+  IconTrash, IconCopy, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove,
 } from '../ui/Icons';
-import { TwemojiImg } from '../editor/EmojiPickerPanel';
+import FolderGlyph from '../ui/FolderGlyph';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
 import CoachBlock from '../ui/CoachBlock';
 import { isCoachBlock } from '../../lib/coachBlock';
@@ -556,8 +556,7 @@ export default function FolderView({
             {isUnassigned ? <IconInbox size={18} />
               : isTrash ? <IconTrash size={18} />
               : isSharedWithMe ? <IconShare size={18} />
-              : folder.icon ? <TwemojiImg emoji={folder.icon} label={folder.name} size={18} />
-              : <IconFolder size={18} />}
+              : <FolderGlyph folder={folder} size={18} />}
           </span>
           {breadcrumb.length > 1 && onSelectFolder && (
             <span style={{ display: 'inline-flex', alignItems: 'center', fontSize: 14, fontWeight: 500, color: 'var(--text-muted)' }}>
@@ -698,7 +697,7 @@ export default function FolderView({
                       onMouseLeave={(e) => { if (!isOver) e.currentTarget.style.background = 'var(--bg-card, #fff)'; }}
                     >
                       <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--text-muted)' }}>
-                        {cf.icon ? <TwemojiImg emoji={cf.icon} label={cf.name} size={14} /> : <IconFolder size={14} />}
+                        <FolderGlyph folder={cf} size={14} />
                       </span>
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cf.name}</span>
                       <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>({cfCount})</span>
