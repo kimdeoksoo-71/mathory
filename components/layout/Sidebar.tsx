@@ -777,8 +777,9 @@ export default function Sidebar({
       >
         {!collapsed && (
           <span style={{
-            fontSize: 19, fontWeight: 600, color: 'var(--mathory-red)',
+            fontSize: 19, fontWeight: 400, color: '#944728',
             letterSpacing: '-0.03em', fontFamily: 'var(--font-logo)',
+            textShadow: '0 1px 0 rgba(0,0,0,0.06)',
           }}>
             Mathory
           </span>

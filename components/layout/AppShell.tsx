@@ -1072,8 +1072,9 @@ function HomeView() {
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
         <h1 style={{
-          fontSize: 48, fontWeight: 600, color: 'var(--mathory-red)', marginBottom: 8,
+          fontSize: 48, fontWeight: 400, color: 'var(--mathory-red-dark)', marginBottom: 8,
           fontFamily: 'var(--font-logo)', letterSpacing: '-0.03em', lineHeight: 1,
+          textShadow: '0 1px 0 rgba(0,0,0,0.06)',
         }}>Mathory</h1>
         <p style={{ fontSize: 15, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontStyle: 'italic' }}>
           Write the logic. Preserve the insight.
