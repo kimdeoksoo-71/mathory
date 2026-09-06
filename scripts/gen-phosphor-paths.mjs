@@ -76,7 +76,7 @@ const ICONS = {
   bracketsCurly: ['brackets-curly', 'regular'],            // SnippetIcon
   collapseIn: ['arrows-in-line-vertical', 'regular'],      // CollapseAllIcon 접기 (D10)
   collapseOut: ['arrows-out-line-vertical', 'regular'],    // CollapseAllIcon 펼치기 (D10)
-  dollarSimple: ['currency-dollar-simple', 'regular'],     // InlineMathIcon·BlockMathIcon (D7)
+  dollarSimple: ['currency-dollar-simple', 'regular'],     // 컨택트시트 비교용만 — $·$$ 도안은 M5 후속에서 M3 복원(구 D7)
   highlighter: ['highlighter', 'regular'],                 // KeySentenceIcon
   listChecks: ['list-checks', 'regular'],                  // ProofreadIcon
   numberCircleOne: ['number-circle-one', 'regular'],       // SpecialCharIcon
@@ -180,14 +180,23 @@ function buildSheet(PH_) {
   ];
   const SIZES = [12, 14, 16, 18, 20];
 
+  // M5 후속 — $·$$는 M3 stroke 도안 복원+조정(덕수 판정). UnifiedToolbar LEGACY_MATH_SVG_PROPS와 동일 규격
+  // (viewBox 52 크롭 · stroke 3.25 = 시각 1.25px · $$ 간격 6→2유닛).
+  const legacyMathSvg = (size, paths) =>
+    `<svg width="${size}" height="${size}" viewBox="6 6 52 52" fill="none" stroke="currentColor" stroke-width="3.25" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+  const legacyInlineMath = (size) => legacyMathSvg(size,
+    '<path d="M32 16 L32 48"/><path d="M38 22 C38 22 36 19 32 19 C28 19 25 21 25 24.5 C25 28 28 29.5 32 31 C36 32.5 39 34.5 39 38.5 C39 42 36 45 32 45 C28 45 26 42 26 42"/>');
+  const legacyBlockMath = (size) => legacyMathSvg(size,
+    '<g transform="translate(2 0)"><path d="M23 16 L23 48"/><path d="M29 22 C29 22 27.5 19 23 19 C19 19 17 21.5 17 24.5 C17 28 19.5 29.5 23 31 C26.5 32.5 29 34.5 29 38.5 C29 42 27 45 23 45 C19 45 17 42 17 42"/></g><g transform="translate(-2 0)"><path d="M41 16 L41 48"/><path d="M47 22 C47 22 45.5 19 41 19 C37 19 35 21.5 35 24.5 C35 28 37.5 29.5 41 31 C44.5 32.5 47 34.5 47 38.5 C47 42 45 45 41 45 C37 45 35 42 35 42"/></g>');
+
   const row2 = [
-    ['실행취소', 'arrowUUpLeft'], ['다시실행', 'arrowUUpRight'], ['인라인 수식', 'dollarSimple'],
-    ['블록 수식', null], ['OCR', 'scan'], ['Σ', 'sigma'], ['강조', 'highlighter'], ['상용구', 'bracketsCurly'],
+    ['실행취소', 'arrowUUpLeft'], ['다시실행', 'arrowUUpRight'], ['인라인 수식 (M3 복원)', legacyInlineMath],
+    ['블록 수식 (M3 복원)', legacyBlockMath], ['OCR', 'scan'], ['Σ', 'sigma'], ['강조', 'highlighter'], ['상용구', 'bracketsCurly'],
     ['특수문자', 'numberCircleOne'], ['표', 'table'], ['맞춤법', 'listChecks'],
     ['AI 완성', 'sparkle'], ['찾기', 'magnifyingGlass'], ['접기', 'collapseIn'], ['펼치기', 'collapseOut'],
   ];
   const row2Line = (size) => row2.map(([t, k]) =>
-    `<span class="btn" title="${t}">${k ? ph(PH_[k], size) : blockMath(size, 'aniso')}</span>`).join('');
+    `<span class="btn" title="${t}">${typeof k === 'function' ? k(size) : ph(PH_[k], size)}</span>`).join('');
 
   const daggers = [
     ['FolderPathBar 꺾쇠', 'caret-right', 'caretRight', 10],
@@ -247,7 +256,7 @@ ${[18, 20, 22].map((s) => `<div style="margin: 8px 0"><span class="row2">${row2L
 <h2>5. BlockBottomToolbar 15px — plus / split-vertical(블록 분할) / rows(수식행 분할) (Q4)</h2>
 <span class="row2">${ph(PH_.plus, 15)}${ph(PH_.splitBlock, 15)}${ph(PH_.rows, 15)}</span>
 
-<h2>6. 블록 수식 — x0.62 비등방 vs 0.8 등방+겹침, 인라인 $ 옆에서 (Q5)</h2>
+<h2>6. ~~블록 수식 — x0.62 비등방 vs 0.8 등방+겹침~~ ⚠ M5 후속에서 폐기 — $·$$는 M3 도안 복원(위 Row 2 참조). 아래는 기록용</h2>
 <span class="row2">${ph(PH_.dollarSimple, 20)}<span class="lbl">인라인</span>${blockMath(20, 'aniso')}<span class="lbl">비등방</span>${blockMath(20, 'iso')}<span class="lbl">등방+겹침</span></span>
 
 <h2>7. IconTextWidth 24 정방 — 스테퍼 목업 (Q6)</h2>

@@ -14,7 +14,7 @@ import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader, PhIcon } from '../ui/Icons';
 import { PH } from '../ui/phosphorPaths';
-import { ICON_SIZE, SVG_PROPS } from './toolbarIcons';
+import { ICON_SIZE } from './toolbarIcons';
 
 // ═══════════════════════════════════════════════
 // Row 2 아이콘 — Phosphor regular · ICON_SIZE 20 (M4 · Final_V4 §3-1).
@@ -22,19 +22,42 @@ import { ICON_SIZE, SVG_PROPS } from './toolbarIcons';
 // 브라켓(CORNER_BRACKETS)은 M4에서 폐기 — 켜짐 프레임은 IconButton의 active 테두리 하나다.
 // ═══════════════════════════════════════════════
 
+/** M5 후속(덕수 판정 2026-09-06) — $·$$ 두 개만 M3 자체 도안으로 복원 + 미세 조정.
+ *  Phosphor currency-dollar-simple(단일 $)·비등방 x0.62 합성($$)이 어색하다는 실사용
+ *  판정. 도안은 M3 원본(stroke S-커브) 그대로, 브라켓은 붙이지 않는다(M4가 Row 2
+ *  전체에서 폐기한 장식 — 이 둘만 되살리면 줄이 어긋난다).
+ *  - 렌더 크기는 Row 2 규격 ICON_SIZE(20) 유지, 대신 **viewBox를 64→52 창으로 크롭**
+ *    (M3 도안은 64칸 중 세로 32만 써서 브라켓 없이는 Phosphor 옆에서 작아 보였다).
+ *    글리프 실높이 10px(원본 64) → 12.3px — 44 크롭(14.5px)은 "너무 크다" 판정이라
+ *    **원본과 44 크롭의 중간**으로 확정(덕수 3차 지시).
+ *  - strokeWidth 3.25 = 시각 3.25×20/52 = 1.25px(Phosphor regular 20px과 동일 굵기).
+ *  - $$의 두 달러 사이 간격은 6→2유닛(1/3, 덕수) — translate ±2로 좁혔다. */
+const LEGACY_MATH_SVG_PROPS = {
+  width: ICON_SIZE, height: ICON_SIZE, viewBox: '6 6 52 52',
+  fill: 'none' as const, stroke: 'currentColor', strokeWidth: 3.25,
+  strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
+};
+
 function InlineMathIcon() {
-  return <PhIcon d={PH.dollarSimple} size={ICON_SIZE} />;
+  return (
+    <svg {...LEGACY_MATH_SVG_PROPS}>
+      <path d="M32 16 L32 48" />
+      <path d="M38 22 C38 22 36 19 32 19 C28 19 25 21 25 24.5 C25 28 28 29.5 32 31 C36 32.5 39 34.5 39 38.5 C39 42 36 45 32 45 C28 45 26 42 26 42" />
+    </svg>
+  );
 }
 
-/** 블록 수식 $$ — currency-dollar-simple을 x 0.62배로 눌러 좌·우 배치 (D7 · Final_V4 §4-3).
- *  비등방 scale은 fill path의 세로 획을 가늘게 한다(20px에서 1.25→0.78px) — 흐리면
- *  대안은 0.8배 등방 축소+겹침(Q5, 컨택트시트 판정).
- *  좌표: path x 56~200(폭 144) → 0.62배 폭 89.3 · 간격 12 → tx −2 / 99. */
 function BlockMathIcon() {
   return (
-    <svg {...SVG_PROPS}>
-      <g transform="translate(-2 0) scale(0.62 1)"><path d={PH.dollarSimple} /></g>
-      <g transform="translate(99 0) scale(0.62 1)"><path d={PH.dollarSimple} /></g>
+    <svg {...LEGACY_MATH_SVG_PROPS}>
+      <g transform="translate(2 0)">
+        <path d="M23 16 L23 48" />
+        <path d="M29 22 C29 22 27.5 19 23 19 C19 19 17 21.5 17 24.5 C17 28 19.5 29.5 23 31 C26.5 32.5 29 34.5 29 38.5 C29 42 27 45 23 45 C19 45 17 42 17 42" />
+      </g>
+      <g transform="translate(-2 0)">
+        <path d="M41 16 L41 48" />
+        <path d="M47 22 C47 22 45.5 19 41 19 C37 19 35 21.5 35 24.5 C35 28 37.5 29.5 41 31 C44.5 32.5 47 34.5 47 38.5 C47 42 45 45 41 45 C37 45 35 42 35 42" />
+      </g>
     </svg>
   );
 }

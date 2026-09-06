@@ -221,7 +221,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
-- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(49종 · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
+- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(49종 · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
 - **폴더 아이콘은 Phosphor 카탈로그다 (M5)**: `Folder.icon` = Phosphor 이름(`^[a-z0-9-]+$` — 옛 유니코드 값은 기본 아이콘으로 표시, 데이터 무접촉 N4). 규칙은 `lib/folderIcon.ts`(import 0 · `test:foldericon`)가, 렌더는 `components/ui/FolderGlyph.tsx` 한 벌이 소유한다(소비처 8곳 — **삼항식 사본 금지**). 기본 3종: 최상위 `folder` · 하위 `folder-simple` · 펼침은 depth 무관 `folder-open`(`folder-simple-open`은 core에 **없다**). **활성 행만 bold** — 글자 700과 같은 조건. 카탈로그 자산은 `icons:assets`가 `public/icons/phosphor/<ver>/`에 3,024개 복사(gitignore · `predev`·`build`가 생성 — **Vercel Build Command가 `next build` 직접 지정이면 전부 빈칸**). 렌더는 `PhAsset`(CSS **mask** + `background-color: currentColor`) — "별도 `.svg`는 currentColor가 끊긴다"는 `<img>` 얘기이고 mask는 유지된다. 단 **UI 상시 아이콘에는 mask 금지**(그쪽은 인라인 path — 첫 페인트 fetch 0). mask 404는 무이벤트 빈칸 — 방어는 쓰기(피커가 인덱스 이름만)·읽기(정규식 불일치 → 기본)에서, core 버전업 시 `--assets`가 사라진 이름 diff를 경고한다. 피커(`PhosphorIconPicker`)는 regular만·brands 78종 제외(상표)·한글 검색은 `lib/phosphor-ko.json`(없어도 영문 동작). **본문(raw_text)에는 아이콘·이모지 렌더 계층이 없다** — M5가 Twemoji를 전면 철거해 이모지 문자는 OS 글꼴로 보인다(N8). Phosphor 코드포인트는 PUA라 본문 문법을 만들지 말 것
 - **제3자 시각 자산 고지 준칙 (M5 D11)**: ① 들일 때 `THIRD_PARTY_LICENSES.md`에 라이선스 전문 ② 배포 산출물에 고지 동봉(생성 파일 헤더 · 정적 디렉터리 `LICENSE`) ③ 설정 "정보/라이선스"에 한 줄 ④ 크레딧 의무형(CC BY 등)은 ③ 필수, MIT형은 ①②로 충족 ⑤ **상표(브랜드 로고)는 사용자 선택 목록에서 제외** ⑥ 버전은 lock 고정 + 경로에 버전 ⑦ **자산을 그만 쓰면 고지도 같이 거둔다**(Twemoji CC BY 문단을 M5에서 삭제한 근거)
 - **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
@@ -302,9 +302,10 @@ globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈�
 로직 검증 356 → **365건**(`test:foldericon` 신설). **규약은 위 "폴더 아이콘은 Phosphor
 카탈로그다" · "제3자 시각 자산 고지 준칙" 절이 소유한다.**
 
-- 덕수 검수 완료(2026-09-06): Q1~Q7 전항 정상. 반영 1건 = agent 드로어 1행 제목에
-  `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭, S8). 남은 것: git push(덕수) 후
-  Vercel 로그 `[icons:assets] OK — 3024개` 확인 · phasedocs 이관
+- 덕수 검수 완료(2026-09-06): Q1~Q7 전항 정상. 반영 2건 — ① agent 드로어 1행 제목에
+  `IconAgent 16`(댓글 모드 `IconComment 16`과 대칭, S8) ② **Row 2 `$`·`$$`만 M3 자체
+  도안 복원**(S9 — M4 D7 뒤집힘, 위 규약 절 참조). 남은 것: git push(덕수) 후
+  Vercel 로그 `[icons:assets] OK — 3024개` 확인(phasedocs 이관은 완료)
 - ⚠ v2 최대 수확: **D9가 죽은 코드였다(E1)** — `ai-models.ts`가 avatarEmoji를 `'🤖'`로
   기본 채움해 "없으면 IconRobot" 갈래가 절대 발화하지 않았다. 기본값 `''`(D15)이 전제
 - ⚠ v1이 놓친 세 번째 폴더 트리 `FolderPickerDialog`(아이콘 0) → N10으로 FolderGlyph 편입
@@ -326,8 +327,8 @@ globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈�
 - ⚠ **`IconDots`는 이름과 달리 도안이 세로 점이었다**(D22) — `dots-three`(가로)로 잘못 대응할 뻔한
   자리. `dots-three-vertical`로 통합하고 별칭만 남겼다
 - 덕수 실물 검수(2026-09-06) 전항 통과: † 잔존 8곳 regular 유지(bold 예외 0) · Σ=`sigma` 채택
-  (M3 자체 Σ 폐기) · 블록 수식 = 비등방 x0.62 채택 · `split-vertical`(블록 분할)·`rows`(수식행 분할) ·
-  Row 2 20px · IconTextWidth 24 정방
+  (M3 자체 Σ 폐기) · ~~블록 수식 = 비등방 x0.62 채택~~(⚠ M5 후속에서 뒤집힘 — $·$$는 M3 도안 복원) ·
+  `split-vertical`(블록 분할)·`rows`(수식행 분할) · Row 2 20px · IconTextWidth 24 정방
 - Q7 확인 완료(2026-09-06): 배포 빌드 로그에 `[icons:check] OK — 49종` 실측 — `prebuild` 배선이 Vercel에서 실제로 돈다(드리프트는 이제 빌드 실패다)
 
 ### 이전: **Phase 63 — FolderView 리스트·칼럼 체계 · 앱 전역 DnD** — 구현·검수 완료 · **배포 완료(2026-09-06)**
