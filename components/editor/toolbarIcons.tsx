@@ -17,7 +17,7 @@ export const ICON_SIZE = 20;
 
 /* SVG_PROPS(공용 fill svg props)는 M5 후속에서 삭제 — 유일 소비처였던 BlockMathIcon이
    M3 stroke 도안으로 복원되며(덕수 판정: Phosphor $·$$가 어색) UnifiedToolbar 로컬
-   LEGACY_MATH_SVG_PROPS를 쓴다. Row 2에서 $·$$ 둘만 자체 도안 예외다. */
+   legacyMathSvgProps(viewBox 창 크롭·이동 팩토리)를 쓴다. Row 2에서 $·$$ 둘만 자체 도안 예외다. */
 
 /** 수식 기호 팔레트 트리거 (D12) — M3 자체 Σ(획 5)를 Phosphor sigma로 교체.
  *  자체 Σ의 존재 이유였던 "브라켓 1.2px 기준 굵기"가 브라켓과 함께 사라졌다. */

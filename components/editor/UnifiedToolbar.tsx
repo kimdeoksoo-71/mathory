@@ -31,16 +31,19 @@ import { ICON_SIZE } from './toolbarIcons';
  *    글리프 실높이 10px(원본 64) → 12.3px — 44 크롭(14.5px)은 "너무 크다" 판정이라
  *    **원본과 44 크롭의 중간**으로 확정(덕수 3차 지시).
  *  - strokeWidth 3.25 = 시각 3.25×20/52 = 1.25px(Phosphor regular 20px과 동일 굵기).
- *  - $$의 두 달러 사이 간격은 6→2유닛(1/3, 덕수) — translate ±2로 좁혔다. */
-const LEGACY_MATH_SVG_PROPS = {
-  width: ICON_SIZE, height: ICON_SIZE, viewBox: '6 6 52 52',
+ *  - $$의 두 달러 사이 간격은 6→2유닛(1/3, 덕수) — translate ±2로 좁혔다.
+ *  - $ ↔ $$ 짝 간격(덕수): viewBox 창을 $는 왼쪽으로(-10 → 글리프가 오른쪽으로),
+ *    $$는 오른쪽으로(+10) 밀어 서로에게 3.8px씩 붙인다. 창 여유 실측 — $ 글리프
+ *    x25~39 ⊂ 창 −4~48 · $$ x19~45 ⊂ 창 16~68(좌측 여유 3 > 획 반폭 1.6). */
+const legacyMathSvgProps = (viewBoxShift: number) => ({
+  width: ICON_SIZE, height: ICON_SIZE, viewBox: `${6 + viewBoxShift} 6 52 52`,
   fill: 'none' as const, stroke: 'currentColor', strokeWidth: 3.25,
   strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const,
-};
+});
 
 function InlineMathIcon() {
   return (
-    <svg {...LEGACY_MATH_SVG_PROPS}>
+    <svg {...legacyMathSvgProps(-10)}>
       <path d="M32 16 L32 48" />
       <path d="M38 22 C38 22 36 19 32 19 C28 19 25 21 25 24.5 C25 28 28 29.5 32 31 C36 32.5 39 34.5 39 38.5 C39 42 36 45 32 45 C28 45 26 42 26 42" />
     </svg>
@@ -49,7 +52,7 @@ function InlineMathIcon() {
 
 function BlockMathIcon() {
   return (
-    <svg {...LEGACY_MATH_SVG_PROPS}>
+    <svg {...legacyMathSvgProps(10)}>
       <g transform="translate(2 0)">
         <path d="M23 16 L23 48" />
         <path d="M29 22 C29 22 27.5 19 23 19 C19 19 17 21.5 17 24.5 C17 28 19.5 29.5 23 31 C26.5 32.5 29 34.5 29 38.5 C29 42 27 45 23 45 C19 45 17 42 17 42" />
@@ -759,12 +762,21 @@ export default function UnifiedToolbar({
           </>
         ) : (
           <>
-            <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
-              <InlineMathIcon />
-            </IconButton>
-            <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
-              <BlockMathIcon />
-            </IconButton>
+            {/* M5 후속 — $·$$ 짝 간격 축소(덕수): 글리프가 20px 박스보다 훨씬 좁아
+                맨눈 간격이 ~28px였다. ① gap 제거+버튼 겹침 8(겹침 구간은 글리프 없는
+                패딩뿐이라 클릭·hover 무해) ② 각 svg viewBox 창을 좌우로 밀어 글리프를
+                서로 쪽으로 ~3.8px씩 → 글리프 간격 ≈9px. 창 이동은 아이콘 함수의
+                viewBoxShift가 담당한다 */}
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
+                <InlineMathIcon />
+              </IconButton>
+              <span style={{ display: 'inline-flex', marginLeft: -8 }}>
+                <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
+                  <BlockMathIcon />
+                </IconButton>
+              </span>
+            </div>
             {/* M3 A3 — 표 삽입 뒤에 있던 OCR을 컨텍스트 영역으로. 커서가 수식 안이면
                 인라인·블록 수식과 함께 사라지고 팔레트가 그 자리에 온다(덕수 메모 그대로).
                 수식 안에서 OCR 접근 불가는 수용된 사양(D5). ocrLoading 중 스왑돼도

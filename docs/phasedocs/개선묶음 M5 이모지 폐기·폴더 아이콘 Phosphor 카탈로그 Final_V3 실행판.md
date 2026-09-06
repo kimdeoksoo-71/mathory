@@ -144,5 +144,10 @@ git push는 덕수가 직접(규칙 3). 완료 시 이 문서를 §11 구현 기
   확정(12.3px = 중간)**. 렌더는 20px 유지(줄 리듬 불변) · stroke 3.25 = 시각 1.25px
   (Phosphor 동일 굵기) · **`$$` 두 달러 간격 6→2유닛(1/3)**. `SVG_PROPS`는 소비처 0이
   되어 삭제. 컨택트시트 Row 2·§6 갱신
+- [x] 검수 반영 3건(S10): **`$` ↔ `$$` 버튼 짝 간격 축소** — 글리프가 20px 박스보다
+  훨씬 좁아(각각 5.4·10px) 맨눈 간격이 ~28px였다. 짝 묶음(gap 0 + 겹침 8px — 겹침
+  구간은 글리프 없는 패딩이라 클릭·hover 무해) + viewBox 창 좌우 이동(±10유닛 =
+  글리프가 서로에게 3.8px씩) → **글리프 간격 ≈9px**. 조절 레버는 겹침(marginLeft)과
+  `legacyMathSvgProps(shift)` 둘
 - [x] 이 문서 `docs/phasedocs/` 이관 완료(규칙 7 — M4 전례대로 검수 완료 시점에. v1·v2는 phaseSketch)
 - [ ] git push(덕수) · Vercel 빌드 로그에 `[icons:assets] OK — 3024개` 확인 후 Cmd+Shift+R → 배포 완료 표기
