@@ -290,7 +290,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현 완료(2026-09-08) · 덕수 검수 대기
+## 현재 Phase: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현·검수 완료(2026-09-08) · **push·배포 대기**
 
 문서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (계보: v1 web → **v2 CLI 실측 = 실행판**. v2 부록 C가 v1 정정 10건·보완 8건)
 
@@ -312,10 +312,13 @@ sticky로 고정). 켜고 끄는 세 속성(`white-space`·`word-break`·`overfl
   `pre`·`normal`·`auto`/`hidden`·`overscroll contain` · **양쪽 다 `vertRoom 0` · `scrollTopPushable 0`** ·
   가로 넘침이 패널 밖으로 새지 않음(`panelHorizLeak 0`) · sticky 거터가 `scrollLeft 300`에도 제자리 ·
   거터 배경 활성 `#E8DFCE` / 비활성 `#F0EAE0`(불투명 확인)
-- **남은 실물 검수 3건**(headless로는 판정 불가): ① 가로 스크롤바 5px 노출과 그로 인한 블록 높이 점프가
-  거슬리는가(D6 — 거슬리면 `.cm-scroller`에 스크롤바 숨김 규칙을 얹어 되돌린다) ② 아이콘
-  (`arrow-elbow-down-left` ↵ 단일, `npm run icons:sheet`) ③ 토글 직후
-  세로 스크롤 보정이 필요한가(D11 — 지금은 가로만 보정한다)
+- **덕수 검수 종결(2026-09-08, "모두 정상")** — 반영 1건: **아이콘 ↵ 단일 + 켬일 때 박스**(D9′).
+  ↔(arrows-out-line-horizontal)가 **Row 1 가로폭 아이콘과 겹쳐 보여** 상태별 쌍을 폐기했고,
+  도안이 하나뿐이라 박스가 유일한 상태 신호이므로 **`active={lineWrap}`으로 방향을 뒤집었다**
+  (접기·찾기의 "기본이 아닌 상태를 켠다"와 반대 — 기본값에서 늘 켜져 보이는 것은 수용한 대가).
+  ⚠ **가로 스크롤바 5px 노출(D6)과 "세로 보정 없음"(D11)이 정상 판정으로 닫혔다** — 스크롤바를
+  숨기거나 토글에 `scrollTop` 보정을 새로 넣지 말 것(켬↔끔에서 블록 높이가 일제히 바뀌는데도
+  보정이 필요 없었다)
 - ⌥Z는 window 리스너라 **항상 동작**한다. Row 2 버튼은 `showToolbar` 게이트 아래라 **그림 블록이 활성이면
   눌리지 않는다** — 접힘 버튼과 같은 성질이라 선례를 따랐고, ⌥Z가 대체 경로다
 - IME 조합 중 토글은 **무시**한다(D12) — reconfigure가 `.cm-content` 전면 재측정을 유발해 조합이 깨진다
