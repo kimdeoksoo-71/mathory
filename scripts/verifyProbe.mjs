@@ -14,6 +14,7 @@
  * 사용법
  *   node scripts/verifyProbe.mjs --rows 15,20-22            # 시트 Data_DS 행 지정
  *   node scripts/verifyProbe.mjs --sample 5 --flagged       # 시트가 결함으로 표시한 행에서 5개
+ *   node scripts/verifyProbe.mjs --vlabel 가정,충분성 --kind solution   # 시트 V열이 그 유형으로 잡은 행
  *   node scripts/verifyProbe.mjs --sample 5                 # 아무 행에서 5개 (과검출 확인용)
  *   node scripts/verifyProbe.mjs --file fixtures/a.md       # 로컬 파일 (--- 로 문제/풀이 구분)
  *   ... --kind problem|solution|both   (기본 both)
@@ -61,6 +62,7 @@ function parseArgs(argv) {
     if (k === '--rows') a.rows = argv[++i];
     else if (k === '--sample') a.sample = Number(argv[++i]);
     else if (k === '--flagged') a.flagged = true;
+    else if (k === '--vlabel') a.vlabel = argv[++i];
     else if (k === '--with-answer') a.withAnswer = true;
     else if (k === '--file') a.file = argv[++i];
     else if (k === '--kind') a.kind = argv[++i];
@@ -374,6 +376,16 @@ function printResult(label, r, sheetRef) {
             : (r) => bad(r.sheet.p) || bad(r.sheet.s) || bad(r.sheet.q);
         pool = rows.filter(want);
         console.log(`시트가 결함으로 표시한 행(${args.kind}): ${pool.length}개`);
+      }
+      /* 61g — 시트 STEP3 V2가 새 유형으로 잡은 행만 고른다 (확장 유형 대조군).
+         V열(Q_REPORT) 리포트의 블록 제목이 `[<라벨>n]` 형식이다(`QualityVerification.gs:468`).
+         시트 v4 Q_TYPES 라벨: 비약 · 오추론 · 가정 · 경우누락 · 충분성 · 불일치.
+         ⚠ **V2 프롬프트로 처리된 행만 새 라벨을 가진다** — 그 전 행은 비약·불일치뿐이다.
+            표본이 0이면 61b 베이스라인을 사람이 재라벨해 대조군으로 쓴다(61g D11). */
+      if (args.vlabel) {
+        const labels = args.vlabel.split(',').map((x) => x.trim()).filter(Boolean);
+        pool = pool.filter((r) => labels.some((L) => r.sheet.report.includes(`[${L}`)));
+        console.log(`시트 V열이 [${labels.join('·')}]로 잡은 행: ${pool.length}개`);
       }
       // 풀이 검증인데 풀이가 없는 행은 표본에서 뺀다 (그냥 건너뛰면 표본 수가 줄어든다)
       if (args.kind === 'solution') pool = pool.filter((r) => r.solution);
