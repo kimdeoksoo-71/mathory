@@ -3,7 +3,7 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap } from '@codemirror/view';
-import { EditorState, Prec } from '@codemirror/state';
+import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
@@ -24,6 +24,44 @@ import {
 } from '../../lib/math-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
+import { computeRevealScrollLeft } from '../../lib/editorScroll';
+
+/* ═══ Phase 65 — 줄바꿈 켬/끔 (⌥Z) ═══════════════════════════════════
+   CodeMirror의 "줄을 접는가"는 **클래스가 아니라 computed white-space**로 정해진다
+   (dist 6195-6200: measure마다 getComputedStyle(contentDOM).whiteSpace를 읽어
+   heightOracle.mustRefreshForWrapping에 넘긴다. 클래스를 보는 6118은 초기 추측 1회뿐).
+   그래서 facet(EditorView.lineWrapping)과 테마를 **함께** 갈아야 높이 오라클이
+   정확히 따라온다 — 셋을 Compartment 하나에 묶는 이유다.
+
+   ⚠ 두 상수를 모듈 최상위에 둔 것은 의도다. 토글마다 EditorView.theme()를 새로
+     만들면 StyleModule이 매번 다시 마운트된다. CM theme은 KaTeX macros와 달리
+     in-place 수정이 없어 상수 공유가 안전하다.
+   ⚠ 끔 모드의 `overflow-y: hidden`은 **안전장치가 아니라 의도 표시**다. hidden은
+     프로그램적 스크롤을 막지 못한다(실측: 고정 높이 박스에서 scrollTop이 32px 밀린다).
+     세로가 안전한 진짜 이유는 이 스크롤러의 높이가 auto로 풀려 여지가 0이기 때문이고,
+     그래서 **블록 CM 체인에 고정 높이를 주면 안 된다**(계획서 D14).
+   ⚠ overscroll-behavior-x: Mac 트랙패드 가로 스와이프가 끝에서 브라우저 뒤로가기로
+     새어 나가는 것을 막는다. 편집 중 뒤로가기는 곧 편집 화면 이탈이다. */
+const WRAP_ON: Extension = [
+  EditorView.lineWrapping,
+  EditorView.theme({
+    '.cm-content': { whiteSpace: 'pre-wrap', wordBreak: 'break-all' },
+    // 내부 자체 스크롤 없음 — 모든 스크롤은 외곽 컨테이너(.scaled-editor)가 담당
+    '.cm-scroller': { overflow: 'visible' },
+  }),
+];
+
+const WRAP_OFF: Extension = EditorView.theme({
+  '.cm-content': { whiteSpace: 'pre' },
+  '.cm-scroller': {
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    overscrollBehaviorX: 'contain',
+    scrollbarWidth: 'thin',   // Firefox 등 ::-webkit-scrollbar 미적용 브라우저 보정
+  },
+});
+
+const wrapExtensions = (on: boolean): Extension => (on ? WRAP_ON : WRAP_OFF);
 
 /** 커서 활동 정보 (Phase 56 D12 — MarkdownEditor / SortableEditorBlock / EditorView 3곳 공유).
  *  blockId 는 MarkdownEditor 자신은 모르므로 상위 래퍼가 주입한다. */
@@ -43,6 +81,8 @@ interface MarkdownEditorProps {
   autoHeight?: boolean;
   onSnippetShortcut?: (index: number) => void;
   onCursorActivity?: (info: Omit<CursorActivityInfo, 'blockId'>) => void;
+  /** Phase 65: 줄바꿈 켬(기본) / 끔이면 긴 줄이 접히지 않고 블록 안에서 좌우 스크롤된다. */
+  lineWrap?: boolean;
 }
 
 export interface MarkdownEditorHandle {
@@ -58,6 +98,10 @@ export interface MarkdownEditorHandle {
   focus: () => void;
   /** 커서 위치의 화면 좌표 반환 */
   getCursorCoords: () => { top: number; left: number } | null;
+  /** Phase 65: 커서가 가로로 보이도록 블록 스크롤러를 민다 (줄바꿈 끔 전용, 켬이면 무동작).
+   *  ⚠ 반드시 focus() **뒤**에 부를 것 — CM의 focus 관찰자가 scrollTop이 0이면
+   *  저장해 둔 scrollLeft를 복원하는데(dist 5124-5129), 우리는 scrollTop이 늘 0이다. */
+  revealCursorX: () => void;
   /** 검색 매치 하이라이트 (Decoration) 설정 */
   setSearchHighlights: (matches: SearchMatch[], activeIndex: number) => void;
   /** 검색 매치 하이라이트 해제 */
@@ -296,9 +340,14 @@ const latexLinter = linter((view) => {
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity, lineWrap = true }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
+    /* Phase 65 — 줄바꿈 Compartment. 뷰마다 하나이고, 초기 state는 마운트 시점의
+       lineWrap을 읽어야 하므로 ref로 최신값을 들고 있는다(effect deps는 []이다). */
+    const wrapCompartment = useRef(new Compartment());
+    const lineWrapRef = useRef(lineWrap);
+    lineWrapRef.current = lineWrap;
     const tabStopsRef = useRef<boolean>(false);
     const chordPendingRef = useRef<boolean>(false);
     const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -407,6 +456,26 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const coords = view.coordsAtPos(pos);
         if (!coords) return null;
         return { top: coords.top, left: coords.left };
+      },
+      /* Phase 65 D8 — 프로그램적 커서 이동(찾기/바꾸기 · 미리보기 수식 클릭)은
+         scrollIntoView를 쓰지 않으므로 CM이 가로로 따라가지 않는다. 그 두 경로만 이걸 부른다.
+         게이트 없이 항상 불러도 되도록, 가로 여지가 없으면 첫 줄에서 빠진다. */
+      revealCursorX() {
+        const view = viewRef.current;
+        if (!view) return;
+        const s = view.scrollDOM;
+        if (s.scrollWidth <= s.clientWidth) return;   // 줄바꿈 켬 · 짧은 줄 → 할 일 없음
+        const coords = view.coordsAtPos(view.state.selection.main.head);
+        if (!coords) return;                          // 세로 뷰포트 밖 → 기존 경로와 같이 건너뜀
+        const rect = s.getBoundingClientRect();
+        /* sticky 거터가 본문 앞을 가리므로 그 오른쪽 변을 좌측 경계로 삼는다.
+           offsetWidth가 아니라 rect를 쓰는 이유: 거터는 스크롤러의 자식이라
+           getBoundingClientRect가 sticky 위치를 이미 반영한다. */
+        const gutters = s.querySelector('.cm-gutters') as HTMLElement | null;
+        const left = gutters ? gutters.getBoundingClientRect().right : rect.left;
+        s.scrollLeft = computeRevealScrollLeft(
+          { left, right: rect.right }, coords.left, s.scrollLeft,
+        );
       },
       setSearchHighlights(matches: SearchMatch[], activeIndex: number) {
         const view = viewRef.current;
@@ -787,7 +856,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           // ── 수식 클릭 하이라이트 (미리보기→편집창) ──
           mathHighlightField,
           mathHighlightTheme,
-          EditorView.lineWrapping,
+          // Phase 65: lineWrapping + white-space/overflow 테마를 한 칸에 묶었다 (파일 상단 참조)
+          wrapCompartment.current.of(wrapExtensions(lineWrapRef.current)),
           latexHighlightPlugin,
           latexHighlightTheme,
           EditorView.updateListener.of((update) => {
@@ -818,20 +888,24 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               backgroundColor: 'transparent',
             },
             '.cm-scroller': {
-              // 내부 자체 스크롤 없음 — 모든 세로 스크롤은 외곽 컨테이너(.scaled-editor)가 담당.
-              // (auto로 두면 CM viewport가 상단 라인을 숨긴 채 멈춰 외곽 스크롤로 복구 안 되는 버그 발생)
-              overflow: 'visible',
+              /* ⚠ overflow는 여기 없다 — Phase 65에서 wrapCompartment(파일 상단)로 옮겼다.
+                 세로 스크롤은 어느 모드에서도 없고(외곽 .scaled-editor가 담당), 가로만
+                 줄바꿈을 끈 동안 이 스크롤러가 맡는다. 여기에 overflow를 다시 적으면
+                 같은 셀렉터·같은 속성이 두 테마에 생겨 토글이 조용히 죽는다. */
               // 기본 = Pretendard (일반 텍스트). 수식 영역은 cm-math-region이 D2Coding으로 오버라이드
               fontFamily: 'var(--font-ui)',
             },
             '.cm-content': {
+              // ⚠ whiteSpace·wordBreak도 wrapCompartment 소유다 (위 주석과 같은 이유)
               padding: '16px',
-              wordBreak: 'break-all',
-              whiteSpace: 'pre-wrap',
               lineHeight: '1.8',
             },
             '.cm-gutters': {
-              backgroundColor: 'transparent',
+              /* Phase 65 D5 — 줄바꿈을 끄면 거터가 sticky로 살아나 본문이 그 뒤로 흐른다.
+                 투명이면 글자가 줄 번호 위로 비쳐 지나가므로 블록 표면색을 깐다.
+                 ⚠ 폴백 필수: 변수가 없으면 unset이 되어 CM base theme의 #f5f5f5 회색 띠가 살아난다.
+                 ⚠ inherit은 안 된다 — .cm-editor가 backgroundColor:transparent를 명시한다. */
+              backgroundColor: 'var(--block-surface, var(--block-bg))',
               borderRight: '1px solid var(--border-subtle)',
               // 블록이 실제 border를 쓰므로 거터가 좌측 테두리를 덮지 않음
               // → 거터 자체의 좌측선/모서리 보정 불필요 (이중선 제거)
@@ -992,6 +1066,14 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    /* Phase 65 — 줄바꿈 토글. Compartment 재구성은 state 변경이라 CM이 measure를
+       확실히 예약한다(CSS만 바꾸면 다음 measure 계기까지 한 프레임 높이가 틀어진다). */
+    useEffect(() => {
+      viewRef.current?.dispatch({
+        effects: wrapCompartment.current.reconfigure(wrapExtensions(lineWrap)),
+      });
+    }, [lineWrap]);
 
     return (
       <div

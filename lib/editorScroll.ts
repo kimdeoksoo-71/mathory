@@ -3,6 +3,7 @@
    편집 패널의 모든 자동 스크롤은 이 모듈을 거쳐야 한다:
    - 스크롤 타깃 계산: computeBlockAwareScrollTop (일반) / computeMathCenterScrollTop (수식 클릭)
    - 실제 스크롤 실행: fastScrollTo (경합 취소 포함)
+   - 가로 목표 계산: computeRevealScrollLeft (Phase 65 — 줄바꿈 끔 전용)
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─── 애니메이션 세대 관리 ───────────────────────────────────────────
@@ -85,4 +86,30 @@ export function computeMathCenterScrollTop(
   return blockRect.height <= containerRect.height
     ? Math.min(center, blockTop - 8)
     : center;
+}
+
+/* ─── 가로 노출 타깃 계산 (Phase 65 D8) ───────────────────────────
+   ⚠ 세로 규약과 별개의 축이다. 세로는 여전히 외곽 `.scaled-editor` 단독이고,
+   가로는 **줄바꿈을 끈 동안에만** 블록 스크롤러(`.cm-scroller`)가 담당한다.
+   타자·화살표·드래그는 CM이 알아서 따라가지만, 프로그램적 커서 이동
+   (찾기/바꾸기 · 미리보기 수식 클릭)은 우리가 `scrollIntoView`를 쓰지 않으므로
+   가로로 따라가지 않는다 → 그 두 경로만 이 함수를 거친다.
+
+   커서가 이미 스크롤러 안이면 현재값을 그대로 돌려준다 → 줄바꿈 켬 모드나
+   짧은 줄에서는 호출해도 무해하다(호출부에 분기를 두지 않기 위한 성질).
+   ⚠ `scroller.left`에는 sticky 거터의 **오른쪽 변**을 넘긴다 — 거터가 본문 앞을
+   가리므로 그 뒤로 커서를 밀어 넣으면 보이지 않는다. */
+export function computeRevealScrollLeft(
+  scroller: { left: number; right: number },
+  cursorLeft: number,
+  scrollLeft: number,
+  margin = 24,
+): number {
+  if (cursorLeft < scroller.left + margin) {
+    return Math.max(0, scrollLeft - (scroller.left + margin - cursorLeft));
+  }
+  if (cursorLeft > scroller.right - margin) {
+    return scrollLeft + (cursorLeft - (scroller.right - margin));
+  }
+  return scrollLeft;
 }
