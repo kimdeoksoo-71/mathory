@@ -198,24 +198,29 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
 
   const gs = await Promise.all(passes.map((pr) =>
     callGemini(pr.system, P.fillTemplate(pr.user, vars), opts.geminiModel,
-      V.buildGeminiConfig(8000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
+      // ⚠ 8000은 라우트 FIRST_MAX_TOKENS의 **사본**이다(61g에서 미통일). 한쪽만 바꾸면 측정이 갈린다.
+    V.buildGeminiConfig(8000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
   const gIn = gs.reduce((n, g) => n + g.inputTokens, 0);
   const gOut = gs.reduce((n, g) => n + g.outputTokens, 0);
 
-  const jsons = gs.map((g) => V.parseAndRepair(g.content));
-  if (jsons.every((j) => !j)) {
+  // ⚠ 파싱 결과를 그 패스와 짝지어 든다 — 라우트와 같은 이유(한 패스가 죽으면 상한이 어긋난다).
+  const parsed = gs.map((g, i) => ({ pass: passes[i], json: V.parseAndRepair(g.content) }));
+  if (parsed.every((x) => !x.json)) {
     return { error: '1차 응답 파싱 실패', raw: gs[0].content.slice(0, 600), ms: Date.now() - t0 };
   }
-  const alive = jsons.filter(Boolean);
+  const alive = parsed.filter((x) => x.json);
 
-  if (alive.every((j) => j.skip === true)) {
-    return { verdict: 'skip', findings: [], note: alive[0].skip_reason,
+  if (alive.every((x) => x.json.skip === true)) {
+    return { verdict: 'skip', findings: [], note: alive[0].json.skip_reason,
              tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
   }
 
-  const derivedAnswer = kind === 'problem' ? String(alive[0].derived_answer || '').trim() : undefined;
+  const derivedAnswer = kind === 'problem' ? String(alive[0].json.derived_answer || '').trim() : undefined;
   const answerCheck = kind === 'problem' ? V.compareAnswer(answer, derivedAnswer) : undefined;
-  const candidates = V.mergeCandidates(alive.map((j) => V.sanitizeFindings(j.candidates, kind, 8)), 12);
+  // ⚠ 상한은 프롬프트가 소유한다 — 여기에 8·12를 리터럴로 박지 말 것(61g E3: 실제로 갈렸었다).
+  const candidates = V.mergeCandidates(
+    alive.map((x) => V.sanitizeFindings(x.json.candidates, kind, x.pass.cap)),
+    P.MERGE_CANDIDATE_CAP);
 
   if (answerCheck === 'mismatch' && !candidates.some((c) => c.tag === '정답불일치')) {
     candidates.unshift({ id: 'c0', tag: '정답불일치', quote: '',
