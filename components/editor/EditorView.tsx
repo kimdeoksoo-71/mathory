@@ -3635,7 +3635,31 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onNavigate={handleSearchNavigate}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '0 0 8px', minHeight: 0 }}>
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{
+            flex: 1,
+            overflowY: 'auto',
+            /* ═══ 편집 패널은 **가로 막다른 길**이다 (Phase 65 후속) ═══════════════
+               "줄바꿈을 꺼도 행번호 열이 좌우로 움직인다"의 진범은 CM sticky가 아니라
+               **조상의 가로 스크롤**이었다. 위 `.content-frame`(Row 3)은 `overflowX:'auto'`이고,
+               좌측 열 `minWidth:420` + 미리보기 열 `flexShrink:0` 고정폭이라 **드로어를 열거나
+               창이 좁으면 상시 가로로 넘친다** → 블록에 가로 여지가 없는 자리에서 스와이프하면
+               편집 열이 통째로 밀리고 거터도 같이 밀린다(거터는 자기 스크롤러 안에서는
+               정상적으로 고정돼 있다 — 실측 이동량 0).
+               ⚠ 두 줄이 짝이다: `overflowX:'hidden'`은 이 패널 자신이 밀리지 않게 하고,
+                 `overscrollBehaviorX:'contain'`은 여기서 시작된 가로 제스처가 `.content-frame`
+                 으로 **전파되지 않게** 막는다. 하나만 두면 다른 경로로 새어 나간다.
+               ⚠ `overflowX`를 아예 적지 않으면 **auto가 된다**(한 축만 지정하면 다른 축은
+                 visible로 남지 못한다). 게다가 `.no-scrollbar`가 가로 스크롤바까지 지워
+                 (globals.css) **보이지 않는 스크롤**이 된다.
+               ⚠ 대가(알고 둔 것): `.content-frame`이 넘치는 좁은 창에서, 포인터가 편집 패널
+                 위에 있는 동안에는 프레임을 가로로 밀 수 없다(미리보기 열·프레임 여백에서는
+                 여전히 된다). `.content-frame`의 `overflowX:'auto'`는 좁은 창에서 열에 닿는
+                 유일한 통로라 **그쪽을 닫으면 안 된다** — 그래서 전파만 끊는다. */
+            overflowX: 'hidden',
+            overscrollBehaviorX: 'contain',
+            padding: '0 0 8px',
+            minHeight: 0,
+          }}>
             <div>
             <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
               <SortableContext items={currentBlocks.map((b) => b.id)} strategy={verticalListSortingStrategy}>

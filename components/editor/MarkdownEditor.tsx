@@ -900,49 +900,46 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               padding: '16px',
               lineHeight: '1.8',
             },
-            /* ═══ 거터 (Phase 65 후속 — 폭 2/3 · 고정 · 경계선 강화) ═══
-               셋이 한 덩어리다: 좁히면 경계가 흐려지므로 선을 함께 올려야 한다.
-               ⚠ 폭 총합의 진실은 이 세 규칙의 합이다 — `.cm-gutter-lint`(lint 열) +
-                 `.cm-lineNumbers`(번호 열) + borderRight. 한 곳만 줄이면 2/3가 안 나온다. */
+            /* ═══ 거터 ═══════════════════════════════════════════════════
+               ⚠ **폭·구분선을 손대지 말 것 (2026-09-08 덕수 판정으로 원복됨)**.
+                 한 번 "폭 2/3(49→33px) + 구분선 강화"를 넣었다가 셋이 함께 무너져 되돌렸다:
+                 ① 폭을 줄이며 minWidth를 2자리 글자 폭 아래로 내리자 **블록마다 번호 열 폭이
+                    갈렸다**(1자리 블록은 minWidth가, 2자리 블록은 글자 폭이 이겨서) — 아래
+                    "2자리까지 폭 통일"이 바로 그 정렬을 지키는 장치다
+                 ② 선을 진하게 하니 '요약에 넣기' 블록의 얇은 바에서 **선이 끊겨 보였다**
+                    (거터 선은 CM 높이만큼만 그려지는데 바가 그 위를 차지한다)
+                 원래 값이 옳았다. 되살리려면 ①②를 먼저 풀 것. */
             '.cm-gutters': {
               /* Phase 65 D5 — 줄바꿈을 끄면 거터가 sticky로 살아나 본문이 그 뒤로 흐른다.
                  투명이면 글자가 줄 번호 위로 비쳐 지나가므로 블록 표면색을 깐다.
                  ⚠ 폴백 필수: 변수가 없으면 unset이 되어 CM base theme의 #f5f5f5 회색 띠가 살아난다.
                  ⚠ inherit은 안 된다 — .cm-editor가 backgroundColor:transparent를 명시한다. */
               backgroundColor: 'var(--block-surface, var(--block-bg))',
-              /* ⚠ 구분선은 `--border-subtle`(#E8E4DF)이었는데 거터 배경과 대비가 **1.06:1**로
-                 사실상 보이지 않았다. 줄바꿈을 끄면 본문이 이 선 밑으로 들어가 사라지므로
-                 "어디서 잘렸는지"를 즉시 알려면 선이 실재해야 한다 → `--block-hairline`
-                 (1.66:1 / 활성 카드 1.50:1). 블록 사이 구분선과 같은 색이다.
-                 더 여리게 하려면 `--border-content`(1.38 / 1.25)가 다음 단계. */
-              borderRight: '1px solid var(--block-hairline)',
-              /* 번호를 본문보다 한 급 작게 — 편집 영역을 넓히는 주 레버이고
-                 lint 열(`1.4em`)·번호 열 최소폭이 전부 이 em을 따라 함께 줄어든다. */
-              fontSize: '0.82em',
+              borderRight: '1px solid var(--border-subtle)',
+              /* 가로 고정. CM이 `position:sticky`를 인라인으로 박고(dist 11152) 좌표는 base theme의
+                 `.cm-gutters-before { inset-inline-start: 0 }`가 준다 — 여기 `left`는 그 논리 속성에
+                 기대지 않으려는 명시일 뿐이다.
+                 ⚠ **거터가 움직이는 진짜 원인은 여기가 아니라 바깥 패널이었다** — `.scaled-editor`가
+                   `overflowY`만 지정해 가로축이 auto로 열려 있었고, `.no-scrollbar`라 가로 스크롤바가
+                   보이지도 않아 트랙패드 스와이프에 **블록 통째로** 소리 없이 밀렸다. 그쪽을
+                   `overflow-x: hidden`으로 닫았다(EditorView `.scaled-editor`). 이 규칙만 보고
+                   "sticky가 안 먹는다"고 진단하지 말 것. */
+              left: '0',
               // 블록이 실제 border를 쓰므로 거터가 좌측 테두리를 덮지 않음
               // → 거터 자체의 좌측선/모서리 보정 불필요 (이중선 제거)
             },
             /* 줄 번호 영역: 2자리까지 폭 통일, 3자리 이상부터 자연 확장.
-               ⚠ CodeMirror가 셀 폭을 인라인으로 강제하므로 !important 필요.
-               ⚠ 2자리 폭을 정하는 것은 minWidth가 아니라 **글자 폭 + 좌우 padding**이다
-                 (실측: 15px에서 숫자 한 자 ≈ 9.2px라 2자리 18.4px + 패딩 8px = 26.4px가
-                  옛 1.8em(27px)을 꽉 채우고 있었다). 그래서 폭을 줄이려면 padding부터 깎는다. */
+               CodeMirror가 셀 폭을 인라인으로 강제하므로 !important 필요.
+               ⚠ 1.8em(15px에서 27px)은 여유가 아니라 **2자리 번호가 꽉 채우는 값**이다
+                 (숫자 한 자 ≈ 9.2px → 2자리 18.4 + base padding 8 = 26.4px). 이보다 낮추면
+                 1자리 블록과 2자리 블록의 열 폭이 갈려 블록마다 어긋난다 — 위 ① 참조.
+               ⚠ tabular-nums: 본문 글꼴(var(--font-ui))의 숫자는 폭이 제각각이라 오른쪽만 맞고
+                 왼쪽이 들쭉날쭉했다. 고정폭 숫자로 두 변을 함께 맞춘다(가운데 정렬이 아니라
+                 오른쪽 정렬을 유지하는 이유: 자릿수가 달라도 **1의 자리가 같은 세로선**에 선다). */
             '.cm-lineNumbers .cm-gutterElement': {
-              minWidth: '1.5em !important',
-              padding: '0 2px 0 3px',
+              minWidth: '1.8em !important',
               textAlign: 'right',
-            },
-            /* lint 열: 마커를 10px 점으로 갈아 뒀는데(아래 `.cm-lint-marker-*::after`)
-               폭은 base theme의 1.4em(=21px) 그대로라 점 하나에 21px을 쓰고 있었다. */
-            '.cm-gutter-lint': {
-              width: '1em',
-            },
-            '.cm-gutter-lint .cm-gutterElement': {
-              padding: '0.1em',
-            },
-            '.cm-lint-marker': {
-              width: '0.8em',
-              height: '0.8em',
+              fontVariantNumeric: 'tabular-nums',
             },
             // 코드 접힘(fold) 화살표 숨김
             '.cm-foldGutter': {

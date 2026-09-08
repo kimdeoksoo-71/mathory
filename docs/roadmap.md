@@ -1909,9 +1909,12 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 - 실측 검증(임시 라우트 + headless Chrome, 검증 후 삭제 — Phase 61c 방법): 켬 모드 computed style이
   현행과 **동일** · 끔 모드 `pre`/`normal`/`auto`/`hidden`/`contain` · **양쪽 `vertRoom 0`·`scrollTopPushable 0`** ·
   `panelHorizLeak 0` · sticky 거터가 `scrollLeft 300`에도 제자리 · 거터 배경 불투명(활성 `#E8DFCE` / 비활성 `#F0EAE0`)
-- **검수 보완 3건(2026-09-08) — 좌측 행번호 거터**: 폭 49 → **33.4px(68%)** · 좌우 스크롤 시 고정은
-  이미 만족해 **조치 0** · 구분선 `--border-subtle` → `--block-hairline`(대비 **1.06 → 1.66:1** — 옛 선은
-  배경과 같은 색이라 사실상 보이지 않았다). ⚠ 폭 레버는 minWidth가 아니라 fontSize·padding·**lint 열 폭**
+- **검수 보완 — 좌측 행번호 거터(2회 왕복, 1차 전량 원복)**: 폭 2/3·구분선 강화는 되돌렸다
+  (minWidth 1.8em은 2자리가 꽉 채우는 값이라 낮추면 블록마다 열 폭이 갈리고, 선을 진하게 하면
+  '요약에 넣기' 블록의 얇은 바에서 끊겨 보인다). 숫자 정렬은 `tabular-nums`.
+  ⚠ **"행번호 열이 움직인다"의 진범은 조상 `.content-frame`(overflowX:auto)이었다** — CM sticky는 정상.
+  처방은 편집 패널을 가로 막다른 길로 만드는 두 줄(`overflowX:hidden` + `overscrollBehaviorX:contain`).
+  실기기 트랙패드 확인 대기
 - **덕수 검수 종결(2026-09-08, "모두 정상")** — 반영 1건 = 아이콘 ↵ 단일 + 켬일 때 박스(D9′,
   ↔가 Row 1 가로폭 아이콘과 겹쳐 보였다). ⚠ **가로 스크롤바 5px 노출(D6)과 "세로 보정 없음"(D11)이
   정상 판정으로 닫혔다** — 스크롤바를 숨기거나 토글에 `scrollTop` 보정을 새로 넣지 말 것
