@@ -95,11 +95,12 @@ function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
   return <PhIcon d={collapsed ? PH.collapseOut : PH.collapseIn} size={ICON_SIZE} />;
 }
 
-/** 줄바꿈 토글 (Phase 65 D9) — wrapped=true면 줄이 접혀 내려가고(↵), false면 옆으로 뻗는다(↔).
- *  상태별 쌍인 것은 CollapseAllIcon과 같은 이 툴바의 관행이다.
- *  ⚠ Phosphor에 "text-wrap"이라는 이름은 없다(카탈로그 실측) — 이 둘이 가장 가깝다. */
-function LineWrapIcon({ wrapped }: { wrapped: boolean }) {
-  return <PhIcon d={wrapped ? PH.arrowElbowDownLeft : PH.arrowsOutLineHorizontal} size={ICON_SIZE} />;
+/** 줄바꿈 토글 (Phase 65 D9′) — 도안은 리턴 글리프(↵) **하나**이고 상태는 박스가 나른다.
+ *  ⚠ 상태별 쌍(CollapseAllIcon 방식)을 쓰지 않는 이유(덕수 2026-09-08): 끔 도안 후보였던
+ *    arrows-out-line-horizontal이 **Row 1의 가로폭 아이콘(IconTextWidth)과 겹쳐 보인다**.
+ *    도안이 기능(줄바꿈)을 가리키고 켜짐만 박스로 표시하는 편이 헷갈리지 않는다. */
+function LineWrapIcon() {
+  return <PhIcon d={PH.arrowElbowDownLeft} size={ICON_SIZE} />;
 }
 
 /** 강조(핵심문장) — highlighter */
@@ -747,18 +748,21 @@ export default function UnifiedToolbar({
         </IconButton>
       ),
     },
-    /* Phase 65 D9 — 줄바꿈 토글. active는 `!lineWrap`이다: 켬이 기본값이므로 켬을
-       active로 칠하면 버튼이 늘 켜져 보인다. collapseMode·searchOpen과 같이
-       "기본이 아닌 상태에 들어가 있다"는 신호로 쓴다. */
+    /* Phase 65 D9′ — 줄바꿈 토글. 도안이 하나뿐이라 **박스(active)가 유일한 상태 신호**이므로
+       도안의 뜻과 박스를 일치시킨다: 줄바꿈이 켜져 있으면 박스도 켜진다.
+       ⚠ collapseMode·searchOpen("기본이 아닌 상태")과는 반대 방향이다 — 그쪽은 도안이
+         상태를 함께 나르지만 여기는 박스뿐이라, !lineWrap으로 두면 ↵가 켜졌는데
+         줄바꿈은 꺼져 있는 상태가 되어 읽히지 않는다. 기본값(켬)에서 늘 켜져 보이는 것은
+         수용한 대가다(덕수 2026-09-08). */
     {
       key: 'lineWrap',
       node: (
         <IconButton
           title={lineWrap ? '줄바꿈 끄기 — 좌우 스크롤 (⌥Z)' : '줄바꿈 켜기 (⌥Z)'}
           onClick={onToggleLineWrap}
-          active={!lineWrap}
+          active={lineWrap}
         >
-          <LineWrapIcon wrapped={lineWrap} />
+          <LineWrapIcon />
         </IconButton>
       ),
     },

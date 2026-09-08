@@ -28,7 +28,7 @@
 `EditorView`(상태 · localStorage · ⌥Z · 수식 클릭 뒤 가로 노출 · 블록 래퍼 변수) ·
 `UnifiedToolbar`(Row 2 토글 버튼 — 접힘 버튼 오른쪽) ·
 `FindReplacePanel`(매치 이동 뒤 가로 노출) · `lib/editorScroll.ts`(가로 목표 계산 순수 함수) ·
-`scripts/gen-phosphor-paths.mjs`(ICONS 2종 → 55→57종).
+`scripts/gen-phosphor-paths.mjs`(ICONS 1종 → 55→56종).
 **Firestore 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 미리보기·인쇄·열람·공유 0 · 댓글 에디터 0.**
 
 기본값은 **현행(줄바꿈 켬)** 이라 토글에 손대지 않는 사용자에게는 바이트 단위로 같은 화면이다(D2).
@@ -260,10 +260,11 @@ revealCursorX() {
   않는다(Row 2의 확립된 관행 — `:69-95`).
 - **`active={!lineWrap}`** — `collapseMode`·`searchOpen`과 같은 문법으로 "기본이 아닌 상태에 들어가 있다"는
   신호다. 켬이 기본이므로 켬을 active로 칠하면 버튼이 늘 켜져 보인다.
-- **아이콘은 상태별 쌍**(Q4 권장안을 Q5 변경에 맞춰 조정): `CollapseAllIcon`(`:94-96`)이 이미
-  `PH.collapseOut : PH.collapseIn` 쌍이라 이 툴바의 관행이다.
-  켬 `arrow-elbow-down-left`(↵ — 줄이 접혀 내려간다) / 끔 `arrows-out-line-horizontal`(↔ — 줄이 옆으로
-  뻗는다). Phosphor에 "text-wrap"은 **없다**(카탈로그 실측). **`icons:sheet` 실물 판정 항목.**
+- **아이콘은 `arrow-elbow-down-left`(↵) 하나 · 상태는 박스가 나른다** [D9′ — 덕수 판정 2026-09-08].
+  ⚠ 계획 초안의 상태별 쌍(`CollapseAllIcon` 방식)은 **폐기**됐다: 끔 도안 후보였던
+  `arrows-out-line-horizontal`(↔)이 **Row 1의 가로폭 아이콘 `IconTextWidth`와 겹쳐 보인다**.
+  도안이 기능(줄바꿈)을 가리키고 켜짐만 박스로 표시하는 편이 헷갈리지 않는다.
+  Phosphor에 "text-wrap"은 **없다**(카탈로그 실측).
 - `title`: 켬 `'줄바꿈 끄기 — 좌우 스크롤 (⌥Z)'` / 끔 `'줄바꿈 켜기 (⌥Z)'`.
 - `OverflowItems`(`:793`)가 폭 부족 시 자동으로 오버플로 메뉴에 넣는다 — 추가 작업 없음.
 - ⚠ **`showToolbar` 게이트 아래다**(`EditorView.tsx:3040`) — 그림·SVG·GGB 블록이 활성이면 눌리지 않는다.
@@ -342,7 +343,7 @@ Mathory 세로 스크롤은 이미 민감한 자리다(Phase 56). 이번엔 토�
 | Phase 45a "편집창 블록 인셋 E형 — 좌측 기준선 16px" | `.cm-content` padding 불변 | 준수 — 가로 스크롤 시 왼쪽 16px 여백이 콘텐츠와 함께 흐른다(첫 화면은 동일) |
 | "다크 모드 없다" | 새 색 토큰 0(`--block-surface`는 기존 토큰의 별칭) | 준수 |
 | M4 "Row 2는 전 버튼 20px · 브라켓 폐기 · 아이콘은 Phosphor regular 단일" | `ICON_SIZE`(20) · `PhIcon` 직접 · 브라켓 없음 | 준수 |
-| M4 "생성 파일 수동 편집 금지 · `icons:check`가 빌드 실패" | ICONS 표 2행 → `icons:gen` → 커밋 | 준수(55 → **57종**) |
+| M4 "생성 파일 수동 편집 금지 · `icons:check`가 빌드 실패" | ICONS 표 1행 → `icons:gen` → 커밋 | 준수(55 → **56종**) |
 | M5 "UI 상시 아이콘에 mask 금지(인라인 path)" | `PhIcon` = 인라인 path | 준수 |
 | M2 R6 "Row 1·Row 2는 우측 패널에 덮인다" | Row 2 오른쪽 끝이라 패널이 열리면 가려질 수 있다 | **알고 둔다** — 접힘 버튼도 같고, ⌥Z가 대체 경로 |
 | 설계 기준 "보수적으로 하라" | 기본값 현행 유지 · 토글은 사용자 명시 | 준수 |
@@ -441,11 +442,10 @@ export function computeRevealScrollLeft(
 ### 5-6. 아이콘
 `scripts/gen-phosphor-paths.mjs`의 ICONS 표에 2행:
 ```js
-arrowElbowDownLeft: ['arrow-elbow-down-left', 'regular'],        // LineWrapIcon 켬(D9)
-arrowsOutLineHorizontal: ['arrows-out-line-horizontal', 'regular'], // LineWrapIcon 끔(D9)
+arrowElbowDownLeft: ['arrow-elbow-down-left', 'regular'],  // LineWrapIcon (D9′ — 상태는 박스가 나른다)
 ```
 → `npm run icons:gen` → `components/ui/phosphorPaths.ts` 재생성(수동 편집 금지) → `npm run icons:sheet`로
-**실물 판정** → 커밋. `prebuild`의 `icons:check`가 55 → **57종**을 확인한다.
+**실물 판정** → 커밋. `prebuild`의 `icons:check`가 55 → **56종**을 확인한다.
 두 파일명 모두 `@phosphor-icons/core` regular에 **존재 확인 완료**.
 
 ### 5-7. 문서
@@ -488,7 +488,7 @@ arrowsOutLineHorizontal: ['arrows-out-line-horizontal', 'regular'], // LineWrapI
 
 **6-4. 토글**
 ⌥Z(macOS: **Ω 미입력** 확인 · 한글 입력 상태) · Alt+Z(Windows) · ⌥⇧Z는 토글되지 않고 문자 입력 ·
-버튼 클릭 · active 시각(accent 테두리+틴트) · 아이콘 쌍 전환 · 새로고침 후 유지 ·
+버튼 클릭 · **켬일 때 박스가 켜지고 끔일 때 사라지는가**(D9′) · 새로고침 후 유지 ·
 새 블록 추가 시 현재 모드로 마운트 · 접었다 편 블록 · 텍스트→제목 타입 변경(재마운트 없음) 후 유지 ·
 **IME 조합 중 ⌥Z가 무시되는가**(D12) · 토글 직후 스크롤 위치(D11 — 세로 보정 필요 여부 실물 판정) ·
 **그림 블록이 활성일 때**: 버튼은 회색(눌리지 않음)이지만 ⌥Z는 동작(D9).
@@ -501,7 +501,7 @@ Mac 트랙패드 가로 스와이프를 끝까지 밀어도 뒤로가기 없음(
 끔→켬→끔 왕복 후 잔여 `scrollLeft`로 인한 예기치 않은 점프 없음(§2-3 `observers.focus`).
 
 **6-6. 빌드**
-dev 종료 → `npm run build`(`icons:check` **57종** 통과) → dev 재시작(CLAUDE.md 규칙 5 — 순서 엄수).
+dev 종료 → `npm run build`(`icons:check` **56종** 통과) → dev 재시작(CLAUDE.md 규칙 5 — 순서 엄수).
 Firefox 1회(`scrollbar-width: thin` 보정 확인).
 
 ---
@@ -549,7 +549,7 @@ Firestore·타입·API.
 | S2 | 배선 — 상태·localStorage·⌥Z·토글 버튼·두 경로 가로 노출 | `EditorView.tsx` · `UnifiedToolbar.tsx` · `FindReplacePanel.tsx` · 아이콘 2종 |
 | S3 | 문서 — CLAUDE.md 규약 2건 · roadmap · 실행판 이관 | `CLAUDE.md` · `docs/roadmap.md` · 이 문서 |
 
-수정 6파일 · 신규 0 · **308+/14−**. 아이콘 55 → **57종**(`icons:check OK — 57종` 빌드 로그 실측).
+수정 6파일 · 신규 0. 아이콘 55 → **56종**(`icons:check OK — 56종` 빌드 로그 실측).
 로직 검증 **365건 무회귀**(12개 하니스 전부 `fail 0`). `npx tsc --noEmit` 무경고 · 프로덕션 빌드 통과.
 
 ### 9-2. 실측 검증 결과
@@ -579,14 +579,12 @@ Phase 61c의 방법을 그대로 썼다 — 임시 라우트(`app/dev65`)에 `So
 ⚠ **headless에서는 스크롤바가 공간을 차지하지 않았다**(`offsetH === clientH`). §2-2 프로브에서
 확인한 "블록 높이 5px 점프"(D6의 유일한 대가)는 **실물에서만 판정 가능**하다 → 아래 검수 항목 ①.
 
-### 9-3. 남은 덕수 실물 검수 3건
+### 9-3. 덕수 실물 검수 (아이콘 1건 닫힘 · 2건 대기)
 
 1. **가로 스크롤바 5px 노출과 블록 높이 점프**(D6) — 줄이 넘치기 시작/끝날 때 그 블록이 5px 자라고
    아래가 밀린다. 거슬리면 `.cm-scroller`에 스크롤바 숨김 규칙을 얹어 되돌린다(코드 3줄).
-2. **아이콘 쌍**(D9) — 켬 `arrow-elbow-down-left`(↵) / 끔 `arrows-out-line-horizontal`(↔).
-   `npm run icons:sheet`의 Row 2 줄 끝에 '줄바꿈 켬/끔'으로 들어가 있다.
-   ⚠ 바로 왼쪽이 접기/펼치기(`arrows-in/out-line-**vertical**`)라 **가로쌍과 세로쌍이 이웃한다** —
-   맨눈으로 구별되는지가 판정의 핵심이다. 구별이 어려우면 켬 쪽을 ↵ 대신 다른 도안으로.
+2. ~~아이콘 쌍~~ → **닫힘(2026-09-08 덕수 판정, D9′)**: ↔가 Row 1 가로폭 아이콘과 겹쳐 보여
+   **↵ 단일 + 켬일 때 박스**로 확정. 아래 §9-4 참조.
 3. **토글 직후 세로 보정 필요 여부**(D11) — 지금은 가로만 보정한다. 켬↔끔에서 블록 높이가 일제히
    바뀌므로 보던 자리가 어긋나면 `computeBlockAwareScrollTop` 1회를 추가한다.
 
@@ -594,7 +592,27 @@ Phase 61c의 방법을 그대로 썼다 — 임시 라우트(`app/dev65`)에 `So
 드래그 선택의 가장자리 자동 가로 스크롤(§2-3, CM이 공짜로 준다) · 활성 카드 radius 8 모서리의
 스크롤바 클리핑.
 
-### 9-4. 구현 중 확인된 사실 (계획서 보강)
+### 9-4. 검수 반영 1건 — D9′ 아이콘 단일화 (2026-09-08, 덕수)
+
+> *"아이콘이 1행의 가로폭 아이콘과 겹치므로 이렇게 하자. Enter 아이콘으로 통일하고,
+> 활성화될때 박스, 아닐때 박스 제거로 하자."*
+
+계획(D9)의 **상태별 쌍을 폐기**하고 리턴 글리프(↵) 하나로 통일했다.
+
+- **왜**: 끔 도안 `arrows-out-line-horizontal`(↔)이 **Row 1의 가로폭 스테퍼 아이콘
+  `IconTextWidth`와 겹쳐 보인다**. 같은 화면에 좌우 화살표가 둘이면 "본문 폭"과 "줄바꿈"이
+  구별되지 않는다. (계획서가 §6-3에서 걱정한 것은 *접기/펼치기 세로쌍과의* 혼동이었는데,
+  실제로 부딪힌 것은 Row 1의 가로 아이콘이었다 — 검수가 아니면 못 볼 자리였다.)
+- **`active`의 방향이 뒤집혔다**: `!lineWrap` → **`lineWrap`**. 도안이 하나뿐이면 박스가
+  **유일한 상태 신호**이므로 도안의 뜻과 일치해야 한다 — ↵가 켜졌는데 줄바꿈은 꺼진 상태는
+  읽히지 않는다. ⚠ 이 때문에 `collapseMode`·`searchOpen`의 "기본이 아닌 상태를 켠다"는 문법과
+  **반대 방향**이 됐고, 기본값(켬)에서 버튼이 늘 켜져 보이는 것은 **수용한 대가**다.
+- 미사용이 된 `arrowsOutLineHorizontal`은 ICONS 표에서 뺐다(M4 "미사용 아이콘 삭제") →
+  57 → **56종**. 컨택트시트 항목도 '줄바꿈 켬/끔' 둘에서 '줄바꿈' 하나로.
+
+수정 2파일(`UnifiedToolbar.tsx` · `gen-phosphor-paths.mjs`) + 생성물 2 + 문서 3.
+
+### 9-5. 구현 중 확인된 사실 (계획서 보강)
 
 - `React.CSSProperties`에 CSS 변수를 넣을 때 이 저장소의 관행은 **`['--x' as any]`** 다
   (`EditorView.tsx:3688`의 `--content-font-size` 선례). `as string`은 쓰지 않는다.
@@ -636,7 +654,7 @@ VS Code 기본 동작(`editor.wordWrap: off` · Alt+Z 토글 · 고정 거터 ·
 | **C-9** | "`basicSetup`의 `lineNumbers()`·`lintGutter()`가 이미 sticky" | 거터 DOM은 **하나**다(`GutterView`가 단일 `.cm-gutters`를 만들고 그 안에 넣는다, dist 11137) | 배경 대상도 하나(D5) |
 | **C-10** | 행 번호 3건 | `FindReplacePanel` 149-171 · 수식 클릭 2447-2466 · 댓글/agent 버튼 3295-3335 | 사소. §1 표의 나머지 인용은 전부 정확 |
 | **C-11** | Row 1 배치(가로폭·글꼴 옆 세 번째 묶음) · 아이콘 24 정방 · 댓글 버튼 pressed 규약 · "Row 2 툴바 설정 대안" | **Q5로 Row 2 확정**. `IconButton`(32×32·active 테두리+틴트) · `ICON_SIZE` 20 · `PhIcon` 직접 · `useToolbarConfig`는 팔레트 전용이라 대안 자체가 성립 안 함 | **D9 전면 개정** |
-| **C-12** | 아이콘 단일(↵) | `CollapseAllIcon`이 이미 상태별 쌍(`collapseOut`/`collapseIn`)이라 툴바 관행 | 켬 ↵ / 끔 ↔ 쌍 + `active={!lineWrap}`(D9) |
+| **C-12** | 아이콘 단일(↵) | 초안은 쌍으로 바꿨으나 **덕수 판정으로 v1의 단일안이 되살아났다**(↔가 Row 1 가로폭 아이콘과 겹친다) | ↵ 단일 + `active={lineWrap}`(D9′ · §9-4′) |
 | **C-13** | (없음) IME 조합 중 토글 | 프로젝트에 CM DOM 갱신이 조합을 깬 전례 2건. 핸들에 `isComposing()`이 이미 있다 | **D12 신설** |
 | **C-14** | (없음) 포커스가 `scrollLeft`를 되돌린다 | `observers.focus`(dist 5124-5129)는 `scrollTop === 0`이면 `lastScrollLeft` 복원 — 우리는 **늘 참** | `revealCursorX`는 `focus()` 뒤(D8·§2-3) |
 | **C-15** | (없음) 드래그 자동 가로 스크롤 | CM이 `scrollParents.x`로 처리(dist 4707) — 공짜로 얻는다 | §6-3 확인 항목 |

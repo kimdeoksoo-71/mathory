@@ -1889,7 +1889,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 **기본값은 켬(현행)** 이라 토글에 손대지 않는 사용자에게는 바이트 단위로 같은 화면이다.
 **Firestore 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 미리보기·인쇄·열람·공유 0 · 댓글 에디터 0.**
 수정 6파일(`MarkdownEditor` · `EditorView` · `UnifiedToolbar` · `FindReplacePanel` · `lib/editorScroll.ts` ·
-`scripts/gen-phosphor-paths.mjs`) · 신규 0 · 아이콘 55 → **57종**. 로직 검증 **365건 무회귀**.
+`scripts/gen-phosphor-paths.mjs`) · 신규 0 · 아이콘 55 → **56종**. 로직 검증 **365건 무회귀**.
 
 - **토글 UI**: Row 2 툴바 `rightItems` 맨 끝(전체 접기 버튼 오른쪽, 덕수 지정). `IconButton`
   `active={!lineWrap}` — 켬이 기본이므로 "기본이 아닌 상태"를 켜서 표시한다(`collapseMode`·`searchOpen`과 같은 문법)
@@ -1909,8 +1909,8 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 - 실측 검증(임시 라우트 + headless Chrome, 검증 후 삭제 — Phase 61c 방법): 켬 모드 computed style이
   현행과 **동일** · 끔 모드 `pre`/`normal`/`auto`/`hidden`/`contain` · **양쪽 `vertRoom 0`·`scrollTopPushable 0`** ·
   `panelHorizLeak 0` · sticky 거터가 `scrollLeft 300`에도 제자리 · 거터 배경 불투명(활성 `#E8DFCE` / 비활성 `#F0EAE0`)
-- **남은 실물 검수 3건**: ① 가로 스크롤바 5px과 블록 높이 점프가 거슬리는가 ② 아이콘 쌍
-  (`arrow-elbow-down-left` ↵ / `arrows-out-line-horizontal` ↔ — `npm run icons:sheet`) ③ 토글 직후 세로 보정 필요 여부
+- **남은 실물 검수 2건**: ① 가로 스크롤바 5px과 블록 높이 점프가 거슬리는가 ② 토글 직후 세로 보정 필요 여부
+  (아이콘은 덕수 판정으로 확정 — ↵ 단일 + 켬일 때 박스, D9′)
 
 ---
 
