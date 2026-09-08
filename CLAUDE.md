@@ -125,19 +125,25 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 ## 핵심 패턴 & 주의사항
 
 - **편집창 CodeMirror 스크롤 — 세로는 없고 가로만 조건부다 (Phase 65에서 개정)**: `.cm-scroller`에 **세로 스크롤은 어느 모드에서도 없다**(줄바꿈 켬 = `overflow:visible` · 끔 = `overflow-y:hidden`, 양쪽 다 여지 0) → CM의 `EditorView.scrollIntoView` 사용 금지는 그대로이고, 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것. **가로**는 줄바꿈을 끄면(⌥Z · `mathory-editor-wrap`) 블록 스크롤러가 담당한다 — 타자·화살표·드래그는 CM이 알아서 따라가고(`scrollRectIntoView` · `scrollParents.x`), **프로그램적 커서 이동**(찾기/바꾸기 · 미리보기 수식 클릭)만 `revealCursorX()`가 맡는다(그 두 경로엔 `scrollIntoView`가 없다). ⚠ `revealCursorX`는 반드시 `focus()` **뒤**에 — CM의 focus 관찰자가 `scrollTop===0`이면 이전 `scrollLeft`를 복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. ⚠ 켬/끔 세 속성(`white-space`·`word-break`·`overflow`)은 `MarkdownEditor` 상단의 **Compartment 하나**가 소유한다 — 테마에 다시 적으면 같은 셀렉터가 두 벌이 되어 토글이 조용히 죽는다. ⚠ 거터는 끔 모드에서 sticky로 살아나므로 **`--block-surface`**(블록 래퍼가 공급)로 불투명해야 한다 — 투명이면 글자가 줄 번호 위로 지나가고, `var()` 폴백을 빼면 CM base의 `#f5f5f5` 회색 띠가 나온다. ⚠ **거터 폭·구분선을 손대지 말 것 (2026-09-08 원복됨)**: 한 번 "폭 2/3(49→33px) + 구분선 강화"를 넣었다가 되돌렸다 — ① 폭을 줄이며 `minWidth`를 **2자리 글자 폭 아래**로 내리자 블록마다 번호 열이 갈렸다(1자리 블록은 minWidth가, 2자리 블록은 글자 폭이 이겨서). `minWidth: 1.8em`(15px에서 27px)은 여유가 아니라 **2자리가 꽉 채우는 값**이고(한 자 ≈ 9.2px → 18.4 + 패딩 8 = 26.4px) 그래서 "2자리까지 폭 통일"이 성립한다 ② 선을 진하게 하니 **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보였다**(거터 선은 CM 높이만큼만 그려지는데 바가 그 위를 차지한다). 숫자가 들쭉날쭉해 보이는 것은 폭이 아니라 **글꼴의 비례 숫자** 탓이라 `font-variant-numeric: tabular-nums`가 답이다(오른쪽 정렬 유지 — 자릿수가 달라도 1의 자리가 같은 세로선에 선다)
-- **⚠ 편집 열은 절대 가로로 패닝되지 않는다 — `.content-frame`의 `overflowX`는 `hidden`이다 (Phase 65 후속)**:
-  "줄바꿈을 꺼도 행번호 거터가 좌우로 움직인다"의 진범이 이것이었다. CM 거터 sticky는 **정상**이다
-  (자기 스크롤러 안 이동량 0, 3회 실측) — 문제는 조상 `.content-frame`이 `overflowX:'auto'`라
-  **편집 열이 통째로 패닝**되며 거터도 함께 밀린 것이다(실측: 프레임 200px 이동 → 거터 −200px).
-  좌측 열 `minWidth:420` + 미리보기 열 고정폭이라 **드로어를 열거나 창이 좁으면 상시 넘친다**.
-  → 프레임은 `hidden`으로 닫고, 그 넘침은 **미리보기 열을 감싼 가로 스크롤 래퍼**가 받는다.
-  ⚠ **편집창 안의 가로 스크롤은 그대로다** — 블록 `.cm-scroller`(줄바꿈 끔)가 담당하고, 거터는
-  그 안에서 sticky로 고정된다(실측: 스크롤 가능폭 687px에서 400px 이동, 거터 이동 0 = VS Code 동작).
-  ⚠ 미리보기 래퍼는 **고정폭 계약을 지키려는 장치**다 — 래퍼만 줄고 안쪽 열은 `flexShrink:0`이라
-  본문 측정폭(widthEm)이 보존된다. 열 자체를 shrink시키면 그 계약이 깨진다.
-  ⚠ **`.scaled-editor`의 `overscroll-behavior-x`는 효과가 없었다**(2026-09-08 실패 기록) — 그 요소는
-  가로 넘침이 0이라 브라우저가 가로 스크롤 대상으로 **아예 고려하지 않는다**. 넘침이 없는 요소에
-  overscroll-behavior를 걸어 체이닝을 막으려는 처방을 다시 쓰지 말 것
+- **⚠ 미해결: 좌우 스크롤 시 편집창 행번호 거터가 밀린다 (Phase 65 후속, 2026-09-08 보류)**:
+  덕수 판정 "크게 흉하진 않으니 보류". **원인 미특정이고 처방을 두 번 실패했다.**
+  확정된 사실은 셋뿐 — ① CM 거터 sticky는 **블록 안에서 정상**이다(`.cm-scroller`를 400px 밀어도
+  거터 이동 0, 가능폭 687px, 3회 실측) ② 조상이 가로로 스크롤되면 거터도 함께 밀린다
+  (`.content-frame` 200px 이동 → 거터 −200px) ③ `.content-frame`은 좌측 열 `minWidth:420` +
+  미리보기 열 고정폭 때문에 드로어를 열면 실측 304px 넘쳤다. **그 경로를 닫았는데도 증상이 남았다
+  → 아직 못 찾은 제3의 경로가 있다.**
+  ⚠ **실패한 처방(재시도 금지)**: ⓐ `.scaled-editor`에 `overscroll-behavior-x: contain` — 그 요소는
+  가로 넘침이 0이라 브라우저가 **가로 스크롤 대상으로 고려조차 하지 않는다**(넘침 없는 요소에
+  overscroll-behavior는 무의미) ⓑ `.content-frame` 가로 패닝 제거 — 경로 하나는 실제로 닫혔으나 증상 미해소.
+  ⚠ **다음 착수는 재현 프로브가 아니라 실물 특정부터** — 재현 프로브로 **3연속 오진**했다.
+  `document.addEventListener('scroll', e => …, true)`(**capture 필수**, scroll은 버블하지 않는다)로
+  실제로 스크롤되는 요소를 찍은 뒤에야 처방을 논할 것.
+  ⚠ **남겨 둔 변경(효과 미확인·되돌릴 후보)**: `.content-frame` `overflowX:'hidden'` + 미리보기 열을
+  감싼 가로 스크롤 래퍼. 편집 열 패닝 경로를 닫으면서 미리보기 고정폭 계약(본문 측정폭=widthEm)은
+  래퍼가 흡수해 보존한다(래퍼만 `flexShrink:1`, 안쪽 열 `flexShrink:0`). **편집창 안 가로 스크롤은
+  무접촉** — 블록 `.cm-scroller`가 그대로 담당한다.
+  ⚠ `.scaled-editor`의 `overflowX:'hidden'`은 유지 — 한 축만 지정하면 다른 축이 `auto`가 되고
+  `.no-scrollbar`가 스크롤바까지 지워 **보이지 않는 스크롤**이 된다
 - **⚠ 편집창 블록 CM 체인에 고정 높이를 주지 말 것 (Phase 65 D14)**: 위 "세로 여지 0"은 `.cm-scroller`의 높이가 **auto로 풀린다**는 조건에 전적으로 의존한다(실측: auto = 여지 0 / 고정 120px = **여지 32px**). 그리고 **`overflow-y:hidden`은 프로그램적 스크롤을 막지 못한다**(같은 실측에서 `scrollTop`이 32px 밀렸다) → 여지가 생기는 순간 `scrollRectIntoView`가 밀어붙이고 사용자는 되돌릴 수 없다(`MarkdownEditor.tsx`의 옛 `overflow:auto` 주석이 경고한 그 버그다). 체인은 `.scaled-editor` → 블록 래퍼 → `<div padding:0>` → MarkdownEditor 래퍼(`height:100%`) → `.cm-editor` → `.cm-scroller`이고 **어느 마디에도 px 높이·`maxHeight`·`aspect-ratio`를 넣지 말 것**. 감시 지점: 끔 모드에서 모든 블록 `scroller.scrollHeight === scroller.clientHeight`
 - **스크롤 패널에 `paddingBottom:100vh` 금지**: `box-sizing:border-box`에서 요소 높이는 패딩 합보다 작아질 수 없어 패널이 부모보다 커지고, `overflow:hidden` 부모에 복구 불가한 스크롤 틈이 생긴다(CM `scrollRectIntoView`가 밀어붙임). "문서 끝 여백"은 **스페이서 div**로 줄 것 (Phase 56)
 - **`[data-noscroll]` 컨테이너는 세로 스크롤 금지**: 좌·우 칼럼과 content-frame. 스크롤되면 dev 콘솔에 경고가 뜬다 → 어떤 요소가 세로 overflow를 만든 것이니 그 원인을 제거할 것 (Phase 56)
@@ -303,7 +309,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현·검수 완료(2026-09-08) · **push·배포 대기**
+## 현재 Phase: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 본체 구현·검수 완료(2026-09-08) · **push 대기** · ⚠ 거터 1건 미해결(보류)
 
 문서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (계보: v1 web → **v2 CLI 실측 = 실행판**. v2 부록 C가 v1 정정 10건·보완 8건)
 
@@ -330,10 +336,9 @@ sticky로 고정). 켜고 끄는 세 속성(`white-space`·`word-break`·`overfl
   열 폭이 갈려 블록마다 어긋난다(1차 계측이 놓친 이유: 프로브 블록이 전부 2자리였다). 구분선을 진하게 하면
   **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보인다**. 숫자 정렬은 `tabular-nums`로 해결(가운데 정렬 금지 —
   자릿수가 다르면 1의 자리가 흔들린다).
-  ⚠ **"행번호 열이 움직인다"의 진범은 CM sticky가 아니라 조상 `.content-frame`의 가로 패닝이었다**
-  (프레임 200px 이동 → 거터 −200px 실측). 처방은 위 "편집 열은 절대 가로로 패닝되지 않는다" 절이 소유한다.
-  ⚠ 처방을 **두 번 틀렸다** — `overscroll-behavior`는 넘침이 없는 요소에서는 효과가 없다(실패 기록).
-  3차에서 행번호 서식도 함께 조정: 글자 **한 단계 작게**(0.92em) · **Mathory 레드 55%** · 활성 행만 dark 85%
+  ⚠ **"좌우 스크롤 시 거터가 밀린다"는 미해결로 보류됐다**(덕수: "크게 흉하진 않으니 오늘은 이쯤").
+  처방 2건 실패 · 원인 미특정 — 위 "미해결: 좌우 스크롤 시 …" 절이 확정 사실·실패 기록·다음 절차를 소유한다.
+  3차에서 행번호 서식은 함께 조정: 글자 **한 단계 작게**(0.92em) · **Mathory 레드 55%** · 활성 행만 dark 85%
 - **덕수 검수 종결(2026-09-08, "모두 정상")** — 반영 1건: **아이콘 ↵ 단일 + 켬일 때 박스**(D9′).
   ↔(arrows-out-line-horizontal)가 **Row 1 가로폭 아이콘과 겹쳐 보여** 상태별 쌍을 폐기했고,
   도안이 하나뿐이라 박스가 유일한 상태 신호이므로 **`active={lineWrap}`으로 방향을 뒤집었다**
