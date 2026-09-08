@@ -29,7 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, verifyUid } from '../../../lib/apiAuth';
 import { getVerifyProviders, type AIProvider } from '../../../lib/ai-provider';
 import {
-  PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE,
+  PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE, MERGE_CANDIDATE_CAP,
   fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
   type LabeledBlock,
 } from '../../../lib/verify/prompts';
@@ -50,10 +50,9 @@ export const maxDuration = 300;
  *  "검증했다"는 거짓 신호가 남으므로 자르지 않고 거절한다. */
 const MAX_INPUT_CHARS = 15_000;
 
-/** 1차 패스 **하나당** 후보 상한 (시트 QCONFIG.MAX_CANDIDATES) */
-const MAX_CANDIDATES_PER_PASS = 8;
-/** 병합 후 상한. 풀이 검증은 계산·표기 / 논리 두 패스라 합이 커진다 */
-const MAX_CANDIDATES = 12;
+/* 후보 상한은 `lib/verify/prompts.ts`가 단독 소유한다 (61g D9) —
+   패스별 상한은 각 프롬프트 객체의 `cap`, 병합 상한은 `MERGE_CANDIDATE_CAP`.
+   ⚠ 여기에 사본을 두지 말 것: 모델에게 알리는 수와 코드가 강제하는 수가 갈린다. */
 
 /**
  * ⚠️ **올리지 말 것. 실측으로 반증됐다.**
@@ -242,36 +241,43 @@ export async function POST(req: NextRequest) {
     for (const r of firstResults) { inputTokens += r.inputTokens; outputTokens += r.outputTokens; }
     const usdFirst = cost(inputTokens, outputTokens, env.geminiCostIn, env.geminiCostOut);
 
-    const firstJsons = firstResults.map((r) => parseAndRepair(r.content) as Record<string, unknown> | null);
+    /* ⚠ 파싱 결과를 **그 패스와 짝지어** 들고 다닌다 (61g).
+       `alive`는 null을 거른 배열이라, 여기서 `passes[i]`를 인덱스로 대응시키면
+       한 패스가 실패했을 때 상한이 어긋난다(계산이 죽으면 논리 후보에 cap 8이 걸린다). */
+    const firstParsed = firstResults.map((r, i) => ({
+      pass: passes[i],
+      json: parseAndRepair(r.content) as Record<string, unknown> | null,
+    }));
     // 패스가 **전부** 실패했을 때만 오류다. 하나가 살면 그것으로 진행한다 —
     // 두 패스는 서로 독립이므로 한쪽 실패가 다른 쪽을 버릴 이유가 없다.
-    if (firstJsons.every((j) => j === null)) {
+    if (firstParsed.every((p) => p.json === null)) {
       throw new ApiError(502, '1차 검토 응답을 해석하지 못했습니다 — 잠시 후 다시 시도하세요');
     }
 
     // 그림 의존으로 판단 불가 — AI가 스스로 내린 판정만 skip이 된다 (B-8).
     // 두 패스가 다 skip일 때만 skip이다(한쪽만이면 나머지 패스의 후보를 살린다).
-    const alive = firstJsons.filter((j): j is Record<string, unknown> => j !== null);
-    if (alive.every((j) => j.skip === true)) {
+    const alive = firstParsed.filter(
+      (p): p is { pass: typeof p.pass; json: Record<string, unknown> } => p.json !== null);
+    if (alive.every((p) => p.json.skip === true)) {
       return NextResponse.json({
         report: report(kind, 'skip', [], {
           models: { first: env.geminiModel, judge: null },
-          note: String(alive[0]?.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
+          note: String(alive[0]?.json.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
         }),
         usage: { inputTokens, outputTokens, costUsd: round4(usdFirst) },
       });
     }
 
     const derivedAnswer = kind === 'problem'
-      ? repairLatexControlCharsInString(String(alive[0]?.derived_answer ?? '')).trim()
+      ? repairLatexControlCharsInString(String(alive[0]?.json.derived_answer ?? '')).trim()
       : undefined;
     const answerCheck = kind === 'problem'
       ? compareAnswer(String(body.answer ?? ''), derivedAnswer)
       : undefined;
 
     const candidates = mergeCandidates(
-      alive.map((j) => sanitizeFindings(j.candidates, kind, MAX_CANDIDATES_PER_PASS)),
-      MAX_CANDIDATES,
+      alive.map((p) => sanitizeFindings(p.json.candidates, kind, p.pass.cap)),
+      MERGE_CANDIDATE_CAP,
     );
 
     /* ── ❷ 정답 불일치는 후보가 0이어도 그냥 넘길 수 없다 (V2) ──
