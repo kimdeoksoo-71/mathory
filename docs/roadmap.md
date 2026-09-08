@@ -1877,6 +1877,43 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 65: 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤 ✅ (구현 완료 2026-09-08 · 덕수 검수 대기)
+
+계획서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (v1 web → **v2 CLI 실측 = 실행판**)
+
+편집창 블록 CodeMirror에서 **⌥Z**(VS Code와 같은 키)로 줄바꿈을 끄면, 긴 줄이 접히지 않고
+블록 안에서 좌우로 스크롤된다. 줄 번호 거터는 sticky로 제자리에 남고 본문만 흐른다.
+요청 ①②는 사실 CodeMirror의 **기본 상태**였다(base theme이 `white-space:pre` · `overflow-x:auto` ·
+거터 sticky) — 우리가 얹은 세 줄을 걷어낸 것이고, 그 셋을 **Compartment 하나**에 묶어 토글한다.
+
+**기본값은 켬(현행)** 이라 토글에 손대지 않는 사용자에게는 바이트 단위로 같은 화면이다.
+**Firestore 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 미리보기·인쇄·열람·공유 0 · 댓글 에디터 0.**
+수정 6파일(`MarkdownEditor` · `EditorView` · `UnifiedToolbar` · `FindReplacePanel` · `lib/editorScroll.ts` ·
+`scripts/gen-phosphor-paths.mjs`) · 신규 0 · 아이콘 55 → **57종**. 로직 검증 **365건 무회귀**.
+
+- **토글 UI**: Row 2 툴바 `rightItems` 맨 끝(전체 접기 버튼 오른쪽, 덕수 지정). `IconButton`
+  `active={!lineWrap}` — 켬이 기본이므로 "기본이 아닌 상태"를 켜서 표시한다(`collapseMode`·`searchOpen`과 같은 문법)
+- **⚠ v1의 안전 논거가 실측으로 뒤집혔다**: 세로 여지가 없는 이유는 "높이가 콘텐츠 높이라서"가 아니라
+  **"높이가 auto로 풀려서"** 다 — auto 높이 박스에서 가로 스크롤바는 콘텐츠를 잠식하지 않고 박스를 키운다.
+  그리고 `scrollRectIntoView`의 스킵 조건은 **AND**(dist 536)라, 가로 여지가 생기면 스크롤러가 루프에
+  참여해 `scrollTop += moveY`도 실행한다. **세로 여지 0이 유일한 방어다**
+- **⚠ `overflow-y:hidden`은 프로그램적 스크롤을 막지 못한다**(실측: 고정 높이 박스에서 `scrollTop` 32px 밀림)
+  → **블록 CM 체인에 고정 높이 금지**(CLAUDE.md 규약으로 등록). 감시 지점은
+  "끔 모드에서 모든 블록 `scroller.scrollHeight === scroller.clientHeight`"
+- **프로그램적 커서 이동만 우리가 챙긴다**: 타자·화살표·드래그 가장자리는 CM이 알아서 따라가고
+  (`scrollRectIntoView` · `scrollParents.x`), 찾기/바꾸기·미리보기 수식 클릭은 `scrollIntoView`가 없어
+  안 따라간다 → `revealCursorX()` 1줄을 그 두 경로에만. ⚠ 반드시 `focus()` **뒤**(CM focus 관찰자가
+  `scrollTop===0`이면 이전 `scrollLeft`를 복원한다 — 우리는 늘 0이다)
+- **IME 조합 중 토글은 무시**(reconfigure가 전면 재측정을 유발해 조합이 깨진다 — 같은 이유의 가드가
+  프로젝트에 이미 둘)
+- 실측 검증(임시 라우트 + headless Chrome, 검증 후 삭제 — Phase 61c 방법): 켬 모드 computed style이
+  현행과 **동일** · 끔 모드 `pre`/`normal`/`auto`/`hidden`/`contain` · **양쪽 `vertRoom 0`·`scrollTopPushable 0`** ·
+  `panelHorizLeak 0` · sticky 거터가 `scrollLeft 300`에도 제자리 · 거터 배경 불투명(활성 `#E8DFCE` / 비활성 `#F0EAE0`)
+- **남은 실물 검수 3건**: ① 가로 스크롤바 5px과 블록 높이 점프가 거슬리는가 ② 아이콘 쌍
+  (`arrow-elbow-down-left` ↵ / `arrows-out-line-horizontal` ↔ — `npm run icons:sheet`) ③ 토글 직후 세로 보정 필요 여부
+
+---
+
 ## 개선묶음 M5: 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그 전환 ✅ (구현·검수·**배포 완료 2026-09-06** — Vercel 로그 icons:check 55종·icons:assets 3024개 실측)
 
 계획서: `docs/phasedocs/개선묶음 M5 이모지 폐기·폴더 아이콘 Phosphor 카탈로그 Final_V3 실행판.md`

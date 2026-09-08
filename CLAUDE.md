@@ -124,7 +124,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
-- **편집창 CodeMirror 스크롤**: `.cm-scroller`가 `overflow:visible`이라 내부 스크롤이 없음 → CM의 `EditorView.scrollIntoView` 사용 금지. 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것
+- **편집창 CodeMirror 스크롤 — 세로는 없고 가로만 조건부다 (Phase 65에서 개정)**: `.cm-scroller`에 **세로 스크롤은 어느 모드에서도 없다**(줄바꿈 켬 = `overflow:visible` · 끔 = `overflow-y:hidden`, 양쪽 다 여지 0) → CM의 `EditorView.scrollIntoView` 사용 금지는 그대로이고, 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것. **가로**는 줄바꿈을 끄면(⌥Z · `mathory-editor-wrap`) 블록 스크롤러가 담당한다 — 타자·화살표·드래그는 CM이 알아서 따라가고(`scrollRectIntoView` · `scrollParents.x`), **프로그램적 커서 이동**(찾기/바꾸기 · 미리보기 수식 클릭)만 `revealCursorX()`가 맡는다(그 두 경로엔 `scrollIntoView`가 없다). ⚠ `revealCursorX`는 반드시 `focus()` **뒤**에 — CM의 focus 관찰자가 `scrollTop===0`이면 이전 `scrollLeft`를 복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. ⚠ 켬/끔 세 속성(`white-space`·`word-break`·`overflow`)은 `MarkdownEditor` 상단의 **Compartment 하나**가 소유한다 — 테마에 다시 적으면 같은 셀렉터가 두 벌이 되어 토글이 조용히 죽는다. ⚠ 거터는 끔 모드에서 sticky로 살아나므로 **`--block-surface`**(블록 래퍼가 공급)로 불투명해야 한다 — 투명이면 글자가 줄 번호 위로 지나가고, `var()` 폴백을 빼면 CM base의 `#f5f5f5` 회색 띠가 나온다
+- **⚠ 편집창 블록 CM 체인에 고정 높이를 주지 말 것 (Phase 65 D14)**: 위 "세로 여지 0"은 `.cm-scroller`의 높이가 **auto로 풀린다**는 조건에 전적으로 의존한다(실측: auto = 여지 0 / 고정 120px = **여지 32px**). 그리고 **`overflow-y:hidden`은 프로그램적 스크롤을 막지 못한다**(같은 실측에서 `scrollTop`이 32px 밀렸다) → 여지가 생기는 순간 `scrollRectIntoView`가 밀어붙이고 사용자는 되돌릴 수 없다(`MarkdownEditor.tsx`의 옛 `overflow:auto` 주석이 경고한 그 버그다). 체인은 `.scaled-editor` → 블록 래퍼 → `<div padding:0>` → MarkdownEditor 래퍼(`height:100%`) → `.cm-editor` → `.cm-scroller`이고 **어느 마디에도 px 높이·`maxHeight`·`aspect-ratio`를 넣지 말 것**. 감시 지점: 끔 모드에서 모든 블록 `scroller.scrollHeight === scroller.clientHeight`
 - **스크롤 패널에 `paddingBottom:100vh` 금지**: `box-sizing:border-box`에서 요소 높이는 패딩 합보다 작아질 수 없어 패널이 부모보다 커지고, `overflow:hidden` 부모에 복구 불가한 스크롤 틈이 생긴다(CM `scrollRectIntoView`가 밀어붙임). "문서 끝 여백"은 **스페이서 div**로 줄 것 (Phase 56)
 - **`[data-noscroll]` 컨테이너는 세로 스크롤 금지**: 좌·우 칼럼과 content-frame. 스크롤되면 dev 콘솔에 경고가 뜬다 → 어떤 요소가 세로 overflow를 만든 것이니 그 원인을 제거할 것 (Phase 56)
 - **조건부 `style` 객체에 longhand 병합 주의**: shorthand(`padding`)가 뒤에 오면 앞의 longhand(`paddingBottom`)를 조용히 덮어쓴다 → 스프레드 순서에 의존하지 말고 충돌 불가능한 구조를 택할 것
@@ -221,7 +222,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
-- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(49종 · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
+- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(현재 **57종** · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
 - **폴더 아이콘은 Phosphor 카탈로그다 (M5)**: `Folder.icon` = Phosphor 이름(`^[a-z0-9-]+$` — 옛 유니코드 값은 기본 아이콘으로 표시, 데이터 무접촉 N4). 규칙은 `lib/folderIcon.ts`(import 0 · `test:foldericon`)가, 렌더는 `components/ui/FolderGlyph.tsx` 한 벌이 소유한다(소비처 8곳 — **삼항식 사본 금지**). 기본 3종: 최상위 `folder` · 하위 `folder-simple` · 펼침은 depth 무관 `folder-open`(`folder-simple-open`은 core에 **없다**). **활성 행만 bold** — 글자 700과 같은 조건. 카탈로그 자산은 `icons:assets`가 `public/icons/phosphor/<ver>/`에 3,024개 복사(gitignore · `predev`·`build`가 생성 — **Vercel Build Command가 `next build` 직접 지정이면 전부 빈칸**). 렌더는 `PhAsset`(CSS **mask** + `background-color: currentColor`) — "별도 `.svg`는 currentColor가 끊긴다"는 `<img>` 얘기이고 mask는 유지된다. 단 **UI 상시 아이콘에는 mask 금지**(그쪽은 인라인 path — 첫 페인트 fetch 0). mask 404는 무이벤트 빈칸 — 방어는 쓰기(피커가 인덱스 이름만)·읽기(정규식 불일치 → 기본)에서, core 버전업 시 `--assets`가 사라진 이름 diff를 경고한다. 피커(`PhosphorIconPicker`)는 regular만·brands 78종 제외(상표)·한글 검색은 `lib/phosphor-ko.json`(없어도 영문 동작). **본문(raw_text)에는 아이콘·이모지 렌더 계층이 없다** — M5가 Twemoji를 전면 철거해 이모지 문자는 OS 글꼴로 보인다(N8). Phosphor 코드포인트는 PUA라 본문 문법을 만들지 말 것
 - **제3자 시각 자산 고지 준칙 (M5 D11)**: ① 들일 때 `THIRD_PARTY_LICENSES.md`에 라이선스 전문 ② 배포 산출물에 고지 동봉(생성 파일 헤더 · 정적 디렉터리 `LICENSE`) ③ 설정 "정보/라이선스"에 한 줄 ④ 크레딧 의무형(CC BY 등)은 ③ 필수, MIT형은 ①②로 충족 ⑤ **상표(브랜드 로고)는 사용자 선택 목록에서 제외** ⑥ 버전은 lock 고정 + 경로에 버전 ⑦ **자산을 그만 쓰면 고지도 같이 거둔다**(Twemoji CC BY 문단을 M5에서 삭제한 근거)
 - **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
@@ -289,7 +290,38 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현·검수·**배포 완료(2026-09-06)**
+## 현재 Phase: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현 완료(2026-09-08) · 덕수 검수 대기
+
+문서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (계보: v1 web → **v2 CLI 실측 = 실행판**. v2 부록 C가 v1 정정 10건·보완 8건)
+
+편집창 블록 CM에서 ⌥Z로 줄바꿈을 끄면 긴 줄이 접히지 않고 **블록 안에서 좌우 스크롤**된다(줄 번호 거터는
+sticky로 고정). 켜고 끄는 세 속성(`white-space`·`word-break`·`overflow`)을 **Compartment 하나**에 묶었다.
+**기본은 켬(현행)이라 토글에 손대지 않으면 바이트 단위로 같은 화면이다.**
+**Firestore 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 미리보기·인쇄·열람·공유 0 · 댓글 에디터 0.**
+수정 6파일 · 신규 0 · 아이콘 55 → **57종**. 로직 검증 **365건 무회귀**.
+**규약은 위 "편집창 CodeMirror 스크롤" · "블록 CM 체인에 고정 높이를 주지 말 것" 두 절이 소유한다.**
+
+- ⚠ **v1의 안전 논거가 실측으로 뒤집혔다**: "높이가 콘텐츠 높이라 세로 여지가 없다"가 아니라
+  **"높이가 auto로 풀려서"** 다(가로 스크롤바는 auto 높이 박스에서 콘텐츠를 잠식하지 않고 박스를 키운다).
+  그리고 `scrollRectIntoView`의 스킵 조건은 **AND**라(dist 536) 가로 여지가 생기면 스크롤러가 루프에
+  참여해 `scrollTop += moveY`도 실행한다 — 세로 여지 0이 유일한 방어다(D14)
+- ⚠ **`overflow-y:hidden`은 프로그램적 스크롤을 막지 못한다** — 고정 높이 박스에서 `scrollTop`이 32px
+  밀리는 것을 실측했다. "hidden이니 안전하다"고 읽지 말 것
+- 실측 검증(임시 라우트 + headless Chrome, 검증 후 라우트 삭제 — Phase 61c 방법): 켬 모드의 computed
+  style이 현행과 **동일**(`pre-wrap`·`break-all`·`visible`·lineWrapping 클래스 유) · 끔 모드
+  `pre`·`normal`·`auto`/`hidden`·`overscroll contain` · **양쪽 다 `vertRoom 0` · `scrollTopPushable 0`** ·
+  가로 넘침이 패널 밖으로 새지 않음(`panelHorizLeak 0`) · sticky 거터가 `scrollLeft 300`에도 제자리 ·
+  거터 배경 활성 `#E8DFCE` / 비활성 `#F0EAE0`(불투명 확인)
+- **남은 실물 검수 3건**(headless로는 판정 불가): ① 가로 스크롤바 5px 노출과 그로 인한 블록 높이 점프가
+  거슬리는가(D6 — 거슬리면 `.cm-scroller`에 스크롤바 숨김 규칙을 얹어 되돌린다) ② 아이콘 쌍
+  (켬 `arrow-elbow-down-left` ↵ / 끔 `arrows-out-line-horizontal` ↔, `npm run icons:sheet`) ③ 토글 직후
+  세로 스크롤 보정이 필요한가(D11 — 지금은 가로만 보정한다)
+- ⌥Z는 window 리스너라 **항상 동작**한다. Row 2 버튼은 `showToolbar` 게이트 아래라 **그림 블록이 활성이면
+  눌리지 않는다** — 접힘 버튼과 같은 성질이라 선례를 따랐고, ⌥Z가 대체 경로다
+- IME 조합 중 토글은 **무시**한다(D12) — reconfigure가 `.cm-content` 전면 재측정을 유발해 조합이 깨진다
+  (이 프로젝트에 같은 이유의 가드가 이미 둘: `latex-highlight`의 composing 가드 · `latexLinter`)
+
+### 이전: **개선묶음 M5 — 이모지(Twemoji) 폐기 · 폴더 아이콘 Phosphor 카탈로그** — 구현·검수·**배포 완료(2026-09-06)**
 
 문서: `docs/phasedocs/개선묶음 M5 이모지 폐기·폴더 아이콘 Phosphor 카탈로그 Final_V3 실행판.md`
 (계보: 덕수 메모 → v1 web → 덕수 확정 N1~N8 → **v2 CLI 실측**(정정 E1~E4 · 보완 G1~G6 · 덕수 확정 N9~N11) → **Final_V3 = 실행판**(§11이 구현·검수 기록). 중간 판본 v1·v2는 phaseSketch)
