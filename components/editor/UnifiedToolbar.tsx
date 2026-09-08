@@ -95,6 +95,13 @@ function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
   return <PhIcon d={collapsed ? PH.collapseOut : PH.collapseIn} size={ICON_SIZE} />;
 }
 
+/** 줄바꿈 토글 (Phase 65 D9) — wrapped=true면 줄이 접혀 내려가고(↵), false면 옆으로 뻗는다(↔).
+ *  상태별 쌍인 것은 CollapseAllIcon과 같은 이 툴바의 관행이다.
+ *  ⚠ Phosphor에 "text-wrap"이라는 이름은 없다(카탈로그 실측) — 이 둘이 가장 가깝다. */
+function LineWrapIcon({ wrapped }: { wrapped: boolean }) {
+  return <PhIcon d={wrapped ? PH.arrowElbowDownLeft : PH.arrowsOutLineHorizontal} size={ICON_SIZE} />;
+}
+
 /** 강조(핵심문장) — highlighter */
 function KeySentenceIcon() {
   return <PhIcon d={PH.highlighter} size={ICON_SIZE} />;
@@ -173,6 +180,9 @@ interface UnifiedToolbarProps {
   aiLoading: boolean;
   collapseMode: boolean;
   onToggleCollapseAll: () => void;
+  /** Phase 65 — 편집창 줄바꿈 켬/끔 (⌥Z). 끄면 긴 줄이 블록 안에서 좌우 스크롤된다. */
+  lineWrap: boolean;
+  onToggleLineWrap: () => void;
   /** Phase 58 P3 — 선택 영역을 `**…**`로 감싸기/해제 */
   onToggleKey: () => void;
   /** 직전 토글이 규칙 위반으로 거부됐는가 (버튼 흔들림 피드백) */
@@ -602,6 +612,8 @@ export default function UnifiedToolbar({
   aiLoading,
   collapseMode,
   onToggleCollapseAll,
+  lineWrap,
+  onToggleLineWrap,
   onToggleKey,
   keyToggleRejected,
 }: UnifiedToolbarProps) {
@@ -732,6 +744,21 @@ export default function UnifiedToolbar({
           active={collapseMode}
         >
           <CollapseAllIcon collapsed={collapseMode} />
+        </IconButton>
+      ),
+    },
+    /* Phase 65 D9 — 줄바꿈 토글. active는 `!lineWrap`이다: 켬이 기본값이므로 켬을
+       active로 칠하면 버튼이 늘 켜져 보인다. collapseMode·searchOpen과 같이
+       "기본이 아닌 상태에 들어가 있다"는 신호로 쓴다. */
+    {
+      key: 'lineWrap',
+      node: (
+        <IconButton
+          title={lineWrap ? '줄바꿈 끄기 — 좌우 스크롤 (⌥Z)' : '줄바꿈 켜기 (⌥Z)'}
+          onClick={onToggleLineWrap}
+          active={!lineWrap}
+        >
+          <LineWrapIcon wrapped={lineWrap} />
         </IconButton>
       ),
     },

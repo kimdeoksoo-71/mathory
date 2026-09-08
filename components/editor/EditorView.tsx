@@ -220,6 +220,24 @@ function setStoredFontSize(size: number) {
   document.documentElement.style.setProperty('--content-font-size', size + 'px');
 }
 
+/* ═══ Phase 65 — 편집창 줄바꿈 (⌥Z) ═══════════════════════════════════
+   글자 크기·가로폭과 같은 계층의 "보기 설정"이다: 문항·탭·블록과 무관하고 기기별로 남는다.
+   문항별로 두면 "같은 문항인데 조판이 바뀐 것처럼" 보이는 혼란이 생긴다(가로폭 키를
+   ProblemView와 공유하는 이유의 역).
+   ⚠ 키가 lib/constants.ts가 아니라 여기 있는 것은 의도다 — 거기 있는 WIDTH_EM_KEY는
+     ProblemView와 **공유**해서이고, 공유하지 않는 FONT_SIZE_KEY는 이 파일 지역 상수다.
+   기본은 켬(현행). 토글에 손대지 않은 사용자에게는 바이트 단위로 같은 화면이다. */
+const LINE_WRAP_KEY = 'mathory-editor-wrap';
+
+function getStoredLineWrap(): boolean {
+  if (typeof window === 'undefined') return true;
+  try { return localStorage.getItem(LINE_WRAP_KEY) !== 'off'; } catch { return true; }
+}
+
+function setStoredLineWrap(on: boolean) {
+  try { localStorage.setItem(LINE_WRAP_KEY, on ? 'on' : 'off'); } catch {}
+}
+
 /* ═══ EmptyBlockChips: 빈 텍스트 블록에 그림/선택지 빠른 전환 칩 ═══ */
 
 function EmptyBlockChips({ onPick }: { onPick: (type: Block['type']) => void }) {
@@ -686,11 +704,14 @@ function SortableEditorBlock({
   onAddBlock,
   onSplitBlock,
   canSplitBlock,
+  lineWrap,
 }: {
   block: LocalBlock;
   index: number;
   isActive: boolean;
   canDelete: boolean;
+  /** Phase 65: 줄바꿈 켬/끔 (⌥Z) — 전 블록이 함께 움직인다 */
+  lineWrap: boolean;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
   collapseMode: boolean;
   selected: boolean;
@@ -768,6 +789,10 @@ function SortableEditorBlock({
     borderLeft: `0.5px solid ${emphasized ? 'var(--block-border-active)' : 'transparent'}`,
     borderRadius: emphasized ? 8 : 0,
     background: emphasized ? 'var(--block-bg-active)' : 'var(--block-bg)',
+    /* Phase 65 D5 — 블록 표면색을 CM 거터에 공급한다. 줄바꿈을 끄면 거터가 sticky로
+       살아나 본문이 그 뒤로 흐르는데, 투명이면 글자가 줄 번호 위로 비쳐 지나간다.
+       배경과 같은 값을 쓰므로 켬 모드의 합성 결과는 지금과 동일하다. */
+    ['--block-surface' as any]: emphasized ? 'var(--block-bg-active)' : 'var(--block-bg)',
     overflow: 'hidden',
   };
 
@@ -961,6 +986,7 @@ function SortableEditorBlock({
               ref={(el) => { editorRefs.current[block.id] = el; }}
               initialValue={block.raw_text}
               onChange={onChange}
+              lineWrap={lineWrap}
               onSnippetShortcut={onSnippetShortcut}
               onCursorActivity={onCursorActivity
                 ? (info) => onCursorActivity({ ...info, blockId: block.id })
@@ -1043,6 +1069,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 글꼴 크기
   const [contentFontSize, setContentFontSize] = useState(FONT_SIZE_DEFAULT);
+  /* Phase 65 — 편집창 줄바꿈. 기본 켬(현행)이고 마운트 후 localStorage를 반영한다
+     (가로폭 선례 — 초기값을 서버·클라가 같게 두어 hydration mismatch를 피한다). */
+  const [lineWrap, setLineWrap] = useState(true);
+  useEffect(() => { setLineWrap(getStoredLineWrap()); }, []);
   /* 덕수 요청(2026-08-28) — 3번째 이후 탭의 이름 변경·삭제 버튼은 평소에 숨기고
      hover 0.5초 뒤에 나타낸다. 두 버튼이 상시 보이면 탭 줄이 시끄럽고, 삭제가
      늘 노출돼 있는 것도 좋지 않다.
@@ -1192,6 +1222,34 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return next;
     });
   };
+
+  /* Phase 65 D12 — 줄바꿈 토글. 한글 IME 조합 중에는 무시한다:
+     Compartment 재구성이 .cm-content의 white-space를 바꿔 전면 재측정을 유발하는데,
+     이 프로젝트는 CM DOM 갱신이 조합을 깨뜨린 전례가 둘이다
+     (lib/latex-highlight.ts의 composing 가드 · latexLinter의 view.composing 가드).
+     지연 재시도는 하지 않는다 — "눌렀는데 반응이 늦는" 느낌이 더 나쁘다. */
+  const toggleLineWrap = useCallback(() => {
+    const active = activeBlockId ? editorRefs.current[activeBlockId] : null;
+    if (active?.isComposing()) return;
+    setLineWrap((prev) => {
+      const next = !prev;
+      setStoredLineWrap(next);
+      return next;
+    });
+  }, [activeBlockId]);
+
+  /* Phase 65 D11 — 켬→끔 전환에서 활성 블록의 커서가 오른쪽 밖으로 사라지지 않게 한다.
+     끔→켬은 overflow:visible이 되며 scrollLeft가 스스로 풀리므로 할 일이 없다.
+     rAF는 reconfigure 뒤 CM measure를 기다리는 것이다.
+     ⚠ activeBlockId가 deps에 있어 끔 모드에서 블록을 바꿀 때도 도는데, 그쪽도
+       바람직한 동작이라 그대로 둔다(켬 모드에서는 revealCursorX가 첫 줄에서 빠진다). */
+  useEffect(() => {
+    if (lineWrap || !activeBlockId) return;
+    const ref = editorRefs.current[activeBlockId];
+    if (!ref) return;
+    const id = requestAnimationFrame(() => ref.revealCursorX());
+    return () => cancelAnimationFrame(id);
+  }, [lineWrap, activeBlockId]);
 
   // ─── Phase 55a: 블록 구조 Undo/Redo 히스토리 ───
   const applyGenRef = useRef(0);   // apply 세대 카운터 (early return 위에 둬야 hooks 순서 안정)
@@ -2458,6 +2516,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       // 파란 텍스트 선택 대신: 커서만 두고 행 회색 + 수식 노랑 하이라이트
       ref.setSelection(range.from, range.from);
       ref.highlightMath(range.from, range.to);
+      /* Phase 65 D8 — 줄바꿈을 끈 상태에서 수식이 화면 오른쪽 밖일 수 있다.
+         setSelection에는 scrollIntoView가 없어 CM이 가로로 따라가지 않는다.
+         ⚠ 반드시 focus() 뒤 — CM의 focus 관찰자가 scrollTop 0일 때 이전 scrollLeft를
+           복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. */
+      ref.revealCursorX();
 
       // D5‴: 양쪽 패널 모두 수식 중앙으로 (기존에는 편집창만 스크롤했다)
       scrollEditorToMathCenter(blockId);
@@ -2534,9 +2597,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setSelectedBlockIds(new Set());
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo ──
+  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo · ⌥Z 줄바꿈 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      /* Phase 65 D10 — ⌥Z(Windows Alt+Z) 줄바꿈 토글. VS Code와 같은 키다.
+         ⚠ preventDefault 필수: macOS에서 ⌥Z는 'Ω'를 입력하므로 막지 않으면 글자가 들어간다.
+         e.code를 쓰는 이유는 아래 ⌘Z 분기와 같다(C5 — 한글 IME에서 e.key가 흔들린다).
+         !e.ctrlKey가 Windows AltGr(=Ctrl+Alt)을, !e.shiftKey가 ⌥⇧Z('¸')를 흘려보낸다.
+         ⌘Z와 달리 텍스트 편집 중에도 동작한다 — 텍스트 undo와 겹칠 일이 없고,
+         Row 2 버튼은 showToolbar 게이트에 막히므로(그림 블록 활성 시) 이쪽이 대체 경로다. */
+      if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'KeyZ') {
+        e.preventDefault();
+        toggleLineWrap();
+        return;
+      }
       // Phase 55a: 블록 구조 undo/redo. C5(e.code — Korean IME) + C6(포커스 가드).
       if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') {
         const el = document.activeElement as HTMLElement | null;
@@ -2570,7 +2644,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks]);
+  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks, toggleLineWrap]);
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
@@ -3412,6 +3486,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           aiLoading={aiLoadingBlockId !== null}
           collapseMode={collapseMode}
           onToggleCollapseAll={handleToggleCollapseAll}
+          lineWrap={lineWrap}
+          onToggleLineWrap={toggleLineWrap}
           onToggleKey={handleToggleKey}
           keyToggleRejected={keyToggleRejected}
         />
@@ -3613,6 +3689,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onAddBlock={(type) => handleAddBlock(type as Block['type'])}
                     onSplitBlock={handleSplitBlock}
                     canSplitBlock={SPLITTABLE_TYPES.has(block.type)}
+                    lineWrap={lineWrap}
                   />
                   {proofData && (
                     <ProofreadResultBox

@@ -35,6 +35,8 @@ const ICONS = {
   // ── Icons.tsx 38종이 쓰는 것 ──
   arrowUUpLeft: ['arrow-u-up-left', 'regular'],            // IconUndo
   arrowUUpRight: ['arrow-u-up-right', 'regular'],          // IconRedo
+  arrowElbowDownLeft: ['arrow-elbow-down-left', 'regular'],          // LineWrapIcon 켬 (Phase 65 D9)
+  arrowsOutLineHorizontal: ['arrows-out-line-horizontal', 'regular'], // LineWrapIcon 끔 (Phase 65 D9)
   caretDown: ['caret-down', 'regular'],                    // IconChevronDown
   caretLeft: ['caret-left', 'regular'],                    // IconChevronLeft
   caretRight: ['caret-right', 'regular'],                  // IconChevron
@@ -194,6 +196,7 @@ function buildSheet(PH_) {
     ['블록 수식 (M3 복원)', legacyBlockMath], ['OCR', 'scan'], ['Σ', 'sigma'], ['강조', 'highlighter'], ['상용구', 'bracketsCurly'],
     ['특수문자', 'numberCircleOne'], ['표', 'table'], ['맞춤법', 'listChecks'],
     ['AI 완성', 'sparkle'], ['찾기', 'magnifyingGlass'], ['접기', 'collapseIn'], ['펼치기', 'collapseOut'],
+    ['줄바꿈 켬', 'arrowElbowDownLeft'], ['줄바꿈 끔', 'arrowsOutLineHorizontal'],
   ];
   const row2Line = (size) => row2.map(([t, k]) =>
     `<span class="btn" title="${t}">${typeof k === 'function' ? k(size) : ph(PH_[k], size)}</span>`).join('');

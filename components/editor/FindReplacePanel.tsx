@@ -157,6 +157,11 @@ export default function FindReplacePanel({
     onNavigate?.(match.blockId, match.from);
 
     requestAnimationFrame(() => {
+      /* Phase 65 D8 — 줄바꿈을 끈 상태에서 매치가 화면 오른쪽 밖일 수 있다.
+         setSelection에는 scrollIntoView가 없어 CM이 가로로 따라가지 않는다.
+         ⚠ getCursorCoords()보다 **먼저** 부른다 — 가로를 맞춘 뒤 좌표를 읽어야
+           아래 세로 계산에 쓰는 coords가 실제로 보이는 위치를 가리킨다. */
+      handle.revealCursorX();
       const coords = handle.getCursorCoords();
       const container = editorPanelRef.current;   // D15: 전역 querySelector 제거
       if (!coords || !container) return;
