@@ -3610,7 +3610,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
         {/* ─── U자 컨텐츠 프레임: 클레이 + 3면 경계(상·좌·우) + 상단 14px 라운드, 하단 열림 ─── */}
         <div className="content-frame" data-noscroll="content-frame" style={{
-          flex: 1, display: 'flex', overflowX: 'auto', overflowY: 'hidden', minHeight: 0,
+          /* ⚠ overflowX는 'hidden'이다 — 'auto'로 되돌리지 말 것 (Phase 65 후속).
+             이 프레임이 가로로 스크롤되면 **편집 열이 통째로 패닝**되고 그 안의 CM 행번호
+             거터도 함께 밀린다(거터 sticky는 자기 스크롤러 안에서만 유효하다). VS Code처럼
+             "가로 스크롤 = 본문만 움직이고 거터는 제자리"가 되려면 편집 열이 절대 밀리면 안 된다.
+             좁은 창에서 미리보기에 닿는 통로는 아래 preview-scroll 래퍼가 대신 맡는다. */
+          flex: 1, display: 'flex', overflowX: 'hidden', overflowY: 'hidden', minHeight: 0,
           background: 'var(--bg-content)',
           borderTop: '0.5px solid var(--border-content)',
           borderLeft: '0.5px solid var(--border-content)',
@@ -3638,25 +3643,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{
             flex: 1,
             overflowY: 'auto',
-            /* ═══ 편집 패널은 **가로 막다른 길**이다 (Phase 65 후속) ═══════════════
-               "줄바꿈을 꺼도 행번호 열이 좌우로 움직인다"의 진범은 CM sticky가 아니라
-               **조상의 가로 스크롤**이었다. 위 `.content-frame`(Row 3)은 `overflowX:'auto'`이고,
-               좌측 열 `minWidth:420` + 미리보기 열 `flexShrink:0` 고정폭이라 **드로어를 열거나
-               창이 좁으면 상시 가로로 넘친다** → 블록에 가로 여지가 없는 자리에서 스와이프하면
-               편집 열이 통째로 밀리고 거터도 같이 밀린다(거터는 자기 스크롤러 안에서는
-               정상적으로 고정돼 있다 — 실측 이동량 0).
-               ⚠ 두 줄이 짝이다: `overflowX:'hidden'`은 이 패널 자신이 밀리지 않게 하고,
-                 `overscrollBehaviorX:'contain'`은 여기서 시작된 가로 제스처가 `.content-frame`
-                 으로 **전파되지 않게** 막는다. 하나만 두면 다른 경로로 새어 나간다.
-               ⚠ `overflowX`를 아예 적지 않으면 **auto가 된다**(한 축만 지정하면 다른 축은
-                 visible로 남지 못한다). 게다가 `.no-scrollbar`가 가로 스크롤바까지 지워
-                 (globals.css) **보이지 않는 스크롤**이 된다.
-               ⚠ 대가(알고 둔 것): `.content-frame`이 넘치는 좁은 창에서, 포인터가 편집 패널
-                 위에 있는 동안에는 프레임을 가로로 밀 수 없다(미리보기 열·프레임 여백에서는
-                 여전히 된다). `.content-frame`의 `overflowX:'auto'`는 좁은 창에서 열에 닿는
-                 유일한 통로라 **그쪽을 닫으면 안 된다** — 그래서 전파만 끊는다. */
+            /* ⚠ overflowX 명시 필수 — 안 적으면 **auto가 된다**(한 축만 지정하면 다른 축은
+               visible로 남지 못한다). 게다가 `.no-scrollbar`가 가로 스크롤바까지 지워
+               (globals.css) **보이지 않는 스크롤**이 된다.
+               편집창의 가로 스크롤은 블록 안 `.cm-scroller`가 담당한다(줄바꿈 끔) — 이 패널이
+               아니다. 여기서 밀리면 행번호 거터까지 함께 밀린다. */
             overflowX: 'hidden',
-            overscrollBehaviorX: 'contain',
             padding: '0 0 8px',
             minHeight: 0,
           }}>
@@ -3753,6 +3745,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               ⚠ 패딩을 키운 만큼 width도 키울 것 — 안 그러면 본문 측정폭 35em이 깎인다.
                 width의 em과 paddingLeft의 em은 이 열의 fontSize(contentFontSize)를
                 같은 base로 쓰므로 글꼴을 바꿔도 35em이 보존된다. */}
+        {/* ⚠ 가로 스크롤은 **미리보기 쪽에만** 둔다 (Phase 65 후속).
+           좌측 열 minWidth 420 + 이 열의 고정폭 때문에 드로어를 열거나 창이 좁으면 자리가 모자란데,
+           예전에는 그 넘침을 content-frame이 받아 **편집 열까지 통째로 패닝**했다(= 행번호 거터가
+           움직이는 원인). 넘침을 이 래퍼가 받으면 편집 열은 절대 밀리지 않고, 미리보기의 고정폭
+           계약(본문 측정폭 = widthEm)도 그대로 지켜진다 — 래퍼만 줄어들고 안쪽 열은 flexShrink:0. */}
+        <div style={{ display: 'flex', flexShrink: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden', minHeight: 0 }}>
         <div data-noscroll="preview-column" style={{
           /* ⚠ 3.5em은 경우 rail 거터용 좌측 패딩이다 — 본문 측정폭이 widthEm으로
                유지되려면 width도 그만큼 함께 커져야 한다(기존 35 + 3.5 = 38.5 구조). */
@@ -3891,6 +3889,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 (Phase 56) */}
             <div aria-hidden style={{ height: '100vh', flexShrink: 0 }} />
           </div>
+        </div>
         </div>
         </div>
       </div>

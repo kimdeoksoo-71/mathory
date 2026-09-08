@@ -63,6 +63,20 @@ const WRAP_OFF: Extension = EditorView.theme({
 
 const wrapExtensions = (on: boolean): Extension => (on ? WRAP_ON : WRAP_OFF);
 
+/* 행번호 색 (2026-09-08 덕수) — 본문보다 **덜 눈에 띄게**: Mathory 레드 계열을 옅게 깐다.
+   ⚠ 하드코딩 rgba를 토큰과 따로 두면 토큰을 바꿀 때 조용히 어긋난다(Phase 62 `78a780f` 사고).
+     그래서 color-mix로 토큰을 직접 섞고, 미지원 브라우저에만 같은 값의 rgba를 쓴다.
+   ⚠ 상태 표시가 아니라 **보조 정보**라 3:1 대비 규약(Phase 59 G1)의 대상이 아니다 — 오히려
+     본문보다 약해야 한다는 것이 요구사항이다. */
+const mixOK = typeof CSS !== 'undefined'
+  && CSS.supports?.('color', 'color-mix(in srgb, red 50%, transparent)');
+const GUTTER_NUM = mixOK
+  ? 'color-mix(in srgb, var(--mathory-red) 55%, transparent)'
+  : 'rgba(217, 119, 87, 0.55)';                    // = --mathory-red #D97757 55%
+const GUTTER_NUM_ACTIVE = mixOK
+  ? 'color-mix(in srgb, var(--mathory-red-dark) 85%, transparent)'
+  : 'rgba(188, 95, 63, 0.85)';                     // = --mathory-red-dark #BC5F3F 85%
+
 /** 커서 활동 정보 (Phase 56 D12 — MarkdownEditor / SortableEditorBlock / EditorView 3곳 공유).
  *  blockId 는 MarkdownEditor 자신은 모르므로 상위 래퍼가 주입한다. */
 export interface CursorActivityInfo {
@@ -916,6 +930,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
                  ⚠ inherit은 안 된다 — .cm-editor가 backgroundColor:transparent를 명시한다. */
               backgroundColor: 'var(--block-surface, var(--block-bg))',
               borderRight: '1px solid var(--border-subtle)',
+              /* 본문보다 한 단계 작게(글꼴 조절 스텝 1px과 같은 감각) + 옅은 레드.
+                 ⚠ em이라 사용자의 글자 크기 설정을 따라 함께 움직인다 — px로 굳히지 말 것
+                   (Phase 59a C5 "em/px를 섞으면 글꼴 크기에서 무너진다"). */
+              fontSize: '0.92em',
+              color: GUTTER_NUM,
               /* 가로 고정. CM이 `position:sticky`를 인라인으로 박고(dist 11152) 좌표는 base theme의
                  `.cm-gutters-before { inset-inline-start: 0 }`가 준다 — 여기 `left`는 그 논리 속성에
                  기대지 않으려는 명시일 뿐이다.
@@ -937,7 +956,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
                  왼쪽이 들쭉날쭉했다. 고정폭 숫자로 두 변을 함께 맞춘다(가운데 정렬이 아니라
                  오른쪽 정렬을 유지하는 이유: 자릿수가 달라도 **1의 자리가 같은 세로선**에 선다). */
             '.cm-lineNumbers .cm-gutterElement': {
-              minWidth: '1.8em !important',
+              /* ⚠ 2em인 이유: 글꼴을 0.92em로 줄이면 2자리 실측폭(≈24.9px)이 옛 1.8em(24.8px)을
+                   **넘어서** 1자리 블록과 2자리 블록의 열 폭이 갈린다. minWidth는 2자리가 확실히
+                   들어가는 값이어야 "2자리까지 폭 통일"이 성립한다. 글꼴을 더 줄이면 여기도 볼 것. */
+              minWidth: '2em !important',
               textAlign: 'right',
               fontVariantNumeric: 'tabular-nums',
             },
@@ -969,7 +991,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             },
             '&.cm-focused .cm-activeLineGutter': {
               backgroundColor: 'rgba(184, 155, 120, 0.20)',
-              color: 'var(--text-secondary)',
+              // 다른 번호가 레드 계열이라 활성 행만 회색이면 혼자 튄다 — 같은 계열에서 톤만 올린다
+              color: GUTTER_NUM_ACTIVE,
             },
 
             // ═══ 자동완성 드롭다운 스타일 ═══

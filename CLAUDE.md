@@ -125,7 +125,19 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 ## 핵심 패턴 & 주의사항
 
 - **편집창 CodeMirror 스크롤 — 세로는 없고 가로만 조건부다 (Phase 65에서 개정)**: `.cm-scroller`에 **세로 스크롤은 어느 모드에서도 없다**(줄바꿈 켬 = `overflow:visible` · 끔 = `overflow-y:hidden`, 양쪽 다 여지 0) → CM의 `EditorView.scrollIntoView` 사용 금지는 그대로이고, 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것. **가로**는 줄바꿈을 끄면(⌥Z · `mathory-editor-wrap`) 블록 스크롤러가 담당한다 — 타자·화살표·드래그는 CM이 알아서 따라가고(`scrollRectIntoView` · `scrollParents.x`), **프로그램적 커서 이동**(찾기/바꾸기 · 미리보기 수식 클릭)만 `revealCursorX()`가 맡는다(그 두 경로엔 `scrollIntoView`가 없다). ⚠ `revealCursorX`는 반드시 `focus()` **뒤**에 — CM의 focus 관찰자가 `scrollTop===0`이면 이전 `scrollLeft`를 복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. ⚠ 켬/끔 세 속성(`white-space`·`word-break`·`overflow`)은 `MarkdownEditor` 상단의 **Compartment 하나**가 소유한다 — 테마에 다시 적으면 같은 셀렉터가 두 벌이 되어 토글이 조용히 죽는다. ⚠ 거터는 끔 모드에서 sticky로 살아나므로 **`--block-surface`**(블록 래퍼가 공급)로 불투명해야 한다 — 투명이면 글자가 줄 번호 위로 지나가고, `var()` 폴백을 빼면 CM base의 `#f5f5f5` 회색 띠가 나온다. ⚠ **거터 폭·구분선을 손대지 말 것 (2026-09-08 원복됨)**: 한 번 "폭 2/3(49→33px) + 구분선 강화"를 넣었다가 되돌렸다 — ① 폭을 줄이며 `minWidth`를 **2자리 글자 폭 아래**로 내리자 블록마다 번호 열이 갈렸다(1자리 블록은 minWidth가, 2자리 블록은 글자 폭이 이겨서). `minWidth: 1.8em`(15px에서 27px)은 여유가 아니라 **2자리가 꽉 채우는 값**이고(한 자 ≈ 9.2px → 18.4 + 패딩 8 = 26.4px) 그래서 "2자리까지 폭 통일"이 성립한다 ② 선을 진하게 하니 **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보였다**(거터 선은 CM 높이만큼만 그려지는데 바가 그 위를 차지한다). 숫자가 들쭉날쭉해 보이는 것은 폭이 아니라 **글꼴의 비례 숫자** 탓이라 `font-variant-numeric: tabular-nums`가 답이다(오른쪽 정렬 유지 — 자릿수가 달라도 1의 자리가 같은 세로선에 선다)
-- **⚠ 편집 패널(`.scaled-editor`)은 '가로 막다른 길'이다 (Phase 65 후속)**: `overflowX:'hidden'` + `overscrollBehaviorX:'contain'` **두 줄이 짝**이다 — 앞은 패널 자신이 밀리지 않게, 뒤는 여기서 시작된 가로 제스처가 조상으로 전파되지 않게 한다. **"줄바꿈을 꺼도 행번호 열이 좌우로 움직인다"의 진범이 이것**이었다: CM 거터 sticky는 정상인데(자기 스크롤러 안 이동량 0) **조상 `.content-frame`(Row 3)이 `overflowX:'auto'`**이고 좌측 열 `minWidth:420` + 미리보기 열 `flexShrink:0` 고정폭이라 **드로어를 열거나 창이 좁으면 상시 가로로 넘친다** → 블록에 가로 여지가 없는 자리에서 스와이프하면 편집 열이 통째로 밀리고 거터도 같이 밀린다(실측: 프레임 넘침 304px, 200px 밀자 거터가 화면에서 정확히 −200px 이동). ⚠ **`.content-frame`의 `overflowX:'auto'`는 닫지 말 것** — 좁은 창에서 열에 닿는 유일한 통로다(Phase 62 T8″). 그래서 전파만 끊는다. 대가: 프레임이 넘치는 좁은 창에서 포인터가 편집 패널 위에 있는 동안에는 프레임을 가로로 밀 수 없다(미리보기 열·프레임 여백에서는 된다). ⚠ **한 축만 지정하면 다른 축은 `visible`로 남지 못하고 `auto`가 된다** — `.scaled-editor`는 `.no-scrollbar`로 가로 스크롤바까지 지워져 있어(globals.css) 그 auto가 **보이지 않는 스크롤**이 된다
+- **⚠ 편집 열은 절대 가로로 패닝되지 않는다 — `.content-frame`의 `overflowX`는 `hidden`이다 (Phase 65 후속)**:
+  "줄바꿈을 꺼도 행번호 거터가 좌우로 움직인다"의 진범이 이것이었다. CM 거터 sticky는 **정상**이다
+  (자기 스크롤러 안 이동량 0, 3회 실측) — 문제는 조상 `.content-frame`이 `overflowX:'auto'`라
+  **편집 열이 통째로 패닝**되며 거터도 함께 밀린 것이다(실측: 프레임 200px 이동 → 거터 −200px).
+  좌측 열 `minWidth:420` + 미리보기 열 고정폭이라 **드로어를 열거나 창이 좁으면 상시 넘친다**.
+  → 프레임은 `hidden`으로 닫고, 그 넘침은 **미리보기 열을 감싼 가로 스크롤 래퍼**가 받는다.
+  ⚠ **편집창 안의 가로 스크롤은 그대로다** — 블록 `.cm-scroller`(줄바꿈 끔)가 담당하고, 거터는
+  그 안에서 sticky로 고정된다(실측: 스크롤 가능폭 687px에서 400px 이동, 거터 이동 0 = VS Code 동작).
+  ⚠ 미리보기 래퍼는 **고정폭 계약을 지키려는 장치**다 — 래퍼만 줄고 안쪽 열은 `flexShrink:0`이라
+  본문 측정폭(widthEm)이 보존된다. 열 자체를 shrink시키면 그 계약이 깨진다.
+  ⚠ **`.scaled-editor`의 `overscroll-behavior-x`는 효과가 없었다**(2026-09-08 실패 기록) — 그 요소는
+  가로 넘침이 0이라 브라우저가 가로 스크롤 대상으로 **아예 고려하지 않는다**. 넘침이 없는 요소에
+  overscroll-behavior를 걸어 체이닝을 막으려는 처방을 다시 쓰지 말 것
 - **⚠ 편집창 블록 CM 체인에 고정 높이를 주지 말 것 (Phase 65 D14)**: 위 "세로 여지 0"은 `.cm-scroller`의 높이가 **auto로 풀린다**는 조건에 전적으로 의존한다(실측: auto = 여지 0 / 고정 120px = **여지 32px**). 그리고 **`overflow-y:hidden`은 프로그램적 스크롤을 막지 못한다**(같은 실측에서 `scrollTop`이 32px 밀렸다) → 여지가 생기는 순간 `scrollRectIntoView`가 밀어붙이고 사용자는 되돌릴 수 없다(`MarkdownEditor.tsx`의 옛 `overflow:auto` 주석이 경고한 그 버그다). 체인은 `.scaled-editor` → 블록 래퍼 → `<div padding:0>` → MarkdownEditor 래퍼(`height:100%`) → `.cm-editor` → `.cm-scroller`이고 **어느 마디에도 px 높이·`maxHeight`·`aspect-ratio`를 넣지 말 것**. 감시 지점: 끔 모드에서 모든 블록 `scroller.scrollHeight === scroller.clientHeight`
 - **스크롤 패널에 `paddingBottom:100vh` 금지**: `box-sizing:border-box`에서 요소 높이는 패딩 합보다 작아질 수 없어 패널이 부모보다 커지고, `overflow:hidden` 부모에 복구 불가한 스크롤 틈이 생긴다(CM `scrollRectIntoView`가 밀어붙임). "문서 끝 여백"은 **스페이서 div**로 줄 것 (Phase 56)
 - **`[data-noscroll]` 컨테이너는 세로 스크롤 금지**: 좌·우 칼럼과 content-frame. 스크롤되면 dev 콘솔에 경고가 뜬다 → 어떤 요소가 세로 overflow를 만든 것이니 그 원인을 제거할 것 (Phase 56)
@@ -318,9 +330,10 @@ sticky로 고정). 켜고 끄는 세 속성(`white-space`·`word-break`·`overfl
   열 폭이 갈려 블록마다 어긋난다(1차 계측이 놓친 이유: 프로브 블록이 전부 2자리였다). 구분선을 진하게 하면
   **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보인다**. 숫자 정렬은 `tabular-nums`로 해결(가운데 정렬 금지 —
   자릿수가 다르면 1의 자리가 흔들린다).
-  ⚠ **"행번호 열이 움직인다"의 진범은 CM sticky가 아니라 조상 `.content-frame`이었다** — 실측으로
-  프레임을 200px 밀자 거터가 −200px 이동했다. 위 "편집 패널은 '가로 막다른 길'이다" 절이 처방을 소유한다.
-  **실기기 트랙패드 확인이 남아 있다**(overscroll-behavior는 제스처 체이닝만 막아 합성 프로브로는 검증 불가)
+  ⚠ **"행번호 열이 움직인다"의 진범은 CM sticky가 아니라 조상 `.content-frame`의 가로 패닝이었다**
+  (프레임 200px 이동 → 거터 −200px 실측). 처방은 위 "편집 열은 절대 가로로 패닝되지 않는다" 절이 소유한다.
+  ⚠ 처방을 **두 번 틀렸다** — `overscroll-behavior`는 넘침이 없는 요소에서는 효과가 없다(실패 기록).
+  3차에서 행번호 서식도 함께 조정: 글자 **한 단계 작게**(0.92em) · **Mathory 레드 55%** · 활성 행만 dark 85%
 - **덕수 검수 종결(2026-09-08, "모두 정상")** — 반영 1건: **아이콘 ↵ 단일 + 켬일 때 박스**(D9′).
   ↔(arrows-out-line-horizontal)가 **Row 1 가로폭 아이콘과 겹쳐 보여** 상태별 쌍을 폐기했고,
   도안이 하나뿐이라 박스가 유일한 상태 신호이므로 **`active={lineWrap}`으로 방향을 뒤집었다**
