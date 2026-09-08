@@ -900,21 +900,49 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               padding: '16px',
               lineHeight: '1.8',
             },
+            /* ═══ 거터 (Phase 65 후속 — 폭 2/3 · 고정 · 경계선 강화) ═══
+               셋이 한 덩어리다: 좁히면 경계가 흐려지므로 선을 함께 올려야 한다.
+               ⚠ 폭 총합의 진실은 이 세 규칙의 합이다 — `.cm-gutter-lint`(lint 열) +
+                 `.cm-lineNumbers`(번호 열) + borderRight. 한 곳만 줄이면 2/3가 안 나온다. */
             '.cm-gutters': {
               /* Phase 65 D5 — 줄바꿈을 끄면 거터가 sticky로 살아나 본문이 그 뒤로 흐른다.
                  투명이면 글자가 줄 번호 위로 비쳐 지나가므로 블록 표면색을 깐다.
                  ⚠ 폴백 필수: 변수가 없으면 unset이 되어 CM base theme의 #f5f5f5 회색 띠가 살아난다.
                  ⚠ inherit은 안 된다 — .cm-editor가 backgroundColor:transparent를 명시한다. */
               backgroundColor: 'var(--block-surface, var(--block-bg))',
-              borderRight: '1px solid var(--border-subtle)',
+              /* ⚠ 구분선은 `--border-subtle`(#E8E4DF)이었는데 거터 배경과 대비가 **1.06:1**로
+                 사실상 보이지 않았다. 줄바꿈을 끄면 본문이 이 선 밑으로 들어가 사라지므로
+                 "어디서 잘렸는지"를 즉시 알려면 선이 실재해야 한다 → `--block-hairline`
+                 (1.66:1 / 활성 카드 1.50:1). 블록 사이 구분선과 같은 색이다.
+                 더 여리게 하려면 `--border-content`(1.38 / 1.25)가 다음 단계. */
+              borderRight: '1px solid var(--block-hairline)',
+              /* 번호를 본문보다 한 급 작게 — 편집 영역을 넓히는 주 레버이고
+                 lint 열(`1.4em`)·번호 열 최소폭이 전부 이 em을 따라 함께 줄어든다. */
+              fontSize: '0.82em',
               // 블록이 실제 border를 쓰므로 거터가 좌측 테두리를 덮지 않음
               // → 거터 자체의 좌측선/모서리 보정 불필요 (이중선 제거)
             },
-            // 줄 번호 영역: 2자리까지 폭 통일, 3자리 이상부터 자연 확장
-            // CodeMirror가 셀 폭을 인라인으로 강제하므로 !important 필요
+            /* 줄 번호 영역: 2자리까지 폭 통일, 3자리 이상부터 자연 확장.
+               ⚠ CodeMirror가 셀 폭을 인라인으로 강제하므로 !important 필요.
+               ⚠ 2자리 폭을 정하는 것은 minWidth가 아니라 **글자 폭 + 좌우 padding**이다
+                 (실측: 15px에서 숫자 한 자 ≈ 9.2px라 2자리 18.4px + 패딩 8px = 26.4px가
+                  옛 1.8em(27px)을 꽉 채우고 있었다). 그래서 폭을 줄이려면 padding부터 깎는다. */
             '.cm-lineNumbers .cm-gutterElement': {
-              minWidth: '1.8em !important',
+              minWidth: '1.5em !important',
+              padding: '0 2px 0 3px',
               textAlign: 'right',
+            },
+            /* lint 열: 마커를 10px 점으로 갈아 뒀는데(아래 `.cm-lint-marker-*::after`)
+               폭은 base theme의 1.4em(=21px) 그대로라 점 하나에 21px을 쓰고 있었다. */
+            '.cm-gutter-lint': {
+              width: '1em',
+            },
+            '.cm-gutter-lint .cm-gutterElement': {
+              padding: '0.1em',
+            },
+            '.cm-lint-marker': {
+              width: '0.8em',
+              height: '0.8em',
             },
             // 코드 접힘(fold) 화살표 숨김
             '.cm-foldGutter': {
