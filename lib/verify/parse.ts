@@ -203,6 +203,9 @@ export function repairLatexControlChars<T>(v: T): T {
 export const PROBLEM_TAGS = ['조건결함', '답없음', '선택지오류', '표기'] as const;
 export const SOLUTION_TAGS = [
   '계산오류', '표기오류', '논리비약', '논리오류', '수식비일관', '경우누락', '문제풀이불일치',
+  // 61g — 시트 V2(`dda7bba`)의 유형 확장 이식. **개명이 아니라 추가**라 E-4 체계는 그대로다.
+  // 저장된 옛 리포트의 태그는 문자열이라 그대로 남고, 카드는 매핑 표 없이 그대로 찍는다.
+  '근거없는가정', '충분성미확인',
 ] as const;
 export const COMMON_TAGS = ['정답불일치'] as const;
 
@@ -230,6 +233,12 @@ export function normalizeTag(raw: string, kind: VerifyKind): string {
     return '조건결함';
   }
   if (has('계산', 'calc', 'arith')) return '계산오류';
+  // 61g — 시트 type 문자열(`unwarranted_assumption`·`sufficiency_unchecked`)을 받는다.
+  // ⚠ 이 두 줄을 `정답불일치` 힌트 옆(problem 분기 **위**)으로 옮기지 말 것 — 문제 검증으로 샌다.
+  // ⚠ `추론/infer/invalid`는 넣지 않았다: 폴백이 이미 `논리오류`라 무익하고,
+  //    뒤 힌트(`비약`·`일관`·`경우`·`불일치`·`표기`)를 가로채기만 한다(61g E4).
+  if (has('가정', 'assum', 'unwarrant')) return '근거없는가정';
+  if (has('충분', 'suffic', 'uncheck')) return '충분성미확인';
   if (has('비약', 'gap', 'logic_gap')) return '논리비약';
   if (has('일관', 'incons')) return '수식비일관';
   if (has('경우', 'case')) return '경우누락';
@@ -264,7 +273,8 @@ export function sanitizeFindings(arr: unknown, kind: VerifyKind, cap = 8): RawFi
       ...(suggestion ? { suggestion } : {}),
       ...(hint !== undefined ? { blockHint: hint } : {}),
     });
-    if (out.length >= cap) break;   // 후보 상한 8 (시트 MAX_CANDIDATES)
+    if (out.length >= cap) break;   // 패스별 상한. 기본 8, 호출부가 넘긴다(논리 패스 12).
+                                    // 진실은 `lib/verify/prompts.ts`의 CAP_* 하나다(61g D9).
   }
   return out;
 }
@@ -276,6 +286,9 @@ export function sanitizeFindings(arr: unknown, kind: VerifyKind, cap = 8): RawFi
  * - id는 병합 후 **다시 매긴다.** 2차 판정이 id로 맞물리므로 패스별 id를 그대로 두면 충돌한다.
  * - 패스 순서를 섞지 않고 이어 붙인다 — 앞 패스가 먼저 판정된다는 보장은 필요 없지만,
  *   결정적 순서라야 같은 입력에 같은 리포트가 나온다.
+ *   ⚠ 61g에서 **교차 병합(패스별 머리부터 번갈아)을 검토했으나 채택하지 않았다** — 계산 패스
+ *   상한이 8인 한 이어 붙이기와 **결과 집합이 같고 순서만 달라진다**(cap 20: 양쪽 다 계산 8 +
+ *   논리 12). 논리 몫을 늘리는 것은 전적으로 `cap`이지 병합 순서가 아니다(61g E1).
  */
 export function mergeCandidates(lists: RawFinding[][], cap: number): RawFinding[] {
   const out: RawFinding[] = [];

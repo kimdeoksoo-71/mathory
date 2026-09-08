@@ -303,3 +303,76 @@ test('61f LabeledBlock.imageUrl — totalChars는 text만 센다 (자리표시�
   assert.equal(n, F.FIG_PLACEHOLDER.length);
   assert.equal(n, 4);
 });
+
+/* ═══ Phase 61g — 논리 결함 유형 확장 (시트 STEP3 V2 이식) ═══ */
+
+test('61g T1 — 시트 6종 type 문자열이 의도한 태그로 정규화된다', () => {
+  const m = {
+    logic_gap: '논리비약',
+    invalid_inference: '논리오류',          // 어느 힌트에도 안 걸려 폴백 — 의도한 결과(E4)
+    unwarranted_assumption: '근거없는가정',
+    case_omission: '경우누락',
+    sufficiency_unchecked: '충분성미확인',
+    inconsistency: '수식비일관',
+  };
+  for (const [type, tag] of Object.entries(m)) {
+    assert.equal(V.normalizeTag(type, 'solution'), tag, type);
+  }
+});
+
+test('61g T2 — 하위 호환 · 신규 힌트가 문제 검증으로 새지 않는다', () => {
+  // 옛 2종은 종전 태그 그대로 (시트 V1 시절 저장분·재전송 대비)
+  assert.equal(V.normalizeTag('비약', 'solution'), '논리비약');
+  assert.equal(V.normalizeTag('일관성 없음', 'solution'), '수식비일관');
+  // ⚠ 신규 힌트는 problem 분기 **아래**에 있어야 한다 — 위로 옮기면 여기서 깨진다(S3)
+  const allowP = V.allowedTags('problem');
+  for (const t of ['unwarranted_assumption', 'sufficiency_unchecked', '가정', '충분']) {
+    assert.ok(allowP.includes(V.normalizeTag(t, 'problem')), t);
+  }
+});
+
+test('61g T3 — 신규 2종은 풀이 화이트리스트에만 있다', () => {
+  const sol = V.allowedTags('solution');
+  const prob = V.allowedTags('problem');
+  for (const t of ['근거없는가정', '충분성미확인']) {
+    assert.ok(sol.includes(t), t);
+    assert.ok(!prob.includes(t), t);
+    assert.equal(V.normalizeTag(t, 'solution'), t);   // 이미 화이트리스트면 그대로 통과
+  }
+});
+
+test('61g T4 — sanitizeFindings는 호출부가 넘긴 cap을 그대로 쓴다 (논리 패스 12)', () => {
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ tag: '논리비약', quote: `q${i}`, reason: 'r' }));
+  assert.equal(V.sanitizeFindings(mk(20), 'solution', 12).length, 12);
+  assert.equal(V.sanitizeFindings(mk(20), 'solution').length, 8);      // 기본값 불변
+  assert.equal(V.sanitizeFindings(mk(5), 'solution', 12).length, 5);
+});
+
+test('61g T5 — 프롬프트에 신규 유형·전역 검토·"답이 맞아도 결함" 문구가 있다', () => {
+  const logic = P.PROMPT_SOLUTION_FIRST_LOGIC.system;
+  for (const s of ['근거없는가정', '충분성미확인', '전역 검토', '결론을 확정하는 줄']) {
+    assert.ok(logic.includes(s), `논리 1차: ${s}`);
+  }
+  assert.ok(logic.includes('답이 맞더라도'), '논리 1차: 답 정오로 후보를 제외하지 않는다');
+
+  const judge = P.PROMPT_JUDGE.system;
+  assert.ok(judge.includes("[2']"), '2차: 유형별 기준 절');
+  assert.ok(judge.includes('invalid"의 근거가 아닙니다'), '2차: 답이 맞다 ≠ invalid');
+  // ⚠ D5 — uncertain을 조이는 시트 문구는 이식하지 않았고, 반대 방향 한 줄이 [2'] 머리에 있다
+  assert.ok(judge.includes('가리지 못하면 "uncertain"입니다'), '2차: uncertain 우선');
+  assert.ok(!judge.includes('애매해 보인다'), '시트 V2의 uncertain 조임 문구는 이식하지 않는다');
+});
+
+test('61g T6 — 후보 상한의 단일 출처: 프롬프트 문자열과 cap이 일치한다', () => {
+  // ⚠ PROMPT_JUDGE는 1차가 아니라 cap이 없다 — 대상에서 제외(S13)
+  const passes = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES];
+  for (const pr of passes) {
+    assert.equal(typeof pr.cap, 'number', 'cap 필드');
+    assert.ok(pr.system.includes(`최대 ${pr.cap}개`), `system이 알리는 수 = ${pr.cap}`);
+  }
+  const [calc, logic] = P.SOLUTION_FIRST_PASSES;
+  assert.equal(calc.cap, 8);
+  assert.equal(logic.cap, 12);
+  // 병합 상한 = 패스 상한의 합 → 병합 단계는 자르지 않는다
+  assert.equal(P.MERGE_CANDIDATE_CAP, calc.cap + logic.cap);
+});
