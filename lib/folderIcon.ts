@@ -5,14 +5,15 @@
  *
  * - `Folder.icon`은 Phosphor 이름(`^[a-z0-9-]+$`)이거나 옛 유니코드 이모지다.
  *   두 표기는 절대 겹치지 않으므로 정규식 하나로 가른다. 옛 값·빈 값은 기본 아이콘(N4).
- * - weight: 활성(선택) 폴더 행만 bold — 글자가 700으로 굵어지는 조건과 동일(D3).
+ * - weight: regular 단일. ⚠ M5 D3의 "활성 행만 bold"는 M6 D23에서 폐기했다(자산 1,512개 절감) —
+ *   활성 강조는 배경·글자 700이 담당한다. `active`·weight를 되살리지 말 것.
  * - 기본 아이콘: 펼침(depth 무관) folder-open → 최상위 folder → 하위 folder-simple(D4·N3).
  *   ⚠ `folder-simple-open`은 core 2.1.1에 없다 — 펼침을 depth로 가르지 말 것.
  */
 
 export type FolderGlyphSpec =
-  | { kind: 'inline'; key: 'folder' | 'folderSimple' | 'folderOpen'; bold: boolean }
-  | { kind: 'asset'; name: string; weight: 'regular' | 'bold' };
+  | { kind: 'inline'; key: 'folder' | 'folderSimple' | 'folderOpen' }
+  | { kind: 'asset'; name: string };
 
 /** Phosphor 아이콘 이름 판별 — 유니코드 이모지와 불겹침(D7). */
 export function isPhosphorIconName(v: string | undefined | null): v is string {
@@ -23,13 +24,12 @@ export function resolveFolderGlyph(a: {
   icon?: string | null;
   isRoot: boolean;
   expanded?: boolean;
-  active?: boolean;
 }): FolderGlyphSpec {
   if (isPhosphorIconName(a.icon)) {
-    return { kind: 'asset', name: a.icon, weight: a.active ? 'bold' : 'regular' };
+    return { kind: 'asset', name: a.icon };
   }
   const key = a.expanded ? 'folderOpen' : a.isRoot ? 'folder' : 'folderSimple';
-  return { kind: 'inline', key, bold: !!a.active };
+  return { kind: 'inline', key };
 }
 
 // ───────────────────────── 피커 검색 (D6) ─────────────────────────

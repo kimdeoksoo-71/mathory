@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   OPTIONAL_COLUMN_IDS, MIN_COL_WIDTH,
   defaultPrefs, sanitizePrefs, toggledListSort, movedOrder,
-  visibleColumns, buildGridTemplate, verifyRank, blockchainRank, columnLabel,
+  visibleColumns, buildGridTemplate, verifyRank, blockchainRank, columnLabel, columnHeaderKind,
 } from '../.test-build/lib/listColumns.js';
 
 /* ─── 기본값 ─── */
@@ -21,21 +21,40 @@ test('defaultPrefs: 휴지통은 수정일 내림차순(D41 — 최근 버린 �
 });
 
 /* ─── sanitize ─── */
-test('sanitizePrefs: null·비객체·버전 불일치는 기본값', () => {
+test('sanitizePrefs: null·비객체·미지 버전은 기본값', () => {
   assert.deepEqual(sanitizePrefs(null), defaultPrefs());
   assert.deepEqual(sanitizePrefs('x'), defaultPrefs());
-  assert.deepEqual(sanitizePrefs({ v: 2, hidden: ['agent'] }), defaultPrefs());
+  assert.deepEqual(sanitizePrefs({ v: 3, hidden: ['agent'] }), defaultPrefs());
+});
+
+test('sanitizePrefs: v:1 마이그레이션(M6 D2) — order만 기본 순서로, hidden·widths·sort는 보존', () => {
+  const p = sanitizePrefs({ v: 1, order: ['blockchain', 'comments', 'agent'], widths: { agent: 80 }, hidden: ['comments'], sort: { key: 'agent', dir: 'desc' } });
+  assert.equal(p.v, 2);
+  assert.deepEqual(p.order, OPTIONAL_COLUMN_IDS);          // 옛 order는 버린다
+  assert.equal(p.widths.agent, 80);
+  assert.deepEqual(p.hidden, ['comments']);
+  assert.deepEqual(p.sort, { key: 'agent', dir: 'desc' });
+});
+
+test('LIST_COLUMNS 기본 순서(M6 D1) · 헤더 표기(D4)', () => {
+  assert.deepEqual(OPTIONAL_COLUMN_IDS, ['verify_problem', 'verify_solution', 'comments', 'agent', 'blockchain']);
+  assert.equal(columnHeaderKind('comments'), 'icon');
+  assert.equal(columnHeaderKind('agent'), 'icon');
+  assert.equal(columnHeaderKind('blockchain'), 'icon');
+  assert.equal(columnHeaderKind('verify_problem'), 'text');
+  assert.equal(columnHeaderKind('owner'), 'text');
+  assert.equal(columnHeaderKind('ghost'), 'text');
 });
 
 test('sanitizePrefs: 모르는 id는 버리고 새 id는 뒤에 붙는다(D6)', () => {
-  const p = sanitizePrefs({ v: 1, hidden: ['agent', 'ghost'], order: ['comments', 'ghost', 'agent'] });
+  const p = sanitizePrefs({ v: 2, hidden: ['agent', 'ghost'], order: ['comments', 'ghost', 'agent'] });
   assert.deepEqual(p.hidden, ['agent']);
   // 저장에 없던 나머지 optional이 뒤에 순서대로
   assert.deepEqual(p.order, ['comments', 'agent', ...OPTIONAL_COLUMN_IDS.filter((id) => id !== 'comments' && id !== 'agent')]);
 });
 
 test('sanitizePrefs: widths는 조절 대상만·최소 40·정수 반올림', () => {
-  const p = sanitizePrefs({ v: 1, widths: { agent: 10, updated: 90.6, title: 500, ghost: 80, comments: NaN } });
+  const p = sanitizePrefs({ v: 2, widths: { agent: 10, updated: 90.6, title: 500, ghost: 80, comments: NaN } });
   assert.equal(p.widths.agent, MIN_COL_WIDTH);
   assert.equal(p.widths.updated, 91);
   assert.equal('title' in p.widths, false);   // 제목(1fr)은 조절 대상 아님(D7)
@@ -44,9 +63,9 @@ test('sanitizePrefs: widths는 조절 대상만·최소 40·정수 반올림', (
 });
 
 test('sanitizePrefs: sort 키·방향 검증 — 불명이면 기본', () => {
-  assert.deepEqual(sanitizePrefs({ v: 1, sort: { key: 'agent', dir: 'desc' } }).sort, { key: 'agent', dir: 'desc' });
-  assert.deepEqual(sanitizePrefs({ v: 1, sort: { key: 'ghost', dir: 'desc' } }).sort, { key: 'title', dir: 'asc' });
-  assert.deepEqual(sanitizePrefs({ v: 1, sort: { key: 'title', dir: 'up' } }).sort, { key: 'title', dir: 'asc' });
+  assert.deepEqual(sanitizePrefs({ v: 2, sort: { key: 'agent', dir: 'desc' } }).sort, { key: 'agent', dir: 'desc' });
+  assert.deepEqual(sanitizePrefs({ v: 2, sort: { key: 'ghost', dir: 'desc' } }).sort, { key: 'title', dir: 'asc' });
+  assert.deepEqual(sanitizePrefs({ v: 2, sort: { key: 'title', dir: 'up' } }).sort, { key: 'title', dir: 'asc' });
 });
 
 /* ─── 정렬 토글 ─── */
@@ -75,7 +94,7 @@ test('movedOrder: 한 칸 이동 · 경계 무시 · 원본 불변', () => {
 
 /* ─── 표시 칼럼 · 템플릿 ─── */
 test('visibleColumns: 제목 → optional(순서·숨김) → mode → 수정일', () => {
-  const p = sanitizePrefs({ v: 1, hidden: ['blockchain'], order: ['comments', 'agent', 'verify_problem', 'verify_solution', 'blockchain'] });
+  const p = sanitizePrefs({ v: 2, hidden: ['blockchain'], order: ['comments', 'agent', 'verify_problem', 'verify_solution', 'blockchain'] });
   assert.deepEqual(visibleColumns(p, 'my'), ['title', 'comments', 'agent', 'verify_problem', 'verify_solution', 'updated']);
   assert.deepEqual(visibleColumns(p, 'received').includes('owner'), true);
   assert.deepEqual(visibleColumns(p, 'sent').includes('perm'), true);

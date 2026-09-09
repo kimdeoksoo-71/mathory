@@ -8,8 +8,9 @@ import { PH, PH_CORE_VERSION } from './phosphorPaths';
  *   추가·교체는 scripts/gen-phosphor-paths.mjs의 ICONS 표에서.
  * - 획 굵기는 weight 파일이 정한다(regular = 256칸에 16). CSS·strokeWidth로 못 바꾼다.
  * - 최소 렌더 14px(D4). 14 미만 잔존(†)은 컨택트시트 판정 대상 — 임의 축소 금지.
- * - 유지 예외 3종: IconSave(자체 도안 — 저장=Firestore 확정 은유 + checked prop) ·
- *   IconGoogle · IconGithub(상표, D17). 이 셋만 viewBox 24 stroke 계열로 남는다.
+ *   † 9번째: IconSortAsc/Desc **12**(M6 D7 — 덕수 "작아도 충분하다", 리스트 헤더 11.5px 글자 옆).
+ * - 유지 예외 2종: IconGoogle · IconGithub(상표, D17)만 viewBox 24 stroke 계열로 남는다.
+ *   IconSave는 M6 D20에서 Phosphor cloud-arrow-up/cloud-check로 편입(자체 도안 폐기).
  * - ⚠ 미사용 판별은 `grep -rnw IconX`(단어 경계) — JSX 태그 검색은 트리거 맵·ComponentType
  *   변수 같은 값 참조를 놓친다(IconExit 사례, Final_V4 §1-4·N8).
  * - ⚠ `.svg` 파일로 빼지 말 것 — `currentColor`가 끊긴다.
@@ -47,10 +48,11 @@ function phIcon(d: string, defaultSize: number) {
  * 아이콘은 계속 인라인 path(PhIcon: 첫 페인트 fetch 0). 404는 빈칸이 된다(mask엔 onError가
  * 없다) — 방어는 쓰기(피커가 인덱스 이름만)·읽기(isPhosphorIconName 불일치 → 기본 아이콘)에서.
  */
-export function PhAsset({ name, weight = 'regular', size = 16, title }: {
-  name: string; weight?: 'regular' | 'bold'; size?: number; title?: string;
+export function PhAsset({ name, size = 16, title }: {
+  name: string; size?: number; title?: string;
 }) {
-  const url = `/icons/phosphor/${PH_CORE_VERSION}/${weight}/${name}${weight === 'bold' ? '-bold' : ''}.svg`;
+  // M6 D23 — weight는 regular 단일(활성 bold 폐기). 자산 디렉터리도 regular/만 복사한다.
+  const url = `/icons/phosphor/${PH_CORE_VERSION}/regular/${name}.svg`;
   const mask = `url("${url}") center / contain no-repeat`;
   return (
     <span
@@ -63,10 +65,6 @@ export function PhAsset({ name, weight = 'regular', size = 16, title }: {
   );
 }
 
-/** 카탈로그 자산 URL — Sidebar의 bold 예열 fetch가 공유한다(M5 Q3). */
-export function phAssetUrl(name: string, weight: 'regular' | 'bold'): string {
-  return `/icons/phosphor/${PH_CORE_VERSION}/${weight}/${name}${weight === 'bold' ? '-bold' : ''}.svg`;
-}
 
 /* ═══ 내비게이션·셸 ═══ */
 export const IconSidebar = phIcon(PH.sidebarSimple, 20);
@@ -98,7 +96,8 @@ export const IconDotsVertical = phIcon(PH.dotsThreeVertical, 16);
 /** D22 — 현행 IconDots도 도안이 세로 점 3개였다. 별칭으로 통합(이름만 유지). */
 export const IconDots = IconDotsVertical;
 export const IconShare = phIcon(PH.share, 14);
-export const IconComment = phIcon(PH.chatText, 14);
+/** M6 D21 — chat-dots. 옛 chat-text는 코칭 Tip(chat-centered-text)과 꼬리 위치만 달라 같은 도안으로 보였다. */
+export const IconComment = phIcon(PH.chatDots, 14);
 export const IconBlockchain = phIcon(PH.graph, 14);
 export const IconDocLines = phIcon(PH.fileText, 14);
 export const IconCoachImportant = phIcon(PH.chatCenteredText, 14);
@@ -108,6 +107,9 @@ export const IconTextWidth = phIcon(PH.textWidth, 24);
 export const IconAgent = phIcon(PH.legoSmiley, 14);
 /** M5 D9 — AIBrandIcon의 '🤖' 글자 폴백 대체. */
 export const IconRobot = phIcon(PH.robot, 14);
+/** M6 D6·D7 — 정렬 방향(리스트 헤더 · 카드 보기 SortControls). 기본 12는 † 예외(덕수 판정). */
+export const IconSortAsc = phIcon(PH.arrowUp, 12);
+export const IconSortDesc = phIcon(PH.arrowDown, 12);
 
 /** 로딩 스피너 — circle-notch 회전. animateTransform은 회전 대상(<path>)의 자식이어야 한다(D14). */
 export function IconLoader({ size = 14, color = 'currentColor', className }: IconProps) {
@@ -122,22 +124,15 @@ export function IconLoader({ size = 14, color = 'currentColor', className }: Ico
 }
 
 /**
- * 저장 — 클라우드(Firestore 확정) + 체크(저장 완료). **유지 예외(D6, 덕수 확정)** — 이 앱의
- * 저장은 실제로 Firestore 확정을 뜻하므로 도안을 동작에 맞췄다(Phase 55c).
- * checked=false면 구름만 → 미저장(dirty). ListView 수정일 칸의 상태 표시기로도 쓰인다(3:1 규약).
- * ⚠️ IconCheck(단독 체크)와 용도가 다르다 — 여기 체크는 "구름 안의 완료 표시"다.
+ * 저장 — M6 D20: Phosphor `cloud-arrow-up`(checked=false · 미저장 = "올릴 것이 있다") /
+ * `cloud-check`(checked=true · 저장됨). M4 D6의 "유지 예외"(Feather 구름 stroke)는 폐기.
+ * 저장 = Firestore 확정이라는 은유(구름)는 그대로다. 색은 호출부(dirty면 --accent-danger).
+ * ⚠ VersionTimeline이 값(TRIGGER_ICON 맵)으로 참조한다 — 시그니처(size·color·checked)를 유지할 것.
+ * ⚠ IconCheck(단독 체크)와 용도가 다르다 — 여기 체크는 "구름 안의 완료 표시"다.
  */
-export function IconSave({ size = 18, color = 'currentColor', checked = true }:
+export function IconSave({ size = 18, color = 'currentColor', className, checked = true }:
   IconProps & { checked?: boolean }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color}
-      strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-      {/* 구름 (Feather cloud) */}
-      <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
-      {/* 체크 좌표는 미리보기(48·18·14·12px) 검수로 확정 — 임의 조정 금지. */}
-      {checked && <path d="M5.6 11.8 8 14.2 12.4 9.8" />}
-    </svg>
-  );
+  return <PhIcon d={checked ? PH.cloudCheck : PH.cloudArrowUp} size={size} color={color} className={className} />;
 }
 
 /* ═══ 버전 관리 (Phase 55b — 트리거 맵이 컴포넌트 값으로 참조한다) ═══ */

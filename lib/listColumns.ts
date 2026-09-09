@@ -17,17 +17,22 @@ export interface ListColumnDef {
   label: string;
   /** fixed = 위치 고정(제목 1열·수정일 마지막), optional = 보이기/순서 조절 대상 */
   kind: 'fixed' | 'optional';
+  /** M6 D4 — 헤더 표기. 'icon'이면 ListView가 id→아이콘을 매핑하고 label은 말풍선·팝오버·aria-label로 간다 */
+  header: 'text' | 'icon';
 }
 
-/** 레지스트리 — optional의 나열 순서가 기본 표시 순서다 */
+/** 레지스트리 — optional의 나열 순서가 기본 표시 순서다.
+ *  M6 D1 — 검증 2종 → 댓글 → Agent → 원본인증(덕수 나열 순). 라벨은 N2로 불변.
+ *  ⚠ 기본 순서를 바꿀 때는 아래 sanitizePrefs의 버전 마이그레이션을 같이 올릴 것 —
+ *    저장된 prefs의 order가 이 나열보다 우선하므로 레지스트리만 바꾸면 기존 브라우저는 그대로다. */
 export const LIST_COLUMNS: ListColumnDef[] = [
-  { id: 'title', label: '제목', kind: 'fixed' },
-  { id: 'blockchain', label: '원본인증', kind: 'optional' },
-  { id: 'verify_problem', label: '검증(문제)', kind: 'optional' },
-  { id: 'verify_solution', label: '검증(풀이)', kind: 'optional' },
-  { id: 'agent', label: 'Agent', kind: 'optional' },
-  { id: 'comments', label: '댓글', kind: 'optional' },
-  { id: 'updated', label: '수정일', kind: 'fixed' },
+  { id: 'title', label: '제목', kind: 'fixed', header: 'text' },
+  { id: 'verify_problem', label: '검증(문제)', kind: 'optional', header: 'text' },
+  { id: 'verify_solution', label: '검증(풀이)', kind: 'optional', header: 'text' },
+  { id: 'comments', label: '댓글', kind: 'optional', header: 'icon' },
+  { id: 'agent', label: 'Agent', kind: 'optional', header: 'icon' },
+  { id: 'blockchain', label: '원본인증', kind: 'optional', header: 'icon' },
+  { id: 'updated', label: '수정일', kind: 'fixed', header: 'text' },
 ];
 
 export const OPTIONAL_COLUMN_IDS: string[] = LIST_COLUMNS.filter((c) => c.kind === 'optional').map((c) => c.id);
@@ -39,6 +44,11 @@ export function columnLabel(id: string): string {
   return LIST_COLUMNS.find((c) => c.id === id)?.label ?? MODE_COLUMN_LABELS[id] ?? id;
 }
 
+/** M6 D4 — 헤더 표기 종류. mode 칼럼(owner·perm)·불명 id는 text */
+export function columnHeaderKind(id: string): 'text' | 'icon' {
+  return LIST_COLUMNS.find((c) => c.id === id)?.header ?? 'text';
+}
+
 /** 폭 조절 대상(D7) — 제목(1fr)은 직접 조절하지 않는다. mode 칼럼은 고정 px */
 export const WIDTH_ADJUSTABLE_IDS: string[] = [...OPTIONAL_COLUMN_IDS, 'updated'];
 export const MIN_COL_WIDTH = 40;
@@ -46,7 +56,8 @@ export const MIN_COL_WIDTH = 40;
 const SORTABLE_IDS = new Set(['title', 'updated', ...OPTIONAL_COLUMN_IDS]);
 
 export interface ListPrefs {
-  v: 1;
+  /** M6 D2 — v:2. v:1은 order만 버리고(기본 순서 개편) hidden·widths·sort는 살린다 */
+  v: 2;
   /** 숨긴 optional 칼럼 id */
   hidden: string[];
   /** optional 칼럼 표시 순서(고정 칼럼 제외) */
@@ -58,7 +69,7 @@ export interface ListPrefs {
 
 export function defaultPrefs(opts?: { trash?: boolean }): ListPrefs {
   return {
-    v: 1,
+    v: 2,
     hidden: [],
     order: [...OPTIONAL_COLUMN_IDS],
     widths: {},
@@ -72,13 +83,15 @@ export function sanitizePrefs(raw: unknown, opts?: { trash?: boolean }): ListPre
   const d = defaultPrefs(opts);
   if (!raw || typeof raw !== 'object') return d;
   const r = raw as Record<string, unknown>;
-  if (r.v !== 1) return d;
+  if (r.v !== 1 && r.v !== 2) return d;
 
   const known = new Set(OPTIONAL_COLUMN_IDS);
   const hidden = Array.isArray(r.hidden)
     ? r.hidden.filter((x): x is string => typeof x === 'string' && known.has(x))
     : [];
-  const orderIn = Array.isArray(r.order)
+  // M6 D2(N1) — v:1은 order만 기본값으로 리셋한다. 그 판의 order는 옛 레지스트리 순서를
+  // 그대로 저장한 것이라 남기면 기본 순서 개편이 기존 브라우저에 영원히 닿지 않는다.
+  const orderIn = r.v === 2 && Array.isArray(r.order)
     ? r.order.filter((x): x is string => typeof x === 'string' && known.has(x))
     : [];
   // 새 id는 뒤에 붙임 — 저장 당시 없던 칼럼이 사라지지 않는다
@@ -100,7 +113,7 @@ export function sanitizePrefs(raw: unknown, opts?: { trash?: boolean }): ListPre
     sort = { key: s.key, dir: s.dir };
   }
 
-  return { v: 1, hidden, order, widths, sort };
+  return { v: 2, hidden, order, widths, sort };
 }
 
 /** 헤더 클릭 토글 — 같은 키면 방향 반전, 새 키면 기본 방향(제목만 오름차순) */

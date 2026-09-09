@@ -20,24 +20,22 @@ test('isPhosphorIconName: Phosphor 이름 통과, 이모지·빈 값·null 거�
   assert.equal(isPhosphorIconName('folder star'), false);
 });
 
-/* ─── 기본 아이콘 8조합 (D3·D4·N3·N4) ─── */
+/* ─── 기본 아이콘 4조합 (D4·N3·N4 — M6 D23으로 활성 bold 축은 사라졌다) ─── */
 test('기본: 최상위 folder / 하위 folder-simple / 펼침은 depth 무관 folder-open', () => {
-  assert.deepEqual(resolveFolderGlyph({ isRoot: true }), { kind: 'inline', key: 'folder', bold: false });
-  assert.deepEqual(resolveFolderGlyph({ isRoot: false }), { kind: 'inline', key: 'folderSimple', bold: false });
-  assert.deepEqual(resolveFolderGlyph({ isRoot: true, expanded: true }), { kind: 'inline', key: 'folderOpen', bold: false });
-  assert.deepEqual(resolveFolderGlyph({ isRoot: false, expanded: true }), { kind: 'inline', key: 'folderOpen', bold: false });
+  assert.deepEqual(resolveFolderGlyph({ isRoot: true }), { kind: 'inline', key: 'folder' });
+  assert.deepEqual(resolveFolderGlyph({ isRoot: false }), { kind: 'inline', key: 'folderSimple' });
+  assert.deepEqual(resolveFolderGlyph({ isRoot: true, expanded: true }), { kind: 'inline', key: 'folderOpen' });
+  assert.deepEqual(resolveFolderGlyph({ isRoot: false, expanded: true }), { kind: 'inline', key: 'folderOpen' });
 });
 
-test('활성이면 inline은 bold 플래그, asset은 bold weight (D3)', () => {
-  assert.deepEqual(resolveFolderGlyph({ isRoot: true, active: true }), { kind: 'inline', key: 'folder', bold: true });
-  assert.deepEqual(resolveFolderGlyph({ isRoot: false, expanded: true, active: true }), { kind: 'inline', key: 'folderOpen', bold: true });
-  assert.deepEqual(resolveFolderGlyph({ icon: 'folder-star', isRoot: false }), { kind: 'asset', name: 'folder-star', weight: 'regular' });
-  assert.deepEqual(resolveFolderGlyph({ icon: 'folder-star', isRoot: false, active: true }), { kind: 'asset', name: 'folder-star', weight: 'bold' });
+test('사용자 아이콘은 asset regular 단일 — weight 축 없음 (M6 D23)', () => {
+  assert.deepEqual(resolveFolderGlyph({ icon: 'folder-star', isRoot: false }), { kind: 'asset', name: 'folder-star' });
+  assert.deepEqual(resolveFolderGlyph({ icon: 'folder-star', isRoot: true, expanded: true }), { kind: 'asset', name: 'folder-star' });
 });
 
 test('옛 유니코드 값은 기본 아이콘으로 (N4 — 데이터 무접촉·표시만 폴백)', () => {
-  assert.deepEqual(resolveFolderGlyph({ icon: '📁', isRoot: true }), { kind: 'inline', key: 'folder', bold: false });
-  assert.deepEqual(resolveFolderGlyph({ icon: '🍎', isRoot: false, expanded: true, active: true }), { kind: 'inline', key: 'folderOpen', bold: true });
+  assert.deepEqual(resolveFolderGlyph({ icon: '📁', isRoot: true }), { kind: 'inline', key: 'folder' });
+  assert.deepEqual(resolveFolderGlyph({ icon: '🍎', isRoot: false, expanded: true }), { kind: 'inline', key: 'folderOpen' });
 });
 
 /* ─── 검색 (D6) ─── */

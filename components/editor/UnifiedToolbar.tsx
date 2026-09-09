@@ -15,6 +15,7 @@ import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader, PhIcon } from '../ui/Icons';
 import { PH } from '../ui/phosphorPaths';
 import { ICON_SIZE } from './toolbarIcons';
+import { useHoverTip } from '../ui/HoverTip';
 
 // ═══════════════════════════════════════════════
 // Row 2 아이콘 — Phosphor regular · ICON_SIZE 20 (M4 · Final_V4 §3-1).
@@ -210,8 +211,8 @@ const ICON_BTN_BASE: React.CSSProperties = {
   padding: 0,
 };
 
-const TOOLTIP_DELAY_MS = 600;
-
+/* 툴팁은 M6 D5′에서 components/ui/HoverTip.tsx의 useHoverTip으로 뽑아냈다(시각 불변 —
+   600ms · fixed · 11px). 리스트 헤더 아이콘 칼럼과 공유한다. ⚠ 네이티브 title 병기 금지. */
 function IconButton({
   title, onClick, active, disabled, children, buttonRef,
 }: {
@@ -222,35 +223,14 @@ function IconButton({
   children: React.ReactNode;
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
-  const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null);
-  const tipTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const innerBtnRef = useRef<HTMLButtonElement | null>(null);
+  const { anchorRef, show: showTip, hide: hideTip, tip } = useHoverTip(title);
 
-  // 외부 buttonRef와 내부 ref 동시 할당
+  // 외부 buttonRef와 훅의 앵커 ref 동시 할당
   const setBtnRef = (el: HTMLButtonElement | null) => {
-    innerBtnRef.current = el;
+    anchorRef.current = el;
     if (typeof buttonRef === 'function') buttonRef(el);
     else if (buttonRef) (buttonRef as React.MutableRefObject<HTMLButtonElement | null>).current = el;
   };
-
-  const showTip = () => {
-    if (tipTimer.current) clearTimeout(tipTimer.current);
-    tipTimer.current = setTimeout(() => {
-      const el = innerBtnRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setTipPos({ top: r.bottom + 6, left: r.left + r.width / 2 });
-    }, TOOLTIP_DELAY_MS);
-  };
-  const hideTip = () => {
-    if (tipTimer.current) clearTimeout(tipTimer.current);
-    tipTimer.current = null;
-    setTipPos(null);
-  };
-
-  useEffect(() => () => {
-    if (tipTimer.current) clearTimeout(tipTimer.current);
-  }, []);
 
   return (
     <>
@@ -279,30 +259,7 @@ function IconButton({
       >
         {children}
       </button>
-      {tipPos && (
-        <span
-          role="tooltip"
-          style={{
-            position: 'fixed',
-            top: tipPos.top,
-            left: tipPos.left,
-            transform: 'translateX(-50%)',
-            padding: '4px 8px',
-            background: 'rgba(33, 33, 33, 0.92)',
-            color: '#fff',
-            fontSize: 11,
-            fontWeight: 500,
-            fontFamily: 'var(--font-ui, sans-serif)',
-            borderRadius: 4,
-            whiteSpace: 'nowrap',
-            pointerEvents: 'none',
-            zIndex: 9999,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-          }}
-        >
-          {title}
-        </span>
-      )}
+      {tip}
     </>
   );
 }
