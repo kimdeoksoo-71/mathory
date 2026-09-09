@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
 import { IconChevron, IconShare, IconBazaar } from '../ui/Icons';
+import SidebarSectionHeader from './SidebarSectionHeader';
 
 export interface ShareGroup {
   uid: string;
@@ -41,32 +42,13 @@ export default function ShareTree({
 
   return (
     <div>
-      {/* 공유 카테고리 헤더 — My 헤더와 동일 스타일(동렬 최상위) */}
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          style={{
-            flex: 1, display: 'flex', alignItems: 'center',
-            border: 'none', background: 'none', cursor: 'pointer',
-            fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)',
-            letterSpacing: 0.3, fontFamily: 'var(--font-ui)', padding: '4px 0',
-            textAlign: 'left',
-          }}
-        >
-          공유
-        </button>
-        <button
-          onClick={() => setOpen((v) => !v)}
-          title={open ? '접기' : '펼치기'}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer', display: 'flex',
-            color: 'var(--text-muted)', padding: 2,
-            transform: open ? 'rotate(90deg)' : 'rotate(0)', transition: 'transform .15s',
-          }}
-        >
-          <IconChevron size={14} />
-        </button>
-      </div>
+      {/* 공유 카테고리 헤더 — M6 D22: My·최근 문항과 같은 SidebarSectionHeader(동렬 최상위) */}
+      <SidebarSectionHeader
+        icon={<IconShare size={16} />}
+        label="공유"
+        open={open}
+        onToggle={() => setOpen((v) => !v)}
+      />
 
       {open && (
         <div>
@@ -99,7 +81,8 @@ export default function ShareTree({
           {/* ── 받은 ── */}
           <ParentRow
             label="공유 받은 문항"
-            icon={<span style={{ display: 'flex', transform: 'scaleX(-1)' }}><IconShare size={15} /></span>}
+            /* M6 D24 — 받은 = 보낸의 180° 회전(오른쪽 위 → 왼쪽 아래). scaleX(-1)은 화살표가 위로 향해 '받는다'로 읽히지 않았다 */
+            icon={<span style={{ display: 'flex', transform: 'rotate(180deg)' }}><IconShare size={15} /></span>}
             count={receivedTotal}
             active={activeScopeKey === 'received-all'}
             expandable={receivedGroups.length > 0}

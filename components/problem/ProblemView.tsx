@@ -8,7 +8,7 @@ import {
   DIFFICULTIES, CATEGORY_OPTIONS,
   WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
 } from '../../lib/constants';
-import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, CARD_RADIUS } from './TabBody';
+import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, CARD_RADIUS_QUESTION } from './TabBody';
 import PdfDialog from './PdfDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
@@ -643,11 +643,10 @@ export default function ProblemView({
     width: widthEm * contentFontSize, flexShrink: 0,
   };
 
-  /* 덕수 요청(2026-08-28) — 글자크기·가로폭 스테퍼를 **우측 패널 상단**으로 옮겼다.
-     본문 위에 떠 있던 절대배치를 걷어내 댓글·agent 패널과 머리 모양이 통일된다.
-     ⚠ 대가: 우측 패널이 닫혀 있거나 댓글·agent 패널이 열린 동안에는 이 컨트롤에
-       닿을 수 없다(그때는 우측 단이 아예 존재하지 않는다 — Phase 62 D16).
-       글꼴·폭을 바꾸려면 우측 패널을 먼저 열어야 한다. */
+  /* M6 D12 — 글자크기·가로폭 스테퍼를 **제목행 우단**으로 되돌렸다(2026-08-28의 드로어 1행
+     이전을 철회). 드로어를 열어야만 닿는 것이 실사용에서 번거로웠다(덕수).
+     배치는 아래 return의 절대배치 래퍼가 맡는다 — rightReserve를 더하지 않으므로 드로어가
+     열리면 그 밑으로 들어간다(의도). 드로어 1행은 닫기 버튼만 남는다(D14). */
   const viewControls = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         {/* M3 A5(D14) — 폭·글자 스테퍼는 SizeStepper 공용. 'em' 단위는 화면에서 제거,
@@ -837,6 +836,24 @@ export default function ProblemView({
         </div>
       </div>
 
+      {/* ═══ M6 D12·D13 — 폭·글자 스테퍼: 제목행 우단 절대배치 ═══
+          루트(position:relative) 기준이라 '열기' 버튼(right 16 · 26×26 · top 16)과 같은 좌표계다.
+          right = 16 + 26 + 8 → 열기 버튼 왼쪽에 나란히. 세로는 제목행 전체 높이(57)에서 중앙 정렬.
+          ⚠ rightReserve를 더하지 않는다 — 드로어가 열리면 카드(z 40/50) 밑으로 들어가는 것이
+            의도다(덕수). 열기 버튼은 드로어가 열리면 렌더되지 않으므로 겹칠 일도 없다.
+          ⚠ zIndex 10: 열기 버튼(11) · 우측 단(40) · 댓글/agent(50)보다 아래.
+          배경은 제목행과 같은 토큰(--bg-functional) + paddingLeft 8 — 긴 제목이 스테퍼 뒤로
+          깔끔히 잘린다(이음새 없음). */}
+      <div style={{
+        position: 'absolute', top: 0, height: HEADER_H,
+        right: OUTER_PAD + 26 + 8,
+        display: 'flex', alignItems: 'center',
+        zIndex: 10,
+        background: 'var(--bg-functional)', paddingLeft: 8,
+      }}>
+        {viewControls}
+      </div>
+
       {/* ═══ 컨텐츠 행: 본문 + 메타 (패널·핸들은 컨테이너 직속, 전체 높이) ═══ */}
       <div style={{ display: 'flex', flexDirection: 'row', flex: 1, minHeight: 0 }}>
       {/* ═══ 왼쪽 + 가운데: 본문 스크롤 컨테이너 ═══ */}
@@ -972,7 +989,7 @@ export default function ProblemView({
         }}>
           <div style={{
             maxHeight: '80vh', overflow: 'auto', pointerEvents: 'auto',
-            borderRadius: CARD_RADIUS, boxShadow: 'var(--drawer-shadow)',
+            borderRadius: CARD_RADIUS_QUESTION, boxShadow: 'var(--drawer-shadow)',   // M6 D9 — 문제 카드와 같은 12
           }}>
             <TabBody
               tab={tabs.find((t) => t.id === 'question') ?? tabs[0]}
@@ -1000,8 +1017,8 @@ export default function ProblemView({
         onClick={() => setRightOpen(true)}
         title="우측 패널 열기"
         style={{
-          /* D49 — 제목행 접힘에 연동. 스테퍼가 우측 패널로 들어가면서 이 버튼이
-             콘텐츠 우상단의 유일한 떠 있는 컨트롤이 됐다(ctrlW 보정 불필요). */
+          /* D49 — 제목행 접힘에 연동. M6 D12로 스테퍼가 다시 이 버튼 **왼쪽**(right 50)에
+             선다 — 둘 다 루트 기준 절대배치이고 세로 중앙(28.5)이 같다. */
           position: 'absolute', top: 16,
           right: 16 + rightReserve,
           zIndex: 11, width: 26, height: 26,
@@ -1037,9 +1054,9 @@ export default function ProblemView({
         display: 'flex', flexDirection: 'column',
       }}>
         {/* 덕수 요청(2026-08-28) — 머리 행은 댓글·agent·버전 드로어의 **1행 규격**을 따른다:
-            minHeight 57 · padding '0 16px' · gap 12 · 아래 구분선.
-            그래야 패널을 오갈 때 첫 가로선의 Y가 흔들리지 않는다.
-            왼쪽 = 접는 버튼(패널 밖에 떠 있던 것을 안으로), 오른쪽 = 보기 컨트롤.
+            minHeight DRAWER_ROW1_H · padding '0 16px' · gap 12 · 아래 구분선.
+            그래야 패널을 오갈 때 첫 가로선의 Y가 흔들리지 않는다(y=57 규약).
+            M6 D14 — 1행은 닫기 버튼만이다. 보기 컨트롤(스테퍼)은 제목행 우단으로 돌아갔다(D12).
             ⚠ 규격을 바꿀 때는 CommentPanel·VersionDrawer의 1행도 함께 볼 것. */}
         <div style={{
           minHeight: DRAWER_ROW1_H, flexShrink: 0, padding: '0 16px',
@@ -1058,8 +1075,6 @@ export default function ProblemView({
           >
             <IconChevron size={16} />
           </button>
-          <div style={{ flex: 1 }} />
-          {viewControls}
         </div>
         <div style={{
           flex: 1, minHeight: 0, overflowY: 'auto',

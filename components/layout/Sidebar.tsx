@@ -6,6 +6,7 @@ import { User } from 'firebase/auth';
 import { Problem, Folder, UserProfile } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import ShareTree, { ShareGroup } from './ShareTree';
+import SidebarSectionHeader from './SidebarSectionHeader';
 import { ShareScope } from '../../lib/share-scope';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
@@ -802,29 +803,15 @@ export default function Sidebar({
           onMouseEnter={() => setMyHeaderHovered(true)}
           onMouseLeave={() => setMyHeaderHovered(false)}
         >
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            justifyContent: collapsed ? 'center' : 'space-between',
-            marginBottom: 4,
-            gap: 4,
-          }}>
-            {!collapsed ? (
-              <>
-                <button
-                  onClick={() => setFoldersOpen(!foldersOpen)}
-                  style={{
-                    flex: 1,
-                    display: 'flex', alignItems: 'center',
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)',
-                    letterSpacing: 0.3,
-                    fontFamily: 'var(--font-ui)', padding: '4px 0',
-                    textAlign: 'left',
-                  }}
-                >
-                  My
-                </button>
-                {/* + 버튼: My 헤더 hover 시에만 노출 */}
+          {/* M6 D22 — 세 섹션 헤더(My·공유·최근 문항)는 SidebarSectionHeader 한 벌 */}
+          {!collapsed ? (
+            <SidebarSectionHeader
+              icon={<IconFolder size={16} />}
+              label="My"
+              open={foldersOpen}
+              onToggle={() => setFoldersOpen(!foldersOpen)}
+              trailing={
+                /* + 버튼: My 헤더 hover 시에만 노출 */
                 <button
                   onClick={onNewFolder}
                   style={{
@@ -837,27 +824,13 @@ export default function Sidebar({
                 >
                   <IconPlus size={16} />
                 </button>
-                {/* 펼침 토글: + 버튼 우측 */}
-                <button
-                  onClick={() => setFoldersOpen(!foldersOpen)}
-                  style={{
-                    border: 'none', background: 'none', cursor: 'pointer',
-                    color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
-                  }}
-                  title={foldersOpen ? '접기' : '펼치기'}
-                >
-                  <span style={{
-                    transform: foldersOpen ? 'rotate(90deg)' : 'rotate(0)',
-                    transition: 'transform var(--transition-fast)', display: 'flex',
-                  }}>
-                    <IconChevron />
-                  </span>
-                </button>
-              </>
-            ) : (
+              }
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
               <SidebarItem icon={<IconFolder />} label="My" collapsed={collapsed} onClick={() => {}} />
-            )}
-          </div>
+            </div>
+          )}
 
           {!collapsed && foldersOpen && (() => {
             const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
@@ -991,7 +964,7 @@ export default function Sidebar({
 
         {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
         {!collapsed && (
-          <div style={{ padding: '0 12px' }}>
+          <div style={{ padding: '8px 12px' }}>   {/* M6 D22 — 세 섹션 래퍼 여백 통일('8px 12px') */}
             <ShareTree
               receivedTotal={sharedCount}
               receivedGroups={receivedGroups}
@@ -1006,24 +979,12 @@ export default function Sidebar({
         {/* ═══ Section 3: Recent Problems ═══ */}
         <div style={{ flex: 1, padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
           {!collapsed ? (
-            <button
-              onClick={() => setRecentOpen(!recentOpen)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                border: 'none', background: 'none', cursor: 'pointer',
-                fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)',
-                letterSpacing: 0.3, textTransform: 'uppercase' as const,
-                fontFamily: 'var(--font-ui)', padding: '4px 0', marginBottom: 4,
-              }}
-            >
-              <span style={{
-                transform: recentOpen ? 'rotate(90deg)' : 'rotate(0)',
-                transition: 'transform var(--transition-fast)', display: 'flex',
-              }}>
-                <IconChevron />
-              </span>
-              최근 문항
-            </button>
+            <SidebarSectionHeader
+              icon={<IconRecent size={16} />}
+              label="최근 문항"
+              open={recentOpen}
+              onToggle={() => setRecentOpen(!recentOpen)}
+            />
           ) : (
             <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={collapsed} onClick={() => {}} />
           )}

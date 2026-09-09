@@ -15,16 +15,71 @@ import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
-import { IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolderMove } from '../ui/Icons';
+import {
+  IconDotsVertical, IconShare, IconCopy, IconTrash, IconSave, IconComment, IconFolderMove,
+  IconAgent, IconBlockchain, IconSortAsc, IconSortDesc,
+} from '../ui/Icons';
+import { useHoverTip } from '../ui/HoverTip';
 import FolderGlyph from '../ui/FolderGlyph';
 import { useCommentCounts } from '../../hooks/useCommentCounts';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { Draggable, Droppable, dndId, DROP_RING, DROP_TINT } from '../ui/dnd';
 import {
-  type ListPrefs, LIST_COLUMNS, MIN_COL_WIDTH,
-  columnLabel, visibleColumns, buildGridTemplate,
+  type ListPrefs, type ListSortDir, LIST_COLUMNS, MIN_COL_WIDTH,
+  columnLabel, columnHeaderKind, visibleColumns, buildGridTemplate,
   movedOrder, verifyRank, blockchainRank,
 } from '../../lib/listColumns';
+
+/* ═══ M6 D4·D6·D7 — 헤더 표기 ═══
+   댓글·Agent·원본인증 세 칼럼은 헤더가 **아이콘**(14px)이고 라벨은 말풍선(useHoverTip)·
+   칼럼 설정 팝오버·aria-label로 간다. 어느 아이콘인지는 레지스트리의 header 필드가 정하고
+   id→도안 대응은 여기 HEADER_ICON 하나다(셀의 배지 아이콘과 같은 컴포넌트 — 도안 1:1).
+   정렬 화살표는 12px(† 예외 — 덕수 "작아도 충분하다"). 헤더 행 높이는 13으로 불변. */
+const HEADER_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
+  comments: IconComment, agent: IconAgent, blockchain: IconBlockchain,
+};
+const HEADER_ICON_SIZE = 14;
+const SORT_MARK_SIZE = 12;
+
+/** 헤더 표기 — text면 라벨, icon이면 아이콘. 유령 라벨 행도 같은 노드로 폭을 잰다 */
+function HeaderLabel({ id }: { id: string }) {
+  if (columnHeaderKind(id) === 'icon') {
+    const Icon = HEADER_ICON[id];
+    if (Icon) return <span style={{ display: 'inline-flex' }}><Icon size={HEADER_ICON_SIZE} /></span>;
+  }
+  return <>{columnLabel(id)}</>;
+}
+
+function SortMark({ dir }: { dir: ListSortDir }) {
+  return dir === 'asc' ? <IconSortAsc size={SORT_MARK_SIZE} /> : <IconSortDesc size={SORT_MARK_SIZE} />;
+}
+
+/** 헤더 버튼 하나 — 아이콘 칼럼만 hover 말풍선(텍스트 칼럼은 라벨이 이미 보인다).
+ *  ⚠ 네이티브 title 병기 금지(이중 툴팁) — 접근성은 aria-label. 말풍선은 버튼의 형제로 렌더. */
+function HeaderSortButton({ id, sort, onClick }: { id: string; sort: ListPrefs['sort']; onClick: () => void }) {
+  const label = columnLabel(id);
+  const { bind, tip } = useHoverTip(label, { disabled: columnHeaderKind(id) === 'text' });
+  return (
+    <>
+      <button
+        {...bind}
+        aria-label={label}
+        onClick={onClick}
+        style={{
+          border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
+          fontSize: 11.5, fontWeight: 600,
+          color: sort.key === id ? 'var(--text-secondary)' : 'var(--text-muted)',
+          fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 3, padding: 0,
+          minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap',
+        }}
+      >
+        <HeaderLabel id={id} />
+        {sort.key === id && <SortMark dir={sort.dir} />}
+      </button>
+      {tip}
+    </>
+  );
+}
 
 /* Phase 63 D2 — 'trash' 추가: 휴지통도 리스트가 기본이 되면서 전용 메뉴(복원·영구 삭제)를
    ListView가 흡수했다(카드 메뉴 FolderView cardMenuItems의 isTrash 갈래와 동일 구성). */
@@ -96,7 +151,7 @@ function UpdatedCell({ d }: { d?: Date }) {
       fontSize: 12, color: 'var(--text-primary)', whiteSpace: 'nowrap',
       display: 'flex', alignItems: 'center', gap: 4,
     }}>
-      <IconSave size={13} color="var(--mathory-red-dark, #BC5F3F)" />
+      <IconSave size={14} color="var(--mathory-red-dark, #BC5F3F)" />
       {recent}
     </div>
   );
@@ -318,11 +373,12 @@ export default function ListView({
       {/* 유령 라벨 행(D5) — 자동폭(max-content) 트랙이 "헤더 라벨 폭"까지 포함하게 한다.
           헤더는 별도 grid(실측 템플릿 소비자)라, 이 장치가 없으면 본문 트랙이 라벨보다
           좁게 실측돼 헤더 라벨이 잘린다. 높이 0·불가시 — 화면·스냅·간격에 영향 없음.
-          ' ▲'는 정렬 화살표 자리 몫. 사용자 지정 px 트랙에는 영향 없다(고정 트랙이 이긴다). */}
+          뒤의 스페이서(12 + gap 3)는 정렬 화살표 자리 몫(M6 — 헤더와 같은 HeaderLabel 노드로 잰다).
+          사용자 지정 px 트랙에는 영향 없다(고정 트랙이 이긴다). */}
       <div aria-hidden style={{ gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12, height: 0, overflow: 'hidden', visibility: 'hidden' }}>
         {visible.map((id) => (id === 'title' ? null : (
-          <span key={id} style={{ gridColumn: trackOf(id), fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'var(--font-ui)' }}>
-            {columnLabel(id)} ▲
+          <span key={id} style={{ gridColumn: trackOf(id), fontSize: 11.5, fontWeight: 600, whiteSpace: 'nowrap', fontFamily: 'var(--font-ui)', display: 'inline-flex', alignItems: 'center' }}>
+            <HeaderLabel id={id} /><span style={{ display: 'inline-block', width: SORT_MARK_SIZE + 3 }} />
           </span>
         )))}
       </div>
@@ -535,21 +591,9 @@ export function ListHeader({ mode, prefs, template, checkbox = false, selectAll,
       {visible.map((id, i) => (
         <div key={id} style={{ gridColumn: 2 + lead + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
           {sortableIds.has(id) ? (
-            <button
-              onClick={() => onToggleSort(id)}
-              style={{
-                border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left',
-                fontSize: 11.5, fontWeight: 600,
-                color: prefs.sort.key === id ? 'var(--text-secondary)' : 'var(--text-muted)',
-                fontFamily: 'var(--font-ui)', display: 'flex', alignItems: 'center', gap: 3, padding: 0,
-                minWidth: 0, overflow: 'hidden', whiteSpace: 'nowrap',
-              }}
-            >
-              {columnLabel(id)}
-              {prefs.sort.key === id && <span style={{ fontSize: 9 }}>{prefs.sort.dir === 'asc' ? '▲' : '▼'}</span>}
-            </button>
+            <HeaderSortButton id={id} sort={prefs.sort} onClick={() => onToggleSort(id)} />
           ) : (
-            <span style={{ whiteSpace: 'nowrap' }}>{columnLabel(id)}</span>
+            <span style={{ whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}><HeaderLabel id={id} /></span>
           )}
           {adjustable.has(id) && (
             <ColResizeHandle id={id} onResize={resize} onReset={resetWidth} />
@@ -664,6 +708,8 @@ function ColumnSettings({ gridColumn, prefs, onPrefsChange }: {
                     // T5 검수 반영 — 브라우저 기본 파랑 대신 Mathory 로고 레드(덕수 지정)
                     style={{ accentColor: 'var(--mathory-red, #D97757)' }}
                   />
+                  {/* M6 D4 — 아이콘 헤더 칼럼은 라벨 앞에 같은 아이콘을 병기: 헤더 도안과 이름을 잇는 유일한 자리 */}
+                  {columnHeaderKind(id) === 'icon' && <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}><HeaderLabel id={id} /></span>}
                   {columnLabel(id)}
                 </label>
                 <button

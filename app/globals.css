@@ -111,6 +111,7 @@
   /* 경계선 위계 (주목도: content > block > subtle) */
   --border-content:        #D2C8B8;   /* U자 컨텐츠 구분선 (가장 뚜렷) */
   --border-content-active: #B89B78;   /* 구분선 hover 활성 */
+  --border-card-problem:   var(--block-hairline); /* M6 D10 — 문제 카드(폴더뷰·열람뷰·peek) 테두리. 풀이 카드(--border-content 1.45:1)보다 한 칸 진하게(1.73:1) — "읽는 대상"을 모서리 12와 함께 가른다 */
   --border-block:          var(--border-primary); /* 블록 경계 (중간) — Phase 45a E형 이후 편집창 블록은 --block-hairline/--block-border-active를 쓴다 */
   --border-subtle:         var(--border-light);    /* chrome 최소 사용 (가장 약) */
 

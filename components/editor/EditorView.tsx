@@ -29,7 +29,7 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
-import { toneClass } from '../../lib/keyTone';
+import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
 import CoachBlock from '../ui/CoachBlock';
 import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
@@ -692,6 +692,7 @@ function SortableEditorBlock({
   onImageTreatmentChange,
   onImageGrayChange,
   onSummaryChange,
+  summaryEligible,
   onSaveSvgInitialView,
   onSvgHeightChange,
   onSaveGgbInitialView,
@@ -730,6 +731,8 @@ function SortableEditorBlock({
   onImageTreatmentChange: (blockId: string, treatment: 'frame' | undefined) => void;
   onImageGrayChange: (blockId: string, gray: boolean | undefined) => void;
   onSummaryChange: (blockId: string, show: boolean | undefined) => void;
+  /** M6 D16 — 이 탭에 '요약에 넣기'가 의미 있는가(풀이 계열 = isToneScoped). 문제 탭은 false */
+  summaryEligible: boolean;
   onSaveSvgInitialView: (blockId: string, view: { scale: number; positionX: number; positionY: number }) => void;
   onSvgHeightChange: (blockId: string, height: number) => void;
   onSaveGgbInitialView: (blockId: string, coords: { xMin: number; xMax: number; yMin: number; yMax: number }) => void;
@@ -799,7 +802,10 @@ function SortableEditorBlock({
   // 상단바 표시: 활성 블록 + 전체접기 모드(모든 블록)
   const showBar = isActive || collapseMode;
   // 요약에 넣은 블록은 비활성일 때도 그 사실이 보여야 한다 → 스위치만 있는 얇은 바를 남긴다
-  const showSummaryOnlyBar = !showBar && !isHeading && block.showInSummary === true;
+  // M6 D16 — 문제 탭은 요약 없이 전체 표시(TabBody scoped와 같은 판별)라 스위치·바 둘 다 없다.
+  //   스위치가 아무 일도 하지 않는 자리에는 두지 않는다(Phase 59a R5 선례). 저장된 showInSummary는
+  //   문제 탭에서 읽는 곳이 없어 데이터 무접촉.
+  const showSummaryOnlyBar = summaryEligible && !showBar && !isHeading && block.showInSummary === true;
 
   /* 요약에 넣기 스위치. 헤더가 dnd-kit 드래그 핸들 영역이라 바깥 span이 pointerdown을 막는다.
      Phase 45a D3-c: click의 stopPropagation은 dblclick을 막지 않는다(별개 이벤트 타입) →
@@ -810,7 +816,7 @@ function SortableEditorBlock({
        오해만 주는 자리다 (Phase 59a R5 — 제목 블록의 선례를 경우까지 넓힌 것).
      ⚠ 이어짓기(제목행 없는 case)도 마찬가지로 요약에 남지 않는다. 남기고 싶은 내용은
        경우 **사이 블록**에 두고 그 블록의 스위치를 켜면 된다. */
-  const summaryToggle = isHeading || isCaseBlock(block.type) ? null : (
+  const summaryToggle = !summaryEligible || isHeading || isCaseBlock(block.type) ? null : (
     <span
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
@@ -3718,6 +3724,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onImageTreatmentChange={handleImageTreatmentChange}
                     onImageGrayChange={handleImageGrayChange}
                     onSummaryChange={handleSummaryChange}
+                    summaryEligible={isToneScoped(activeTab)}
                     onSaveSvgInitialView={handleSaveSvgInitialView}
                     onSvgHeightChange={handleSvgHeightChange}
                     onSaveGgbInitialView={handleSaveGgbInitialView}

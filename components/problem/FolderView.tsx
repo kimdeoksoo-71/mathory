@@ -27,6 +27,7 @@ import VerifyBadge from '../ui/VerifyBadge';
 import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
   IconTrash, IconCopy, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove, IconAgent,
+  IconSortAsc, IconSortDesc,
 } from '../ui/Icons';
 import FolderGlyph from '../ui/FolderGlyph';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
@@ -797,7 +798,9 @@ export default function FolderView({
                     // Phase 62 D2 — 클레이 카드. 인라인이 --card-surface를 참조하므로
                     // globals.css의 :hover가 변수만 갈아끼우면 배경·페이드가 함께 따라온다.
                     background: 'var(--card-surface, var(--bg-content))',
-                    border: '0.5px solid var(--border-content)',
+                    // M6 D10 — 문제 카드 테두리는 --border-card-problem(= --block-hairline, 1.73:1).
+                    // 풀이 카드·리스트 행은 --border-content 그대로(D11). hover 규칙은 배경·그림자만.
+                    border: '0.5px solid var(--border-card-problem)',
                     borderRadius: 12,
                     padding: '18px 22px',
                     height: 320,
@@ -975,6 +978,7 @@ function SortControls({ sort, onChange }: { sort: SortState; onChange: (s: SortS
     border: 'none', background: 'transparent', cursor: 'pointer',
     fontSize: 12, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)',
     padding: '2px 4px', borderRadius: 4, minWidth: 16, lineHeight: 1, fontWeight: 400,
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
   };
   const toggleDir = () => onChange({ ...sort, dir: sort.dir === 'asc' ? 'desc' : 'asc' });
   return (
@@ -983,8 +987,9 @@ function SortControls({ sort, onChange }: { sort: SortState; onChange: (s: SortS
         <option value="updated">{SORT_KEY_LABELS.updated}</option>
         <option value="name">{SORT_KEY_LABELS.name}</option>
       </select>
+      {/* M6 D8 — 글자 ↑/↓ 대신 리스트 헤더와 같은 Phosphor arrow-up/down(12, † 예외) */}
       <button onClick={toggleDir} style={arrowBtnStyle} title={sort.dir === 'asc' ? '오름차순' : '내림차순'}>
-        {sort.dir === 'asc' ? '↑' : '↓'}
+        {sort.dir === 'asc' ? <IconSortAsc size={12} /> : <IconSortDesc size={12} />}
       </button>
     </div>
   );

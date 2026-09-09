@@ -36,7 +36,9 @@ export default function BlockchainBadge({ problem, size = 14 }: Props) {
         marginLeft: 6,
         opacity: isModified ? 0.55 : 1,
         verticalAlign: 'middle',
-        color: 'currentColor',
+        // M6 D25 — 자리 글자색(제목 --text-primary)을 상속받아 옆 댓글·agent 배지(--text-muted)보다
+        // 검게 튀던 것을 고정색으로. isModified 흐림(opacity)은 그 위에 얹힌다.
+        color: 'var(--text-muted)',
       }}
     >
       <IconBlockchain size={size} />
