@@ -256,7 +256,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   `--accent-soft` · 경고 띠 = `--bg-warn`(= accent-soft) · 검색·수식 하이라이트 = `--highlight-match`/`-active`(레드 틴트, 옛 노랑·주황) ·
   DnD 드롭 링 = `--drop-ring`/`--drop-tint`(옛 인디고) · **성공만 올리브** `--accent-success`/`-bg`(팔레트 밖의 유일한 예외 — '완료'는
   빨강과 갈라야 한다: 버전 diff 추가 행 · 교정 제안 버튼 · ok 배지 · 그래프 저장 토스트). `dialogStyles.DANGER`도 이 토큰이다.
-  **체크박스·라디오는 `globals.css`의 `input[type=checkbox|radio] { accent-color: var(--mathory-red) }` 하나** — inline `accentColor`를
+  **체크박스는 `globals.css`의 `input[type=checkbox]` 커스텀 도안 하나(라디오만 accent-color)** — inline `accentColor`·크기를
   사이트마다 두지 말 것(시트 가져오기·일괄 검증 팝업이 빠져 브라우저 기본 파랑이 새어 나왔다). 회색 하드코딩(`#ddd`·`#888`…)은 문맥별
   토큰(`var(--text-muted, #888)` 꼴 — 폴백에 옛 값 보존)으로 111곳 치환했고, 남긴 것은 브랜드 로고(IconGoogle)·인쇄 CSS·dev 페이지뿐.
   새 색은 hex가 아니라 **토큰으로** 적을 것 — 비교 대상 명암비 규약(위 "명암비 계산" 절)은 그대로
@@ -362,6 +362,9 @@ ICONS 56 → **57종**(+5/−4, toggle 2종은 후속 철회) · 자산 3,024 �
   기본 파랑 해소) ③ **팔레트 밖 색 전수 정리** — 유채색 약 60곳(25파일: 버전 diff·교정 박스·lint 밑줄·검색 하이라이트·DnD 링·심볼 설정·
   공유/Bazaar 오류 띠…)을 위 "색 팔레트" 절의 토큰으로, 회색 111곳을 문맥별 토큰으로. 신규 토큰 6(`--accent-success-bg` · `--bg-warn` ·
   `--highlight-match(-active)` · `--drop-ring/-tint`)
+- **덕수 검수 4차(2026-09-09)**: ① 체크박스를 `appearance:none` 커스텀 도안으로(네이티브는 accent-color로 켜짐 색만 바뀐다) —
+  테두리 `--border-content` · 안쪽 흰색 35% 반투명(바탕보다 조금만 밝게) · 켜짐 로고 레드 62% + 다크 레드 테두리 55%(톤 다운) ·
+  indeterminate 막대 · 14px ② 파비콘 'M' **Bold(700) · 캡높이 30**(SemiBold·26에서 굵기·크기 각 한 단계 — "왜소해 보인다")
 
 ### 이전: **Phase 61g — 정밀 검증 논리 결함 유형 확장(시트 STEP3 V2 이식)** — 구현 완료(2026-09-09) · **덕수 검수 대기**
 

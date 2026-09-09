@@ -1900,6 +1900,7 @@ M4·M5 뒤에 남은 잔여 도안 + 화면 구조 잔손질 14항(A~K). 수정 
 - **덕수 검수 3차 — 색 정리(2026-09-09)**: 팔레트 = 아이보리·클레이·빨강. 유채색 약 60곳(파랑·초록·노랑·구글 레드)을 토큰으로 접고
   회색 111곳을 문맥별 토큰(폴백 보존)으로, 체크박스는 전역 accent-color 하나, 사이드바 '시트 가져오기' 아이콘 18. 신규 토큰 6.
   규약은 CLAUDE.md "색 팔레트는 아이보리·클레이·빨강 셋이다" 절
+- **덕수 검수 4차(2026-09-09)**: 체크박스 커스텀 도안(테두리·안쪽 밝기·켜짐 톤 다운 — accent-color로는 불가) · 파비콘 Bold·캡높이 30
 - **잔여 도안**: 파비콘 Pretendard SemiBold 'M'(D15 — CDN 폰트 잉크 폭 실측 0.999 일치) · ~~ToggleSwitch → Phosphor~~
   `toggle-left/right` 24(D17~D19) · IconSave → `cloud-arrow-up`/`cloud-check`(D20, M4 D6 유지 예외 뒤집힘) ·
   IconComment → `chat-dots`(D21′) · 받은 문항 `rotate(180deg)`(D24) · BlockchainBadge `--text-muted`(D25)

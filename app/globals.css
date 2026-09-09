@@ -255,8 +255,54 @@
 }
 
 /* M6 색 정리 — 체크박스·라디오는 앱 전체가 로고 레드 하나다(덕수 지정, Phase 63 T5의 확대).
-   inline accentColor를 사이트마다 두지 말 것 — 시트 가져오기·일괄 검증 팝업이 빠져 브라우저 기본 파랑이 새어 나왔다. */
-input[type="checkbox"], input[type="radio"] { accent-color: var(--mathory-red); }
+   inline accentColor를 사이트마다 두지 말 것 — 시트 가져오기·일괄 검증 팝업이 빠져 브라우저 기본 파랑이 새어 나왔다.
+   검수 4차(덕수 2026-09-09) — 네이티브 체크박스는 accent-color로 **켜짐 색만** 바뀌고 테두리·안쪽 밝기는 못 건드린다
+   ("테두리가 진하고 안이 너무 희다" · "켜졌을 때 너무 진하다"). 그래서 appearance:none 커스텀 도안으로:
+   - 꺼짐: 테두리 --border-content(구분선과 같은 웜톤) · 안쪽은 흰색 35% 반투명 → 어떤 바탕(흰 팝업·클레이 행) 위에서든
+     바탕보다 **조금만** 밝다(고정 흰색은 클레이 위에서 튄다)
+   - 켜짐: 로고 레드 62% 반투명 + 테두리 다크 레드 55% — 채도를 낮춘 톤. 체크 표시는 흰색 clip-path
+   - indeterminate(리스트 전체선택 일부): 같은 바탕에 가로 막대 · disabled: 45% · 키보드 포커스: 액센트 틴트 링
+   ⚠ 크기 14는 네이티브(13)와 같은 급이라 기존 레이아웃이 밀리지 않는다. 라디오는 아직 소비처 0 — accent-color만 둔다. */
+input[type="radio"] { accent-color: var(--mathory-red); }
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-content);
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.35);
+  display: inline-grid;
+  place-content: center;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+input[type="checkbox"]::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #fff;
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transition: transform 0.1s;
+}
+input[type="checkbox"]:checked,
+input[type="checkbox"]:indeterminate {
+  background: rgba(217, 119, 87, 0.62);       /* --mathory-red 62% */
+  border-color: rgba(188, 95, 63, 0.55);      /* --mathory-red-dark 55% */
+}
+input[type="checkbox"]:checked::before { transform: scale(1); }
+input[type="checkbox"]:indeterminate::before {
+  clip-path: none;
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  transform: scale(1);
+}
+input[type="checkbox"]:disabled { opacity: 0.45; cursor: not-allowed; }
+input[type="checkbox"]:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 1px; }
 
 html, body {
   height: 100%;
