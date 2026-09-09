@@ -134,8 +134,8 @@ function DropdownCategory({
           padding: '4px 8px',
           fontSize: '13px',
           fontFamily: 'var(--font-mono)',
-          backgroundColor: open ? '#e0e0e0' : '#fff',
-          border: '1px solid #ccc',
+          backgroundColor: open ? 'var(--bg-active, #e0e0e0)' : '#fff',
+          border: '1px solid var(--border-primary, #ccc)',
           borderRadius: '4px',
           cursor: 'pointer',
           lineHeight: '1.4',
@@ -145,7 +145,7 @@ function DropdownCategory({
           whiteSpace: 'nowrap',
         }}
         onMouseEnter={(e) => {
-          if (!open) e.currentTarget.style.backgroundColor = '#f0f0f0';
+          if (!open) e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f0f0f0)';
         }}
         onMouseLeave={(e) => {
           if (!open) e.currentTarget.style.backgroundColor = '#fff';
@@ -163,7 +163,7 @@ function DropdownCategory({
             left: 0,
             marginTop: 4,
             backgroundColor: '#fff',
-            border: '1px solid #ddd',
+            border: '1px solid var(--border-primary, #ddd)',
             borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             zIndex: 1000,
@@ -177,7 +177,7 @@ function DropdownCategory({
               padding: '4px 12px 6px',
               fontSize: 11,
               fontWeight: 600,
-              color: '#999',
+              color: 'var(--text-muted, #999)',
               letterSpacing: 0.5,
               fontFamily: 'var(--font-ui, sans-serif)',
             }}
@@ -203,12 +203,12 @@ function DropdownCategory({
                 cursor: 'pointer',
                 fontSize: 13,
                 fontFamily: 'var(--font-mono)',
-                color: '#333',
+                color: 'var(--text-primary, #333)',
                 textAlign: 'left',
                 whiteSpace: 'nowrap',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = '#f5f5f5';
+                e.currentTarget.style.backgroundColor = 'var(--bg-functional, #f5f5f5)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -220,7 +220,7 @@ function DropdownCategory({
               <span
                 style={{
                   fontSize: 11,
-                  color: '#999',
+                  color: 'var(--text-muted, #999)',
                   fontFamily: 'var(--font-ui, sans-serif)',
                 }}
               >

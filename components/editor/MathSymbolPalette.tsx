@@ -139,7 +139,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
             ...(openUp ? { bottom: '100%', marginBottom: 4 } : { top: '100%', marginTop: 4 }),
             ...(alignRight ? { right: 0 } : { left: 0 }),
             width: 340,
-            background: '#fff', border: '1px solid #ddd', borderRadius: 10,
+            background: '#fff', border: '1px solid var(--border-primary, #ddd)', borderRadius: 10,
             boxShadow: '0 6px 24px rgba(0,0,0,0.14)', zIndex: 1000,
             padding: 10, animation: 'fadeIn 0.1s ease',
           }}
@@ -152,7 +152,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
               placeholder="검색 (이름 / LaTeX)"
               style={{
                 flex: 1, boxSizing: 'border-box', height: 30, padding: '0 10px',
-                border: '1px solid #ddd', borderRadius: 6, fontSize: 13, outline: 'none',
+                border: '1px solid var(--border-primary, #ddd)', borderRadius: 6, fontSize: 13, outline: 'none',
               }}
             />
             <button
@@ -161,7 +161,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
               title="기호 설정"
               style={{
                 width: 30, height: 30, flexShrink: 0,
-                border: '1px solid #ddd', borderRadius: 6, background: '#fff',
+                border: '1px solid var(--border-primary, #ddd)', borderRadius: 6, background: '#fff',
                 cursor: 'pointer', fontSize: 15, lineHeight: 1,
               }}
             >⚙</button>
@@ -180,9 +180,9 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
                     style={{
                       flex: '0 0 auto', height: 28, padding: '0 10px',
                       fontSize: 12, fontWeight: active ? 700 : 400,
-                      color: active ? '#3730a3' : '#555',
-                      background: active ? '#eef2ff' : '#f7f7f7',
-                      border: active ? '1px solid #c7d2fe' : '1px solid transparent',
+                      color: active ? 'var(--accent-primary, #c96442)' : 'var(--text-secondary, #5D5647)',
+                      background: active ? 'var(--accent-soft, #f5e6df)' : 'var(--bg-hover, #F0EBE3)',
+                      border: active ? '1px solid var(--accent-primary, #c96442)' : '1px solid transparent',
                       borderRadius: 6, cursor: 'pointer', whiteSpace: 'nowrap',
                     }}
                   >
@@ -207,7 +207,7 @@ export default function MathSymbolPalette({ onInsert, wrapInDollar = false, open
           </div>
 
           {visibleSymbols.length === 0 && (
-            <div style={{ padding: '16px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>
+            <div style={{ padding: '16px 0', textAlign: 'center', color: 'var(--text-muted, #999)', fontSize: 13 }}>
               {q ? '검색 결과 없음' : '이 그룹에 기호가 없습니다'}
             </div>
           )}

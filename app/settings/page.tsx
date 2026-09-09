@@ -156,7 +156,7 @@ export default function SettingsPage() {
         </div>
 
         {status.kind === 'error' && (
-          <p style={{ marginTop: 10, fontSize: 12.5, color: '#d33' }}>{status.message}</p>
+          <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--accent-danger, #C0392B)' }}>{status.message}</p>
         )}
         {status.kind === 'success' && (
           <p style={{ marginTop: 10, fontSize: 12.5, color: '#2a8' }}>저장되었습니다.</p>

@@ -85,7 +85,7 @@ const catLabelStyle: React.CSSProperties = {
 };
 const loginBtnStyle: React.CSSProperties = {
   padding: '8px 0', border: '1px solid var(--border-light, #ddd)', borderRadius: 8,
-  background: '#fff', color: '#333', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+  background: '#fff', color: 'var(--text-primary, #333)', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
   fontFamily: 'var(--font-ui)', width: '100%',
 };
 const hintStyle: React.CSSProperties = {

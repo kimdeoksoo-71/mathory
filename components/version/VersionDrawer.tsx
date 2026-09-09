@@ -252,7 +252,7 @@ export default function VersionDrawer({
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '1px solid var(--border-light)', borderRadius: 5, padding: '3px 6px',
     background: 'transparent', cursor: metaBusy ? 'wait' : 'pointer',
-    color: active ? 'var(--accent-primary, #e53935)' : 'var(--text-muted)',
+    color: active ? 'var(--accent-primary, #c96442)' : 'var(--text-muted)',
   });
 
   const nameInput = (onCommit: (v: string) => void, placeholder: string) => (
@@ -274,7 +274,7 @@ export default function VersionDrawer({
       }}
       style={{
         flex: 1, minWidth: 0, fontSize: 12, padding: '3px 7px', borderRadius: 5,
-        border: '1px solid var(--accent-primary, #e53935)', background: 'var(--bg-input, #fff)',
+        border: '1px solid var(--accent-primary, #c96442)', background: 'var(--bg-input, #fff)',
         color: 'var(--text-primary)', outline: 'none',
       }}
     />
@@ -363,8 +363,8 @@ export default function VersionDrawer({
         <div style={{
           flexShrink: 0, padding: '6px 14px', fontSize: 11,
           borderBottom: '1px solid var(--border-light)',
-          background: notice.tone === 'error' ? 'var(--bg-warn, #fff8e1)' : 'var(--bg-functional, #fafafa)',
-          color: notice.tone === 'error' ? 'var(--accent-danger, #e53935)' : 'var(--text-secondary)',
+          background: notice.tone === 'error' ? 'var(--bg-warn, #f5e6df)' : 'var(--bg-functional, #fafafa)',
+          color: notice.tone === 'error' ? 'var(--accent-danger, #C0392B)' : 'var(--text-secondary)',
         }}>{notice.text}</div>
       )}
 
@@ -430,7 +430,7 @@ export default function VersionDrawer({
 
                 <button onClick={() => setRestoreOpen(true)} style={{
                   marginLeft: 'auto', fontSize: 11, padding: '2px 10px', borderRadius: 5,
-                  cursor: 'pointer', border: 'none', background: '#e53935', color: '#fff',
+                  cursor: 'pointer', border: 'none', background: 'var(--accent-danger, #C0392B)', color: '#fff',
                   fontWeight: 600, flexShrink: 0,
                 }}>이 버전으로 복원</button>
               </>

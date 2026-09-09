@@ -88,12 +88,12 @@ export const searchHighlightField = StateField.define<SearchHighlightState>({
 
 export const searchHighlightTheme = EditorView.baseTheme({
   '.cm-search-match': {
-    backgroundColor: 'rgba(255, 235, 59, 0.45)', // 연한 노란색
+    backgroundColor: 'var(--highlight-match)', // M6 색 정리 — 레드 틴트(옛 연한 노랑 rgba(255,235,59))
     borderRadius: '2px',
   },
   '.cm-search-match-active': {
-    backgroundColor: 'rgba(255, 152, 0, 0.55)', // 주황색
+    backgroundColor: 'var(--highlight-match-active)', // 현재 매치 — 한 단 진한 레드 틴트(옛 주황)
     borderRadius: '2px',
-    outline: '1px solid rgba(255, 152, 0, 0.7)',
+    outline: '1px solid var(--mathory-red-dark)',
   },
 });

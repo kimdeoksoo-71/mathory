@@ -138,6 +138,16 @@
   --accent-danger: #C0392B;
   --accent-danger-bg: #FEF2F2;
   --accent-success: #5f6b3c;       /* 성공/완료 (올리브) */
+  --accent-success-bg: #EDEFE3;    /* 올리브 틴트 — 'ok' 배지·교정 제안 버튼·버전 diff 추가 행 (M6 색 정리) */
+  /* M6 색 정리(덕수 2026-09-09) — 팔레트는 아이보리·클레이·빨강 셋뿐이다. 경고·오류·성공·선택·하이라이트가
+     각자 파랑(#1a56c4·#6366f1·#c7d2fe)·초록(#1e7a3a·#22c55e)·노랑(#fde68a·rgba(255,235,59))·구글 레드(#e53935)를
+     들고 있던 것을 아래 토큰으로 접었다. 새 상태색을 만들지 말 것 — 오류 = --accent-danger, 경고 = --mathory-red,
+     성공 = --accent-success(올리브 — 팔레트 밖이지만 '완료'만은 빨강과 갈라야 해 유일한 예외), 선택·hover 틴트 = --accent-soft. */
+  --bg-warn: var(--accent-soft);   /* 경고 띠(저장 실패·버전 복원 안내) — 옛 #fff8e1 노랑을 액센트 틴트로 */
+  --highlight-match: rgba(217, 119, 87, 0.22);        /* 검색 매치·미리보기 수식 하이라이트 (옛 노랑 rgba(255,235,59)) */
+  --highlight-match-active: rgba(188, 95, 63, 0.42);  /* 현재 매치 (옛 주황 rgba(255,152,0)) */
+  --drop-ring: 0 0 0 2px rgba(188, 95, 63, 0.30);     /* DnD 드롭 대상 링·틴트 (옛 인디고 rgba(91,106,191)) */
+  --drop-tint: rgba(188, 95, 63, 0.10);
 
   /* Badge colors */
   --badge-bg: #E8E4DF;
@@ -243,6 +253,10 @@
   margin: 0;
   padding: 0;
 }
+
+/* M6 색 정리 — 체크박스·라디오는 앱 전체가 로고 레드 하나다(덕수 지정, Phase 63 T5의 확대).
+   inline accentColor를 사이트마다 두지 말 것 — 시트 가져오기·일괄 검증 팝업이 빠져 브라우저 기본 파랑이 새어 나왔다. */
+input[type="checkbox"], input[type="radio"] { accent-color: var(--mathory-red); }
 
 html, body {
   height: 100%;
@@ -1051,8 +1065,8 @@ p:has(.marker-circled) {
       두면 다른 화면에서는 클래스가 붙어도 **아무 일도 일어나지 않는다** — 실제로 열람뷰가
       그런 상태였다. 붙이는 쪽이 공용이면 스타일도 공용이어야 한다. */
 .math-highlight-active {
-  /* 편집창 cm-math-hl과 동일한 연한 노랑 */
-  background-color: rgba(255, 224, 51, 0.30) !important;
+  /* 편집창 cm-math-hl과 같은 토큰(M6 색 정리 — 옛 연한 노랑 rgba(255,224,51)) */
+  background-color: var(--highlight-match) !important;
   border-radius: 3px;
 }
 
@@ -1062,7 +1076,7 @@ p:has(.marker-circled) {
   border-radius: 4px;
 }
 @keyframes verify-jump-flash {
-  0%, 40% { background-color: rgba(255, 224, 51, 0.28); }
+  0%, 40% { background-color: var(--highlight-match); }
   100%    { background-color: transparent; }
 }
 

@@ -866,9 +866,9 @@ export default function AppShell() {
         {kicked && !user && (
           <div style={{
             padding: '10px 16px',
-            background: '#fdecea',
-            borderBottom: '1px solid #f5c6cb',
-            color: '#721c24',
+            background: 'var(--accent-danger-bg, #FEF2F2)',
+            borderBottom: '1px solid var(--accent-danger, #C0392B)',
+            color: 'var(--accent-danger, #C0392B)',
             fontSize: 13,
             fontFamily: 'var(--font-ui)',
             display: 'flex', alignItems: 'center', gap: 8,
@@ -880,7 +880,7 @@ export default function AppShell() {
             <button
               onClick={() => setKicked(false)}
               style={{
-                border: 'none', background: 'transparent', color: '#721c24',
+                border: 'none', background: 'transparent', color: 'var(--accent-danger, #C0392B)',
                 cursor: 'pointer', fontSize: 16, padding: '0 4px', lineHeight: 1,
               }}
               title="닫기"

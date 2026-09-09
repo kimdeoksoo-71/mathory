@@ -96,7 +96,7 @@ export default function FolderPathBar({
           style={{
             ...chipStyle,
             fontWeight: 600, color: 'var(--text-secondary)',
-            background: path.length === 0 ? 'var(--bg-active, #e8eaf6)' : 'var(--bg-hover)',
+            background: path.length === 0 ? 'var(--bg-active, #E8E2D9)' : 'var(--bg-hover)',
           }}
         >
           <span>My</span>
@@ -163,7 +163,7 @@ export default function FolderPathBar({
                 type="button"
                 onClick={() => toggle(seg.id)}
                 title={isLast ? '하위 폴더로 이동' : '형제 폴더로 이동'}
-                style={{ ...chipStyle, background: isLast ? 'var(--bg-active, #e8eaf6)' : 'var(--bg-hover)', color: isLast ? 'var(--text-secondary)' : 'var(--text-muted)' }}
+                style={{ ...chipStyle, background: isLast ? 'var(--bg-active, #E8E2D9)' : 'var(--bg-hover)', color: isLast ? 'var(--text-secondary)' : 'var(--text-muted)' }}
               >
                 <FolderGlyph folder={seg} size={13} />
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{seg.name}</span>

@@ -118,7 +118,7 @@ export default function DialogHost() {
                 style={dialogInput}
               />
               {error && (
-                <div style={{ marginTop: 8, fontSize: 12.5, color: '#d33' }}>{error}</div>
+                <div style={{ marginTop: 8, fontSize: 12.5, color: 'var(--accent-danger, #C0392B)' }}>{error}</div>
               )}
             </>
           ) : (

@@ -329,7 +329,7 @@ export default function GgbViewer({
         position: 'relative',
         width: '100%',
         height,
-        background: '#fafafa',
+        background: 'var(--bg-functional, #fafafa)',
         border: '1px solid var(--border-light, #e0e0e0)',
         borderRadius: 6,
         overflow: 'hidden',
@@ -381,7 +381,7 @@ export default function GgbViewer({
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(255,255,255,0.95)',
-          fontSize: 12, color: 'var(--accent-danger, #c33)',
+          fontSize: 12, color: 'var(--accent-danger, #C0392B)',
         }}>
           {error}
         </div>
@@ -436,7 +436,7 @@ export default function GgbViewer({
           position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)',
           zIndex: 9999,
           padding: '6px 14px', fontSize: 12,
-          background: savedToast.ok ? 'rgba(40,140,60,0.92)' : 'rgba(180,40,40,0.92)',
+          background: savedToast.ok ? 'rgba(95,107,60,0.92)' : 'rgba(192,57,43,0.92)'   /* M6 색 정리 — 올리브/danger */,
           color: '#fff',
           borderRadius: 4, pointerEvents: 'none',
           maxWidth: '90%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

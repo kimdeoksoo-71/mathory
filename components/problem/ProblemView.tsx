@@ -1108,7 +1108,7 @@ export default function ProblemView({
                   }}
                   onMouseEnter={(e) => {
                     (e.currentTarget as HTMLElement).style.background = item.danger
-                      ? 'var(--accent-danger-bg, rgba(229,57,53,0.08))'
+                      ? 'var(--accent-danger-bg, rgba(192,57,43,0.08))'
                       : 'var(--bg-hover)';
                   }}
                   onMouseLeave={(e) => {
@@ -1233,8 +1233,8 @@ export default function ProblemView({
               ) : (
                 <div style={{
                   width: 16, height: 16, borderRadius: '50%', flexShrink: 0,
-                  background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 9, fontWeight: 600, color: '#666',
+                  background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 9, fontWeight: 600, color: 'var(--text-secondary, #666)',
                 }}>
                   {((authorProfile?.email || authorProfile?.displayName || '?').charAt(0)).toUpperCase()}
                 </div>

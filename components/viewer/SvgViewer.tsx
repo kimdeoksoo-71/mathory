@@ -111,7 +111,7 @@ export default function SvgViewer({
     return (
       <div style={{
         height, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: 'var(--accent-danger, #c33)', fontSize: 12,
+        color: 'var(--accent-danger, #C0392B)', fontSize: 12,
       }}>
         SVG 로드 실패: {error}
       </div>
@@ -375,8 +375,8 @@ function FullscreenOverlay({
           position: 'fixed', top: 16, right: 16, zIndex: 10000,
           width: 40, height: 40,
           // 흰 배경 SVG 위에서도 보이도록 회색 (흰 X는 묻힘)
-          background: 'rgba(255,255,255,0.9)', color: '#666',
-          border: '1px solid #bbb',
+          background: 'rgba(255,255,255,0.9)', color: 'var(--text-secondary, #666)',
+          border: '1px solid var(--border-content, #bbb)',
           borderRadius: 6, cursor: 'pointer',
           fontSize: 18,
         }}

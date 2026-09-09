@@ -186,7 +186,7 @@ export default function PublicComments({
           </div>
         )}
         {writeError && (
-          <div style={{ marginTop: 8, fontSize: 11.5, color: '#a4322a' }}>{writeError}</div>
+          <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--accent-danger, #C0392B)' }}>{writeError}</div>
         )}
       </div>
     </div>
@@ -201,7 +201,7 @@ const loginBtnStyle: React.CSSProperties = {
 function submitBtnStyle(disabled: boolean): React.CSSProperties {
   return {
     padding: '7px 16px', border: 'none', borderRadius: 7,
-    background: disabled ? '#ccc' : 'var(--accent-primary, #B8845C)', color: '#fff',
+    background: disabled ? 'var(--text-placeholder, #ccc)' : 'var(--accent-primary, #B8845C)', color: '#fff',
     fontSize: 12, fontWeight: 700, cursor: disabled ? 'not-allowed' : 'pointer',
     fontFamily: 'var(--font-ui)',
   };
@@ -230,7 +230,7 @@ function CommentRow({ c, name }: { c: ProblemComment; name: string }) {
         <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary, #333)' }}>{name}</span>
         <span style={{ fontSize: 11, color: 'var(--text-faint, #aaa)' }}>{fmt(c.createdAt)}</span>
         {c.resolved && (
-          <span style={{ fontSize: 10, color: '#888', border: '1px solid #ddd', borderRadius: 4, padding: '0 4px' }}>
+          <span style={{ fontSize: 10, color: 'var(--text-muted, #888)', border: '1px solid var(--border-primary, #ddd)', borderRadius: 4, padding: '0 4px' }}>
             해결됨
           </span>
         )}

@@ -250,7 +250,7 @@ export default function ShareTargetModal({ problem, onClose, onChanged }: ShareT
         )}
 
         {error && (
-          <div style={{ marginTop: 12, padding: 8, borderRadius: 6, background: '#fdecea', color: '#a4322a', fontSize: 12 }}>
+          <div style={{ marginTop: 12, padding: 8, borderRadius: 6, background: 'var(--accent-danger-bg, #FEF2F2)', color: 'var(--accent-danger, #C0392B)', fontSize: 12 }}>
             {error}
           </div>
         )}
@@ -279,8 +279,8 @@ function Avatar({ photoURL, name, size = 28 }: { photoURL: string; name: string;
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.45, color: '#666', fontWeight: 600,
+      background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.45, color: 'var(--text-secondary, #666)', fontWeight: 600,
     }}>
       {(name || '?').charAt(0).toUpperCase()}
     </div>

@@ -793,7 +793,7 @@ export default function Sidebar({
       <div style={{ padding: collapsed ? '8px 8px' : '8px 12px' }}>
         <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={collapsed} onClick={onNewProblem} />
         <SidebarItem icon={<IconSearch />} label="검색" collapsed={collapsed} onClick={onSearch} />
-        <SidebarItem icon={<IconDownload />} label="시트 가져오기" collapsed={collapsed} onClick={onSheetImport} />
+        <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={collapsed} onClick={onSheetImport} />
       </div>
 
       {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
@@ -1018,8 +1018,8 @@ export default function Sidebar({
           ) : (
             <div style={{
               width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-              background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 600, color: '#666',
+              background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #666)',
             }}>{(idOnly || '?').charAt(0).toUpperCase()}</div>
           );
           const openSettings = () => router.push('/settings');

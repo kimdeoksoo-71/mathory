@@ -373,7 +373,7 @@ export default function EditorPreview({
         ),
         th: ({ children, style, ...props }) => (
           <th style={{
-            border: '1px solid #999',
+            border: '1px solid var(--border-content-active, #B89B78)',   // M6 색 정리 — 옛 쿨그레이 #999를 웜톤으로
             padding: '6px 10px',
             fontWeight: 600,
             ...(style || {}),
@@ -381,7 +381,7 @@ export default function EditorPreview({
         ),
         td: ({ children, style, ...props }) => (
           <td style={{
-            border: '1px solid #999',
+            border: '1px solid var(--border-content-active, #B89B78)',   // M6 색 정리 — 옛 쿨그레이 #999를 웜톤으로
             padding: '6px 10px',
             ...(style || {}),
           }} {...props}>{children}</td>
@@ -457,7 +457,7 @@ export default function EditorPreview({
       height: autoHeight ? 'auto' : '100%',
       padding: borderless ? '0' : '16px',
       backgroundColor: borderless ? 'transparent' : '#ffffff',
-      border: borderless ? 'none' : '1px solid #ddd',
+      border: borderless ? 'none' : '1px solid var(--border-primary, #ddd)',
       borderRadius: borderless ? '0' : '8px',
       overflow: borderless ? 'visible' : 'auto',
       // CSS 변수 기반 → 상자/선택지 내부 중첩 EditorPreview까지 동일 스케일 (없으면 15px)

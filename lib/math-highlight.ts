@@ -53,7 +53,7 @@ export const mathHighlightField = StateField.define<MathHighlightRange | null>({
 
 export const mathHighlightTheme = EditorView.baseTheme({
   '.cm-math-hl': {
-    backgroundColor: 'rgba(255, 224, 51, 0.30)', // 연한 노랑 (수식, 미리보기와 동일)
+    backgroundColor: 'var(--highlight-match)', // M6 색 정리 — 레드 틴트 토큰(미리보기 .math-highlight-active와 같은 토큰)
     borderRadius: '2px',
   },
 });

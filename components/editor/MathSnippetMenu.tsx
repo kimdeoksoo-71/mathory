@@ -139,14 +139,14 @@ export default function MathSnippetMenu({
       <div
         style={{
           padding: '10px 14px',
-          borderBottom: '1px solid #eee',
+          borderBottom: '1px solid var(--border-light, #eee)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
         }}
       >
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#3D3929' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #2D2A23)' }}>
           {mode === 'list' ? '수식 상용구' : mode === 'add' ? '새 상용구 등록' : '상용구 수정'}
         </span>
         {mode !== 'list' && (
@@ -157,7 +157,7 @@ export default function MathSnippetMenu({
               border: 'none',
               cursor: 'pointer',
               fontSize: 12,
-              color: '#888',
+              color: 'var(--text-muted, #888)',
               padding: '2px 6px',
             }}
           >
@@ -171,7 +171,7 @@ export default function MathSnippetMenu({
         <>
           {/* 내장 구조 템플릿 (Phase 54) */}
           <div style={{ padding: '4px 0', borderBottom: '1px solid #f0efe9', flexShrink: 0 }}>
-            <div style={{ padding: '4px 14px', fontSize: 11, color: '#aaa' }}>구조 템플릿</div>
+            <div style={{ padding: '4px 14px', fontSize: 11, color: 'var(--text-faint, #aaa)' }}>구조 템플릿</div>
             {STRUCTURE_TEMPLATES.map((t) => (
               <div
                 key={t.label}
@@ -181,15 +181,15 @@ export default function MathSnippetMenu({
                 onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'none'; }}
                 onClick={() => { onInsert(t.insert); onClose(); }}
               >
-                <span style={{ flex: 1, fontSize: 13, color: '#3D3929' }}>{t.label}</span>
-                <span style={{ fontSize: 11, color: '#bbb', fontFamily: 'monospace' }}>{t.insert.trim()}</span>
+                <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary, #2D2A23)' }}>{t.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--text-faint, #bbb)', fontFamily: 'monospace' }}>{t.insert.trim()}</span>
               </div>
             ))}
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
             {snippets.length === 0 ? (
-              <div style={{ padding: '20px 14px', textAlign: 'center', color: '#999', fontSize: 13 }}>
+              <div style={{ padding: '20px 14px', textAlign: 'center', color: 'var(--text-muted, #999)', fontSize: 13 }}>
                 등록된 상용구가 없습니다
               </div>
             ) : (
@@ -216,12 +216,12 @@ export default function MathSnippetMenu({
                   }}
                 >
                   {/* 왼쪽: 이름 */}
-                  <span style={{ flex: 1, fontSize: 13, color: '#3D3929', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <span style={{ flex: 1, fontSize: 13, color: 'var(--text-primary, #2D2A23)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {s.name}
                   </span>
 
                   {/* 우측: 단축키 + 편집/삭제 */}
-                  <span style={{ fontSize: 11, color: '#aaa', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-faint, #aaa)', fontFamily: 'monospace', whiteSpace: 'nowrap' }}>
                     {s.shortcutIndex <= 9 ? `${modLabel}${s.shortcutIndex}` : ''}
                   </span>
 
@@ -235,7 +235,7 @@ export default function MathSnippetMenu({
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: 11,
-                      color: '#aaa',
+                      color: 'var(--text-faint, #aaa)',
                       padding: '2px 4px',
                       borderRadius: 3,
                     }}
@@ -243,7 +243,7 @@ export default function MathSnippetMenu({
                       (e.currentTarget as HTMLElement).style.color = 'var(--accent-primary)';
                     }}
                     onMouseLeave={(e) => {
-                      (e.currentTarget as HTMLElement).style.color = '#aaa';
+                      (e.currentTarget as HTMLElement).style.color = 'var(--text-faint, #aaa)';
                     }}
                     title="수정"
                   >
@@ -260,16 +260,16 @@ export default function MathSnippetMenu({
                       border: 'none',
                       cursor: 'pointer',
                       fontSize: 11,
-                      color: confirmDeleteId === s.id ? '#e53935' : '#aaa',
+                      color: confirmDeleteId === s.id ? 'var(--accent-danger, #C0392B)' : 'var(--text-faint, #aaa)',
                       padding: '2px 4px',
                       borderRadius: 3,
                     }}
                     onMouseEnter={(e) => {
-                      (e.currentTarget as HTMLElement).style.color = '#e53935';
+                      (e.currentTarget as HTMLElement).style.color = 'var(--accent-danger, #C0392B)';
                     }}
                     onMouseLeave={(e) => {
                       if (confirmDeleteId !== s.id) {
-                        (e.currentTarget as HTMLElement).style.color = '#aaa';
+                        (e.currentTarget as HTMLElement).style.color = 'var(--text-faint, #aaa)';
                       }
                     }}
                     title={confirmDeleteId === s.id ? '한번 더 클릭하면 삭제' : '삭제'}
@@ -282,7 +282,7 @@ export default function MathSnippetMenu({
           </div>
 
           {/* 하단: 새 상용구 등록 */}
-          <div style={{ borderTop: '1px solid #eee', flexShrink: 0 }}>
+          <div style={{ borderTop: '1px solid var(--border-light, #eee)', flexShrink: 0 }}>
             <button
               onClick={openAddForm}
               style={{
@@ -301,7 +301,7 @@ export default function MathSnippetMenu({
                 transition: 'background 0.1s',
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = '#f0f4ff';
+                (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover, #F0EBE3)';
               }}
               onMouseLeave={(e) => {
                 (e.currentTarget as HTMLElement).style.background = 'none';
@@ -318,7 +318,7 @@ export default function MathSnippetMenu({
         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
           {/* 상용구 이름 */}
           <div>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted, #888)', display: 'block', marginBottom: 4 }}>
               상용구 이름
             </label>
             <input
@@ -328,7 +328,7 @@ export default function MathSnippetMenu({
               style={{
                 width: '100%',
                 padding: '6px 10px',
-                border: '1px solid #ddd',
+                border: '1px solid var(--border-primary, #ddd)',
                 borderRadius: 6,
                 fontSize: 13,
                 outline: 'none',
@@ -338,7 +338,7 @@ export default function MathSnippetMenu({
                 e.currentTarget.style.borderColor = 'var(--accent-primary)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#ddd';
+                e.currentTarget.style.borderColor = 'var(--border-primary, #ddd)';
               }}
               autoFocus
             />
@@ -346,7 +346,7 @@ export default function MathSnippetMenu({
 
           {/* 단축키 번호 */}
           <div>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted, #888)', display: 'block', marginBottom: 4 }}>
               단축키 ({modLabel}번호)
             </label>
             <select
@@ -355,7 +355,7 @@ export default function MathSnippetMenu({
               style={{
                 width: '100%',
                 padding: '6px 10px',
-                border: '1px solid #ddd',
+                border: '1px solid var(--border-primary, #ddd)',
                 borderRadius: 6,
                 fontSize: 13,
                 outline: 'none',
@@ -378,7 +378,7 @@ export default function MathSnippetMenu({
 
           {/* 상용구 내용 (LaTeX) */}
           <div>
-            <label style={{ fontSize: 12, color: '#888', display: 'block', marginBottom: 4 }}>
+            <label style={{ fontSize: 12, color: 'var(--text-muted, #888)', display: 'block', marginBottom: 4 }}>
               상용구 내용 (LaTeX)
             </label>
             <textarea
@@ -389,7 +389,7 @@ export default function MathSnippetMenu({
               style={{
                 width: '100%',
                 padding: '8px 10px',
-                border: '1px solid #ddd',
+                border: '1px solid var(--border-primary, #ddd)',
                 borderRadius: 6,
                 fontSize: 13,
                 fontFamily: 'var(--font-mono)',
@@ -402,7 +402,7 @@ export default function MathSnippetMenu({
                 e.currentTarget.style.borderColor = 'var(--accent-primary)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#ddd';
+                e.currentTarget.style.borderColor = 'var(--border-primary, #ddd)';
               }}
             />
           </div>
@@ -413,12 +413,12 @@ export default function MathSnippetMenu({
               onClick={() => setMode('list')}
               style={{
                 padding: '6px 16px',
-                border: '1px solid #ddd',
+                border: '1px solid var(--border-primary, #ddd)',
                 borderRadius: 6,
                 background: '#fff',
                 cursor: 'pointer',
                 fontSize: 13,
-                color: '#666',
+                color: 'var(--text-secondary, #666)',
               }}
             >
               취소

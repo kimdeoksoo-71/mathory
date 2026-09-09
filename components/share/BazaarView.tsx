@@ -160,7 +160,7 @@ export default function BazaarView({
       >
         <div style={{ padding: 16 }}>
           {error && (
-            <div style={{ marginBottom: 10, padding: 8, borderRadius: 6, background: '#fdecea', color: '#a4322a', fontSize: 11.5 }}>
+            <div style={{ marginBottom: 10, padding: 8, borderRadius: 6, background: 'var(--accent-danger-bg, #FEF2F2)', color: 'var(--accent-danger, #C0392B)', fontSize: 11.5 }}>
               {error}
             </div>
           )}
@@ -256,7 +256,7 @@ function BazaarRow({
         {post.authorNickname || '익명'}
       </button>
       {showDate && (
-        <span style={{ ...cellDate, color: expired ? '#c33' : 'var(--text-faint, #bbb)' }}>
+        <span style={{ ...cellDate, color: expired ? 'var(--accent-danger, #C0392B)' : 'var(--text-faint, #bbb)' }}>
           {post.mode === 'snapshot' && expired ? '만료' : fmtDate(post.createdAt)}
         </span>
       )}
@@ -270,7 +270,7 @@ function BazaarRow({
       {mine && hovered && (
         <span style={actionOverlayStyle}>
           <button onClick={copyLink} style={smallBtnStyle}>{copied ? '복사됨' : '링크 복사'}</button>
-          <button onClick={() => onTakedown(post)} style={{ ...smallBtnStyle, color: '#c33', borderColor: '#e3b5b5' }}>
+          <button onClick={() => onTakedown(post)} style={{ ...smallBtnStyle, color: 'var(--accent-danger, #C0392B)', borderColor: 'var(--accent-danger, #C0392B)' }}>
             게시 내리기
           </button>
         </span>
@@ -343,7 +343,7 @@ const tagChipStyle: React.CSSProperties = {
 };
 const badgeStyle = (mode: string): React.CSSProperties => ({
   fontSize: 9.5, fontWeight: 700, padding: '1px 5px', borderRadius: 4,
-  background: mode === 'live' ? 'var(--accent-primary, #B8845C)' : '#8a8a8a', color: '#fff',
+  background: mode === 'live' ? 'var(--accent-primary, #B8845C)' : 'var(--text-muted, #9C9585)', color: '#fff',
 });
 const actionOverlayStyle: React.CSSProperties = {
   position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',

@@ -84,8 +84,9 @@ export function isProblemDrag(kind: DragKind): boolean {
 
 /* ─── 하이라이트 한 문법 (D27) — 링 + 틴트, border 불변 ───
    사이드바 현행 조건부 2px border는 over 순간 행이 자라는 결함이라 철거했다(F6). */
-export const DROP_RING = '0 0 0 2px rgba(91, 106, 191, 0.25)';
-export const DROP_TINT = 'rgba(91, 106, 191, 0.12)';
+/* M6 색 정리 — 옛 인디고 rgba(91,106,191)를 Mathory 레드 틴트 토큰으로(globals --drop-ring/--drop-tint). */
+export const DROP_RING = 'var(--drop-ring, 0 0 0 2px rgba(188, 95, 63, 0.30))';
+export const DROP_TINT = 'var(--drop-tint, rgba(188, 95, 63, 0.10))';
 
 /* ─── DnD 렌더프롭 래퍼 (FolderView에서 이주) ─── */
 export function Draggable({ id, data, disabled, children }: {

@@ -1035,7 +1035,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             '.cm-tooltip': { zIndex: '10200' },
             // ═══ 자동완성 드롭다운 스타일 ═══
             '.cm-tooltip.cm-tooltip-autocomplete': {
-              border: '1px solid #ddd',
+              border: '1px solid var(--border-primary, #ddd)',
               borderRadius: '8px',
               boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
               backgroundColor: '#fff',
@@ -1067,17 +1067,17 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             },
 
             // ═══ Lint 밑줄 스타일 ═══
-            // LaTeX 오류 (중괄호/begin-end 불일치, 닫힘 누락): 빨간색 물결 밑줄
+            // LaTeX 오류 (중괄호/begin-end 불일치, 닫힘 누락): --accent-danger 물결 밑줄 (M6 색 정리 — 옛 #e53935)
             '.cm-lintRange-error': {
               backgroundImage: 'none !important',
-              textDecoration: 'wavy underline #e53935',
+              textDecoration: 'wavy underline var(--accent-danger, #C0392B)',
               textDecorationSkipInk: 'none',
               textUnderlineOffset: '3px',
             },
-            // LaTeX 경고 (미등록 명령어): 주황색 물결 밑줄
+            // LaTeX 경고 (미등록 명령어): --mathory-red 물결 밑줄 (옛 주황 #f57c00 — 오류보다 한 단 연한 빨강으로 가른다)
             '.cm-lintRange-warning': {
               backgroundImage: 'none !important',
-              textDecoration: 'wavy underline #f57c00',
+              textDecoration: 'wavy underline var(--mathory-red, #D97757)',
               textDecorationSkipInk: 'none',
               textUnderlineOffset: '3px',
             },
@@ -1085,12 +1085,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             // ═══ Lint 거터 마커 ═══
             '.cm-lint-marker-error::after': {
               content: '"●"',
-              color: '#e53935',
+              color: 'var(--accent-danger, #C0392B)',
               fontSize: '10px',
             },
             '.cm-lint-marker-warning::after': {
               content: '"●"',
-              color: '#f57c00',
+              color: 'var(--mathory-red, #D97757)',
               fontSize: '10px',
             },
 

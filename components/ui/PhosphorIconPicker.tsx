@@ -132,7 +132,7 @@ export function PhosphorIconPicker({
         autoFocus={autoFocus}
         style={{
           width: '100%', boxSizing: 'border-box', padding: '6px 8px', fontSize: 13,
-          border: '1px solid #ddd', borderRadius: 6, outline: 'none', marginBottom: 6,
+          border: '1px solid var(--border-primary, #ddd)', borderRadius: 6, outline: 'none', marginBottom: 6,
         }}
       />
 
@@ -146,7 +146,7 @@ export function PhosphorIconPicker({
             <IconGrid names={searchResults.map((i) => i.n)} onPick={handlePick} />
           </div>
         ) : (
-          <div style={{ padding: 16, fontSize: 12, color: '#999', textAlign: 'center' }}>
+          <div style={{ padding: 16, fontSize: 12, color: 'var(--text-muted, #999)', textAlign: 'center' }}>
             검색 결과 없음
           </div>
         )
@@ -158,7 +158,7 @@ export function PhosphorIconPicker({
             onChange={(e) => setCategory(e.target.value)}
             style={{
               width: '100%', boxSizing: 'border-box', padding: '5px 6px', fontSize: 12.5,
-              border: '1px solid #ddd', borderRadius: 6, marginBottom: 6,
+              border: '1px solid var(--border-primary, #ddd)', borderRadius: 6, marginBottom: 6,
               background: 'var(--bg-card, #fff)', color: 'var(--text-primary, #222)',
               fontFamily: 'var(--font-ui, sans-serif)', cursor: 'pointer',
             }}
@@ -171,7 +171,7 @@ export function PhosphorIconPicker({
           {/* 최근 사용 */}
           {recent.length > 0 && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#999', padding: '0 2px 4px' }}>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #999)', padding: '0 2px 4px' }}>
                 최근 사용
               </div>
               <IconGrid names={recent} onPick={handlePick} />

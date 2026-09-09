@@ -27,15 +27,15 @@ export default function LoginButton({ user }: LoginButtonProps) {
   if (user) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-        <span style={{ fontSize: '14px', color: '#333' }}>
+        <span style={{ fontSize: '14px', color: 'var(--text-primary, #333)' }}>
           {user.displayName || user.email}
         </span>
         <button
           onClick={handleLogout}
           style={{
             padding: '6px 14px',
-            backgroundColor: '#f5f5f5',
-            border: '1px solid #ddd',
+            backgroundColor: 'var(--bg-functional, #f5f5f5)',
+            border: '1px solid var(--border-primary, #ddd)',
             borderRadius: '6px',
             cursor: 'pointer',
             fontSize: '13px',

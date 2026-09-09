@@ -56,7 +56,7 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
               ...imageTreatmentStyle(block),
             }} />
           ) : (
-            <span style={{ color: '#888', fontSize: 12 }}>(이미지 없음)</span>
+            <span style={{ color: 'var(--text-muted, #888)', fontSize: 12 }}>(이미지 없음)</span>
           )}
         </div>
       );

@@ -55,7 +55,7 @@ export default function SymbolCatalog({ inGroupIds, onPick, canPick }: Props) {
           placeholder="기호 검색 (이름 / LaTeX)"
           style={{
             width: '100%', boxSizing: 'border-box', height: 32, padding: '0 10px',
-            border: '1px solid #ddd', borderRadius: 6, fontSize: 13, outline: 'none',
+            border: '1px solid var(--border-primary, #ddd)', borderRadius: 6, fontSize: 13, outline: 'none',
           }}
         />
         {!canPick && (
@@ -68,7 +68,7 @@ export default function SymbolCatalog({ inGroupIds, onPick, canPick }: Props) {
       <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
         {searchResults ? (
           searchResults.length === 0 ? (
-            <div style={{ padding: '20px 0', textAlign: 'center', color: '#999', fontSize: 13 }}>검색 결과 없음</div>
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--text-muted, #999)', fontSize: 13 }}>검색 결과 없음</div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 40px)', gap: 6 }}>
               {searchResults.map((s) => (
@@ -79,8 +79,8 @@ export default function SymbolCatalog({ inGroupIds, onPick, canPick }: Props) {
         ) : (
           sections.map((sec) => (
             <div key={sec.key} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#999', margin: '0 0 6px', letterSpacing: 0.3 }}>
-                {sec.label} <span style={{ color: '#ccc', fontWeight: 400 }}>({sec.syms.length})</span>
+              <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted, #999)', margin: '0 0 6px', letterSpacing: 0.3 }}>
+                {sec.label} <span style={{ color: 'var(--text-placeholder, #ccc)', fontWeight: 400 }}>({sec.syms.length})</span>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, 40px)', gap: 6 }}>
                 {sec.syms.map((s) => (

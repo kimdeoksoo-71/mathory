@@ -78,8 +78,8 @@ export default function VersionTimeline({
               display: 'flex', flexDirection: 'column', gap: 3, alignItems: 'stretch',
               textAlign: 'left', padding: '9px 12px', border: 'none', cursor: 'pointer',
               borderBottom: '1px solid var(--border-light)',
-              background: selected ? 'var(--bg-input, #eef2ff)' : 'transparent',
-              borderLeft: selected ? '3px solid var(--accent-primary, #e53935)' : '3px solid transparent',
+              background: selected ? 'var(--bg-input, #FFFFFF)' : 'transparent',
+              borderLeft: selected ? '3px solid var(--accent-primary, #c96442)' : '3px solid transparent',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -93,13 +93,13 @@ export default function VersionTimeline({
                 <TriggerIcon size={14} />
               </span>
               {v.name && (
-                <span style={{ fontSize: 12, color: 'var(--accent-primary, #e53935)', fontWeight: 600 }}>
+                <span style={{ fontSize: 12, color: 'var(--accent-primary, #c96442)', fontWeight: 600 }}>
                   {v.name}
                 </span>
               )}
               {v.pinned && (
                 <span title="고정" style={{
-                  display: 'inline-flex', alignItems: 'center', color: 'var(--accent-primary, #e53935)',
+                  display: 'inline-flex', alignItems: 'center', color: 'var(--accent-primary, #c96442)',
                 }}><IconPin size={14} filled /></span>
               )}
               {/* Phase 55b: 내보냄 표시(표시 전용 — 조작은 선택 버전 툴바에서) */}

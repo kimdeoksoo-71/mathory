@@ -69,8 +69,8 @@ export const dialogInput: React.CSSProperties = {
   border: '1px solid var(--border-light, #ddd)', borderRadius: 6,
 };
 
-/** 위험 버튼 색은 RestoreConfirm 전례(#e53935)를 따른다. */
-export const DANGER = '#e53935';
+/** 위험 버튼 색 — M6 색 정리로 --accent-danger 하나(옛 구글 레드 #e53935 폐기). */
+export const DANGER = 'var(--accent-danger, #C0392B)';
 
 export function dialogBtn(
   kind: 'primary' | 'ghost' | 'danger',

@@ -77,8 +77,8 @@ function OwnerBadge({ displayName, photoURL }: { displayName: string; photoURL: 
       ) : (
         <div style={{
           width: 28, height: 28, borderRadius: '50%',
-          background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 12, color: '#666', fontWeight: 600,
+          background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 12, color: 'var(--text-secondary, #666)', fontWeight: 600,
         }}>
           {(displayName || '?').charAt(0).toUpperCase()}
         </div>
@@ -92,7 +92,7 @@ function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       height: '100%', minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#666', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
+      color: 'var(--text-secondary, #666)', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
     }}>
       {children}
     </div>

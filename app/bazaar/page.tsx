@@ -24,7 +24,7 @@ export default function BazaarLandingPage() {
 
   if (loading || user) {
     return (
-      <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14 }}>
+      <div style={{ height: '100dvh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted, #888)', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14 }}>
         이동 중…
       </div>
     );

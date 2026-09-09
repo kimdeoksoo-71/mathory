@@ -24,7 +24,7 @@ export default function MigratePage() {
   if (loading) return <div style={{ padding: 40 }}>로딩 중...</div>;
   if (!user) return <div style={{ padding: 40 }}>로그인 필요</div>;
   if (user.email !== ADMIN_EMAIL) {
-    return <div style={{ padding: 40, color: '#e53935' }}>권한 없음 ({user.email})</div>;
+    return <div style={{ padding: 40, color: 'var(--accent-danger, #C0392B)' }}>권한 없음 ({user.email})</div>;
   }
 
   const appendLog = (s: string) => setLog((prev) => [...prev, s]);
@@ -138,7 +138,7 @@ export default function MigratePage() {
   return (
     <div style={{ maxWidth: 800, margin: '40px auto', padding: 24, fontFamily: 'system-ui' }}>
       <h1 style={{ fontSize: 22, marginBottom: 8 }}>Stage 0 데이터 마이그레이션</h1>
-      <div style={{ fontSize: 13, color: '#666', marginBottom: 24 }}>
+      <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginBottom: 24 }}>
         로그인 사용자: {user.email} ({user.uid})
       </div>
 
@@ -159,8 +159,8 @@ export default function MigratePage() {
         </button>
       </div>
 
-      <div style={{ borderTop: '1px solid #eee', paddingTop: 16, marginBottom: 16 }}>
-        <div style={{ fontSize: 13, color: '#666', marginBottom: 8 }}>
+      <div style={{ borderTop: '1px solid var(--border-light, #eee)', paddingTop: 16, marginBottom: 16 }}>
+        <div style={{ fontSize: 13, color: 'var(--text-secondary, #666)', marginBottom: 8 }}>
           Phase 52(B1): 공개 문항 기존 댓글에 <code>commentStream</code> 플래그 백필
           (미실행 시 기존 공개 댓글이 공개 뷰어에서 안 보임). 신규 댓글은 자동.
         </div>
@@ -174,7 +174,7 @@ export default function MigratePage() {
       </div>
 
       {result && (
-        <div style={{ padding: 12, background: '#f5f5f5', borderRadius: 6, fontSize: 13, marginBottom: 16 }}>
+        <div style={{ padding: 12, background: 'var(--bg-functional, #f5f5f5)', borderRadius: 6, fontSize: 13, marginBottom: 16 }}>
           <div>전체 문제: {result.total}개</div>
           <div>authorUid 누락: <b>{result.needAuthorUid.length}</b>개</div>
           <div>visibility 누락: <b>{result.needVisibility.length}</b>개</div>
@@ -190,13 +190,13 @@ export default function MigratePage() {
   );
 }
 
-function btn(disabled: boolean, bg = '#1976d2'): React.CSSProperties {
+function btn(disabled: boolean, bg = 'var(--accent-primary, #c96442)'): React.CSSProperties {
   return {
     padding: '10px 20px',
     fontSize: 14,
     borderRadius: 6,
     border: 'none',
-    background: disabled ? '#999' : bg,
+    background: disabled ? 'var(--text-faint, #999)' : bg,
     color: '#fff',
     cursor: disabled ? 'not-allowed' : 'pointer',
     fontWeight: 600,

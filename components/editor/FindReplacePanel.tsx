@@ -379,7 +379,7 @@ function OptionToggle({ label, title, active, onClick, underline }: {
   return (
     <button onClick={(e) => { e.stopPropagation(); onClick(); }} title={title}
       style={{ border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
-        background: active ? 'rgba(91,106,191,0.12)' : 'transparent',
+        background: active ? 'var(--accent-soft, #f5e6df)' : 'transparent',
         color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
         cursor: 'pointer', padding: '2px 5px', fontSize: 12, fontFamily: 'monospace',
         borderRadius: 3, lineHeight: 1.3, transition: 'all 0.12s', flexShrink: 0,

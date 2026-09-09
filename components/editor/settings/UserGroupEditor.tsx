@@ -122,8 +122,8 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
   };
 
   const iconBtn: React.CSSProperties = {
-    width: 22, height: 22, border: '1px solid #e5e5e5', borderRadius: 4, background: '#fff',
-    cursor: 'pointer', fontSize: 11, lineHeight: 1, color: '#666', padding: 0,
+    width: 22, height: 22, border: '1px solid var(--border-light, #e5e5e5)', borderRadius: 4, background: '#fff',
+    cursor: 'pointer', fontSize: 11, lineHeight: 1, color: 'var(--text-secondary, #666)', padding: 0,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   };
 
@@ -137,8 +137,8 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
               key={g.id}
               onClick={() => onSelectGroup(g.id)}
               style={{
-                border: selected ? '1.5px solid #6366f1' : '1px solid #e5e2dc',
-                background: selected ? 'rgba(99,102,241,0.05)' : '#fff',
+                border: selected ? '1.5px solid var(--accent-primary, #c96442)' : '1px solid var(--border-light, #E8E4DF)',
+                background: selected ? 'var(--accent-soft, #f5e6df)' : 'var(--bg-input, #fff)',
                 borderRadius: 8, padding: 8, marginBottom: 8, cursor: 'pointer',
               }}
             >
@@ -152,22 +152,22 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
                     onChange={(e) => setEditingName(e.target.value)}
                     onBlur={commitRename}
                     onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setEditingId(null); }}
-                    style={{ flex: 1, height: 24, padding: '0 6px', fontSize: 13, border: '1px solid #c7d2fe', borderRadius: 4, outline: 'none' }}
+                    style={{ flex: 1, height: 24, padding: '0 6px', fontSize: 13, border: '1px solid var(--border-content-active, #B89B78)', borderRadius: 4, outline: 'none' }}
                   />
                 ) : (
-                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: '#333', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {g.name} <span style={{ color: '#bbb', fontWeight: 400 }}>{g.symbolIds.length}</span>
+                  <span style={{ flex: 1, fontSize: 13, fontWeight: 600, color: 'var(--text-primary, #333)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {g.name} <span style={{ color: 'var(--text-faint, #bbb)', fontWeight: 400 }}>{g.symbolIds.length}</span>
                   </span>
                 )}
                 <button type="button" title="위로" style={iconBtn} onClick={(e) => { e.stopPropagation(); move(i, -1); }} disabled={i === 0}>▲</button>
                 <button type="button" title="아래로" style={iconBtn} onClick={(e) => { e.stopPropagation(); move(i, 1); }} disabled={i === groups.length - 1}>▼</button>
                 <button type="button" title="이름 변경" style={iconBtn} onClick={(e) => { e.stopPropagation(); setEditingId(g.id); setEditingName(g.name); }}>✎</button>
-                <button type="button" title="그룹 삭제" style={{ ...iconBtn, color: '#ef4444' }} onClick={(e) => { e.stopPropagation(); deleteGroup(g); }}>×</button>
+                <button type="button" title="그룹 삭제" style={{ ...iconBtn, color: 'var(--accent-danger, #C0392B)' }} onClick={(e) => { e.stopPropagation(); deleteGroup(g); }}>×</button>
               </div>
 
               {/* 기호 그리드 */}
               {g.symbolIds.length === 0 ? (
-                <div style={{ fontSize: 11, color: '#bbb', padding: '6px 2px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-faint, #bbb)', padding: '6px 2px' }}>
                   오른쪽 카탈로그에서 기호를 클릭해 추가하세요.
                 </div>
               ) : (
@@ -195,9 +195,9 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
           disabled={groups.length >= MAX_GROUPS}
           style={{
             width: '100%', height: 34, marginTop: 2,
-            border: '1px dashed #cbd5e1', borderRadius: 8, background: '#fafafa',
+            border: '1px dashed var(--border-primary, #E0DCD6)', borderRadius: 8, background: 'var(--bg-functional, #fafafa)',
             cursor: groups.length >= MAX_GROUPS ? 'not-allowed' : 'pointer',
-            color: groups.length >= MAX_GROUPS ? '#ccc' : '#555', fontSize: 13,
+            color: groups.length >= MAX_GROUPS ? 'var(--text-placeholder, #ccc)' : 'var(--text-secondary, #555)', fontSize: 13,
           }}
         >
           + 그룹 추가 {groups.length >= MAX_GROUPS && '(최대 12)'}
@@ -208,7 +208,7 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
       {deleted && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8, marginTop: 8,
-          padding: '8px 12px', background: '#1f2937', color: '#fff', borderRadius: 8, fontSize: 12,
+          padding: '8px 12px', background: 'var(--text-primary, #2D2A23)', color: '#fff', borderRadius: 8, fontSize: 12,
         }}>
           <span style={{ flex: 1 }}>'{deleted.group.name}' 그룹 삭제됨</span>
           <button type="button" onClick={undoDelete} style={{ border: 'none', background: 'none', color: '#93c5fd', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>

@@ -60,8 +60,8 @@ export default function ImageUploadButton({ onUpload }: ImageUploadButtonProps) 
         style={{
           padding: '4px 10px',
           fontSize: '14px',
-          backgroundColor: uploading ? '#eee' : '#fff',
-          border: '1px solid #ccc',
+          backgroundColor: uploading ? 'var(--bg-hover, #eee)' : '#fff',
+          border: '1px solid var(--border-primary, #ccc)',
           borderRadius: '4px',
           cursor: uploading ? 'not-allowed' : 'pointer',
           minWidth: '36px',
@@ -71,7 +71,7 @@ export default function ImageUploadButton({ onUpload }: ImageUploadButtonProps) 
           if (!uploading) e.currentTarget.style.backgroundColor = '#e8e8e8';
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.backgroundColor = uploading ? '#eee' : '#fff';
+          e.currentTarget.style.backgroundColor = uploading ? 'var(--bg-hover, #eee)' : '#fff';
         }}
       >
         {uploading ? '⏳' : '🖼️'}

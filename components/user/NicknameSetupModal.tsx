@@ -92,7 +92,7 @@ export default function NicknameSetupModal({
         />
 
         {status.kind === 'error' && (
-          <p style={{ marginTop: 10, fontSize: 12.5, color: '#d33' }}>{status.message}</p>
+          <p style={{ marginTop: 10, fontSize: 12.5, color: 'var(--accent-danger, #C0392B)' }}>{status.message}</p>
         )}
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 18 }}>

@@ -5,11 +5,12 @@ import type { ContentDiff, BlockDiff, BlockDiffKind } from '../../lib/version/di
 
 const KIND_BADGE: Record<BlockDiffKind, { label: string; color: string; bg: string } | null> = {
   unchanged: null,
-  added: { label: '추가', color: '#137333', bg: '#e6f4ea' },
-  removed: { label: '삭제', color: '#c5221f', bg: '#fce8e6' },
-  modified: { label: '수정', color: '#8a6d0b', bg: '#fef7e0' },
-  moved: { label: '이동', color: '#1a56c4', bg: '#e8f0fe' },
-  moved_modified: { label: '이동+수정', color: '#1a56c4', bg: '#e8f0fe' },
+  // M6 색 정리 — 구글 diff 팔레트(초록·노랑·파랑)를 앱 팔레트로: 추가=올리브 · 삭제=danger · 수정=레드 틴트 · 이동=중립
+  added: { label: '추가', color: 'var(--accent-success, #5f6b3c)', bg: 'var(--accent-success-bg, #EDEFE3)' },
+  removed: { label: '삭제', color: 'var(--accent-danger, #C0392B)', bg: 'var(--accent-danger-bg, #FEF2F2)' },
+  modified: { label: '수정', color: 'var(--mathory-red-dark, #BC5F3F)', bg: 'var(--accent-soft, #f5e6df)' },
+  moved: { label: '이동', color: 'var(--text-secondary, #5D5647)', bg: 'var(--bg-active, #E8E2D9)' },
+  moved_modified: { label: '이동+수정', color: 'var(--text-secondary, #5D5647)', bg: 'var(--bg-active, #E8E2D9)' },
 };
 
 function WordDiff({ parts }: { parts: NonNullable<BlockDiff['textParts']> }) {
@@ -20,9 +21,9 @@ function WordDiff({ parts }: { parts: NonNullable<BlockDiff['textParts']> }) {
           key={i}
           style={
             p.added
-              ? { background: '#c9f2d4', color: '#0b6b2e' }
+              ? { background: 'var(--accent-success-bg, #EDEFE3)', color: 'var(--accent-success, #5f6b3c)' }
               : p.removed
-              ? { background: '#ffd0d4', color: '#a01722', textDecoration: 'line-through' }
+              ? { background: 'var(--accent-danger-bg, #FEF2F2)', color: 'var(--accent-danger, #C0392B)', textDecoration: 'line-through' }
               : undefined
           }
         >
@@ -37,10 +38,10 @@ function BlockRow({ bd }: { bd: BlockDiff }) {
   const badge = KIND_BADGE[bd.kind];
   const raw = (bd.after || bd.before)?.raw_text ?? '';
   const bg =
-    bd.kind === 'added' ? '#f2fbf5'
-    : bd.kind === 'removed' ? '#fff5f5'
+    bd.kind === 'added' ? 'var(--accent-success-bg, #EDEFE3)'
+    : bd.kind === 'removed' ? 'var(--accent-danger-bg, #FEF2F2)'
     : bd.kind === 'unchanged' ? 'transparent'
-    : '#fffdf5';
+    : 'var(--bg-functional, #FCFAF6)';
 
   return (
     <div style={{
@@ -59,7 +60,7 @@ function BlockRow({ bd }: { bd: BlockDiff }) {
       <pre style={{
         margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
         fontFamily: 'var(--font-mono, monospace)', fontSize: 11, lineHeight: 1.5,
-        color: bd.kind === 'removed' ? '#a01722' : 'var(--text-secondary, #444)',
+        color: bd.kind === 'removed' ? 'var(--accent-danger, #C0392B)' : 'var(--text-secondary, #444)',
         textDecoration: bd.kind === 'removed' ? 'line-through' : undefined,
       }}>
         {bd.textParts ? <WordDiff parts={bd.textParts} /> : raw}
@@ -80,18 +81,18 @@ export default function VersionDiff({ diff }: { diff: ContentDiff }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 12 }}>
       {/* 메타 변경 */}
       {(diff.meta.titleChanged || diff.meta.answerChanged) && (
-        <div style={{ padding: '6px 8px', borderRadius: 5, background: '#fffdf5' }}>
+        <div style={{ padding: '6px 8px', borderRadius: 5, background: 'var(--bg-functional, #FCFAF6)' }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 3 }}>문항 메타</div>
           {diff.meta.titleChanged && (
             <div style={{ fontSize: 11 }}>
-              제목: <span style={{ color: '#a01722', textDecoration: 'line-through' }}>{diff.meta.before.title || '—'}</span>
-              {' → '}<span style={{ color: '#0b6b2e' }}>{diff.meta.after.title || '—'}</span>
+              제목: <span style={{ color: 'var(--accent-danger, #C0392B)', textDecoration: 'line-through' }}>{diff.meta.before.title || '—'}</span>
+              {' → '}<span style={{ color: 'var(--accent-success, #5f6b3c)' }}>{diff.meta.after.title || '—'}</span>
             </div>
           )}
           {diff.meta.answerChanged && (
             <div style={{ fontSize: 11 }}>
-              정답: <span style={{ color: '#a01722', textDecoration: 'line-through' }}>{diff.meta.before.answer || '—'}</span>
-              {' → '}<span style={{ color: '#0b6b2e' }}>{diff.meta.after.answer || '—'}</span>
+              정답: <span style={{ color: 'var(--accent-danger, #C0392B)', textDecoration: 'line-through' }}>{diff.meta.before.answer || '—'}</span>
+              {' → '}<span style={{ color: 'var(--accent-success, #5f6b3c)' }}>{diff.meta.after.answer || '—'}</span>
             </div>
           )}
         </div>

@@ -245,8 +245,8 @@ function Avatar({ photoURL, name, size }: { photoURL?: string; name: string; siz
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.45, color: '#666', fontWeight: 600,
+      background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.45, color: 'var(--text-secondary, #666)', fontWeight: 600,
     }}>
       {(name || '?').charAt(0).toUpperCase()}
     </div>

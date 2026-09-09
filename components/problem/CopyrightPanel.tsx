@@ -143,7 +143,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               fontSize: 11,
-              color: isModified ? 'var(--accent-danger, #e53935)' : 'var(--text-primary)',
+              color: isModified ? 'var(--accent-danger, #C0392B)' : 'var(--text-primary)',
               marginBottom: 4,
               textDecoration: 'none',
               transition: 'color 0.15s',
@@ -156,7 +156,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
             }}
             onMouseLeave={(e) => {
               (e.currentTarget as HTMLElement).style.color = isModified
-                ? 'var(--accent-danger, #e53935)'
+                ? 'var(--accent-danger, #C0392B)'
                 : 'var(--text-primary)';
               const span = (e.currentTarget as HTMLElement).querySelector('span');
               if (span) (span as HTMLElement).style.textDecoration = 'none';
@@ -188,7 +188,7 @@ export default function CopyrightPanel({ problem, isOwner, currentUserUid, onUpd
       ) : null}
 
       {error && (
-        <div style={{ fontSize: 11, color: 'var(--accent-danger, #e53935)', marginTop: 6 }}>
+        <div style={{ fontSize: 11, color: 'var(--accent-danger, #C0392B)', marginTop: 6 }}>
           {error}
         </div>
       )}

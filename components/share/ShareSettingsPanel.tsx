@@ -287,7 +287,6 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
           checked={pubComments}
           disabled={bazaarBusy}
           onChange={(e) => (post ? handleTogglePubComments(e.target.checked) : setPubComments(e.target.checked))}
-          style={{ accentColor: 'var(--accent-primary, #B8845C)' }}
         />
         <span>공개 댓글 허용 (로그인 누구나)</span>
       </label>
@@ -361,7 +360,6 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
               checked={tabVis[t.id] !== false}
               disabled={busy}
               onChange={(e) => handleTabChange(t.id, e.target.checked)}
-              style={{ accentColor: 'var(--accent-primary, #B8845C)' }}
             />
             <span>{t.label}</span>
           </label>
@@ -415,7 +413,6 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
                     checked={commentsVis}
                     disabled={liveBusy}
                     onChange={(e) => handleToggleComments(e.target.checked)}
-                    style={{ accentColor: 'var(--accent-primary, #B8845C)' }}
                   />
                   <span>댓글 공개 표시</span>
                 </label>
@@ -500,7 +497,7 @@ export default function ShareSettingsPanel({ problemId, ownerUid, tabs, onManage
       )}
 
       {error && (
-        <div style={{ marginTop: 10, padding: 8, borderRadius: 6, background: '#fdecea', color: '#a4322a', fontSize: 11 }}>
+        <div style={{ marginTop: 10, padding: 8, borderRadius: 6, background: 'var(--accent-danger-bg, #FEF2F2)', color: 'var(--accent-danger, #C0392B)', fontSize: 11 }}>
           {error}
         </div>
       )}
@@ -578,8 +575,8 @@ function primaryBtnStyle(busy: boolean): React.CSSProperties {
 
 function dangerBtnStyle(busy: boolean): React.CSSProperties {
   return {
-    width: '100%', padding: '6px 0', border: '1px solid var(--accent-danger, #c33)',
-    background: 'transparent', color: 'var(--accent-danger, #c33)',
+    width: '100%', padding: '6px 0', border: '1px solid var(--accent-danger, #C0392B)',
+    background: 'transparent', color: 'var(--accent-danger, #C0392B)',
     borderRadius: 6, cursor: busy ? 'wait' : 'pointer', fontSize: 11.5, fontWeight: 600,
   };
 }

@@ -296,7 +296,7 @@ function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursor
             left: 0,
             marginTop: 4,
             backgroundColor: '#fff',
-            border: '1px solid #ddd',
+            border: '1px solid var(--border-primary, #ddd)',
             borderRadius: 8,
             boxShadow: '0 4px 16px rgba(0,0,0,0.12)',
             zIndex: 1000,
@@ -311,7 +311,7 @@ function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursor
                   padding: '0 2px 4px',
                   fontSize: 11,
                   fontWeight: 600,
-                  color: '#999',
+                  color: 'var(--text-muted, #999)',
                   letterSpacing: 0.5,
                   fontFamily: 'var(--font-ui, sans-serif)',
                 }}
@@ -331,13 +331,13 @@ function SpecialCharDropdown({ onInsert }: { onInsert: (template: string, cursor
                       padding: '6px',
                       fontSize: 16,
                       backgroundColor: '#fff',
-                      border: '1px solid #eee',
+                      border: '1px solid var(--border-light, #eee)',
                       borderRadius: 4,
                       cursor: 'pointer',
                       lineHeight: 1,
                       textAlign: 'center',
                     }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#f0f0f0'; }}
+                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-hover, #f0f0f0)'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#fff'; }}
                   >
                     {it.char}

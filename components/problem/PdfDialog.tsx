@@ -74,7 +74,6 @@ export default function PdfDialog({ open, onClose, tabs, onConfirm, isPrinting }
               type="checkbox"
               checked={selection[tab.id] !== false}
               onChange={(e) => setSelection((prev) => ({ ...prev, [tab.id]: e.target.checked }))}
-              style={{ accentColor: 'var(--accent-primary)' }}
             />
             {tab.label}
           </label>

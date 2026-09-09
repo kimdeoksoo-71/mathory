@@ -110,7 +110,7 @@ function Centered({ children }: { children: React.ReactNode }) {
   return (
     <div style={{
       height: '100%', minHeight: 240, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      color: '#666', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
+      color: 'var(--text-secondary, #666)', fontFamily: 'var(--font-ui, sans-serif)', fontSize: 14,
     }}>
       {children}
     </div>

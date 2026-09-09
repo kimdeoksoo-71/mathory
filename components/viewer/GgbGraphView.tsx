@@ -376,7 +376,7 @@ export default function GgbGraphView({ spec, autoActivate = false, onRegisterExp
         width: '100%',
         height: PREVIEW_HEIGHT,
         margin: '8px 0',
-        background: '#fafafa',
+        background: 'var(--bg-functional, #fafafa)',
         // 테두리 없음 — 활성화(팬·줌 가능) 시에만 살짝 그림자로 구분
         borderRadius: 6,
         overflow: 'hidden',
@@ -428,7 +428,7 @@ export default function GgbGraphView({ spec, autoActivate = false, onRegisterExp
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           background: 'rgba(255,255,255,0.95)',
-          fontSize: 12, color: 'var(--accent-danger, #c33)',
+          fontSize: 12, color: 'var(--accent-danger, #C0392B)',
         }}>
           {error}
         </div>
@@ -439,7 +439,7 @@ export default function GgbGraphView({ spec, autoActivate = false, onRegisterExp
         <div style={{
           position: 'absolute', top: 8, left: 8, zIndex: 9999,
           padding: '2px 8px', fontSize: 10,
-          background: 'rgba(220,160,40,0.92)', color: '#fff',
+          background: 'rgba(188,95,63,0.92)'   /* M6 색 정리 — 옛 주황 → mathory-red-dark */, color: '#fff',
           borderRadius: 4, pointerEvents: 'none',
         }}>
           {warning}

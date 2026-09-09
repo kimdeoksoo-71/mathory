@@ -33,7 +33,7 @@ export function isCoachBlock(type: string): boolean {
 /** 렌더 사이트가 최상위 블록 요소에 붙일 className.
  *  ⚠ 색은 `.coach-important`가 --coach-accent를 세우고 `.coach-block`이 그것을
  *    소비한다 — 두 클래스가 **같은 요소**에 있어야 한다.
- *  ⚠ 개선묶음 M2: 타입과 무관하게 항상 `coach-important`(보라 #6639ba)를 낸다.
+ *  ⚠ 개선묶음 M2: 타입과 무관하게 항상 `coach-important`(M6부터 --mathory-red-dark, 옛 보라 #6639ba)를 낸다.
  *    `.coach-caution` 규칙과 --coach-caution 토큰은 globals.css에서 삭제했다. */
 export function coachClassName(_type: string): string {
   return 'coach-block coach-important';

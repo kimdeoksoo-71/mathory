@@ -3248,13 +3248,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       {recoverableDraft && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px',
-          background: 'var(--bg-warn, #fff8e1)', borderBottom: '1px solid var(--border-light)',
+          background: 'var(--bg-warn, #f5e6df)', borderBottom: '1px solid var(--border-light)',
           fontSize: 13, color: 'var(--text-primary)', flexShrink: 0,
         }}>
           <span>복구되지 않은 변경이 있습니다.</span>
           <button onClick={() => applyRecoveredDraft(recoverableDraft)} style={{
             padding: '3px 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
-            background: '#e53935', color: '#fff', fontSize: 12,
+            background: 'var(--accent-danger, #C0392B)', color: '#fff', fontSize: 12,
           }}>복구</button>
           <button onClick={() => { clearDraft(problemId); setRecoverableDraft(null); }} style={{
             padding: '3px 10px', border: '1px solid var(--border-light)', borderRadius: 5,

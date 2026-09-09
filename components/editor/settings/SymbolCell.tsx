@@ -11,7 +11,7 @@ import { symbolPreviewHtml } from '../../../lib/katex-render';
 import type { MathSymbol, Tier } from '../../../types/toolbar-config';
 
 // 등급 시각 구분 (§4-2): 색 + 좌상단 점 (색맹 대응)
-const TIER_BG: Record<Tier, string> = { 1: '#fff', 2: '#eff6ff', 3: '#f4f4f5', 4: '#f4f4f5' };
+const TIER_BG: Record<Tier, string> = { 1: 'var(--bg-input, #fff)', 2: 'var(--accent-soft, #f5e6df)', 3: 'var(--bg-hover, #F0EBE3)', 4: 'var(--bg-hover, #F0EBE3)' };   // M6 색 정리 — 옛 파랑 틴트 #eff6ff 폐기
 const TIER_DOTS: Record<Tier, string> = { 1: '', 2: '', 3: '·', 4: '··' };
 
 interface Props {
@@ -46,9 +46,9 @@ export default function SymbolCell({ sym, onClick, onRemove, checked, showTier, 
           width: '100%', height: '100%',
           // safe center: 박스에 맞으면 가운데, 넘치면 시작(왼쪽) 정렬 → 큰 기호도 앞부분 보임
           display: 'flex', alignItems: 'center', justifyContent: 'safe center',
-          padding: 2, border: '1px solid #eee', borderRadius: 6,
-          background: hover && onClick ? '#f0f4ff' : bg,
-          borderColor: hover && onClick ? '#c7d2fe' : '#eee',
+          padding: 2, border: '1px solid var(--border-light, #eee)', borderRadius: 6,
+          background: hover && onClick ? 'var(--bg-active, #E8E2D9)' : bg,
+          borderColor: hover && onClick ? 'var(--border-content-active, #B89B78)' : 'var(--border-light, #E8E4DF)',
           cursor: onClick ? 'pointer' : 'default', overflow: 'hidden',
           fontSize: 15, lineHeight: 1,
         }}
@@ -60,7 +60,7 @@ export default function SymbolCell({ sym, onClick, onRemove, checked, showTier, 
       {showTier && TIER_DOTS[sym.tier] && (
         <span style={{
           position: 'absolute', top: 1, left: 3, fontSize: 11, lineHeight: 1,
-          color: '#9ca3af', pointerEvents: 'none', letterSpacing: -1,
+          color: 'var(--text-faint, #B8AFA4)', pointerEvents: 'none', letterSpacing: -1,
         }}>{TIER_DOTS[sym.tier]}</span>
       )}
 
@@ -68,7 +68,7 @@ export default function SymbolCell({ sym, onClick, onRemove, checked, showTier, 
       {checked && !hover && (
         <span style={{
           position: 'absolute', top: -4, right: -4, width: 15, height: 15,
-          borderRadius: '50%', background: '#22c55e', color: '#fff',
+          borderRadius: '50%', background: 'var(--accent-success, #5f6b3c)', color: '#fff',
           fontSize: 10, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center',
           pointerEvents: 'none',
         }}>✓</span>
@@ -82,7 +82,7 @@ export default function SymbolCell({ sym, onClick, onRemove, checked, showTier, 
           onClick={(e) => { e.stopPropagation(); onRemove(sym); }}
           style={{
             position: 'absolute', top: -6, right: -6, width: 16, height: 16,
-            borderRadius: '50%', background: '#ef4444', color: '#fff', border: '1.5px solid #fff',
+            borderRadius: '50%', background: 'var(--accent-danger, #C0392B)', color: '#fff', border: '1.5px solid #fff',
             fontSize: 11, lineHeight: 1, cursor: 'pointer', padding: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}

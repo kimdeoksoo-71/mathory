@@ -482,7 +482,7 @@ export default function FolderView({
         return (
           <div key={block.id || `ggb-${i}`} style={{
             margin: '0.8em 0', height: 200,
-            background: '#fafafa',
+            background: 'var(--bg-functional, #fafafa)',
             border: '1px solid var(--border-light, #e0e0e0)',
             borderRadius: 6,
             display: 'flex', alignItems: 'center', justifyContent: 'center',

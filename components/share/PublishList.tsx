@@ -186,7 +186,7 @@ export default function PublishList({ shares, publicProblems, onChanged }: Publi
             <div style={{ width: 90, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
               {row.kind === 'snapshot' ? (
                 <>
-                  <span style={{ fontSize: 11.5, color: row.share.expiresAt && row.share.expiresAt.getTime() <= Date.now() ? 'var(--accent-danger, #c33)' : 'var(--text-secondary)' }}>
+                  <span style={{ fontSize: 11.5, color: row.share.expiresAt && row.share.expiresAt.getTime() <= Date.now() ? 'var(--accent-danger, #C0392B)' : 'var(--text-secondary)' }}>
                     {expiryLabel(row.share.expiresAt)}
                   </span>
                   <select
@@ -238,9 +238,9 @@ function ModeBadge({ live }: { live: boolean }) {
     <span style={{
       display: 'inline-block', padding: '1px 6px', borderRadius: 5,
       fontSize: 10.5, fontWeight: 700, lineHeight: 1.5,
-      color: live ? 'var(--accent-primary, #2563eb)' : 'var(--text-muted)',
-      background: live ? 'var(--accent-soft, rgba(37,99,235,0.1))' : 'var(--bg-subtle, #f1f1f1)',
-      border: `1px solid ${live ? 'var(--accent-primary, #2563eb)' : 'var(--border-light, #ddd)'}`,
+      color: live ? 'var(--accent-primary, #c96442)' : 'var(--text-muted)',
+      background: live ? 'var(--accent-soft, rgba(201,100,66,0.1))' : 'var(--bg-subtle, #f1f1f1)',
+      border: `1px solid ${live ? 'var(--accent-primary, #c96442)' : 'var(--border-light, #ddd)'}`,
     }}>
       {live ? '실시간' : '스냅샷'}
     </span>
@@ -250,9 +250,9 @@ function ModeBadge({ live }: { live: boolean }) {
 function btnStyle(danger: boolean): React.CSSProperties {
   return {
     padding: '4px 10px', fontSize: 11.5, fontWeight: 600, borderRadius: 6,
-    border: `1px solid ${danger ? 'var(--accent-danger, #c33)' : 'var(--border-primary)'}`,
+    border: `1px solid ${danger ? 'var(--accent-danger, #C0392B)' : 'var(--border-primary)'}`,
     background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-ui)',
-    color: danger ? 'var(--accent-danger, #c33)' : 'var(--text-secondary)',
+    color: danger ? 'var(--accent-danger, #C0392B)' : 'var(--text-secondary)',
     whiteSpace: 'nowrap',
   };
 }

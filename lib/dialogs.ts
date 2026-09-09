@@ -16,7 +16,7 @@ export type DialogMessage = string | string[];
 export interface ConfirmOptions {
   title?: string;
   message: DialogMessage;
-  /** 확인 버튼을 위험색(#e53935)으로. 삭제·영구 삭제·해제 계열에 쓴다. */
+  /** 확인 버튼을 위험색(--accent-danger)으로. 삭제·영구 삭제·해제 계열에 쓴다. */
   danger?: boolean;
   confirmLabel?: string;
   cancelLabel?: string;

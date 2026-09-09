@@ -1518,9 +1518,9 @@ function PendingAIBubble({
         padding: 10,
         borderRadius: 8,
         border: pending.error ? '1px solid #e0a0a0' : '1px dashed var(--border-light)',
-        background: pending.error ? '#fff5f5' : 'transparent',
+        background: pending.error ? 'var(--accent-danger-bg, #FEF2F2)' : 'transparent',
         display: 'flex', alignItems: 'center', gap: 8,
-        fontSize: 12, color: pending.error ? '#c44' : 'var(--text-muted)',
+        fontSize: 12, color: pending.error ? 'var(--accent-danger, #C0392B)' : 'var(--text-muted)',
       }}
     >
       {pending.providers && pending.providers.length > 0 ? (
@@ -1543,7 +1543,7 @@ function PendingAIBubble({
         <button
           onClick={onRetry}
           style={{
-            border: '1px solid #c44', background: 'transparent', color: '#c44',
+            border: '1px solid var(--accent-danger, #C0392B)', background: 'transparent', color: 'var(--accent-danger, #C0392B)',
             borderRadius: 4, padding: '2px 8px', fontSize: 11, cursor: 'pointer',
             fontFamily: 'var(--font-ui)', flexShrink: 0,
           }}
@@ -1556,7 +1556,7 @@ function PendingAIBubble({
           onClick={onDismiss}
           title="닫기"
           style={{
-            border: 'none', background: 'transparent', color: '#c44',
+            border: 'none', background: 'transparent', color: 'var(--accent-danger, #C0392B)',
             fontSize: 14, lineHeight: 1, padding: 0, cursor: 'pointer',
             width: 18, height: 18, flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -1768,8 +1768,8 @@ function CommentItem({
         ) : (
           <div style={{
             width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
-            background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 600, color: '#666',
+            background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 600, color: 'var(--text-secondary, #666)',
           }}>{info.name.charAt(0).toUpperCase()}</div>
         )}
         <span
@@ -1885,7 +1885,7 @@ function CommentItem({
           {graphStatus && (
             <span style={{
               fontSize: 10,
-              color: graphStatus.ok ? '#2a8a3c' : 'var(--accent-danger, #c33)',
+              color: graphStatus.ok ? 'var(--accent-success, #5f6b3c)' : 'var(--accent-danger, #C0392B)',
             }}>
               {graphStatus.msg}
             </span>

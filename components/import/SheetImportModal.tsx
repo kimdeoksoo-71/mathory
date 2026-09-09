@@ -233,8 +233,8 @@ const btn = (kind: 'primary' | 'ghost', disabled = false): React.CSSProperties =
 const badge = (tone: 'warn' | 'muted' | 'ok'): React.CSSProperties => ({
   display: 'inline-block', padding: '1px 6px', borderRadius: 4,
   fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap',
-  background: tone === 'warn' ? 'rgba(188,95,63,0.12)' : tone === 'ok' ? 'rgba(60,130,80,0.12)' : 'var(--bg-hover, #f3f3f3)',
-  color: tone === 'warn' ? ACCENT : tone === 'ok' ? '#3c8250' : 'var(--text-muted, #888)',
+  background: tone === 'warn' ? 'rgba(188,95,63,0.12)' : tone === 'ok' ? 'var(--accent-success-bg, #EDEFE3)' : 'var(--bg-hover, #f3f3f3)',
+  color: tone === 'warn' ? ACCENT : tone === 'ok' ? 'var(--accent-success, #5f6b3c)' : 'var(--text-muted, #888)',
 });
 
 /* ═══ 컴포넌트 ═══ */

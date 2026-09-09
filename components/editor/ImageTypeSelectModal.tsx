@@ -51,11 +51,11 @@ export default function ImageTypeSelectModal({ onSelect, onCancel }: Props) {
               style={{
                 textAlign: 'left',
                 padding: '10px 12px',
-                background: opt.disabled ? '#f5f5f5' : '#fff',
+                background: opt.disabled ? 'var(--bg-functional, #f5f5f5)' : '#fff',
                 border: '1px solid var(--border-light, #ddd)',
                 borderRadius: 6,
                 cursor: opt.disabled ? 'not-allowed' : 'pointer',
-                color: opt.disabled ? '#aaa' : 'var(--text-primary, #222)',
+                color: opt.disabled ? 'var(--text-faint, #aaa)' : 'var(--text-primary, #222)',
               }}
               onMouseEnter={(e) => {
                 if (!opt.disabled) e.currentTarget.style.background = '#f5f7fa';
@@ -65,7 +65,7 @@ export default function ImageTypeSelectModal({ onSelect, onCancel }: Props) {
               }}
             >
               <div style={{ fontSize: 13, fontWeight: 500 }}>{opt.label}</div>
-              <div style={{ fontSize: 11, color: opt.disabled ? '#bbb' : 'var(--text-muted, #888)', marginTop: 2 }}>
+              <div style={{ fontSize: 11, color: opt.disabled ? 'var(--text-faint, #bbb)' : 'var(--text-muted, #888)', marginTop: 2 }}>
                 {opt.desc}
               </div>
             </button>

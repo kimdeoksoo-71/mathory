@@ -481,7 +481,7 @@ export default function ListView({
                   checked={selectedIds?.has(p.id) ?? false}
                   onClick={(e) => handleCheck(p.id, e.shiftKey)}
                   onChange={() => {}}
-                  style={{ accentColor: 'var(--mathory-red, #D97757)', cursor: 'pointer' }}
+                  style={{ cursor: 'pointer' }}
                 />
               </div>
             )}
@@ -589,7 +589,7 @@ export function ListHeader({ mode, prefs, template, checkbox = false, selectAll,
             checked={selectAll.checked}
             onChange={selectAll.onToggle}
             title="전체 선택"
-            style={{ accentColor: 'var(--mathory-red, #D97757)', cursor: 'pointer' }}
+            style={{ cursor: 'pointer' }}
           />
         </div>
       )}
@@ -713,8 +713,6 @@ function ColumnSettings({ gridColumn, prefs, onPrefsChange }: {
                     type="checkbox"
                     checked={!prefs.hidden.includes(id)}
                     onChange={() => toggleHidden(id)}
-                    // T5 검수 반영 — 브라우저 기본 파랑 대신 Mathory 로고 레드(덕수 지정)
-                    style={{ accentColor: 'var(--mathory-red, #D97757)' }}
                   />
                   {/* M6 D4 — 아이콘 헤더 칼럼은 라벨 앞에 같은 아이콘을 병기: 헤더 도안과 이름을 잇는 유일한 자리 */}
                   {columnHeaderKind(id) === 'icon' && <span style={{ display: 'inline-flex', color: 'var(--text-muted)' }}><HeaderLabel id={id} /></span>}
@@ -747,8 +745,8 @@ function Avatar({ photoURL, name, size }: { photoURL?: string; name: string; siz
   return (
     <div style={{
       width: size, height: size, borderRadius: '50%', flexShrink: 0,
-      background: '#ddd', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.45, color: '#666', fontWeight: 600,
+      background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.45, color: 'var(--text-secondary, #666)', fontWeight: 600,
     }}>
       {(name || '?').charAt(0).toUpperCase()}
     </div>

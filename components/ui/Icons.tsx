@@ -90,7 +90,7 @@ export const IconTrash = phIcon(PH.trash, 14);
 export const IconClose = phIcon(PH.x, 16);
 export const IconCopy = phIcon(PH.copy, 14);
 export const IconCheck = phIcon(PH.check, 14);
-export const IconDownload = phIcon(PH.downloadSimple, 14);
+export const IconDownload = phIcon(PH.downloadSimple, 14);   // ⚠ 사이드바 항목에서는 size={18} — 이웃(IconPlus·IconSearch 18)과 맞춘다
 export const IconGrip = phIcon(PH.dotsSixVertical, 14);
 export const IconDotsVertical = phIcon(PH.dotsThreeVertical, 16);
 /** D22 — 현행 IconDots도 도안이 세로 점 3개였다. 별칭으로 통합(이름만 유지). */

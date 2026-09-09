@@ -65,7 +65,7 @@ export default function RestoreConfirm({
           {!same && (
             <button onClick={onConfirm} disabled={busy} style={{
               padding: '6px 14px', border: 'none', borderRadius: 6,
-              background: '#e53935', color: '#fff', cursor: busy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600,
+              background: 'var(--accent-danger, #C0392B)', color: '#fff', cursor: busy ? 'wait' : 'pointer', fontSize: 13, fontWeight: 600,
             }}>{busy ? '복원 중…' : '복원'}</button>
           )}
         </div>
