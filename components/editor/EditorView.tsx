@@ -2586,6 +2586,31 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => els.forEach((el) => el.removeEventListener('scroll', onScroll));
   }, []);
 
+  /* ─── 가로 트립와이어 (Phase 65 후속): [data-nohscroll] 컨테이너는 가로로 스크롤되면 안 된다 ───
+     편집창의 행번호 거터는 블록 안 `.cm-scroller`에 sticky로 고정되는데, 그 **조상**이 가로로
+     밀리면 블록째 밀려 "거터가 움직인다"로 보인다(실측: `.content-frame` 154px 이동 → 거터 −153px).
+     S8이 `.content-frame`·`.scaled-editor`의 `overflow-x`를 `hidden`으로 닫았지만 그건 CSS 값
+     하나에 기댄 상태라, 누가 다시 `auto`로 되돌리거나 새 조상이 생기면 조용히 재발한다.
+     그래서 불변식을 코드가 강제한다 — 어떤 경로(사용자 제스처·CM의 scrollRectIntoView·포커스
+     복원·다른 스크립트)로 가로 스크롤이 생기든 즉시 0으로 되돌리고 dev에서 경고한다.
+     ⚠ 대상은 편집 열의 조상 체인 셋뿐(content-frame · left-column · scaled-editor). 미리보기 열을
+       감싼 가로 스크롤 래퍼는 **의도적으로 제외** — 좁은 창에서 미리보기에 닿는 통로다.
+     ⚠ `.scaled-editor`는 세로로는 늘 스크롤되므로 `scrollLeft === 0` 조기 반환이 비용의 전부다. */
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>('[data-nohscroll]'));
+    const onScroll = (e: Event) => {
+      const el = e.currentTarget as HTMLElement;
+      if (el.scrollLeft === 0) return;
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('[Phase65] nohscroll 컨테이너가 가로 스크롤됨 — 편집 열이 밀려 행번호 거터가 함께 움직인다:',
+          el.dataset.nohscroll, { scrollLeft: el.scrollLeft, hOver: el.scrollWidth - el.clientWidth });
+      }
+      el.scrollLeft = 0;
+    };
+    els.forEach((el) => el.addEventListener('scroll', onScroll));
+    return () => els.forEach((el) => el.removeEventListener('scroll', onScroll));
+  }, []);
+
   /* ─── 탭 전환 시 activeBlockId 갱신 + 전체접기/선택 초기화 ─── */
   useEffect(() => {
     const blocks = allBlocks[activeTab] || [];
@@ -3609,7 +3634,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       }}>
 
         {/* ─── U자 컨텐츠 프레임: 클레이 + 3면 경계(상·좌·우) + 상단 14px 라운드, 하단 열림 ─── */}
-        <div className="content-frame" data-noscroll="content-frame" style={{
+        <div className="content-frame" data-noscroll="content-frame" data-nohscroll="content-frame" style={{
           /* ⚠ overflowX는 'hidden'이다 — 'auto'로 되돌리지 말 것 (Phase 65 후속).
              이 프레임이 가로로 스크롤되면 **편집 열이 통째로 패닝**되고 그 안의 CM 행번호
              거터도 함께 밀린다(거터 sticky는 자기 스크롤러 안에서만 유효하다). VS Code처럼
@@ -3624,7 +3649,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }}>
 
         {/* ─── Left: Editor ─── */}
-        <div data-noscroll="left-column" style={{
+        <div data-noscroll="left-column" data-nohscroll="left-column" style={{
           flex: 1, minWidth: 420,
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           // FindReplacePanel 팝업 기준 컨테이너
@@ -3640,7 +3665,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onNavigate={handleSearchNavigate}
           />
 
-          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" style={{
+          <div ref={editorPanelRef} className="scaled-editor no-scrollbar" data-nohscroll="scaled-editor" style={{
             flex: 1,
             overflowY: 'auto',
             /* ⚠ overflowX 명시 필수 — 안 적으면 **auto가 된다**(한 축만 지정하면 다른 축은
