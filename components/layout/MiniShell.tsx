@@ -4,6 +4,7 @@ import { signInWithPopup } from 'firebase/auth';
 import useAuth from '../../hooks/useAuth';
 import { auth, googleProvider } from '../../lib/firebase';
 import { IconBazaar, IconChevron } from '../ui/Icons';
+import Wordmark from '../ui/Wordmark';
 
 /**
  * Phase 53 C단계: 공개 열람용 미니 셸.
@@ -30,7 +31,8 @@ export default function MiniShell({
       {/* ── 미니 사이드바 ── */}
       <aside style={sidebarStyle}>
         <a href="/" title="Mathory 메인으로" style={{ textDecoration: 'none' }}>
-          <div style={logoStyle}>Mathory</div>
+          <Wordmark as="div" size={19} weight={600} color="var(--mathory-red, #D97757)"
+            style={{ marginBottom: 18 }} />
         </a>
 
         <div style={catLabelStyle}>공유</div>
@@ -74,10 +76,6 @@ const sidebarStyle: React.CSSProperties = {
   width: 232, flexShrink: 0,
   background: 'var(--bg-functional, #fafafa)', padding: '16px 12px',
   display: 'flex', flexDirection: 'column',
-};
-const logoStyle: React.CSSProperties = {
-  fontSize: 19, fontWeight: 600, color: 'var(--mathory-red, #D97757)',
-  letterSpacing: '-0.03em', fontFamily: 'var(--font-logo)', marginBottom: 18,
 };
 const catLabelStyle: React.CSSProperties = {
   fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)', letterSpacing: 0.3,

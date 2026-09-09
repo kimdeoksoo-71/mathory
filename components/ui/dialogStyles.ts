@@ -26,6 +26,10 @@ export const Z_DIALOG = 10500;
 /** RefTooltip 등 "다이얼로그보다는 아래, 나머지보다는 위" 계층 (개선묶음 M2 C에서 사용) */
 export const Z_TOOLTIP = Z_DIALOG - 100;
 
+/** Phase 64 D9 — 폰 바텀 시트. 다이얼로그(10500)·말풍선(10400)보다 **아래**여야
+ *  시트 안에서 띄운 confirm·참조 말풍선이 시트를 덮는다. 폰 콘텐츠 계층(≤9000)보다는 위. */
+export const Z_SHEET = 9500;
+
 export const dialogOverlay: React.CSSProperties = {
   position: 'fixed', inset: 0, zIndex: Z_DIALOG,
   background: 'rgba(0,0,0,0.4)',

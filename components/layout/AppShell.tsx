@@ -43,6 +43,8 @@ import ProblemView from '../problem/ProblemView';
 import EditorView from '../editor/EditorView';
 import FolderPickerDialog from '../ui/FolderPickerDialog';
 import { alertDialog, confirmDialog, promptDialog } from '../../lib/dialogs';
+import { parseDeepLink } from '../../lib/deepLink';
+import Wordmark from '../ui/Wordmark';
 
 type ViewState =
   | { type: 'home' }
@@ -249,27 +251,22 @@ export default function AppShell() {
     return () => { cancelled = true; };
   }, [authLoading, user]);
 
-  // Phase 52(D5)/53(E): 로그인 후 딥링크 진입
+  // Phase 52(D5)/53(E): 로그인 후 딥링크 진입 — 파싱은 lib/deepLink.ts(Phase 64 D8, PhoneApp과 공용)
   //  ?view=bazaar → Bazaar 전체 / ?view=p&id= → 공개 문항 임베드 / ?view=shared&id= → 스냅샷 임베드
   const bazaarDeepLinkRef = useRef(false);
   useEffect(() => {
     if (!user || bazaarDeepLinkRef.current) return;
-    const params = new URLSearchParams(window.location.search);
-    const v = params.get('view');
-    const id = params.get('id');
-    if (v === 'bazaar') {
-      bazaarDeepLinkRef.current = true;
+    const link = parseDeepLink(window.location.search);
+    if (!link) return;
+    bazaarDeepLinkRef.current = true;
+    if (link.view === 'bazaar') {
       setView({ type: 'share', scope: { kind: 'bazaar', filter: 'all' } });
-      window.history.replaceState({}, '', '/');
-    } else if (v === 'p' && id) {
-      bazaarDeepLinkRef.current = true;
-      setView({ type: 'public-problem', problemId: id });
-      window.history.replaceState({}, '', '/');
-    } else if (v === 'shared' && id) {
-      bazaarDeepLinkRef.current = true;
-      setView({ type: 'public-shared', shareId: id });
-      window.history.replaceState({}, '', '/');
+    } else if (link.view === 'p') {
+      setView({ type: 'public-problem', problemId: link.id });
+    } else {
+      setView({ type: 'public-shared', shareId: link.id });
     }
+    window.history.replaceState({}, '', '/');
   }, [user]);
 
   // Phase 49: 공유 트리에 필요한 사용자 프로필 해석 (보낸 대상 + 받은 출처) — 캐시 재사용
@@ -800,7 +797,7 @@ export default function AppShell() {
     <DragKindContext.Provider value={activeDragItem?.kind ?? null}>
     {/* Phase 62 D18 — 사이드바 리사이즈 핸들의 기준 상자. AppShell 안에는 절대배치 요소가 없어
         position:relative를 줘도 파급이 없다. ⚠ 핸들을 <aside> 안에 두면 overflow:hidden에 잘린다. */}
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', position: 'relative' }}>
+    <div style={{ display: 'flex', height: '100dvh', overflow: 'hidden', position: 'relative' }}>
       <Sidebar
         collapsed={collapsed}
         width={sidebar.width}
@@ -1071,11 +1068,8 @@ function HomeView() {
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <div style={{ textAlign: 'center' }}>
-        <h1 style={{
-          fontSize: 48, fontWeight: 400, color: 'var(--mathory-red-dark)', marginBottom: 8,
-          fontFamily: 'var(--font-logo)', letterSpacing: '-0.03em', lineHeight: 1,
-          textShadow: '0 1px 0 rgba(0,0,0,0.06)',
-        }}>Mathory</h1>
+        <Wordmark as="h1" size={48} color="var(--mathory-red-dark)" shadow
+          style={{ marginBottom: 8, lineHeight: 1 }} />
         <p style={{ fontSize: 15, color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', fontStyle: 'italic' }}>
           Write the logic. Preserve the insight.
         </p>

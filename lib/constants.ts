@@ -37,3 +37,12 @@ export const WIDTH_EM_KEY = 'mathory-problem-width-em';
 export const WIDTH_EM_DEFAULT = 35;
 export const WIDTH_EM_MIN = 35;
 export const WIDTH_EM_MAX = 45;
+
+/* ═══ 본문 글자 크기 (Phase 64 D12에서 ProblemView 지역 상수를 이관) ═══
+   앱 열람뷰(ProblemView)와 폰 리더(⋯ 시트 스테퍼)가 localStorage 키를 공유한다 —
+   키를 공유하면 기본값도 공유해야 PC↔폰이 한 값을 본다(Q7). ⚠ 사본 금지. */
+export const FONT_SIZE_KEY = 'mathory-content-font-size';
+export const FONT_SIZE_DEFAULT = 15;
+export const FONT_SIZE_MIN = 11;
+export const FONT_SIZE_MAX = 24;
+export const FONT_SIZE_STEP = 1;

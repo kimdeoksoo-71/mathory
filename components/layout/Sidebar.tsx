@@ -7,6 +7,7 @@ import { Problem, Folder, UserProfile } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import ShareTree, { ShareGroup } from './ShareTree';
 import SidebarSectionHeader from './SidebarSectionHeader';
+import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle, IconUserCircleBold, IconRecentBold,
@@ -768,13 +769,7 @@ export default function Sidebar({
         }}
       >
         {!collapsed && (
-          <span style={{
-            fontSize: 19, fontWeight: 400, color: '#944728',
-            letterSpacing: '-0.03em', fontFamily: 'var(--font-logo)',
-            textShadow: '0 1px 0 rgba(0,0,0,0.06)',
-          }}>
-            Mathory
-          </span>
+          <Wordmark size={19} color="#944728" shadow />
         )}
         <button
           onClick={onToggle}

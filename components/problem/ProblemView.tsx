@@ -7,6 +7,7 @@ import { getFolderPath } from '../../lib/folder-tree';
 import {
   DIFFICULTIES, CATEGORY_OPTIONS,
   WIDTH_EM_KEY, WIDTH_EM_DEFAULT, WIDTH_EM_MIN, WIDTH_EM_MAX,
+  FONT_SIZE_KEY, FONT_SIZE_DEFAULT, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP,
 } from '../../lib/constants';
 import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, CARD_RADIUS_QUESTION } from './TabBody';
 import PdfDialog from './PdfDialog';
@@ -38,12 +39,7 @@ import {
 import { alertDialog } from '../../lib/dialogs';
 import SizeStepper, { FontSizeGlyph } from '../ui/SizeStepper';
 
-const FONT_SIZE_KEY = 'mathory-content-font-size';
-const FONT_SIZE_DEFAULT = 15;
-const FONT_SIZE_MIN = 11;
-const FONT_SIZE_MAX = 24;
-const FONT_SIZE_STEP = 1;
-
+/* FONT_SIZE_* 5종은 Phase 64 D12에서 lib/constants.ts로 이관 — 폰 ⋯ 시트와 공유(값 무변경) */
 
 /* ═══ v3 P — 제목행 고정 · 문제 카드는 흐름 그대로 · hold-to-peek ═══
    M2의 스크롤 자동접힘(M2_COLLAPSE·HEADER_H 2단)은 **통째로 철거**됐다.

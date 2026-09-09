@@ -7,6 +7,14 @@ export const metadata = {
   description: '수학 문제 편집·관리 웹 플랫폼',
 };
 
+/* Phase 64 D5 — viewportFit:'cover'는 폰 하단 탭 바의 env(safe-area-inset-bottom) 때문.
+   ⚠ maximumScale은 두지 않는다 — 수식 핀치 확대는 독자의 권리다. */
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover' as const,
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
