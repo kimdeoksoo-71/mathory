@@ -93,6 +93,9 @@ interface CommentPanelProps {
   /** Phase 61b: 검증 대상 총 글자 수(사전 차단용). 편집 화면에서만 전달.
    *  kind별로 다르다 — 문제 검증은 문제 탭만, 풀이 검증은 문제+풀이를 함께 보낸다. */
   verifyCharCount?: (kind: VerifyKind) => number;
+  /** Phase 64 §5-3 ③ — 폰 바텀 시트에서 false: 터치의 네이티브 선택 UI와 겹치는
+   *  SelectionInsertPopup을 렌더하지 않는다. 기본 true = 데스크톱 무변경. */
+  selectionPopup?: boolean;
 }
 
 interface DisplayInfo {
@@ -145,6 +148,7 @@ export default function CommentPanel({
   onClose, onCommentsChange, onInsertGraphBlock,
   onRunVerify, onJumpToBlock, verifyCharCount, onInsertToEditor,
   width = '35em',
+  selectionPopup = true,
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
   const isOwner = currentUid === ownerUid;
@@ -919,11 +923,13 @@ export default function CommentPanel({
       {/* ═══ Phase 61c: 선택 → 삽입/복사 팝업 ═══
            ⚠ 패널 루트의 **직계 자식**이어야 한다 — 메시지 리스트(overflowY:auto) 안에 두면 잘린다.
            팝업 자체는 열람뷰에도 마운트된다([복사]). [편집창에 삽입]만 prop 게이트다. */}
-      <SelectionInsertPopup
-        scrollRef={messagesScrollRef}
-        getSource={commentSource}
-        onInsertToEditor={onInsertToEditor}
-      />
+      {selectionPopup && (
+        <SelectionInsertPopup
+          scrollRef={messagesScrollRef}
+          getSource={commentSource}
+          onInsertToEditor={onInsertToEditor}
+        />
+      )}
 
       {/* ═══ 헤더 ═══ 높이 57px (사이드바 헤더와 정렬) */}
       <div style={{
