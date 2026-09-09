@@ -46,3 +46,12 @@ export const FONT_SIZE_DEFAULT = 15;
 export const FONT_SIZE_MIN = 11;
 export const FONT_SIZE_MAX = 24;
 export const FONT_SIZE_STEP = 1;
+
+/* ═══ 카드 위계 반지름 (M6 D9 — Phase 64 G-2에서 TabBody 지역 상수를 이관) ═══
+   문제 = '읽는 대상'(12 + --card-shadow-problem) / 풀이 = '쓰는 대상'(0 · 그림자 없음).
+   테두리는 두 카드가 같다(0.5px --border-content) — 테두리로 차별화하지 말 것(M6 검수 2차).
+   판별은 `!isToneScoped(tabId)`(lib/keyTone). 소비처: TabBody(재export) · ProblemView peek ·
+   폰 리더(PhoneReader). ⚠ 여기로 옮긴 이유: TabBody는 SvgViewer·GgbViewer를 정적 import라
+   폰·공개 라우트가 상수만 가지러 가도 뷰어가 번들에 딸려온다(Phase 64 함정 5·7). */
+export const CARD_RADIUS = 0;
+export const CARD_RADIUS_QUESTION = 12;

@@ -1213,6 +1213,15 @@ p:has(.marker-circled) {
    ⚠ 폰 여부는 useIsPhone 훅이 정하고 CSS는 [data-phone] 속성 스코프만 본다 —
      판별용 @media 금지(함정 2). @media (hover: hover)만 예외(입력 장치 질의). */
 
+/* D13 — 수식 넘침은 수식만 가로 스크롤. 폰 카드 폭(~21.7em)에서 긴 display 수식이
+   본문을 밀지 않게 한다. 들여쓰기 3em → 1em(좁은 화면의 좌단 절약).
+   ⚠ ③은 기존 `.callout-block .katex-display { padding-left: 0 }`(위쪽, 동특이도 0,2,0)와의
+     **순서 의존 차단**이다(함정 4) — 이 줄이 없으면 callout 안 display 수식이 ①의 1em을
+     다시 받아 이중 들여쓰기가 된다. */
+[data-phone] .katex-display { padding-left: 1em; overflow-x: auto; overflow-y: hidden; }
+[data-phone] .callout-block { padding-left: 1em; }
+[data-phone] .callout-block .katex-display { padding-left: 0; }
+
 /* D9 — 바텀 시트 열림/닫힘 (BottomSheet.tsx) */
 @keyframes phone-sheet-in  { from { transform: translateY(28px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 @keyframes phone-sheet-out { from { transform: translateY(0); opacity: 1; }   to { transform: translateY(28px); opacity: 0; } }

@@ -15,6 +15,7 @@ import OutlineToggle from '../ui/OutlineToggle';
 import CoachBlock from '../ui/CoachBlock';
 import { isCoachBlock } from '../../lib/coachBlock';
 import { IconCheck, IconCopy } from '../ui/Icons';
+import { CARD_RADIUS, CARD_RADIUS_QUESTION } from '../../lib/constants';
 
 /* ═══════════════════════════════════════════════════════════════
    Phase 59 — ProblemView의 탭 한 행 ([탭 라벨 | 탭 본문]).
@@ -50,15 +51,11 @@ export const LABEL_GAP_EM = 1.4;
 export const CARD_PAD_L_EM = 2.6;
 export const CARD_PAD_R_EM = 2.4;
 
-/** 풀이 계열 카드 반지름. 2026-08-28 12 → 6, M6 후속(덕수 2026-09-09) 6 → **0(직각)** —
- *  문제 카드(12)와의 차별화를 더 벌렸다. */
-export const CARD_RADIUS = 0;
-/** M6 D9 — 문제 카드 반지름 = 폴더뷰 카드(12). 문제는 '읽는 대상', 풀이는 '쓰는 대상' —
- *  모서리(12/0)와 **그림자**(--card-shadow-problem / 없음)로 가른다.
- *  ⚠ 테두리는 두 카드가 같다(0.5px --border-content) — M6 D10의 진한 테두리·검수 1차의 1px은
- *    덕수 검수 2차(2026-09-09)에서 "부담스럽다"로 철회. 테두리로 차별화하지 말 것.
- *  판별은 `!isToneScoped(tab.id)` — extra 탭은 풀이 계열(0). hold-to-peek 카드도 12. */
-export const CARD_RADIUS_QUESTION = 12;
+/** 풀이 계열 카드 반지름 0(직각) / M6 D9 문제 카드 12 + --card-shadow-problem.
+ *  값·규약 주석은 Phase 64 G-2에서 lib/constants.ts로 이관(폰 리더가 뷰어 번들 없이 공유) —
+ *  기존 소비처(ProblemView 등)를 위해 여기서 재export한다. 판별은 `!isToneScoped(tab.id)` —
+ *  extra 탭은 풀이 계열(0). hold-to-peek 카드도 12. 테두리로 차별화하지 말 것(M6 검수 2차). */
+export { CARD_RADIUS, CARD_RADIUS_QUESTION };
 
 /** 라벨 열의 sticky top (풀이 계열 탭).
  *  ⚠ v3 P5-1 — 12에서 40으로 올렸다. 그 **위**에 hold-to-peek 알약이 서기 때문이다

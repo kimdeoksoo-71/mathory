@@ -12,6 +12,14 @@ import OutlineSections from '../problem/OutlineSections';
 import OutlineToggle from '../ui/OutlineToggle';
 import CoachBlock from '../ui/CoachBlock';
 import { isCoachBlock } from '../../lib/coachBlock';
+import dynamic from 'next/dynamic';
+
+/* Phase 64 D14 — 폰 리더 전용 svg·ggb 분기의 지연 로드.
+   ⚠ 정적 import 금지(함정 5): /p(36파일)·/shared(29파일) closure에 뷰어가 없다 —
+     정적으로 넣으면 viewers=false인 공개 페이지도 react-zoom-pan-pinch를 싣는다.
+   ⚠ ssr:false 필수 — GgbViewer가 window.GGBApplet을 만진다(저장소 첫 next/dynamic). */
+const SvgViewerLazy = dynamic(() => import('../viewer/SvgViewer'), { ssr: false });
+const GgbViewerLazy = dynamic(() => import('../viewer/GgbViewer'), { ssr: false });
 
 const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
 
@@ -26,7 +34,13 @@ const BORDERED_TYPES: Set<string> = new Set(['gana', 'roman', 'box']);
  * 넓은 화면 + 탭 2개면 PublicViewerShell이 탭 바 없이 좌·우 2단으로 가르므로
  * "탭 바 옆"이라는 자리가 존재하지 않는다. 탭 콘텐츠 자신이 유일한 공통 자리다.
  */
-export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; tabId: string }) {
+export default function ProblemTabContent({ blocks, tabId, viewers = false }: {
+  blocks: Block[];
+  tabId: string;
+  /** Phase 64 D14 — 폰 리더에서만 true. 기본 false = 공개 뷰어(PublicViewerShell) 현행
+   *  동작 무변경(svg·ggb 미지원, D16). true면 TabBody와 같은 렌더를 지연 로드로 켠다. */
+  viewers?: boolean;
+}) {
   // ⚠ useOutlineState가 blocks 참조로 memo하므로 정렬 결과를 매 렌더 새로 만들면 안 된다
   const sorted = useMemo(() => [...blocks].sort((a, b) => a.order - b.order), [blocks]);
   const caseLabels = useMemo(() => buildCaseLabels(sorted), [sorted]);
@@ -57,6 +71,40 @@ export default function ProblemTabContent({ blocks, tabId }: { blocks: Block[]; 
             }} />
           ) : (
             <span style={{ color: 'var(--text-muted, #888)', fontSize: 12 }}>(이미지 없음)</span>
+          )}
+        </div>
+      );
+    }
+
+    if (viewers && block.type === 'svg') {
+      /* TabBody.tsx의 svg 분기와 같은 렌더 (Phase 64 D14) */
+      return (
+        <div key={block.id} style={{ margin: '0.8em 0' }}>
+          {block.raw_text ? (
+            <SvgViewerLazy
+              url={block.raw_text}
+              initialView={block.svg_initial_view}
+              height={block.svg_height || 300}
+              enableFullscreen
+            />
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted, #888)', fontSize: 12 }}>(SVG 없음)</div>
+          )}
+        </div>
+      );
+    }
+    if (viewers && block.type === 'ggb') {
+      /* TabBody.tsx의 ggb 분기와 같은 렌더 (Phase 64 D14) */
+      return (
+        <div key={block.id} style={{ margin: '0.8em 0' }}>
+          {block.raw_text ? (
+            <GgbViewerLazy
+              url={block.raw_text}
+              initialCoords={block.ggb_initial_coords}
+              height={block.ggb_height || 350}
+            />
+          ) : (
+            <div style={{ textAlign: 'center', color: 'var(--text-muted, #888)', fontSize: 12 }}>(GeoGebra 없음)</div>
           )}
         </div>
       );

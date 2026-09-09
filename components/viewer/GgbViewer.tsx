@@ -321,8 +321,9 @@ export default function GgbViewer({
       ref={hostRef}
       style={isFullscreen ? {
         // 브라우저 viewport 전체 오버레이 (Mac OS 메뉴바는 그대로 표시됨)
+        // Phase 64 D14 — 100vh → 100dvh: 폰 주소창이 하단을 가리지 않도록
         position: 'fixed', inset: 0, zIndex: 9998,
-        width: '100vw', height: '100vh',
+        width: '100vw', height: '100dvh',
         background: '#fff',
         cursor: 'default',
       } : {
