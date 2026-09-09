@@ -40,11 +40,11 @@ export default function PhoneReader({
   tabBlocks: Record<string, Block[]>;
   /** ⋯ 시트의 [링크 복사] */
   shareUrl?: string;
-  /** 있으면 💬 버튼 + 댓글 시트 */
-  commentsSlot?: React.ReactNode;
+  /** 있으면 💬 버튼 + 댓글 시트. 함수형이면 close 콜백을 받아 그린다(CommentPanel의 X 배선) */
+  commentsSlot?: React.ReactNode | ((close: () => void) => React.ReactNode);
   commentCount?: number;
-  /** 있으면 agent 버튼 + 시트 (Stage 4 — 오너·멤버 게이트는 호출자 소유) */
-  agentSlot?: React.ReactNode;
+  /** 있으면 agent 버튼 + 시트 (오너·멤버 게이트는 호출자 소유). 함수형 = commentsSlot과 동일 */
+  agentSlot?: React.ReactNode | ((close: () => void) => React.ReactNode);
   /** 앱 경로의 뒤로가기. 미전달(공개 독립 라우트)이면 좌측이 워드마크 */
   onBack?: () => void;
 }) {
@@ -158,12 +158,14 @@ export default function PhoneReader({
         <>
           {commentsSlot && (
             <BottomSheet open={sheet === 'comments'} height="78%" onClose={() => setSheet(null)}>
-              <div style={{ padding: '0 12px 12px' }}>{commentsSlot}</div>
+              <div style={{ padding: '0 12px 12px', height: '100%', boxSizing: 'border-box' }}>
+                {typeof commentsSlot === 'function' ? commentsSlot(() => setSheet(null)) : commentsSlot}
+              </div>
             </BottomSheet>
           )}
           {agentSlot && (
             <BottomSheet open={sheet === 'agent'} height="78%" onClose={() => setSheet(null)}>
-              {agentSlot}
+              {typeof agentSlot === 'function' ? agentSlot(() => setSheet(null)) : agentSlot}
             </BottomSheet>
           )}
           {questionTab && (
