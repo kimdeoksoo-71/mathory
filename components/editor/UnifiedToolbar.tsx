@@ -101,7 +101,8 @@ function CollapseAllIcon({ collapsed }: { collapsed: boolean }) {
  *    arrows-out-line-horizontal이 **Row 1의 가로폭 아이콘(IconTextWidth)과 겹쳐 보인다**.
  *    도안이 기능(줄바꿈)을 가리키고 켜짐만 박스로 표시하는 편이 헷갈리지 않는다. */
 function LineWrapIcon() {
-  return <PhIcon d={PH.arrowElbowDownLeft} size={ICON_SIZE} />;
+  // M6 후속(덕수 2026-09-09) — Row 2 규격 20의 80%(16). 리턴 글리프가 같은 줄의 다른 도안보다 커 보였다.
+  return <PhIcon d={PH.arrowElbowDownLeft} size={Math.round(ICON_SIZE * 0.8)} />;
 }
 
 /** 강조(핵심문장) — highlighter */

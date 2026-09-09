@@ -94,8 +94,8 @@ const ICONS = {
   cloudArrowUp: ['cloud-arrow-up', 'regular'],             // IconSave 미저장 (M6 D20 — Feather 자체 도안 폐기)
   cloudCheck: ['cloud-check', 'regular'],                  // IconSave 저장됨 (M6 D20)
   chatDots: ['chat-dots', 'regular'],                      // IconComment (M6 D21 — chat-text 대체, Tip의 chat-centered-text와 분리)
-  toggleOff: ['toggle-left', 'regular'],                   // ToggleSwitch OFF (M6 D17)
-  toggleOn: ['toggle-right', 'fill'],                      // ToggleSwitch ON — 켜짐은 fill (M4 D13 · M6 D17)
+  // toggleOff/toggleOn(toggle-left/right)은 M6 D17에서 넣었다가 덕수 검수(2026-09-09)로 철회 —
+  // ToggleSwitch가 트랙+손잡이 도안으로 복귀해 소비처 0. 되살리지 말 것.
 };
 
 const assetFile = (name, w) =>
@@ -303,10 +303,10 @@ ${ph(PH_.robot, 14)} ${ph(PH_.robot, 16)} <span class="lbl">provider 미상·ava
 <td><span style="font:600 11.5px -apple-system,sans-serif;color:#5D5647;display:inline-flex;align-items:center;gap:3px">검증(문제) ${ph(PH_.arrowUp, 12)}</span><span class="lbl">12 (채택)</span></td>
 <td><span style="font:600 11.5px -apple-system,sans-serif;color:#5D5647;display:inline-flex;align-items:center;gap:3px">수정일 ${ph(PH_.arrowDown, 14)}</span><span class="lbl">14</span></td></tr></table>
 
-<h2>M6-2. ToggleSwitch — toggle-left(OFF regular) / toggle-right(ON fill) 20 / 24(확정 D18) / 28 · 활성 블록 배경</h2>
+<h2>M6-2. ToggleSwitch — ⚠ 철회(덕수 2026-09-09): Phosphor toggle 글리프 대신 옛 트랙+손잡이 도안 복귀 · 22×13 → 18×11(손잡이 7)</h2>
 <div style="background:#E8DFCE;border:0.5px solid #C2B7A2;border-radius:6px;padding:8px 12px;display:inline-flex;gap:26px;align-items:center">
-${[20, 24, 28].map((s) => `<span style="display:inline-flex;align-items:center;gap:8px">${ph(PH_.toggleOn, s, '#B89B78')}${ph(PH_.toggleOff, s, '#9C9585')}<span class="lbl">${s}</span></span>`).join('')}
-<span style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#B89B78"></span><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#C8C1B6"></span><span class="lbl">현행 트랙 22×13</span></span></div>
+<span style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#B89B78"></span><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#C8C1B6"></span><span class="lbl">옛 22×13</span></span>
+<span style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-block;width:18px;height:11px;border-radius:5.5px;background:#B89B78"></span><span style="display:inline-block;width:18px;height:11px;border-radius:5.5px;background:#C8C1B6"></span><span class="lbl">현행 18×11 (채택)</span></span></div>
 
 <h2>M6-3. IconSave — cloud-arrow-up(미저장 · --accent-danger) / cloud-check(저장됨 · --text-faint) 18 · 리스트 수정일 14 · 버전 트리거 14</h2>
 <span class="row2">${ph(PH_.cloudArrowUp, 18, '#C9463D')}${ph(PH_.cloudCheck, 18, '#C8C1B6')}<span class="lbl">18</span>${ph(PH_.cloudArrowUp, 14, '#BC5F3F')}${ph(PH_.cloudCheck, 14, '#BC5F3F')}<span class="lbl">14</span></span>

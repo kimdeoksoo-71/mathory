@@ -5,21 +5,21 @@
  *
  * Phase 47에서 댓글 패널('보이기' 등)에 만들었고, Phase 59에서 블록 상단바의
  * '요약에 넣기'가 같은 모양을 쓰게 되면서 공용으로 옮겼다.
- * ⚠ 사본을 만들지 말 것 — 도안·크기·색이 두 벌로 갈리면 금방 어긋난다.
+ * ⚠ 사본을 만들지 말 것 — 트랙·손잡이 치수와 색이 두 벌로 갈리면 금방 어긋난다.
  *
- * M6 D17~D19 — 트랙+손잡이 span 2개를 Phosphor `toggle-left`(OFF · regular) /
- * `toggle-right`(ON · fill) 한 글리프로 바꿨다. 24px 글리프의 잉크 bbox가 22.5×13.5라
- * 옛 트랙(22×13)과 0.5px 차 — 소비처 4곳(블록 상단바 · 열람뷰 '요약' · 댓글 패널 2)의
- * 레이아웃이 움직이지 않는다. 켜짐은 fill weight(IconPin과 같은 규약), 색은
- * ON --border-content-active / OFF --text-muted(옛 --text-placeholder는 선 도안에서 1.35:1).
+ * M6 후속(덕수 2026-09-09) — M6 D17~D19의 Phosphor toggle-left/right 글리프는 **철회**했다
+ * ("변경 전 디자인이 더 자연스럽다"). 트랙+손잡이 도안으로 복귀하되 크기만 줄였다:
+ * 22×13(손잡이 9) → **18×11(손잡이 7)** — 옆에 놓이는 상단바 아이콘(14px)과 비슷한 눈높이.
+ * 켜짐 위치 9 = 18 − 7 − 2. 색은 그대로(ON --border-content-active / OFF --text-placeholder —
+ * 활성 블록 배경 #E8DFCE에서 1.35:1, 옛 --bg-active는 1.03:1이라 트랙이 안 보였다).
  *
  * 드래그 핸들 위(dnd-kit)나 클릭 가로채기가 필요한 자리에서는 호출부가
  * 바깥 span에서 pointerdown을 막는다 (이 컴포넌트는 순수하게 둔다).
  */
-import { PhIcon } from './Icons';
-import { PH } from './phosphorPaths';
-
-const TOGGLE_SIZE = 24;
+const TRACK_W = 18;
+const TRACK_H = 11;
+const KNOB = 7;
+const KNOB_INSET = 2;
 
 export default function ToggleSwitch({
   label, on, onToggle, title, disabled, labelStyle,
@@ -53,12 +53,22 @@ export default function ToggleSwitch({
       }}
     >
       <span style={labelStyle}>{label}</span>
-      <PhIcon
-        d={on ? PH.toggleOn : PH.toggleOff}
-        size={TOGGLE_SIZE}
-        color={on ? 'var(--border-content-active, #B89B78)' : 'var(--text-muted)'}
-        style={{ flexShrink: 0, transition: 'color 0.15s' }}
-      />
+      <span style={{
+        position: 'relative', display: 'inline-block',
+        width: TRACK_W, height: TRACK_H, borderRadius: TRACK_H / 2,
+        background: on ? 'var(--border-content-active, #B89B78)' : 'var(--text-placeholder, #C8C1B6)',
+        transition: 'background 0.15s',
+        flexShrink: 0,
+      }}>
+        <span style={{
+          position: 'absolute', top: KNOB_INSET,
+          left: on ? TRACK_W - KNOB - KNOB_INSET : KNOB_INSET,
+          width: KNOB, height: KNOB, borderRadius: '50%',
+          background: '#fff',
+          transition: 'left 0.15s',
+          boxShadow: '0 1px 2px rgba(0,0,0,0.25)',
+        }} />
+      </span>
     </button>
   );
 }

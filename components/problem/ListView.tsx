@@ -414,7 +414,7 @@ export default function ListView({
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--text-muted)', flexShrink: 0 }}>({count})</span>
               </div>
-              <div style={{ gridColumn: trackOf('updated'), fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+              <div style={{ gridColumn: trackOf('updated'), fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap', textAlign: 'center' }}>
                 {fmtDate(updated)}
               </div>
             </div>
@@ -488,7 +488,12 @@ export default function ListView({
 
             {visible.map((id) => (
               /* overflow hidden — 사용자가 트랙을 좁혔을 때 셀 내용이 옆 칸으로 넘치지 않게 */
-              <div key={id} style={{ gridColumn: trackOf(id), minWidth: 0, overflow: 'hidden' }}>
+              <div key={id} style={{
+                gridColumn: trackOf(id), minWidth: 0, overflow: 'hidden',
+                /* M6 후속(덕수) — 제목만 왼쪽, 나머지 칼럼은 가운데 정렬(헤더도 같은 기준).
+                   제목 셀은 flex로 감싸지 않는다 — 안의 span이 block+ellipsis라 그대로 둬야 잘린다. */
+                ...(id === 'title' ? null : { display: 'flex', alignItems: 'center', justifyContent: 'center' }),
+              }}>
                 {cellFor(id, p)}
               </div>
             ))}
@@ -589,7 +594,10 @@ export function ListHeader({ mode, prefs, template, checkbox = false, selectAll,
         </div>
       )}
       {visible.map((id, i) => (
-        <div key={id} style={{ gridColumn: 2 + lead + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center' }}>
+        <div key={id} style={{
+          gridColumn: 2 + lead + i, position: 'relative', minWidth: 0, display: 'flex', alignItems: 'center',
+          justifyContent: id === 'title' ? 'flex-start' : 'center',   // M6 후속 — 본문 셀과 같은 정렬 기준
+        }}>
           {sortableIds.has(id) ? (
             <HeaderSortButton id={id} sort={prefs.sort} onClick={() => onToggleSort(id)} />
           ) : (

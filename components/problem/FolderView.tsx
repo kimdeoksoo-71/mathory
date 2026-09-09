@@ -799,8 +799,9 @@ export default function FolderView({
                     // globals.css의 :hover가 변수만 갈아끼우면 배경·페이드가 함께 따라온다.
                     background: 'var(--card-surface, var(--bg-content))',
                     // M6 D10 — 문제 카드 테두리는 --border-card-problem(= --block-hairline, 1.73:1).
-                    // 풀이 카드·리스트 행은 --border-content 그대로(D11). hover 규칙은 배경·그림자만.
-                    border: '0.5px solid var(--border-card-problem)',
+                    // M6 후속 — 굵기 0.5 → 1px(풀이 카드의 2배, TabBody CARD_BORDER_QUESTION과 동일).
+                    // 풀이 카드·리스트 행은 --border-content 0.5px 그대로(D11). hover 규칙은 배경·그림자만.
+                    border: '1px solid var(--border-card-problem)',
                     borderRadius: 12,
                     padding: '18px 22px',
                     height: 320,

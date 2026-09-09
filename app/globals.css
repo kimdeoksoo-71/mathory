@@ -217,7 +217,10 @@
        말 것 — 아이콘 + 600 굵기가 실제 식별 수단이다. */
   /* ⚠ 개선묶음 M2 G — --coach-caution(#a40e26) 삭제. 코칭은 'Tip' 한 종류이고
        coachClassName이 타입과 무관하게 .coach-important만 낸다. 되살리지 말 것. */
-  --coach-important: #6639ba;
+  /* M6 후속(덕수 2026-09-09) — 보라 #6639ba → Mathory 레드(경우 dot과 같은 --mathory-red-dark).
+     로고+Tip 라벨+왼쪽 바가 전부 --coach-accent 하나를 읽으므로 이 토큰 하나로 셋이 함께 움직인다.
+     명암비 카드면 3.80 · hover면 3.28 — 텍스트 4.5 미달이지만 라벨 식별은 아이콘+600이 담당(Phase 59a 규약). */
+  --coach-important: var(--mathory-red-dark);
 
   /* Sizing */
   /* Phase 62 D20 — --sidebar-expanded / --sidebar-collapsed 삭제.

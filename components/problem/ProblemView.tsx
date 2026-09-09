@@ -843,9 +843,12 @@ export default function ProblemView({
             의도다(덕수). 열기 버튼은 드로어가 열리면 렌더되지 않으므로 겹칠 일도 없다.
           ⚠ zIndex 10: 열기 버튼(11) · 우측 단(40) · 댓글/agent(50)보다 아래.
           배경은 제목행과 같은 토큰(--bg-functional) + paddingLeft 8 — 긴 제목이 스테퍼 뒤로
-          깔끔히 잘린다(이음새 없음). */}
+          깔끔히 잘린다(이음새 없음).
+          ⚠ 높이는 HEADER_H − 1이다(덕수 검수 2026-09-09) — 제목행은 border-box 57이라 아래 구분선이
+            y=56~57에 그려지는데, 이 불투명 래퍼를 57로 두면 그 1px을 덮어 선이 스테퍼 아래서 끊겼다.
+            56이면 선 위에서 끝나고 세로 중앙(28)은 제목행 내용 상자(56)의 중앙과 같다. */}
       <div style={{
-        position: 'absolute', top: 0, height: HEADER_H,
+        position: 'absolute', top: 0, height: HEADER_H - 1,
         right: OUTER_PAD + 26 + 8,
         display: 'flex', alignItems: 'center',
         zIndex: 10,

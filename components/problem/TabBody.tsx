@@ -50,12 +50,15 @@ export const LABEL_GAP_EM = 1.4;
 export const CARD_PAD_L_EM = 2.6;
 export const CARD_PAD_R_EM = 2.4;
 
-/** 풀이 계열 카드 반지름. 덕수 요청(2026-08-28)으로 12 → 6(절반)으로 낮췄다. */
-export const CARD_RADIUS = 6;
+/** 풀이 계열 카드 반지름. 2026-08-28 12 → 6, M6 후속(덕수 2026-09-09) 6 → **0(직각)** —
+ *  문제 카드(12)와의 차별화를 더 벌렸다. */
+export const CARD_RADIUS = 0;
 /** M6 D9 — 문제 카드 반지름 = 폴더뷰 카드(12). 문제는 '읽는 대상', 풀이는 '쓰는 대상' —
- *  모서리(12/6)와 테두리(--border-card-problem / --border-content)로 가른다.
- *  판별은 `!isToneScoped(tab.id)` — extra 탭은 풀이 계열(6). hold-to-peek 카드도 12. */
+ *  모서리(12/0)와 테두리(1px --border-card-problem / 0.5px --border-content)로 가른다.
+ *  판별은 `!isToneScoped(tab.id)` — extra 탭은 풀이 계열(0). hold-to-peek 카드도 12. */
 export const CARD_RADIUS_QUESTION = 12;
+/** M6 후속 — 문제 카드 테두리는 풀이(0.5px)의 2배. 폴더뷰 카드(FolderView)와 같은 값. */
+export const CARD_BORDER_QUESTION = '1px solid var(--border-card-problem)';
 
 /** 라벨 열의 sticky top (풀이 계열 탭).
  *  ⚠ v3 P5-1 — 12에서 40으로 올렸다. 그 **위**에 hold-to-peek 알약이 서기 때문이다
@@ -307,7 +310,7 @@ export default function TabBody({
             ['--card-pad-r' as any]: `${cardPadR}px`,
             background: 'var(--card-surface, var(--bg-content))',
             // M6 D9·D10 — 문제 카드는 radius 12 + 한 칸 진한 테두리(네 변 동시 — Phase 45a 코너 규약).
-            border: scoped ? '0.5px solid var(--border-content)' : '0.5px solid var(--border-card-problem)',
+            border: scoped ? '0.5px solid var(--border-content)' : CARD_BORDER_QUESTION,
             borderRadius: scoped ? CARD_RADIUS : CARD_RADIUS_QUESTION,
             transition: 'background 0.15s, height 0.18s ease',
             ['--case-dot-fill' as any]: 'var(--card-surface, var(--bg-content))',

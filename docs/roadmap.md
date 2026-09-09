@@ -1884,16 +1884,19 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 **신기능 0 · 서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0(카드 크롬만).**
 M4·M5 뒤에 남은 잔여 도안 + 화면 구조 잔손질 14항(A~K). 수정 21파일 · 신규 2(`HoverTip.tsx` ·
-`SidebarSectionHeader.tsx`) · ICONS 56 → **59종**(+7/−4) · 자산 3,024 → **1,512개**(regular 단일) ·
-커밋 S1~S12 · 로직 검증 371 → **373건**(`test:list` +2).
+`SidebarSectionHeader.tsx`) · ICONS 56 → **57종**(+5/−4 · toggle 2종은 검수로 철회) · 자산 3,024 → **1,512개**(regular 단일) ·
+커밋 S1~S12 + 검수 후속 1 · 로직 검증 371 → **373건**(`test:list` +2).
 
 - **리스트**: 칼럼 기본 순서 검증2 → 댓글 → Agent → 원본인증(D1) · prefs **v:2** — v:1은 order만 리셋(D2) ·
   댓글·Agent·원본인증 헤더 = 14px 아이콘 + `useHoverTip` 말풍선(D4·D5′, 네이티브 title 병기 금지) ·
   정렬 화살표 `arrow-up/down` **12**(D6·D7 — 덕수 "작아도 충분하다", † 예외 9번째) · 카드 보기 ↑↓도 같은 도안(D8)
-- **카드**: 문제 카드 radius 12 + `--border-card-problem`(= `--block-hairline` 1.73:1) / 풀이 6 + `--border-content`(D9~D11) —
+- **카드**: 문제 카드 radius 12 + **1px** `--border-card-problem`(= `--block-hairline` 1.73:1) / 풀이 **0(직각)** + 0.5px `--border-content`(D9~D11 + 검수 강화) —
   폴더뷰 카드·열람뷰 문제 카드·hold-to-peek 3곳 동일
 - **스테퍼**: 드로어 1행 → 제목행 우단 절대배치(D12~D14, 2026-08-28 이전을 철회 — 드로어를 열어야 닿는 것이 번거로웠다)
-- **잔여 도안**: 파비콘 Pretendard SemiBold 'M'(D15 — CDN 폰트 잉크 폭 실측 0.999 일치) · ToggleSwitch → Phosphor
+- **덕수 검수 1차 반영(2026-09-09, "매우 만족")**: 코칭 블록 빨강(`--mathory-red-dark`) · 리스트 칼럼 제목 왼쪽/나머지 가운데 ·
+  문제 카드 테두리 1px·풀이 카드 직각 · 제목행 구분선이 스테퍼 래퍼(57)에 덮이던 것 → `HEADER_H − 1` · **ToggleSwitch Phosphor 글리프
+  철회 → 옛 트랙 18×11**(ICONS 59 → 57) · 줄바꿈 아이콘 16
+- **잔여 도안**: 파비콘 Pretendard SemiBold 'M'(D15 — CDN 폰트 잉크 폭 실측 0.999 일치) · ~~ToggleSwitch → Phosphor~~
   `toggle-left/right` 24(D17~D19) · IconSave → `cloud-arrow-up`/`cloud-check`(D20, M4 D6 유지 예외 뒤집힘) ·
   IconComment → `chat-dots`(D21′) · 받은 문항 `rotate(180deg)`(D24) · BlockchainBadge `--text-muted`(D25)
 - **사이드바**: `SidebarSectionHeader` 공용 — My `folder` · 공유 `share-fat` · 최근 `clock` 16px, 12.5/600 통일(D22) ·
