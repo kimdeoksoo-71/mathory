@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
-import { keymap } from '@codemirror/view';
+import { keymap, tooltips } from '@codemirror/view';
 import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
@@ -51,13 +51,45 @@ const WRAP_ON: Extension = [
   }),
 ];
 
+/* ═══ 끔 모드의 거터는 sticky 가 아니라 **fixed** 다 (2026-09-09 덕수 검수 반영) ═══════
+   증상: 좌우 스크롤이 끝에 닿아 **튕길 때(러버밴드)** 행번호 거터가 본문과 함께 튕겼다.
+   원인: `position: sticky` 요소는 스크롤러의 *스크롤 콘텐츠 레이어* 안에 있다. 튕김은 컴포지터가
+   그 레이어를 통째로 탄성 이동시키는 효과라 sticky 도 같이 움직인다. 이때 `scrollLeft` 는 변하지
+   않으므로 scroll 이벤트도 없고 프로그램적 스크롤로는 **절대 재현되지 않는다** — 어제 프로브 3회가
+   전부 빗나간 이유다(영상 프레임 실측: 왼쪽 끝 튕김에 "1" 이 본문과 함께 오른쪽으로 밀렸다 복귀).
+   처방: 스크롤러에 `transform` 을 주어 `position: fixed` 자손의 containing block 으로 만들고,
+   거터를 fixed 로 뺀다. fixed 요소는 스크롤 오프셋(튕김 포함)의 영향권 밖이면서 containing block
+   (= 이 블록의 스크롤러)에 붙어 있으므로 블록을 따라 움직이고 튕김에는 반응하지 않는다.
+   커서·선택 레이어(`.cm-layer`)는 스크롤러 안에 그대로라 **본문과 함께 튕긴다**(의도).
+   ⚠ `!important` 는 CM 이 인라인으로 박는 `position: sticky`(dist 11152)를 이기기 위해 필수.
+   ⚠ fixed 는 흐름에서 빠지므로 거터 자리를 `padding-left: var(--gutter-w)` 로 되살린다 —
+     값은 ResizeObserver 가 실제 거터 폭(3자리 확장 포함)을 공급한다(아래 마운트 코드).
+   ⚠ CM 의 `scrollMargins` 제공자(dist 11282)는 `fixed` 플래그(=unfixGutters 미설정)만 보고
+     `dom.offsetWidth` 를 왼쪽 마진으로 내보내므로, 타자·화살표의 캐럿 노출도 거터 폭을 그대로 뺀다.
+   ⚠ `.cm-editor` 에 transform 이 생기면 거기 마운트되는 CM 툴팁(자동완성·lint, 기본 `view.dom`)이
+     `position: fixed` 좌표를 잃고 래퍼 `overflow:hidden` 에 갇힌다 → `tooltips({ parent: document.body })`
+     로 툴팁을 body 로 뺀다(CM 공식 옵션). z-index 는 테마의 `.cm-tooltip` 이 준다.
+   ⚠ 켬 모드는 손대지 않는다 — 튕길 스크롤이 없고, 기본값은 현행과 바이트 단위로 같아야 한다(D2). */
 const WRAP_OFF: Extension = EditorView.theme({
   '.cm-content': { whiteSpace: 'pre' },
+  /* ⚠ transform 은 스크롤러가 아니라 **.cm-editor(&)** 에 둔다. 스크롤러에 두면 fixed 거터의
+       containing block 이 스크롤러 자신이 되어 *스크롤 콘텐츠의 일부*로 취급된다 — 실측:
+       scrollLeft 400 에서 거터가 −400 으로 본문과 함께 밀렸다. containing block 이 스크롤러
+       바깥이어야 스크롤 오프셋(튕김 포함)의 영향권 밖이 된다. */
+  '&': { transform: 'translate(0)' },          // fixed 거터의 containing block (identity — 좌표 불변)
   '.cm-scroller': {
     overflowX: 'auto',
     overflowY: 'hidden',
     overscrollBehaviorX: 'contain',
     scrollbarWidth: 'thin',   // Firefox 등 ::-webkit-scrollbar 미적용 브라우저 보정
+    paddingLeft: 'var(--gutter-w, 0px)',       // 흐름에서 빠진 거터 자리
+  },
+  '.cm-gutters': {
+    position: 'fixed !important',
+    top: '0',
+    bottom: '0',
+    left: '0',
+    height: 'auto',                            // base theme 의 100% 대신 top/bottom 으로 늘린다
   },
 });
 
@@ -812,6 +844,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           metaListener,
           tabHandler,
           basicSetup,
+          /* 툴팁을 body 로 — 끔 모드에서 .cm-editor 에 transform 이 걸리므로(fixed 거터의 containing
+             block) 에디터 안의 fixed 툴팁은 좌표를 잃는다. body 컨테이너는 view.themeClasses 를
+             그대로 받아 아래 .cm-tooltip 테마가 계속 적용된다. */
+          tooltips({ parent: document.body, position: 'fixed' }),
           latexAutocompletion,
           // ── 괄호 자동닫기 제어 ──
           Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {
@@ -995,6 +1031,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
               color: GUTTER_NUM_ACTIVE,
             },
 
+            // ═══ 툴팁 공통 — body 에 마운트되므로 앱 패널(≤10000) 위, 다이얼로그(10500) 아래 ═══
+            '.cm-tooltip': { zIndex: '10200' },
             // ═══ 자동완성 드롭다운 스타일 ═══
             '.cm-tooltip.cm-tooltip-autocomplete': {
               border: '1px solid #ddd',
@@ -1079,6 +1117,18 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
       viewRef.current = view;
 
+      /* 끔 모드 fixed 거터의 자리(padding-left) 공급. 거터 폭은 줄 수(2→3자리)로 바뀌므로
+         ResizeObserver 로 따라간다. syncGutters 는 같은 DOM 노드를 떼었다 붙이므로 관찰이 유지된다.
+         켬 모드에서는 변수만 세팅되고 소비처가 없다(테마에 paddingLeft 가 없다). */
+      const gutterEl = view.scrollDOM.querySelector('.cm-gutters') as HTMLElement | null;
+      const syncGutterWidth = () => {
+        if (gutterEl) view.scrollDOM.style.setProperty('--gutter-w', gutterEl.offsetWidth + 'px');
+      };
+      syncGutterWidth();
+      const gutterRO = (typeof ResizeObserver !== 'undefined' && gutterEl)
+        ? new ResizeObserver(syncGutterWidth) : null;
+      if (gutterRO && gutterEl) gutterRO.observe(gutterEl);
+
       /* ── 드래그 선택 판별 (Phase 56 D17) ──────────────────────────
          mousedown ~ mouseup 구간은 "드래그 진행 중"으로 보고 정렬을 억제하다가,
          mouseup 시점에 선택이 비어 있으면(=단순 클릭) 그때 한 번만 통지한다.
@@ -1110,6 +1160,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       return () => {
         document.removeEventListener('mousedown', onPointerDown, true);
         document.removeEventListener('mouseup', onPointerUp);
+        gutterRO?.disconnect();
         view.destroy();
         if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
       };
