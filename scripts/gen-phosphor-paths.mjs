@@ -8,7 +8,7 @@
  *   node scripts/gen-phosphor-paths.mjs           재생성 (icons:gen — paths + 피커 인덱스)
  *   node scripts/gen-phosphor-paths.mjs --check   재생성 결과 ↔ 커밋본 비교, 불일치면 exit 1 (build)
  *   node scripts/gen-phosphor-paths.mjs --sheet   docs/icons-contact-sheet.html 재생성 (실물 판정용)
- *   node scripts/gen-phosphor-paths.mjs --assets  카탈로그 자산 3,024개 + LICENSE →
+ *   node scripts/gen-phosphor-paths.mjs --assets  카탈로그 자산 1,512개(regular · M6부터) + LICENSE →
  *                                                 public/icons/phosphor/<ver>/ 복사 (M5 D2 —
  *                                                 gitignore 산출물 · predev·build에서 실행 · 멱등)
  *
@@ -40,7 +40,6 @@ const ICONS = {
   caretLeft: ['caret-left', 'regular'],                    // IconChevronLeft
   caretRight: ['caret-right', 'regular'],                  // IconChevron
   chatCenteredText: ['chat-centered-text', 'regular'],     // IconCoachImportant (D5)
-  chatText: ['chat-text', 'regular'],                      // IconComment (D5)
   check: ['check', 'regular'],                             // IconCheck
   circleNotch: ['circle-notch', 'regular'],                // IconLoader (D14)
   clock: ['clock', 'regular'],                             // IconRecent
@@ -53,12 +52,9 @@ const ICONS = {
   exit: ['sign-out', 'regular'],                           // IconExit (D23)
   fileText: ['file-text', 'regular'],                      // IconDocLines
   folder: ['folder', 'regular'],                           // IconFolder
-  folderBold: ['folder', 'bold'],                          // FolderGlyph 활성(M5 D3)
   folderMove: ['folder-simple-dashed', 'regular'],         // IconFolderMove
   folderOpen: ['folder-open', 'regular'],                  // FolderGlyph 펼침(M5 D4)
-  folderOpenBold: ['folder-open', 'bold'],                 // FolderGlyph 펼침+활성(M5 D3)
   folderSimple: ['folder-simple', 'regular'],              // FolderGlyph 하위 기본(M5 D4)
-  folderSimpleBold: ['folder-simple', 'bold'],             // FolderGlyph 하위+활성(M5 D3)
   graph: ['graph', 'regular'],                             // IconBlockchain (D5)
   magnifyingGlass: ['magnifying-glass', 'regular'],        // IconSearch·SearchReplaceIcon (D11)
   pencilSimple: ['pencil-simple', 'regular'],              // IconEdit
@@ -92,6 +88,14 @@ const ICONS = {
   // ── M5 (Agent 라벨·AI 폴백) ──
   legoSmiley: ['lego-smiley', 'regular'],                  // IconAgent (M5 D8)
   robot: ['robot', 'regular'],                             // IconRobot — AIBrandIcon 폴백 (M5 D9)
+  // ── M6 (디자인·기능 조정) ──
+  arrowUp: ['arrow-up', 'regular'],                        // IconSortAsc — 리스트 헤더·카드 정렬 방향 (M6 D6 · 12px † 예외 D7)
+  arrowDown: ['arrow-down', 'regular'],                    // IconSortDesc (M6 D6)
+  cloudArrowUp: ['cloud-arrow-up', 'regular'],             // IconSave 미저장 (M6 D20 — Feather 자체 도안 폐기)
+  cloudCheck: ['cloud-check', 'regular'],                  // IconSave 저장됨 (M6 D20)
+  chatDots: ['chat-dots', 'regular'],                      // IconComment (M6 D21 — chat-text 대체, Tip의 chat-centered-text와 분리)
+  toggleOff: ['toggle-left', 'regular'],                   // ToggleSwitch OFF (M6 D17)
+  toggleOn: ['toggle-right', 'fill'],                      // ToggleSwitch ON — 켜짐은 fill (M4 D13 · M6 D17)
 };
 
 const assetFile = (name, w) =>
@@ -169,7 +173,7 @@ function buildSheet(PH_) {
   const ladder = [
     ['IconChevron', 'caretRight'], ['IconChevronLeft', 'caretLeft'], ['IconChevronDown', 'caretDown'],
     ['IconTrash', 'trash'], ['IconFolder', 'folder'], ['IconShare *', 'share'], ['IconDownload', 'downloadSimple'],
-    ['IconCopy', 'copy'], ['IconComment *', 'chatText'], ['IconLoader', 'circleNotch'], ['IconBlockchain *', 'graph'],
+    ['IconCopy', 'copy'], ['IconComment *', 'chatDots'], ['IconLoader', 'circleNotch'], ['IconBlockchain *', 'graph'],
     ['IconPlus', 'plus'], ['IconRename *', 'cursorText'], ['IconClose', 'x'], ['IconDotsVertical(·Dots)', 'dotsThreeVertical'],
     ['IconFolderMove', 'folderMove'], ['IconSearch', 'magnifyingGlass'], ['IconBazaar', 'storefront'],
     ['IconEdit', 'pencilSimple'], ['IconGrip', 'dotsSixVertical'], ['IconInbox', 'tray'],
@@ -178,6 +182,7 @@ function buildSheet(PH_) {
     ['IconUndo', 'arrowUUpLeft'], ['IconRedo', 'arrowUUpRight'], ['IconCheck', 'check'],
     ['IconDocLines', 'fileText'], ['IconTag', 'tag'], ['IconCoachImportant *', 'chatCenteredText'],
     ['IconExit(sign-out)', 'exit'],
+    ['IconSortAsc (M6)', 'arrowUp'], ['IconSortDesc (M6)', 'arrowDown'], ['IconSave ✓ (M6)', 'cloudCheck'], ['IconSave ↑ (M6)', 'cloudArrowUp'],
   ];
   const SIZES = [12, 14, 16, 18, 20];
 
@@ -213,7 +218,7 @@ function buildSheet(PH_) {
   }).join('\n');
 
   const chatCmp = [12, 14, 17].map((s) =>
-    `<td>${ph(PH_.chatText, s)} ${ph(PH_.chatCenteredText, s)} <span class="lbl">${s}px</span></td>`).join('');
+    `<td>${ph(PH_.chatDots, s)} ${ph(PH_.chatCenteredText, s)} <span class="lbl">${s}px</span></td>`).join('');
 
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8">
 <title>M4 아이콘 컨택트시트</title>
@@ -238,10 +243,10 @@ function buildSheet(PH_) {
   .stepper .num { font-size: 12px; color: #2D2A23; min-width: 20px; text-align: center; }
   .cmp td { padding-right: 28px; }
 </style></head><body class="icons">
-<h1>M4 아이콘 컨택트시트 <span class="muted">— @phosphor-icons/core@${corePkg.version} · Final_V4 §4-6 · 재생성: npm run icons:sheet</span></h1>
+<h1>아이콘 컨택트시트 (M4 · M5 · M6) <span class="muted">— @phosphor-icons/core@${corePkg.version} · 재생성: npm run icons:sheet</span></h1>
 <p class="muted">배경 --bg-functional(#FCFAF6) · 아이콘색 --text-muted(#9C9585). "현행"과의 비교는 배포본 앱을 옆에 띄워서.</p>
 
-<h2>1. 38종 사다리 12/14/16/18/20 <span class="muted">(유지 3종 제외 · * = 대안 도안)</span></h2>
+<h2>1. 사다리 12/14/16/18/20 <span class="muted">(유지 2종(IconGoogle·IconGithub) 제외 · * = 대안 도안 · IconSave는 M6에서 Phosphor로)</span></h2>
 <table class="ladder">${ladder.map(([n, k]) =>
   `<tr><td>${n}</td>${SIZES.map((s) => `<td>${ph(PH_[k], s)}</td>`).join('')}</tr>`).join('\n')}</table>
 
@@ -265,27 +270,23 @@ ${[18, 20, 22].map((s) => `<div style="margin: 8px 0"><span class="row2">${row2L
 <span class="stepper">${ph(PH_.textWidth, 24)}<span class="num">39</span><span style="display:inline-flex;flex-direction:column;gap:2px">${stepperChevron(true)}${stepperChevron(false)}</span></span>
 <span class="lbl">현행은 27×15 비정방 — Row 1 실물에서 높이 확인</span>
 
-<h2>8. chat-text(댓글) vs chat-centered-text(코칭) — 꼬리 위치 구분 (B5)</h2>
+<h2>8. chat-dots(댓글 · M6 D21) vs chat-centered-text(코칭) — 옛 chat-text는 꼬리 위치만 달라 같은 계열로 보였다 (B5 → M6)</h2>
 <table class="cmp"><tr>${chatCmp}</tr></table>
 
 <h2>9. dots-three-vertical 통합 (D22 · 기본 16)</h2>
 ${ph(PH_.dotsThreeVertical, 16)} <span class="lbl">Sidebar·FolderView·ListView 점 메뉴</span>
 
-<h2>10. VersionTimeline 트리거 열 14px — 유지 IconSave + Phosphor 3종 혼합 자리 (B13)</h2>
-<div class="clay">${legacySave(14)} <span class="lbl">manual_save(유지·stroke)</span> ${ph(PH_.exit, 14)} <span class="lbl">editor_exit(sign-out)</span> ${ph(PH_.tag, 14)} <span class="lbl">named</span> ${ph(PH_.clockCounterClockwise, 14)} <span class="lbl">restore</span></div>
+<h2>10. VersionTimeline 트리거 열 14px — Phosphor 4종 (B13 → M6 D20에서 IconSave도 Phosphor)</h2>
+<div class="clay">${ph(PH_.cloudCheck, 14)} <span class="lbl">manual_save(cloud-check)</span> ${legacySave(14)} <span class="lbl">(옛 stroke 도안 — 기록용)</span> ${ph(PH_.exit, 14)} <span class="lbl">editor_exit(sign-out)</span> ${ph(PH_.tag, 14)} <span class="lbl">named</span> ${ph(PH_.clockCounterClockwise, 14)} <span class="lbl">restore</span></div>
 
-<h2>M5-1. 기본 폴더 3종 × regular/bold × 14/15/16/18 — bold = 활성 행(글자 700과 짝) (Q1)</h2>
-<table class="ladder"><tr><th>도안</th><th colspan="4">regular</th><th colspan="4">bold</th></tr>
-${[['folder (최상위)', 'folder', 'folderBold'], ['folder-simple (하위)', 'folderSimple', 'folderSimpleBold'], ['folder-open (펼침)', 'folderOpen', 'folderOpenBold']].map(([label, r, b]) =>
-  `<tr><td>${label}</td>${[14, 15, 16, 18].map((s) => `<td>${ph(PH_[r], s)}</td>`).join('')}${[14, 15, 16, 18].map((s) => `<td>${ph(PH_[b], s)}</td>`).join('')}</tr>`).join('\n')}</table>
-<p class="muted">비활성 opacity 0.75 대비: <span style="opacity:.75">${ph(PH_.folderSimple, 18)}</span> ↔ 활성 ${ph(PH_.folderSimpleBold, 18)}</p>
+<!-- M5-1(폴더 bold 사다리)은 M6 D23에서 bold 자산 폐기와 함께 삭제 — 활성 강조는 배경·글자 700만 -->
 
 <h2>M5-2. 하위 폴더 펼침 — folder-simple → folder-open 전환(탭 유무 가족 점프) (Q2)</h2>
 <span class="row2">${ph(PH_.folderSimple, 16)}<span class="lbl">닫힘</span>${ph(PH_.folderOpen, 16)}<span class="lbl">펼침(N3 (a))</span>${ph(PH_.folder, 16)}<span class="lbl">참고: 최상위 닫힘</span></span>
 
-<h2>M5-3. IconAgent = lego-smiley — IconComment(chat-text) 옆 병렬 무게감, 대안 3종 (Q5)</h2>
+<h2>M5-3. IconAgent = lego-smiley — IconComment(chat-dots · M6) 옆 병렬 무게감, 대안 3종 (Q5)</h2>
 <table class="cmp"><tr>${[14, 17].map((s) =>
-  `<td>${ph(PH_.chatText, s)} ${ph(PH_.legoSmiley, s)} <span class="lbl">lego-smiley ${s}px</span></td>`).join('')}
+  `<td>${ph(PH_.chatDots, s)} ${ph(PH_.legoSmiley, s)} <span class="lbl">lego-smiley ${s}px</span></td>`).join('')}
 <td>${ph(PH_.robot, 17)} <span class="lbl">robot</span></td>
 <td>${ph(pathOf('user-focus', 'regular'), 17)} <span class="lbl">user-focus</span></td>
 <td>${ph(pathOf('chats-circle', 'regular'), 17)} <span class="lbl">chats-circle</span></td></tr></table>
@@ -295,6 +296,40 @@ ${ph(PH_.robot, 14)} ${ph(PH_.robot, 16)} <span class="lbl">provider 미상·ava
 
 <h2>M5-5. Row 2 — '이모지' 버튼 제거 후 특수문자·표 사이 간격 (Q7)</h2>
 <div><span class="row2">${row2Line(20)}</span><span class="lbl">20px (현행)</span></div>
+
+<h2>M6-1. 정렬 화살표 arrow-up/down — 헤더 11.5px/600 옆 12(확정 D7 · † 예외) / 14 대조 · 현행 ▲9</h2>
+<table class="cmp"><tr>
+<td><span style="font:600 11.5px -apple-system,sans-serif;color:#5D5647;display:inline-flex;align-items:center;gap:3px">검증(문제) <span style="font-size:9px">▲</span></span><span class="lbl">현행 ▲ 9px</span></td>
+<td><span style="font:600 11.5px -apple-system,sans-serif;color:#5D5647;display:inline-flex;align-items:center;gap:3px">검증(문제) ${ph(PH_.arrowUp, 12)}</span><span class="lbl">12 (채택)</span></td>
+<td><span style="font:600 11.5px -apple-system,sans-serif;color:#5D5647;display:inline-flex;align-items:center;gap:3px">수정일 ${ph(PH_.arrowDown, 14)}</span><span class="lbl">14</span></td></tr></table>
+
+<h2>M6-2. ToggleSwitch — toggle-left(OFF regular) / toggle-right(ON fill) 20 / 24(확정 D18) / 28 · 활성 블록 배경</h2>
+<div style="background:#E8DFCE;border:0.5px solid #C2B7A2;border-radius:6px;padding:8px 12px;display:inline-flex;gap:26px;align-items:center">
+${[20, 24, 28].map((s) => `<span style="display:inline-flex;align-items:center;gap:8px">${ph(PH_.toggleOn, s, '#B89B78')}${ph(PH_.toggleOff, s, '#9C9585')}<span class="lbl">${s}</span></span>`).join('')}
+<span style="display:inline-flex;align-items:center;gap:8px"><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#B89B78"></span><span style="display:inline-block;width:22px;height:13px;border-radius:7px;background:#C8C1B6"></span><span class="lbl">현행 트랙 22×13</span></span></div>
+
+<h2>M6-3. IconSave — cloud-arrow-up(미저장 · --accent-danger) / cloud-check(저장됨 · --text-faint) 18 · 리스트 수정일 14 · 버전 트리거 14</h2>
+<span class="row2">${ph(PH_.cloudArrowUp, 18, '#C9463D')}${ph(PH_.cloudCheck, 18, '#C8C1B6')}<span class="lbl">18</span>${ph(PH_.cloudArrowUp, 14, '#BC5F3F')}${ph(PH_.cloudCheck, 14, '#BC5F3F')}<span class="lbl">14</span></span>
+
+<h2>M6-4. 사이드바 헤더 3종 아이콘 16 — folder(My) · share-fat(공유) · clock(최근 문항)</h2>
+<span class="row2">${ph(PH_.folder, 16)}<span class="lbl">My</span>${ph(PH_.share, 16)}<span class="lbl">공유</span>${ph(PH_.clock, 16)}<span class="lbl">최근 문항</span></span>
+
+<h2>M6-5. 공유 받은 문항 — share-fat rotate(180deg)(채택 D24) vs 옛 scaleX(−1)</h2>
+<span class="row2">${ph(PH_.share, 15)}<span class="lbl">보낸 문항(원본)</span>${ph(PH_.share, 15, 'currentColor', 'style="transform:rotate(180deg)"')}<span class="lbl">받은 문항 = rotate(180)</span>${ph(PH_.share, 15, 'currentColor', 'style="transform:scaleX(-1)"')}<span class="lbl">옛 scaleX(−1)</span></span>
+
+<h2>M6-6. 파비콘 — 현행 stroke M / Pretendard SemiBold path(채택 D15 · 실물 글리프 대비 0.999) / Bold path × 64·32·16</h2>
+<div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap">${[64, 32, 16].map((sz) => {
+  const cur = '<path d="M17 45 V21 L32 39 L47 21 V45" fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>';
+  const semi = '<path d="M18.37 19V45H22.9V27.04H23.11L30.33 44.93H33.67L40.89 27.12H41.14V45H45.63V19H39.88L32.16 37.89H31.84L24.12 19Z" fill="#fff"/>';
+  const bold = '<path d="M17.96 19V45H23.2V27.91H23.42L30.2 44.89H33.8L40.58 27.98H40.8V45H46.04V19H39.36L32.14 36.63H31.86L24.64 19Z" fill="#fff"/>';
+  const ic = (inner) => `<svg width="${sz}" height="${sz}" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#D97757"/>${inner}</svg>`;
+  return `<span class="lbl">${sz}</span>${ic(cur)}${ic(semi)}${ic(bold)}`; }).join('')}</div>
+
+<h2>M6-7. 카드 테두리 — 문제 카드(radius 12 · --block-hairline #C2B7A2 · 채택 D9/D10) vs 풀이 카드(radius 6 · --border-content #D2C8B8 · 현행)</h2>
+<div style="background:#F4EFE7;padding:14px;border-radius:8px;display:inline-flex;gap:16px">
+<div style="width:180px;height:70px;border:0.5px solid #C2B7A2;border-radius:12px;background:#F4EFE7"><span class="lbl">문제 · 12 · hairline</span></div>
+<div style="width:180px;height:70px;border:0.5px solid #D2C8B8;border-radius:6px;background:#F4EFE7"><span class="lbl">풀이 · 6 · content</span></div>
+<div style="width:180px;height:70px;border:0.5px solid #D2C8B8;border-radius:12px;background:#F4EFE7"><span class="lbl">(옛 문제 · 12 · content)</span></div></div>
 </body></html>
 `;
 }
@@ -302,7 +337,8 @@ ${ph(PH_.robot, 14)} ${ph(PH_.robot, 16)} <span class="lbl">provider 미상·ava
 // ───────────────────────── 카탈로그 자산 복사 (--assets · M5 D2) ─────────────────────────
 
 const ASSETS_ROOT = path.join(ROOT, 'public', 'icons', 'phosphor');
-const ASSET_WEIGHTS = ['regular', 'bold'];
+/* M6 D23 — bold 자산 폐기(활성 폴더 강조는 배경·글자 700만). 1,512개(regular)만 복사한다. */
+const ASSET_WEIGHTS = ['regular'];
 
 function copyAssets() {
   const srcRoot = path.join(path.dirname(assetFile('trash', 'regular')), '..');
@@ -324,6 +360,18 @@ function copyAssets() {
     console.log(`[icons:assets] 구 버전 ${old} 디렉터리 삭제`);
   }
 
+  // M6 D23 — ASSET_WEIGHTS에 없는 weight 디렉터리(옛 bold)는 지운다. 로컬 public/은 gitignore라
+  // 남아 있어도 배포에는 안 실리지만, 남겨 두면 "있는데 왜 안 쓰나"가 된다.
+  if (fs.existsSync(destRoot)) {
+    for (const d of fs.readdirSync(destRoot)) {
+      const full = path.join(destRoot, d);
+      if (fs.statSync(full).isDirectory() && !ASSET_WEIGHTS.includes(d)) {
+        fs.rmSync(full, { recursive: true });
+        console.log(`[icons:assets] 폐기 weight 디렉터리 삭제: ${d}/`);
+      }
+    }
+  }
+
   let copied = 0;
   let total = 0;
   for (const w of ASSET_WEIGHTS) {
@@ -343,8 +391,8 @@ function copyAssets() {
   // 라이선스 동봉 (D11 — MIT 고지는 배포 산출물에 함께 실린다)
   fs.copyFileSync(path.join(srcRoot, '..', 'LICENSE'), path.join(destRoot, 'LICENSE'));
 
-  if (total !== 3024) {
-    console.error(`[icons:assets] 파일 수 ${total} ≠ 3,024 — core 구성이 바뀌었다. D2 전제를 재확인할 것.`);
+  if (total !== 1512) {
+    console.error(`[icons:assets] 파일 수 ${total} ≠ 1,512 — core 구성이 바뀌었다(M6까지는 regular 1,512). D2 전제를 재확인할 것.`);
     process.exit(1);
   }
   console.log(`[icons:assets] OK — ${total}개(신규 쓰기 ${copied}) → public/icons/phosphor/${corePkg.version}/ · LICENSE 동봉`);
