@@ -73,6 +73,8 @@ export const IconSearch = phIcon(PH.magnifyingGlass, 18);
 export const IconSearchPlain = IconSearch;
 export const IconBazaar = phIcon(PH.storefront, 18);
 export const IconRecent = phIcon(PH.clock, 18);
+/** M6 검수 5차(덕수) — 사이드바 'My' 헤더. 옛 IconFolder는 바로 아래 폴더 행 아이콘과 같은 도안이라 위계가 안 읽혔다. */
+export const IconUserCircle = phIcon(PH.userCircle, 18);
 export const IconFolder = phIcon(PH.folder, 18);
 export const IconInbox = phIcon(PH.tray, 14);
 export const IconChevron = phIcon(PH.caretRight, 14);

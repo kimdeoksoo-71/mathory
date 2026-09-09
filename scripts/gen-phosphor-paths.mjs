@@ -93,6 +93,7 @@ const ICONS = {
   arrowDown: ['arrow-down', 'regular'],                    // IconSortDesc (M6 D6)
   cloudArrowUp: ['cloud-arrow-up', 'regular'],             // IconSave 미저장 (M6 D20 — Feather 자체 도안 폐기)
   cloudCheck: ['cloud-check', 'regular'],                  // IconSave 저장됨 (M6 D20)
+  userCircle: ['user-circle', 'regular'],                  // 사이드바 'My' 섹션 헤더 (M6 검수 5차 — 폴더 아이콘과 겹치던 folder 대체)
   chatDots: ['chat-dots', 'regular'],                      // IconComment (M6 D21 — chat-text 대체, Tip의 chat-centered-text와 분리)
   // toggleOff/toggleOn(toggle-left/right)은 M6 D17에서 넣었다가 덕수 검수(2026-09-09)로 철회 —
   // ToggleSwitch가 트랙+손잡이 도안으로 복귀해 소비처 0. 되살리지 말 것.

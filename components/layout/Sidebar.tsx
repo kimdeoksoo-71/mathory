@@ -9,7 +9,7 @@ import ShareTree, { ShareGroup } from './ShareTree';
 import SidebarSectionHeader from './SidebarSectionHeader';
 import { ShareScope } from '../../lib/share-scope';
 import {
-  IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent,
+  IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle,
   IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
@@ -806,7 +806,7 @@ export default function Sidebar({
           {/* M6 D22 — 세 섹션 헤더(My·공유·최근 문항)는 SidebarSectionHeader 한 벌 */}
           {!collapsed ? (
             <SidebarSectionHeader
-              icon={<IconFolder size={16} />}
+              icon={<IconUserCircle size={16} />}
               label="My"
               open={foldersOpen}
               onToggle={() => setFoldersOpen(!foldersOpen)}
@@ -828,7 +828,7 @@ export default function Sidebar({
             />
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-              <SidebarItem icon={<IconFolder />} label="My" collapsed={collapsed} onClick={() => {}} />
+              <SidebarItem icon={<IconUserCircle />} label="My" collapsed={collapsed} onClick={() => {}} />
             </div>
           )}
 
