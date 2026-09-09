@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import SnapshotView from '../../../components/share/SnapshotView';
 import MiniShell from '../../../components/layout/MiniShell';
+import ResponsiveShell from '../../../components/layout/ResponsiveShell';
+import { guessPhoneFromHeaders } from '../../../lib/device';
 
 const SITE = 'https://mathory.app';
 const OG_IMAGE = '/og-default.png'; // Phase 53 B단계: 정적 브랜드 카드(1200×630). 동적 썸네일은 후속.
@@ -63,9 +66,18 @@ export async function generateMetadata(
 }
 
 export default function SharedPage({ params }: { params: { shareId: string } }) {
+  // Phase 64 D2·D7 — 서버 UA 추정으로 첫 셸을 고른다(클라 보정은 useIsPhone)
+  const h = headers();
+  const initialPhone = guessPhoneFromHeaders(h.get('user-agent'), h.get('sec-ch-ua-mobile'));
   return (
-    <MiniShell>
-      <SnapshotView shareId={params.shareId} />
-    </MiniShell>
+    <ResponsiveShell
+      initialPhone={initialPhone}
+      desktop={
+        <MiniShell>
+          <SnapshotView shareId={params.shareId} />
+        </MiniShell>
+      }
+      phone={<SnapshotView shareId={params.shareId} reader="phone" />}
+    />
   );
 }

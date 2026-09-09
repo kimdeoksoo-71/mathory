@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import PublicProblemView from '../../../components/share/PublicProblemView';
 import MiniShell from '../../../components/layout/MiniShell';
+import ResponsiveShell from '../../../components/layout/ResponsiveShell';
+import { guessPhoneFromHeaders } from '../../../lib/device';
 
 const SITE = 'https://mathory.app';
 const OG_IMAGE = '/og-default.png'; // Phase 51 L1: 정적 기본 1장(로고+슬로건). 동적 썸네일은 v2.
@@ -54,9 +57,18 @@ export async function generateMetadata(
 }
 
 export default function PublicProblemPage({ params }: { params: { problemId: string } }) {
+  // Phase 64 D2·D7 — 서버 UA 추정으로 첫 셸을 고른다(클라 보정은 useIsPhone)
+  const h = headers();
+  const initialPhone = guessPhoneFromHeaders(h.get('user-agent'), h.get('sec-ch-ua-mobile'));
   return (
-    <MiniShell>
-      <PublicProblemView problemId={params.problemId} />
-    </MiniShell>
+    <ResponsiveShell
+      initialPhone={initialPhone}
+      desktop={
+        <MiniShell>
+          <PublicProblemView problemId={params.problemId} />
+        </MiniShell>
+      }
+      phone={<PublicProblemView problemId={params.problemId} reader="phone" />}
+    />
   );
 }

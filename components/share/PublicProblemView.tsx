@@ -7,6 +7,8 @@ import PublicViewerShell from './PublicViewerShell';
 import PublicComments from './PublicComments';
 import ShareButton from './ShareButton';
 import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
+import PhoneReader from '../phone/PhoneReader';
+import PhoneShell from '../layout/PhoneShell';
 
 /**
  * Phase 51: 실시간 공개 문항 뷰어 (`/p/{id}`). 완전 읽기 전용.
@@ -15,12 +17,16 @@ import { Block, Problem, TabMeta, DEFAULT_TABS } from '../../types/problem';
  * - 댓글(읽기 전용)은 5단계에서 추가
  */
 export default function PublicProblemView({
-  problemId, onOwnerEdit,
+  problemId, onOwnerEdit, reader = 'desktop', onBack,
 }: {
   problemId: string;
   /** 앱 셸 임베드(E단계)에서 오너 '편집' 클릭 시 호출 → 앱 내 ProblemView 전환.
    *  미전달(스탠드얼론 /p)이면 앱 홈 딥링크로 폴백. */
   onOwnerEdit?: () => void;
+  /** Phase 64 D7 — 'phone'이면 PublicViewerShell 대신 PhoneReader. 데이터 로직 무변경 */
+  reader?: 'desktop' | 'phone';
+  /** 폰 앱 경로(PhoneApp 임베드)의 뒤로가기 — 미전달(독립 /p)이면 워드마크 */
+  onBack?: () => void;
 }) {
   const { user } = useAuth();
   const [problem, setProblem] = useState<Problem | null>(null);
@@ -62,14 +68,40 @@ export default function PublicProblemView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [problemId, visibleKey]);
 
-  if (status === 'loading') return <Centered>불러오는 중…</Centered>;
+  if (status === 'loading') {
+    const c = <Centered>불러오는 중…</Centered>;
+    return reader === 'phone' ? <PhoneShell left={onBack ? 'back' : 'wordmark'} onBack={onBack}>{c}</PhoneShell> : c;
+  }
   if (status === 'unavailable' || !problem) {
-    return <Centered>비공개로 전환되었거나 존재하지 않는 문항입니다.</Centered>;
+    const c = <Centered>비공개로 전환되었거나 존재하지 않는 문항입니다.</Centered>;
+    return reader === 'phone' ? <PhoneShell left={onBack ? 'back' : 'wordmark'} onBack={onBack}>{c}</PhoneShell> : c;
   }
 
   const url = typeof window !== 'undefined' ? `${window.location.origin}/p/${problemId}` : `/p/${problemId}`;
   // 오너 전용 편집 진입점(U1). E단계 딥링크(?view=p&id=) 전이라도 앱 홈으로 안전 착지.
   const isOwner = !!user && user.uid === problem.authorUid;
+
+  if (reader === 'phone') {
+    /* Phase 64 §6-1·2 — 폰 리더. '편집' 진입점은 두지 않는다(E4 — 폰 편집 없음).
+       댓글 슬롯은 데스크톱과 같은 조건·같은 컴포넌트. */
+    return (
+      <PhoneReader
+        title={problem.title || '제목 없음'}
+        meta="실시간 공개 · 편집 즉시 반영"
+        tabs={visibleTabs}
+        tabBlocks={tabBlocks}
+        shareUrl={url}
+        onBack={onBack}
+        commentsSlot={problem.commentsVisible !== false ? (
+          <PublicComments
+            problemId={problemId}
+            commentSessionId={problem.commentSessionId ?? null}
+            writeEnabled={problem.publicCommentsEnabled === true}
+          />
+        ) : undefined}
+      />
+    );
+  }
 
   return (
     <PublicViewerShell

@@ -18,7 +18,7 @@ import { IconChevronLeft } from '../ui/Icons';
 export const PHONE_TOPBAR_H = 52;
 
 export default function PhoneShell({
-  title, left = 'wordmark', onBack, right, tabs, footer, children,
+  title, left = 'wordmark', onBack, right, tabs, footer, overlay, children,
 }: {
   title?: string;
   /** 'back' = ← 버튼(onBack 필수) / 'wordmark' = 로고(→ /) */
@@ -27,6 +27,10 @@ export default function PhoneShell({
   right?: React.ReactNode;
   tabs?: React.ReactNode;
   footer?: React.ReactNode;
+  /** BottomSheet들 — 루트 직계 자식으로 마운트(absolute 기준·본문 스크롤러 밖).
+   *  ⚠ 본문(children) 안에 시트를 두지 말 것 — [data-ref-tooltip] 게이트 안에 들어가
+   *    문제 카드 정의부가 두 벌이 되는 P13 함정을 부른다. */
+  overlay?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -82,6 +86,9 @@ export default function PhoneShell({
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }}>
         {children}
       </div>
+
+      {/* ── 오버레이(바텀 시트) — 루트 직계 ── */}
+      {overlay}
 
       {/* ── 하단 탭 바(옵션 — PhoneApp) ── */}
       {footer && (
