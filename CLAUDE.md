@@ -248,8 +248,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
-- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(현재 **56종** · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 8곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12)은 검수 통과로 regular 유지, **유지 예외 4종**(`IconSave` 자체 도안·`checked` prop / `IconGoogle` / `IconGithub` / AI 로고 `<img>`)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
-- **폴더 아이콘은 Phosphor 카탈로그다 (M5)**: `Folder.icon` = Phosphor 이름(`^[a-z0-9-]+$` — 옛 유니코드 값은 기본 아이콘으로 표시, 데이터 무접촉 N4). 규칙은 `lib/folderIcon.ts`(import 0 · `test:foldericon`)가, 렌더는 `components/ui/FolderGlyph.tsx` 한 벌이 소유한다(소비처 8곳 — **삼항식 사본 금지**). 기본 3종: 최상위 `folder` · 하위 `folder-simple` · 펼침은 depth 무관 `folder-open`(`folder-simple-open`은 core에 **없다**). **활성 행만 bold** — 글자 700과 같은 조건. 카탈로그 자산은 `icons:assets`가 `public/icons/phosphor/<ver>/`에 3,024개 복사(gitignore · `predev`·`build`가 생성 — **Vercel Build Command가 `next build` 직접 지정이면 전부 빈칸**). 렌더는 `PhAsset`(CSS **mask** + `background-color: currentColor`) — "별도 `.svg`는 currentColor가 끊긴다"는 `<img>` 얘기이고 mask는 유지된다. 단 **UI 상시 아이콘에는 mask 금지**(그쪽은 인라인 path — 첫 페인트 fetch 0). mask 404는 무이벤트 빈칸 — 방어는 쓰기(피커가 인덱스 이름만)·읽기(정규식 불일치 → 기본)에서, core 버전업 시 `--assets`가 사라진 이름 diff를 경고한다. 피커(`PhosphorIconPicker`)는 regular만·brands 78종 제외(상표)·한글 검색은 `lib/phosphor-ko.json`(없어도 영문 동작). **본문(raw_text)에는 아이콘·이모지 렌더 계층이 없다** — M5가 Twemoji를 전면 철거해 이모지 문자는 OS 글꼴로 보인다(N8). Phosphor 코드포인트는 PUA라 본문 문법을 만들지 말 것
+- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(현재 **59종** · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). **최소 렌더 14px** — † 예외 9곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12 · **리스트 정렬 화살표 `IconSortAsc/Desc` 12** — M6 D7 덕수 판정 "작아도 충분하다")은 검수 통과로 regular 유지, **유지 예외 3종**(`IconGoogle` / `IconGithub` / AI 로고 `<img>` — ⚠ `IconSave`는 M6 D20에서 Phosphor `cloud-arrow-up`/`cloud-check`로 편입돼 유지 예외에서 빠졌다. `checked` prop·시그니처는 그대로라 `VersionTimeline.TRIGGER_ICON` 값 참조가 무변경)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
+- **hover 말풍선은 `useHoverTip`(`components/ui/HoverTip.tsx`) 하나다 (M6 D5′)**: 툴바 `IconButton`의 툴팁(600ms · fixed · 11px · `Z_TOOLTIP`)을 훅으로 뽑아 리스트 헤더 아이콘 칼럼과 공유한다. ⚠ **네이티브 `title`과 병기하지 말 것** — 600ms 커스텀과 ~1s 네이티브가 둘 다 떠 이중 툴팁이 된다. 접근성은 `aria-label`. ⚠ 말풍선은 `position:fixed`라 **transform 조상 밑에서 좌표를 잃는다**(Phase 65 S11의 CM 툴팁이 그랬다) — 새 소비처는 transform 조상이 없는지 확인. 앵커 ref는 소비처가 자기 ref와 **병합**해 넣는다(`bind.ref`를 그대로 쓰면 기존 ref를 덮어쓴다)
+- **폴더 아이콘은 Phosphor 카탈로그다 (M5)**: `Folder.icon` = Phosphor 이름(`^[a-z0-9-]+$` — 옛 유니코드 값은 기본 아이콘으로 표시, 데이터 무접촉 N4). 규칙은 `lib/folderIcon.ts`(import 0 · `test:foldericon`)가, 렌더는 `components/ui/FolderGlyph.tsx` 한 벌이 소유한다(소비처 8곳 — **삼항식 사본 금지**). 기본 3종: 최상위 `folder` · 하위 `folder-simple` · 펼침은 depth 무관 `folder-open`(`folder-simple-open`은 core에 **없다**). ⚠ **M5의 "활성 행만 bold"는 M6 D23′에서 폐기했다** — 활성 강조는 행 배경·글자 700만이고 `resolveFolderGlyph`·`FolderGlyph`·`PhAsset`에 `active`·weight 축이 없다(되살리지 말 것 — bold 자산 1,512개와 prefetch effect가 딸려온다). 카탈로그 자산은 `icons:assets`가 `public/icons/phosphor/<ver>/regular/`에 **1,512개**(regular 단일 · `ASSET_WEIGHTS`) 복사(gitignore · `predev`·`build`가 생성 — **Vercel Build Command가 `next build` 직접 지정이면 전부 빈칸**). 렌더는 `PhAsset`(CSS **mask** + `background-color: currentColor`) — "별도 `.svg`는 currentColor가 끊긴다"는 `<img>` 얘기이고 mask는 유지된다. 단 **UI 상시 아이콘에는 mask 금지**(그쪽은 인라인 path — 첫 페인트 fetch 0). mask 404는 무이벤트 빈칸 — 방어는 쓰기(피커가 인덱스 이름만)·읽기(정규식 불일치 → 기본)에서, core 버전업 시 `--assets`가 사라진 이름 diff를 경고한다. 피커(`PhosphorIconPicker`)는 regular만·brands 78종 제외(상표)·한글 검색은 `lib/phosphor-ko.json`(없어도 영문 동작). **본문(raw_text)에는 아이콘·이모지 렌더 계층이 없다** — M5가 Twemoji를 전면 철거해 이모지 문자는 OS 글꼴로 보인다(N8). Phosphor 코드포인트는 PUA라 본문 문법을 만들지 말 것
 - **제3자 시각 자산 고지 준칙 (M5 D11)**: ① 들일 때 `THIRD_PARTY_LICENSES.md`에 라이선스 전문 ② 배포 산출물에 고지 동봉(생성 파일 헤더 · 정적 디렉터리 `LICENSE`) ③ 설정 "정보/라이선스"에 한 줄 ④ 크레딧 의무형(CC BY 등)은 ③ 필수, MIT형은 ①②로 충족 ⑤ **상표(브랜드 로고)는 사용자 선택 목록에서 제외** ⑥ 버전은 lock 고정 + 경로에 버전 ⑦ **자산을 그만 쓰면 고지도 같이 거둔다**(Twemoji CC BY 문단을 M5에서 삭제한 근거)
 - **마커 굵기 규약은 "화면 inherit · 인쇄 600"이다 (M1 E)**: `(가)`·`ㄱ.`은 Phase 60이, `①`은 M1이
   같은 처방을 받았다 — `globals.css`의 `.preview-content .marker-*  { font-weight: inherit }`가
@@ -316,7 +317,33 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 61g — 정밀 검증 논리 결함 유형 확장(시트 STEP3 V2 이식)** — 구현 완료(2026-09-09) · **덕수 검수 대기**
+## 현재 Phase: **개선묶음 M6 — 디자인·기능 조정** — 구현 완료(2026-09-09) · **덕수 검수 대기**
+
+문서: `docs/phasedocs/개선묶음 M6 디자인·기능 조정 v2 실행판.md`
+(계보: 덕수 메모 → v1 web → **v2 CLI 실측 교차검토 = 실행판**(§9가 구현 기록). v2 부록 C가 v1 정정 6·보완 9, §5-0이 실측 3)
+
+M4·M5로 아이콘을 Phosphor로 통일한 뒤 남은 **잔여 도안**(저장·댓글·정렬 화살표·토글·파비콘)과
+**화면 구조 잔손질**(리스트 칼럼 순서·아이콘 헤더 · 문제/풀이 카드 구분 · 스테퍼 위치 · 사이드바 헤더 3종)
+14항을 한 묶음으로 닫았다. **신기능 0 · 서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0.**
+수정 21파일 · 신규 2(`components/ui/HoverTip.tsx` · `components/layout/SidebarSectionHeader.tsx`) ·
+ICONS 56 → **59종**(+7/−4) · 자산 3,024 → **1,512개**(regular 단일) · 커밋 S1~S12 · 로직 검증 371 → **373건**.
+**규약은 위 "아이콘 체계" · "hover 말풍선" · "폴더 아이콘" · "칼럼 규칙" · "요약에 남는 것" · "on/off 컨트롤" 절이 소유한다.**
+
+- **리스트(D1~D8)**: optional 기본 순서 검증2 → 댓글 → Agent → 원본인증 · prefs **v:2**(v:1은 order만 리셋) ·
+  댓글·Agent·원본인증 헤더는 14px 아이콘 + `useHoverTip` 말풍선 · 정렬 화살표 `arrow-up/down` **12**(† 예외)
+- **카드(D9~D11)**: 문제 카드 radius **12** + `--border-card-problem`(= `--block-hairline`, 1.73:1) · 풀이 6 + `--border-content` —
+  "읽는 대상 / 쓰는 대상"을 모서리와 테두리로 가른다. 판별 `!isToneScoped(tab.id)` · peek 카드도 12
+- **스테퍼(D12~D14)**: 드로어 1행 → **제목행 우단 절대배치**(right 50 · zIndex 10 · `rightReserve` 미가산 — 드로어가 열리면
+  그 밑으로 들어가는 것이 의도). 2026-08-28의 "드로어 1행 이전"을 철회. 드로어 1행은 닫기 버튼만(y=57 규약 불변)
+- **잔여 도안**: 파비콘 Pretendard SemiBold 'M' path(D15, 실측 0.999 일치) · 토글 Phosphor 24(D17~D19) · IconSave cloud(D20) ·
+  IconComment `chat-dots`(D21′) · 받은 문항 `rotate(180deg)`(D24) · BlockchainBadge `--text-muted`(D25)
+- **사이드바(D22·D23′)**: `SidebarSectionHeader` 공용(My IconFolder · 공유 IconShare · 최근 IconRecent 16, 12.5/600, 래퍼 `'8px 12px'`) ·
+  활성 폴더 bold **폐기**(M5 D3 뒤집힘)
+- ⚠ v2 최대 수확: v1의 "네이티브 `title` 병기"는 **이중 툴팁**(D5′), `chatText` 삭제가 컨택트시트 3곳을 깨뜨림(D21′),
+  `tests/folderIcon` :25-28 누락(D23′)
+- **알고 두는 손실**: v:1 prefs의 순서 커스텀 소실(1회) · 우측 단이 열린 동안 스테퍼 접근 불가(의도) · 활성 폴더 강조는 배경·700만
+
+### 이전: **Phase 61g — 정밀 검증 논리 결함 유형 확장(시트 STEP3 V2 이식)** — 구현 완료(2026-09-09) · **덕수 검수 대기**
 
 문서: `docs/phasedocs/Phase61g 정밀 검증 논리 결함 유형 확장 v5 실행판.md`
 (계보: v1 web → v4 CLI 실측 교차검토 → **v5 = 실행판**. v2·v3는 만들지 않았다.
@@ -341,7 +368,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   ④ **유형 쏠림** — 논리비약이 사라지고 신규 2종만 올라오면 후퇴 신호(아래 61b 절 참조).
   검출 수의 ±1은 신호가 아니다(n=10 표본으로 판본을 가리지 말 것)
 
-### 이전: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현·검수 완료 · 거터 튕김 **해결(2026-09-09)** · S10·S11 push 대기
+### 이전: **Phase 65 — 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤** — 구현·검수 완료 · 거터 튕김 **해결(2026-09-09)** · **push 완료**
 
 문서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (계보: v1 web → **v2 CLI 실측 = 실행판**. v2 부록 C가 v1 정정 10건·보완 8건)
 
@@ -466,7 +493,11 @@ globals.css · CC BY 고지 · 의존성 2) + 폴더 아이콘 Phosphor 카탈�
   행**(높이 0·불가시) 덕이다 — 지우면 헤더가 잘린다. 좌우 인셋 14 = 가장자리 2px 스페이서 트랙 +
   columnGap 12(subgrid에 컨테이너 패딩 금지 — 첫·끝 트랙이 부모와 어긋난다)
 - **⚠ 칼럼 규칙은 `lib/listColumns.ts`(import 0 · `npm run test:list`)가 소유** — prefs 스키마는
-  "모르는 id 무시, 새 id 뒤에 붙임"(후속 칼럼이 저장값을 깨지 않는다). verifyRank의 verdict 순서는
+  "모르는 id 무시, 새 id 뒤에 붙임"(후속 칼럼이 저장값을 깨지 않는다). **prefs는 v:2다(M6 D2)** —
+  저장된 `order`가 레지스트리 나열보다 우선하므로 **기본 순서를 바꿀 때는 레지스트리만이 아니라
+  `sanitizePrefs`의 버전 마이그레이션을 같이 올릴 것**(v:1은 order만 리셋하고 hidden·widths·sort는
+  보존). 헤더 표기는 `header: 'text' | 'icon'`(댓글·Agent·원본인증이 icon — id→도안은 ListView의
+  `HEADER_ICON` 하나, 라벨은 말풍선·팝오버·aria-label로). verifyRank의 verdict 순서는
   `VERIFY_VERDICT_META`와 의도적 이중(import 0) — **어휘 추가 시 양쪽 함께**. prefs 저장 키
   `mathory.listPrefs.<folder.id>`(공유 뷰는 `__shared_with_me__`/`__sent__` 단위 병합 — Q16)
 - **⚠ 제목행 sticky 래퍼는 철거됐다(D42)** — 헤더가 스크롤 밖(제목바 행 2)이라 "행이 헤더 위로
@@ -695,10 +726,10 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 
 - **경우 블록**: 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호(`C1.` · `C2a.`)는 **raw_text에 넣지 않고 렌더 시 산출**한다(`lib/caseBlock.ts`) → 삽입·삭제·이동에 강하다. 대신 MD 복사·다운로드에는 번호가 없다(GitHub 아카이브 주석에만 동봉)
 - **이어짓기**: 첫 줄이 빈 case/subcase = 직전 경우의 연속(번호·dot 없음, rail만 이어짐). 한 경우 안에 이미지·선택지 블록을 넣는 유일한 방법
-- **요약에 남는 것은 정확히 셋 (Phase 59 §11-9 → Phase 59a 개정)**: ① 제목 블록 ② 경우·하위 경우 제목행 ③ `Block.showInSummary`를 켠 블록. 스위치는 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기"**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)이고 블록 종류를 가리지 않는다. ⚠ **제목 블록과 경우 계열에는 스위치를 두지 않는다** — 둘 다 자동으로 들어가고 `buildOutline`이 `showInSummary`를 아예 읽지 않으므로(heading은 즉시 `continue`, case는 `!isCaseBlock` 조건으로 제외) 스위치가 아무 일도 하지 않으면서 오해만 준다. ⚠ **Phase 59의 `**` 발췌(kind:'keys'·`.outline-keys`·`extractKeySentences`)는 Phase 59a에서 폐기됐다** — 하나의 마커가 강조·발췌·톤 트리거 3역을 겸해 "강조할 범위"와 "요약에 남길 범위"가 묶여 있었다. 되살리지 말 것
+- **요약에 남는 것은 정확히 셋 (Phase 59 §11-9 → Phase 59a 개정)**: ① 제목 블록 ② 경우·하위 경우 제목행 ③ `Block.showInSummary`를 켠 블록. 스위치는 활성 블록 상단바(휴지통 왼쪽)의 **"요약에 넣기"**(`components/ui/ToggleSwitch` — 댓글 패널 '보이기'와 공용)이고 블록 종류를 가리지 않는다. ⚠ **'요약에 넣기'는 풀이 계열 탭 전용이다(M6 D16)** — `summaryEligible = isToneScoped(activeTab)`(TabBody의 scoped 판별과 같다). 문제 탭은 요약 없이 전체 표시라 스위치·요약 전용 바 둘 다 없다(저장된 `showInSummary`는 문제 탭에서 읽는 곳이 없어 데이터 무접촉). ⚠ **제목 블록과 경우 계열에는 스위치를 두지 않는다** — 둘 다 자동으로 들어가고 `buildOutline`이 `showInSummary`를 아예 읽지 않으므로(heading은 즉시 `continue`, case는 `!isCaseBlock` 조건으로 제외) 스위치가 아무 일도 하지 않으면서 오해만 준다. ⚠ **Phase 59의 `**` 발췌(kind:'keys'·`.outline-keys`·`extractKeySentences`)는 Phase 59a에서 폐기됐다** — 하나의 마커가 강조·발췌·톤 트리거 3역을 겸해 "강조할 범위"와 "요약에 남길 범위"가 묶여 있었다. 되살리지 말 것
 - **경우 제목행을 누르면 '구역'이 열린다 (Phase 59a 후속)**: 펼침 단위는 경우 블록 하나가 아니라 **그 경우 + 다음 '제목행 있는' 경우 직전까지의 모든 블록**이다. 경계는 제목 블록에서도 끊기고, **이어짓기는 경계가 아니다**(직전 경우의 연속이므로 딸려 들어간다 — 덕분에 이어짓기 내용이 요약에서 다시 닿는다). 이유: 경우 본문의 일부를 들여쓰기 블록으로 떼어내면 예전 방식에서는 뒷부분이 요약에서 영영 사라져 **"분리하면 요약이 망가지니 분리를 못 하는"** 상태였다. `OutlineItem.segment`(구역 전체)와 `.pinned`(그중 스위치 켠 것)를 `buildOutline`이 만들고, 렌더는 **접힘 = pinned / 펼침 = segment 배타**다(동시에 그리면 같은 블록이 두 번 나온다)
 - **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
-- **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다
+- **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 도안·색이 두 벌로 갈린다. M6 D17~D19부터 트랙+손잡이 span이 아니라 Phosphor `toggle-left`(OFF regular)/`toggle-right`(ON **fill**) 24px 글리프 하나다(잉크 22.5×13.5 = 옛 트랙 22×13 근사라 4곳 레이아웃 무이동). ON `--border-content-active` / OFF `--text-muted`
 - **우측 패널은 4종이고 '떠 있는 카드'다 (개선묶음 M2)**: 우측 단(ProblemView 메뉴·메타) · 댓글 · agent · 버전 드로어. 넷 다 `DRAWER_INSET 8`(사면) · `DRAWER_RADIUS 10` · `DRAWER_BORDER 1px --border-content` · 2겹 그림자 · 폭 `PANEL_WIDTH_DEFAULT 420`. 값은 전부 `components/ui/dialogStyles.ts`가 소유한다. ⚠ **한 변이라도 여백이 0이면** "붙어 있는 패널"로 읽혀 3단 구분이 무너진다. ⚠ **`DRAWER_ROW1_H = 57 − DRAWER_INSET − DRAWER_BORDER_W`(=48)** — 중앙 컨텐츠의 두 가로선(y=57·98)과 정렬하기 위한 값이다. 48을 숫자로 굳히지 말 것이고, 2행(41)은 두 선의 간격이므로 건드리지 말 것. ⚠ **컨텐츠 예약 폭의 정의는 "드로어 카드의 좌측 경계선까지"** 다 — 그보다 크면 그 차이만큼 빈 띠가 생겨 컨텐츠가 잘려 나간 것처럼 보인다. 두 경우의 식이 다르다: 댓글·agent `width + 8`, 우측 단 `width − 8`(우측 단만 바깥 자리를 width로 잡고 카드를 그 안에 넣기 때문)
 - **⚠ EditorView Row1·Row2는 '덮는다' (개선묶음 M2 R6)**: 아래 "덮지 않고 밀어낸다" 규약을 그 두 행에 한해 의도적으로 깼다 — 패널을 여닫을 때마다 제목·탭이 줄었다 늘었다 하며 "편집 대상이 바뀐 것처럼" 보였다. **Row3(content-frame)의 밀어내기는 그대로**다(본문까지 덮으면 편집이 막힌다). 대가로 Row1 우측 끝의 버전 기록·글꼴 조절이 패널 뒤로 숨는다
 - **좌·중·우 3단은 밝기 서열로 가른다 (개선묶음 M2 R7)**: 상대휘도 실측 — 사이드바 `--bg-sidebar #FAF7F2` 0.9326 < 중앙 `--bg-functional #FCFAF6` 0.9572 < 드로어 `--bg-drawer #FFFFFF` 1.0000. 여기에 사이드바 우변 `--rail-hairline`(0.25pt)이 더해진다. ⚠ **서열이 뒤집히면 3단 구분이 통째로 무너진다** — 셋을 함께 볼 것. ⚠ 중앙을 더 낮추지 말 것(`#FBF8F3` 0.9412면 사이드바와의 차가 0.009로 줄어 사실상 사라진다). ⚠ 셋 다 아이보리 계열이라 **명암비 최악값(FolderView 카드 hover `#E8DFCE`)은 불변** — Phase 58·59a 계산은 그대로 유효하다

@@ -1877,7 +1877,34 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
-## Phase 65: 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤 ✅ (구현·검수 완료 2026-09-08 · 거터 튕김 **해결 2026-09-09** · S10·S11 push 대기)
+## 개선묶음 M6: 디자인·기능 조정 🚧 (구현 완료 2026-09-09 · **덕수 검수 대기**)
+
+계획서: `docs/phasedocs/개선묶음 M6 디자인·기능 조정 v2 실행판.md`
+(덕수 메모 → v1 web → **v2 CLI 실측 교차검토 = 실행판**. §9가 구현 기록, 부록 C가 v1 정정 6·보완 9)
+
+**신기능 0 · 서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0(카드 크롬만).**
+M4·M5 뒤에 남은 잔여 도안 + 화면 구조 잔손질 14항(A~K). 수정 21파일 · 신규 2(`HoverTip.tsx` ·
+`SidebarSectionHeader.tsx`) · ICONS 56 → **59종**(+7/−4) · 자산 3,024 → **1,512개**(regular 단일) ·
+커밋 S1~S12 · 로직 검증 371 → **373건**(`test:list` +2).
+
+- **리스트**: 칼럼 기본 순서 검증2 → 댓글 → Agent → 원본인증(D1) · prefs **v:2** — v:1은 order만 리셋(D2) ·
+  댓글·Agent·원본인증 헤더 = 14px 아이콘 + `useHoverTip` 말풍선(D4·D5′, 네이티브 title 병기 금지) ·
+  정렬 화살표 `arrow-up/down` **12**(D6·D7 — 덕수 "작아도 충분하다", † 예외 9번째) · 카드 보기 ↑↓도 같은 도안(D8)
+- **카드**: 문제 카드 radius 12 + `--border-card-problem`(= `--block-hairline` 1.73:1) / 풀이 6 + `--border-content`(D9~D11) —
+  폴더뷰 카드·열람뷰 문제 카드·hold-to-peek 3곳 동일
+- **스테퍼**: 드로어 1행 → 제목행 우단 절대배치(D12~D14, 2026-08-28 이전을 철회 — 드로어를 열어야 닿는 것이 번거로웠다)
+- **잔여 도안**: 파비콘 Pretendard SemiBold 'M'(D15 — CDN 폰트 잉크 폭 실측 0.999 일치) · ToggleSwitch → Phosphor
+  `toggle-left/right` 24(D17~D19) · IconSave → `cloud-arrow-up`/`cloud-check`(D20, M4 D6 유지 예외 뒤집힘) ·
+  IconComment → `chat-dots`(D21′) · 받은 문항 `rotate(180deg)`(D24) · BlockchainBadge `--text-muted`(D25)
+- **사이드바**: `SidebarSectionHeader` 공용 — My `folder` · 공유 `share-fat` · 최근 `clock` 16px, 12.5/600 통일(D22) ·
+  **활성 폴더 bold 폐기**(D23′ — M5 D3 뒤집힘, bold 자산·prefetch 삭제)
+- **요약 스위치는 풀이 계열 탭 전용**(D16 — `summaryEligible = isToneScoped(activeTab)`)
+- ⚠ 판본 왕복 수확: v1의 네이티브 `title` 병기 → 이중 툴팁이라 금지 · `chatText` 삭제가 컨택트시트 3곳을 깨뜨림 ·
+  `tests/folderIcon` :25-28 누락 · `--block-border-active` 명암비 2.0 → 2.35(카드면) 정정
+
+---
+
+## Phase 65: 편집창 줄바꿈 끄기(VS Code식) · 블록 내 가로 스크롤 ✅ (구현·검수 완료 2026-09-08 · 거터 튕김 **해결 2026-09-09** · **push 완료**)
 
 계획서: `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` (v1 web → **v2 CLI 실측 = 실행판**)
 
@@ -1930,7 +1957,7 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 **서버 0 · 규칙 0 · 스키마 0(`Folder.icon` string 그대로, 값만 Phosphor 이름) · 전처리 0 · raw_text 0.**
 Twemoji 전면 철거(파일 3 삭제 · 렌더 플러그인 2 · CDN·CC BY 고지·의존성 2 제거) ·
-폴더 아이콘 = Phosphor 카탈로그 피커(regular+bold 3,024 자산 self-host · CSS mask · 한글 검색 1,414종) ·
+폴더 아이콘 = Phosphor 카탈로그 피커(regular+bold 3,024 자산 self-host · CSS mask · 한글 검색 1,414종 — ⚠ **M6 D23′에서 bold 폐기, regular 1,512개**) ·
 Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-models 기본 avatarEmoji `''`).
 신규 4(`lib/folderIcon.ts` · `components/ui/FolderGlyph.tsx` · `PhosphorIconPicker.tsx` · `lib/phosphor-ko.json`) ·
 커밋 11(S1~S10 + docs 이관 1) · 로직 검증 356 → **365건**(`test:foldericon` 9 신설).
@@ -1951,7 +1978,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
   `currentColor` 유지 · 컴포넌트 이름·props 불변). `prebuild`의 `icons:check`가 드리프트를 빌드 실패로
 - **Row 2 코너 브라켓 폐기(D19)** — 12종×8획=96개 회색 선 제거, 전 버튼 20px(획 1.25px ≈ 옛 브라켓),
   active 배경 구글 파랑 하드코딩 → accent 틴트(D18). 브랜드 모티프는 로고·favicon·빈 화면에만
-- **대안 도안 6종(덕수 확정)** + 유지 4(IconSave·Google·Github·AI 로고) + 블록 수식 자체 도안
+- **대안 도안 6종(덕수 확정)** + 유지 4(IconSave·Google·Github·AI 로고 — ⚠ IconSave는 **M6 D20에서 Phosphor cloud로 편입**, 유지 3) + 블록 수식 자체 도안
   (`currency-dollar-simple` 비등방 x0.62 ×2) + Σ=`sigma`(M3 자체 Σ 폐기) + OCR=`scan`(글자 아이콘 제거)
 - **미사용 10종 삭제 · 크기 상향 22곳(12~13→14)** · † 잔존 8곳은 검수로 regular 유지 ·
   IconTextWidth 27×15 예외 폐기 → 24 정방 · IconDots=세로점 통합(D22) · IconExit=`sign-out`(D23)
@@ -2340,4 +2367,4 @@ S1의 "경우 줄만"은 CLI v1이 "rail을 막는 것은 경우 줄뿐"이라�
 (1번 한글 IME 조합 중 ⌘B 끝글자 중복, 2번 저장 왕복 중 타이핑 유실, 3번 저장 후 CodeMirror remount,
 4번 키입력마다 전체 리렌더, 5번 `/api/copyright/register` 무인증,
 6번 내보낸 md에서 heading 블록이 탭 제목과 같은 레벨 — 제목 블록 디자인 개편 때 처리,
-7번 아이콘 시스템 잔여 부채, 8번 좌우 스크롤 시 편집창 행번호 거터 밀림 — Phase 65 후속 보류)
+7번 아이콘 시스템 잔여 부채, 8번 좌우 스크롤 시 편집창 행번호 거터 밀림 — Phase 65 후속에서 해결)
