@@ -75,6 +75,10 @@ export const IconBazaar = phIcon(PH.storefront, 18);
 export const IconRecent = phIcon(PH.clock, 18);
 /** M6 검수 5차(덕수) — 사이드바 'My' 헤더. 옛 IconFolder는 바로 아래 폴더 행 아이콘과 같은 도안이라 위계가 안 읽혔다. */
 export const IconUserCircle = phIcon(PH.userCircle, 18);
+/** M6 검수 6차 — 사이드바 최상위 카테고리 헤더 3종(My·공유·최근 문항) 전용 **bold**. "regular 단일"의 명시 예외 — 다른 자리 금지. */
+export const IconUserCircleBold = phIcon(PH.userCircleBold, 16);
+export const IconShareBold = phIcon(PH.shareBold, 16);
+export const IconRecentBold = phIcon(PH.clockBold, 16);
 export const IconFolder = phIcon(PH.folder, 18);
 export const IconInbox = phIcon(PH.tray, 14);
 export const IconChevron = phIcon(PH.caretRight, 14);

@@ -3,9 +3,11 @@
 /**
  * M6 D22 — 사이드바 최상위 섹션 헤더 한 벌(My · 공유 · 최근 문항).
  * 세 헤더가 각자 사본으로 살며 글자 크기(12.5/11.5)·uppercase·아이콘 유무가 갈렸던 것을
- * 하나로 묶었다. 규격: [아이콘 16 · --text-muted] [라벨 12.5/600/--text-muted/자간 .3 · flex:1]
- * [trailing] [chevron 14 · 열리면 90°]. 아이콘은 접힘(collapsed) 모드 SidebarItem의 것과
- * 같은 컴포넌트를 넘긴다 — 펼침·접힘에서 도안·의미가 1:1.
+ * 하나로 묶었다. 규격: [아이콘 16 bold · --text-muted] [라벨 13.5/700 · --text-muted · 자간 .3 · flex:1]
+ * [trailing] [chevron 14 · 열리면 90°]. M6 검수 6차(덕수) — 아이콘 bold + 글자 12.5/600 → 13.5/700로
+ * 각 한 단계: 최상위 카테고리가 아래 항목(13.5/500·regular)보다 한 급 위임을 굵기로 나른다.
+ * 아이콘은 접힘(collapsed) 모드 SidebarItem의 regular 도안과 같은 이름의 bold 판
+ * (IconUserCircleBold·IconShareBold·IconRecentBold) — 펼침·접힘에서 도안·의미가 1:1.
  * 래퍼 여백('8px 12px')은 호출부(Sidebar)가 세 섹션에 똑같이 준다 — 헤더 사이 간격이
  * 달라 보이던 실제 원인이 그 여백 차이였다(v1 §1 G).
  */
@@ -29,7 +31,7 @@ export default function SidebarSectionHeader({ icon, label, open, onToggle, trai
           flex: 1, minWidth: 0,
           display: 'flex', alignItems: 'center',
           border: 'none', background: 'none', cursor: 'pointer',
-          fontSize: 12.5, fontWeight: 600, color: 'var(--text-muted)',
+          fontSize: 13.5, fontWeight: 700, color: 'var(--text-muted)',
           letterSpacing: 0.3,
           fontFamily: 'var(--font-ui)', padding: '4px 2px',
           textAlign: 'left',
