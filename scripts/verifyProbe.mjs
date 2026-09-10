@@ -410,7 +410,7 @@ function printResult(label, r, sheetRef) {
 
   const opts = {
     geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
-    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-4-8',
+    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',   // 2026-09-10 라우트와 동일하게 Opus 5
     judgeCodeExec: args.judgeCodeExec,
   };
 

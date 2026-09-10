@@ -142,12 +142,15 @@ function readEnv() {
     apiKey, bucket,
     allowedUids: allowedRaw.split(',').map((s) => s.trim()).filter(Boolean),
     geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
-    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-4-8',
+    // 2026-09-10 Opus 4.8 → Opus 5 (같은 단가 $5/$25). 같은 행 10개 A/B: 4.8은 실재하는 표기 결함 4건(행 1543,
+    // 기호가 깨져 흰 공·검은 공이 같은 ◯)을 전부 기각(기각률 92%)했고 Opus 5는 확정했다(기각률 50% = 베이스라인).
+    // 판정 최장 52.6s → 38.1s. ⚠ thinking은 Opus 5에서 기본 켜짐이지만 `thinking:'adaptive'` 명시는 그대로 둔다.
+    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',
     // F1: 2차 판정의 code_execution은 시트 STEP3에 전례가 없는 신규 요소다(그쪽 payload에는
     //     tools가 아예 없다). 기본 off로 두고 실측 후 켠다.
     judgeCodeExec: process.env.VERIFY_JUDGE_CODE_EXEC === '1',
     // 단가는 모델이 env 고정이라 ai_models 문서를 못 쓴다 → 라우트 상수.
-    // Claude Opus 4.8: $5 / $25 per 1M (2026-06 기준 Anthropic 공시가).
+    // Claude Opus 5: $5 / $25 per 1M (2026-06 기준 Anthropic 공시가 — Opus 4.8과 같은 단가).
     claudeCostIn: 5, claudeCostOut: 25,
     geminiCostIn: Number(process.env.VERIFY_GEMINI_COST_IN || 0),
     geminiCostOut: Number(process.env.VERIFY_GEMINI_COST_OUT || 0),

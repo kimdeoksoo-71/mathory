@@ -580,7 +580,7 @@ export function getAIProvider(): AIProvider {
   if (provider === 'claude') {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다');
-    const model = process.env.AI_MODEL || 'claude-opus-4-8';
+    const model = process.env.AI_MODEL || 'claude-opus-5';
     return new ClaudeProvider(apiKey, model);
   }
 
