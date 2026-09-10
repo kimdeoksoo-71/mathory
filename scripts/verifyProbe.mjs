@@ -190,7 +190,7 @@ function formatGuideFromType(t, answer, P) {
 async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts }) {
   const t0 = Date.now();
   const targetBlocks = kind === 'problem' ? problemBlocks : solutionBlocks;
-  // 문제 = 한 패스 / 풀이 = 계산·표기 + 논리 두 패스. ⚠ 병렬 (라우트와 동일)
+  // 문제 = 한 패스 / 풀이 = 계산·표기 + 논리 + 군더더기(61h) 세 패스. ⚠ 병렬 (라우트와 동일)
   const passes = kind === 'problem' ? [P.PROMPT_PROBLEM_FIRST] : P.SOLUTION_FIRST_PASSES;
   const vars = {
     problem: P.labelBlocks(problemBlocks),
@@ -207,21 +207,26 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
 
   // ⚠ 파싱 결과를 그 패스와 짝지어 든다 — 라우트와 같은 이유(한 패스가 죽으면 상한이 어긋난다).
   const parsed = gs.map((g, i) => ({ pass: passes[i], json: V.parseAndRepair(g.content) }));
-  if (parsed.every((x) => !x.json)) {
+  // ⚠ 두 게이트(전부 실패·전부 skip)는 **결함 패스만** 본다 — 라우트와 동일(61h E4·N1).
+  //   군더더기 패스의 실패·skip은 "군더더기 없음"으로 흘린다.
+  const defectParsed = parsed.filter((x) => !x.pass.severity);
+  if (defectParsed.every((x) => !x.json)) {
     return { error: '1차 응답 파싱 실패', raw: gs[0].content.slice(0, 600), ms: Date.now() - t0 };
   }
   const alive = parsed.filter((x) => x.json);
+  const defectAlive = alive.filter((x) => !x.pass.severity);
+  const garbagePassDead = parsed.some((x) => x.pass.severity && !x.json);   // Stage 2·3 빈도 관찰용
 
-  if (alive.every((x) => x.json.skip === true)) {
-    return { verdict: 'skip', findings: [], note: alive[0].json.skip_reason,
+  if (defectAlive.every((x) => x.json.skip === true)) {
+    return { verdict: 'skip', findings: [], note: defectAlive[0].json.skip_reason,
              tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
   }
 
-  const derivedAnswer = kind === 'problem' ? String(alive[0].json.derived_answer || '').trim() : undefined;
+  const derivedAnswer = kind === 'problem' ? String(defectAlive[0].json.derived_answer || '').trim() : undefined;
   const answerCheck = kind === 'problem' ? V.compareAnswer(answer, derivedAnswer) : undefined;
-  // ⚠ 상한은 프롬프트가 소유한다 — 여기에 8·12를 리터럴로 박지 말 것(61g E3: 실제로 갈렸었다).
+  // ⚠ 상한은 프롬프트가 소유한다 — 여기에 8·12·6을 리터럴로 박지 말 것(61g E3: 실제로 갈렸었다).
   const candidates = V.mergeCandidates(
-    alive.map((x) => V.sanitizeFindings(x.json.candidates, kind, x.pass.cap)),
+    alive.map((x) => V.sanitizeFindings(x.json.candidates, kind, x.pass.cap, x.pass.severity)),
     P.MERGE_CANDIDATE_CAP);
 
   if (answerCheck === 'mismatch' && !candidates.some((c) => c.tag === '정답불일치')) {
@@ -233,39 +238,58 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
   const rawCandidates = candidates.map((c) => ({ ...c }));   // 2차 전 상태 보존 (과검출 관찰용)
 
   if (candidates.length === 0) {
-    return { verdict: 'ok', findings: [], note: '(후보 없음)', derivedAnswer, answerCheck,
-             rawCandidates, tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
+    return { verdict: 'ok', findings: [], garbage: [], note: '(후보 없음)', derivedAnswer, answerCheck,
+             rawCandidates, garbagePassDead, tokens: [gIn, gOut], ms: Date.now() - t0, judged: false };
   }
 
-  const anchors = candidates.map((c) => V.anchorByQuote(c.quote, targetBlocks));
+  const anchors = new Map(candidates.map((c) => [c.id, V.anchorByQuote(c.quote, targetBlocks)]));
+  const { defect, garbage } = V.splitBySeverity(candidates);   // 61h — 판정자가 다르다
 
-  const judgeUser = P.fillTemplate(P.PROMPT_JUDGE.user, {
+  const judgeVars = {
     problem: P.labelBlocks(problemBlocks),
     solution: P.labelBlocks(kind === 'problem' ? problemBlocks : solutionBlocks),
-    candidates: P.formatCandidatesForJudge(candidates),
-  });
-
-  const c = await callClaude(V.buildClaudeParams({
-    model: opts.claudeModel, system: P.PROMPT_JUDGE.system,
-    messages: [{ role: 'user', content: judgeUser }],
+  };
+  // ⚠ 16000은 라우트 JUDGE_MAX_TOKENS(32k)의 **사본이 아니라 옛 값**이다(61h E9·N3 — 측정 연속성 때문에
+  //   이번엔 그대로 둔다). 라우트와 갈린 자리임을 알고 볼 것. `truncated`도 여기엔 없다.
+  const judgeOne = (prompt, cands) => callClaude(V.buildClaudeParams({
+    model: opts.claudeModel, system: prompt.system,
+    messages: [{ role: 'user', content: P.fillTemplate(prompt.user, { ...judgeVars, candidates: P.formatCandidatesForJudge(cands) }) }],
     maxTokens: 16000, enableCodeExecution: false,
     opts: { thinking: 'adaptive', effort: 'high', enableCodeExecution: opts.judgeCodeExec },
-  }));
+  })).then((r) => ({ ...r, ms: Date.now() - t0 }));
 
-  const judgeJson = V.parseAndRepair(c.content);
-  const judgments = judgeJson?.judgments;
-  if (!Array.isArray(judgments)) {
-    return { error: '2차 응답 파싱 실패', raw: c.content.slice(0, 600), rawCandidates,
-             tokens: [gIn + c.inputTokens, gOut + c.outputTokens], ms: Date.now() - t0 };
+  // ⚠ 두 판정은 병렬 (라우트와 동일). 결함 후보가 없으면 결함 판정자는 부르지 않는다.
+  const tJ = Date.now();
+  const [dc, gc] = await Promise.all([
+    defect.length ? judgeOne(P.PROMPT_JUDGE, defect) : null,
+    garbage.length ? judgeOne(P.PROMPT_GARBAGE_JUDGE, garbage) : null,
+  ]);
+  const jIn = (dc?.inputTokens ?? 0) + (gc?.inputTokens ?? 0);
+  const jOut = (dc?.outputTokens ?? 0) + (gc?.outputTokens ?? 0);
+  const tokens = [gIn + jIn, gOut + jOut];
+
+  let judgments = [];
+  if (dc) {
+    judgments = V.parseAndRepair(dc.content)?.judgments;
+    if (!Array.isArray(judgments)) {
+      return { error: '2차(결함) 응답 파싱 실패', raw: dc.content.slice(0, 600), rawCandidates, tokens, ms: Date.now() - t0 };
+    }
   }
+  // 군더더기 판정 실패는 결함/군더더기를 갈라 기록한다(61h G7) — 라우트(N2)처럼 결함 리포트는 살린다
+  let garbageJudgments = null;
+  if (gc) {
+    const gj = V.parseAndRepair(gc.content)?.judgments;
+    garbageJudgments = Array.isArray(gj) ? gj : null;
+  }
+  const garbageJudgeFailed = garbage.length > 0 && garbageJudgments === null;
 
   const rulings = V.indexJudgments(judgments);
   const findings = [];
-  candidates.forEach((cand, i) => {
+  defect.forEach((cand) => {
     const j = rulings[cand.id];
     const ruling = j?.ruling ?? 'uncertain';
     if (ruling === 'invalid') return;
-    const a = anchors[i];
+    const a = anchors.get(cand.id);
     findings.push({
       tag: cand.tag,
       verdict: ruling === 'valid' && a.found ? 'fail' : 'check',
@@ -274,12 +298,46 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
     });
   });
 
+  // 61h — 군더더기 합성 (라우트와 같은 모양). escalate → findings에 check 결함(D5·N4)
+  const gRul = V.indexJudgments(garbageJudgments ?? []);
+  const garbageOut = [];
+  let escalated = 0;
+  if (!garbageJudgeFailed) {
+    garbage.forEach((cand) => {
+      const j = gRul[cand.id];
+      const ruling = j?.ruling ?? 'uncertain';
+      const a = anchors.get(cand.id);
+      if (j?.escalate) {
+        escalated++;
+        findings.push({
+          tag: V.normalizeTag(j.escalateTag, 'solution'), verdict: 'check',
+          blockKey: a.blockKey, quoteFound: a.found,
+          quote: cand.quote, reason: `[군더더기 검토에서 격상] ${j.note || cand.reason}`,
+        });
+        return;
+      }
+      if (ruling === 'invalid') return;
+      garbageOut.push({
+        tag: cand.tag, ruling,
+        verdict: ruling === 'valid' && a.found ? 'fail' : 'check',
+        blockKey: a.blockKey, quoteFound: a.found,
+        quote: cand.quote, reason: j?.note || cand.reason,
+        suggestion: j?.suggestion || cand.suggestion || '',
+      });
+    });
+  }
+
+  const defectRaw = rawCandidates.filter((c) => c.severity !== 'garbage');
+  const garbageRaw = rawCandidates.filter((c) => c.severity === 'garbage');
   return {
-    verdict: V.synthesizeVerdict(findings), findings, derivedAnswer, answerCheck,
-    rawCandidates, rejected: rawCandidates.length - findings.length,
-    stopReason: c.stopReason,
-    tokens: [gIn + c.inputTokens, gOut + c.outputTokens],
-    ms: Date.now() - t0, judged: true,
+    verdict: V.synthesizeVerdict(findings), findings, garbage: garbageOut, derivedAnswer, answerCheck,
+    rawCandidates, defectRaw, garbageRaw,
+    rejected: defectRaw.length - (findings.length - escalated),
+    garbageRejected: garbageJudgeFailed ? null : garbageRaw.length - garbageOut.length - escalated,
+    escalated, garbageJudgeFailed, garbagePassDead,
+    stopReason: dc?.stopReason, garbageStopReason: gc?.stopReason,
+    judgeMs: dc ? dc.ms - (tJ - t0) : null, garbageJudgeMs: gc ? gc.ms - (tJ - t0) : null,
+    tokens, ms: Date.now() - t0, judged: true,
   };
 }
 
@@ -297,7 +355,11 @@ function printResult(label, r, sheetRef) {
     const mark = { match: '✓ 일치', mismatch: '✕ 불일치', no_answer: '− 등록 정답 없음' }[r.answerCheck];
     console.log(`  정답대조: ${mark}${r.derivedAnswer ? `  (AI 도출: ${r.derivedAnswer})` : ''}`);
   }
-  if (r.judged) console.log(`  후보 ${r.rawCandidates.length}건 → 확정 ${r.findings.length}건 (기각 ${r.rejected})`);
+  if (r.judged) {
+    const dr = r.defectRaw ?? r.rawCandidates;
+    console.log(`  결함 후보 ${dr.length}건 → 남김 ${r.findings.length - (r.escalated || 0)}건 (기각 ${r.rejected})`
+              + (r.judgeMs != null ? `  · 결함 판정 ${(r.judgeMs / 1000).toFixed(1)}s` : ''));
+  }
   for (const [i, f] of (r.findings || []).entries()) {
     console.log(`   ${i + 1}. [${f.tag}] ${f.verdict}`
               + `${f.quoteFound ? ` @${f.blockKey}` : ' @원문미확인'}`);
@@ -306,9 +368,30 @@ function printResult(label, r, sheetRef) {
   }
   if (r.judged && r.rejected > 0) {
     const kept = new Set((r.findings || []).map((f) => f.quote));
-    const dropped = r.rawCandidates.filter((c) => !kept.has(c.quote));
+    const dropped = (r.defectRaw ?? r.rawCandidates).filter((c) => !kept.has(c.quote));
     console.log(`  기각된 후보(2차가 걸러낸 것 — 여기가 많으면 1차가 과하다):`);
     for (const d of dropped) console.log(`      · [${d.tag}] ${String(d.reason).replace(/\n/g, ' ').slice(0, 110)}`);
+  }
+  /* 61h — 군더더기 절 (대조군 없음 — 기록과 눈으로 읽기가 전부다, D10) */
+  if (r.judged && (r.garbageRaw?.length || r.garbagePassDead)) {
+    const gr = r.garbageRaw ?? [];
+    console.log(`  군더더기 후보 ${gr.length}건 → 남김 ${r.garbage.length}건 (기각 ${r.garbageRejected ?? '?'} · 격상 ${r.escalated})`
+              + (r.garbageJudgeMs != null ? `  · 군더더기 판정 ${(r.garbageJudgeMs / 1000).toFixed(1)}s` : '')
+              + (r.garbageJudgeFailed ? '  ✖ 군더더기 판정 파싱 실패(절 생략)' : '')
+              + (r.garbagePassDead ? '  ✖ 1차 군더더기 패스 파싱 실패' : ''));
+    for (const [i, f] of r.garbage.entries()) {
+      console.log(`   g${i + 1}. [${f.tag}] ${f.verdict}(${f.ruling})${f.quoteFound ? ` @${f.blockKey}` : ' @원문미확인'}`);
+      if (f.quote) console.log(`      인용: ${f.quote.replace(/\n/g, ' ').slice(0, 90)}`);
+      console.log(`      사유: ${String(f.reason).replace(/\n/g, ' ').slice(0, 160)}`);
+      if (f.suggestion) console.log(`      제안: ${String(f.suggestion).replace(/\n/g, ' ').slice(0, 120)}`);
+    }
+    const kept = new Set(r.garbage.map((f) => f.quote));
+    const escQ = new Set((r.findings || []).filter((f) => String(f.reason).startsWith('[군더더기')).map((f) => f.quote));
+    const dropped = gr.filter((c) => !kept.has(c.quote) && !escQ.has(c.quote));
+    if (dropped.length && !r.garbageJudgeFailed) {
+      console.log(`  기각된 군더더기 후보:`);
+      for (const d of dropped) console.log(`      · [${d.tag}] ${String(d.reason).replace(/\n/g, ' ').slice(0, 110)}`);
+    }
   }
 }
 
@@ -475,6 +558,28 @@ function printResult(label, r, sheetRef) {
     console.log(`  시트 정상 → 우리 check  : ${t.애매}건   △ 소음이면 보수 문구 강화`);
     console.log(`  시트 정상 → 우리 ok     : ${t.일치_정상}건   ✓ 일치`);
     if (t.기타) console.log(`  판정 없음/기타          : ${t.기타}건`);
+  }
+
+  /* 61h — 군더더기 요약 (풀이 검증만 · 대조군 없음) */
+  const gRows = out.filter((o) => o.kind === 'solution' && o.result.judged);
+  if (gRows.length) {
+    const sum = (f) => gRows.reduce((n, o) => n + (f(o.result) || 0), 0);
+    const tagDist = {};
+    for (const o of gRows) for (const c of (o.result.garbageRaw || [])) tagDist[c.tag] = (tagDist[c.tag] || 0) + 1;
+    const gms = gRows.map((o) => o.result.garbageJudgeMs).filter((x) => x != null);
+    const dms = gRows.map((o) => o.result.judgeMs).filter((x) => x != null);
+    console.log(`\n군더더기 요약 — 풀이 검증 ${gRows.length}건 (2차까지 간 것만)`);
+    console.log(`  1차 후보 평균: ${(sum((r) => r.garbageRaw?.length) / gRows.length).toFixed(2)}건`
+              + ` · 상한 6 도달: ${gRows.filter((o) => (o.result.garbageRaw?.length || 0) >= 6).length}건`
+              + ` · 1차 패스 실패: ${gRows.filter((o) => o.result.garbagePassDead).length}건`);
+    console.log(`  태그 분포(1차): ${Object.entries(tagDist).map(([k, v]) => `${k} ${v}`).join(' · ') || '(없음)'}`
+              + `   ← 느슨한서술 0이면 동치 검사 문구가 안 먹는 신호`);
+    console.log(`  판정: 확정(fail) ${sum((r) => r.garbage?.filter((f) => f.verdict === 'fail').length)}`
+              + ` · 확인(check) ${sum((r) => r.garbage?.filter((f) => f.verdict === 'check').length)}`
+              + ` · 기각 ${sum((r) => r.garbageRejected)} · 격상(escalate) ${sum((r) => r.escalated)}`
+              + ` · 판정 실패 ${gRows.filter((o) => o.result.garbageJudgeFailed).length}건`);
+    console.log(`  판정 시간: 결함 최장 ${dms.length ? (Math.max(...dms) / 1000).toFixed(1) : '-'}s`
+              + ` · 군더더기 최장 ${gms.length ? (Math.max(...gms) / 1000).toFixed(1) : '-'}s   (200s 문턱)`);
   }
 
   const totalIn = out.reduce((n, o) => n + (o.result.tokens?.[0] || 0), 0);
