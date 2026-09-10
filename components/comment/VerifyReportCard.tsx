@@ -50,8 +50,10 @@ const ANSWER_CHECK_LABEL: Record<string, string> = {
 export function buildReportMarkdown(report: VerifyReport): string {
   const m = VERDICT_META[report.verdict] ?? VERDICT_META.check;
   const n = report.findings.length;
+  const g = report.garbage?.length ?? 0;   // Phase 61h — 종합 판정과 별개로 요약에만 건수를 남긴다
   const head = `**${KIND_LABEL[report.kind] ?? '검증'}** — ${m.icon} ${m.label}`
     + (n > 0 ? ` · 지적 ${n}건` : '')
+    + (g > 0 ? ` · 군더더기 ${g}건` : '')
     + (report.note ? ` · ${report.note}` : '');
   return `${head}\n\n\`\`\`mathory-verify\n${JSON.stringify(report)}\n\`\`\``;
 }
@@ -82,6 +84,7 @@ export default function VerifyReportCard({
 }) {
   const [answerOpen, setAnswerOpen] = useState(false);
   const meta = VERDICT_META[report.verdict] ?? VERDICT_META.check;
+  const garbage = report.garbage ?? [];   // Phase 61h — 옛 리포트에는 없다
 
   return (
     <div style={{
@@ -109,6 +112,20 @@ export default function VerifyReportCard({
       {report.findings.map((f, i) => (
         <FindingRow key={i} finding={f} index={i + 1} onJumpToBlock={onJumpToBlock} />
       ))}
+
+      {/* Phase 61h — 군더더기 절. 결함 아래 별도 절이고 종합 판정·좌측 띠 색에 관여하지 않는다.
+          escalate된 것은 이미 위 findings에 check 결함으로 들어가 있어 여기엔 없다. */}
+      {garbage.length > 0 && (
+        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border-light)' }}>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 2 }}>
+            군더더기 {garbage.length}건
+            <span style={{ color: 'var(--text-faint)' }}> · 종합 판정에 영향 없음</span>
+          </div>
+          {garbage.map((f, i) => (
+            <FindingRow key={i} finding={f} index={i + 1} severity="garbage" onJumpToBlock={onJumpToBlock} />
+          ))}
+        </div>
+      )}
 
       {/* 정답 대조 */}
       {report.answerCheck && (
@@ -198,13 +215,16 @@ function ModelChip({ name }: { name: string }) {
 }
 
 function FindingRow({
-  finding, index, onJumpToBlock,
+  finding, index, severity, onJumpToBlock,
 }: {
   finding: VerifyFinding;
   index: number;
+  /** Phase 61h — 군더더기 절의 행. 확정 칩을 결함색(`--accent-danger`)이 아니라 `--bg-warn` 틴트로 */
+  severity?: 'garbage';
   onJumpToBlock?: (blockKey: string, quote: string) => void;
 }) {
   const isFail = finding.verdict === 'fail';
+  const isGarbage = severity === 'garbage';
   const canJump = !!onJumpToBlock && !!finding.blockKey;
   /* ⚠️ hover를 state로 들지 않는다 (Phase 61c) — mouseenter/leave가 카드 안에서 리렌더를
      일으키고, 그 리렌더가 MathText의 innerHTML을 다시 써서 드래그 선택을 죽였다.
@@ -248,8 +268,9 @@ function FindingRow({
         <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{index}.</span>
         <span style={{
           fontSize: 10.5, fontWeight: 600, padding: '1px 6px', borderRadius: 3,
-          background: isFail ? 'var(--accent-danger-bg)' : 'var(--bg-secondary)',
-          color: isFail ? 'var(--accent-danger)' : 'var(--text-secondary)',
+          // 61h — 군더더기 확정은 경고 틴트(--bg-warn = accent-soft). 팔레트 밖 색·신규 토큰 0(M6 규약)
+          background: isFail ? (isGarbage ? 'var(--bg-warn)' : 'var(--accent-danger-bg)') : 'var(--bg-secondary)',
+          color: isFail && !isGarbage ? 'var(--accent-danger)' : 'var(--text-secondary)',
         }}>
           {finding.tag}
         </span>
