@@ -65,7 +65,7 @@ const ICONS = {
   sidebarSimple: ['sidebar-simple', 'regular'],            // IconSidebar
   storefront: ['storefront', 'regular'],                   // IconBazaar
   tag: ['tag', 'regular'],                                 // IconTag
-  textWidth: ['arrows-out-line-horizontal', 'regular'],    // IconTextWidth (D5·§4-5)
+  textWidth: ['text-h', 'regular'],                        // IconTextWidth — 문단폭 스테퍼(EditorView Row1·ProblemView). M6 검수 7차(덕수 2026-09-10): arrows-out-line-horizontal → text-h
   trash: ['trash', 'regular'],                             // IconTrash
   tray: ['tray', 'regular'],                               // IconInbox
   x: ['x', 'regular'],                                     // IconClose

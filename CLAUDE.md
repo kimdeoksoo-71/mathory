@@ -362,6 +362,7 @@ ICONS 56 → **61종**(+9/−4, toggle 2종은 후속 철회 · user-circle 5차
   기본 파랑 해소) ③ **팔레트 밖 색 전수 정리** — 유채색 약 60곳(25파일: 버전 diff·교정 박스·lint 밑줄·검색 하이라이트·DnD 링·심볼 설정·
   공유/Bazaar 오류 띠…)을 위 "색 팔레트" 절의 토큰으로, 회색 111곳을 문맥별 토큰으로. 신규 토큰 6(`--accent-success-bg` · `--bg-warn` ·
   `--highlight-match(-active)` · `--drop-ring/-tint`)
+- **덕수 검수 7차(2026-09-10)**: 문단폭 스테퍼 아이콘(`IconTextWidth`, EditorView Row1·ProblemView 제목행) 도안을 `arrows-out-line-horizontal` → **`text-h`**로(키·24px 유지)
 - **덕수 검수 4차(2026-09-09)**: ① 체크박스를 `appearance:none` 커스텀 도안으로(네이티브는 accent-color로 켜짐 색만 바뀐다) —
   테두리 `--border-content` · 안쪽 흰색 35% 반투명(바탕보다 조금만 밝게) · 켜짐 로고 레드 62% + 다크 레드 테두리 55%(톤 다운) ·
   indeterminate 막대 · 14px ② 파비콘 'M' **Bold(700) · 캡높이 30**(SemiBold·26에서 굵기·크기 각 한 단계 — "왜소해 보인다")

@@ -108,7 +108,7 @@ export const IconBlockchain = phIcon(PH.graph, 14);
 export const IconDocLines = phIcon(PH.fileText, 14);
 export const IconCoachImportant = phIcon(PH.chatCenteredText, 14);
 /** 문단 가로폭(SizeStepper 라벨). M3의 27×15 비정방 예외는 M4에서 폐기 — 정방 24(§4-5). */
-export const IconTextWidth = phIcon(PH.textWidth, 24);
+export const IconTextWidth = phIcon(PH.textWidth, 24);   // 도안은 text-h(M6 검수 7차 — 옛 arrows-out-line-horizontal). 키 이름은 유지
 /** M5 D8 — "Agent" 글자 라벨(검수 13차 확정)을 대체한 아이콘. 옆 IconComment와 같은 크기로. */
 export const IconAgent = phIcon(PH.legoSmiley, 14);
 /** M5 D9 — AIBrandIcon의 '🤖' 글자 폴백 대체. */
