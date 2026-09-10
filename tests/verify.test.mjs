@@ -289,7 +289,8 @@ test('61f labelBlocks — image 블록이 (image) 라벨과 자리표시자로 �
 
 test('61f D8 — 프롬프트가 "이미지를 보지 못합니다"를 더는 단정하지 않는다', async () => {
   const P = await import('../.test-build/lib/verify/prompts.js');
-  const all = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES, P.PROMPT_JUDGE]
+  // 61h G1 — 군더더기 판정자도 감시 대상에 넣는다(1차 군더더기 패스는 SOLUTION_FIRST_PASSES로 자동 포함)
+  const all = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES, P.PROMPT_JUDGE, P.PROMPT_GARBAGE_JUDGE]
     .map((pr) => pr.system + pr.user).join('\n');
   assert.ok(!all.includes('이미지를 보지 못합니다'), '첨부 후에는 거짓이 되는 단정 문구');
   assert.ok(all.includes('첨부되지 않음'), '첨부되지 않은 그림에 한해 skip/uncertain');
@@ -363,16 +364,114 @@ test('61g T5 — 프롬프트에 신규 유형·전역 검토·"답이 맞아도
   assert.ok(!judge.includes('애매해 보인다'), '시트 V2의 uncertain 조임 문구는 이식하지 않는다');
 });
 
-test('61g T6 — 후보 상한의 단일 출처: 프롬프트 문자열과 cap이 일치한다', () => {
-  // ⚠ PROMPT_JUDGE는 1차가 아니라 cap이 없다 — 대상에서 제외(S13)
+test("61g T6′ — 후보 상한의 단일 출처: 프롬프트 문자열과 cap이 일치한다 (61h: 패스 3)", () => {
+  // ⚠ PROMPT_JUDGE·PROMPT_GARBAGE_JUDGE는 1차가 아니라 cap이 없다 — 대상에서 제외(S13)
   const passes = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES];
   for (const pr of passes) {
     assert.equal(typeof pr.cap, 'number', 'cap 필드');
     assert.ok(pr.system.includes(`최대 ${pr.cap}개`), `system이 알리는 수 = ${pr.cap}`);
   }
-  const [calc, logic] = P.SOLUTION_FIRST_PASSES;
+  const [calc, logic, garbage] = P.SOLUTION_FIRST_PASSES;
+  assert.equal(P.SOLUTION_FIRST_PASSES.length, 3);
   assert.equal(calc.cap, 8);
   assert.equal(logic.cap, 12);
+  assert.equal(garbage.cap, 6);
   // 병합 상한 = 패스 상한의 합 → 병합 단계는 자르지 않는다
-  assert.equal(P.MERGE_CANDIDATE_CAP, calc.cap + logic.cap);
+  assert.equal(P.MERGE_CANDIDATE_CAP, calc.cap + logic.cap + garbage.cap);
+  assert.equal(P.MERGE_CANDIDATE_CAP, 26);
+  // severity는 군더더기 패스에만 — 결함 패스에 생기면 게이트(N1)가 그 패스를 놓친다
+  assert.equal(garbage.severity, 'garbage');
+  for (const pr of [P.PROMPT_PROBLEM_FIRST, calc, logic]) assert.equal('severity' in pr, false);
+});
+
+/* ═══ Phase 61h — 군더더기 검출 (별도 축) ═══ */
+
+test('61h T1 — 군더더기 태그 정규화: 시트 키·한글 변형 · 힌트 순서(E3)', () => {
+  assert.deepEqual([...V.GARBAGE_TAGS], ['무관서술', '중복서술', '느슨한서술']);
+  const m = {
+    irrelevant: '무관서술', redundant: '중복서술', loose_equivalence: '느슨한서술',
+    중언부언: '중복서술', 동치: '느슨한서술',
+    // ⚠ E3 — '불필요'는 '필요'를 품는다. 느슨 힌트가 먼저 오거나 '필요' 단독 힌트가 있으면 여기서 깨진다
+    불필요: '무관서술', unnecessary: '무관서술',
+  };
+  for (const [raw, tag] of Object.entries(m)) assert.equal(V.normalizeGarbageTag(raw), tag, raw);
+});
+
+test('61h T2 — 격리: 군더더기 어휘는 결함 화이트리스트 밖이고 폴백은 무관서술', () => {
+  assert.equal(V.normalizeGarbageTag(''), '무관서술');
+  assert.equal(V.normalizeGarbageTag('logic_gap'), '무관서술');
+  const sol = V.allowedTags('solution');
+  for (const g of V.GARBAGE_TAGS) {
+    assert.ok(!sol.includes(g), `${g}는 SOLUTION_TAGS 밖`);
+    const t = V.normalizeTag(g, 'solution');
+    assert.ok(sol.includes(t) && !V.GARBAGE_TAGS.includes(t), `normalizeTag(${g}) → 결함 어휘(${t})`);
+  }
+});
+
+test('61h T3 — sanitizeFindings severity: 군더더기 태그 정규화 · cap 6 · 미지정이면 필드 없음', () => {
+  const mk = (n) => Array.from({ length: n }, (_, i) => ({ tag: 'redundant', quote: `q${i}`, reason: 'r' }));
+  const g = V.sanitizeFindings(mk(7), 'solution', 6, 'garbage');
+  assert.equal(g.length, 6);
+  for (const f of g) { assert.equal(f.severity, 'garbage'); assert.equal(f.tag, '중복서술'); }
+  const d = V.sanitizeFindings(mk(2), 'solution', 8);
+  for (const f of d) { assert.equal('severity' in f, false); assert.equal(f.tag, '논리오류'); }   // 결함 경로는 폴백
+});
+
+test('61h T4 — mergeCandidates: 같은 인용은 같은 severity 안에서만 합쳐진다 · id 재부여', () => {
+  const d = (q) => ({ id: 'x', tag: '계산오류', quote: q, reason: 'r' });
+  const g = (q) => ({ id: 'y', tag: '중복서술', quote: q, reason: 'r', severity: 'garbage' });
+  assert.equal(V.mergeCandidates([[d('같은 인용')], [d('같은  인용')]], 26).length, 1);      // 종전 동작(첫 고정)
+  const both = V.mergeCandidates([[d('같은 인용')], [g('같은 인용')]], 26);
+  assert.equal(both.length, 2);                                                             // 축이 다르면 둘 다
+  assert.deepEqual(both.map((c) => c.id), ['c1', 'c2']);
+  assert.deepEqual(both.map((c) => c.severity), [undefined, 'garbage']);
+  const three = V.mergeCandidates([[d('a'), d('b')], [g('c')]], 26);
+  assert.deepEqual(three.map((c) => [c.id, c.quote]), [['c1', 'a'], ['c2', 'b'], ['c3', 'c']]);   // 결함 앞, 군더더기 뒤
+});
+
+test('61h T5 — splitBySeverity: 순서·id 보존, 합집합 = 입력, severity 없음 = 결함', () => {
+  const cands = [
+    { id: 'c1', tag: '계산오류', quote: 'a', reason: 'r' },
+    { id: 'c2', tag: '중복서술', quote: 'b', reason: 'r', severity: 'garbage' },
+    { id: 'c3', tag: '논리비약', quote: 'c', reason: 'r' },
+  ];
+  const { defect, garbage } = V.splitBySeverity(cands);
+  assert.deepEqual(defect.map((c) => c.id), ['c1', 'c3']);
+  assert.deepEqual(garbage.map((c) => c.id), ['c2']);
+  assert.equal(defect.length + garbage.length, cands.length);
+  assert.deepEqual(V.splitBySeverity([]), { defect: [], garbage: [] });
+});
+
+test('61h T7 — 프롬프트 문구: 1차는 재현율 문구가 없고, 2차는 escalate·확신할 때만', () => {
+  const g1 = P.PROMPT_SOLUTION_FIRST_GARBAGE.system;
+  for (const s of ['무관서술', '중복서술', '느슨한서술', '삭제 검사', '동치 검사', '(heading)', '(coach_important)', '최대 6개']) {
+    assert.ok(g1.includes(s), `군더더기 1차: ${s}`);
+  }
+  // ⚠ recallRules의 문장이 실제로 이 문자열인지 먼저 확인한다 — 문구가 바뀌면 부재 단언이 공허해진다
+  assert.ok(P.PROMPT_SOLUTION_FIRST_LOGIC.system.includes('놓치는 쪽이 훨씬 나쁩니다'), '기준 문장 실재');
+  assert.ok(!g1.includes('놓치는 쪽이 훨씬 나쁩니다'), '군더더기 1차에 결함 재현율 문구를 넣지 않는다');
+  assert.ok(!g1.includes('의심되면 올리십시오'), '군더더기 1차에 결함 재현율 문구를 넣지 않는다');
+
+  const g2 = P.PROMPT_GARBAGE_JUDGE.system;
+  for (const s of ['escalate', 'escalate_tag', '확신할 때만 valid', '삭제 검사', '동치 검사']) {
+    assert.ok(g2.includes(s), `군더더기 2차: ${s}`);
+  }
+  assert.ok(!g2.includes('애매해 보인다'), '시트 V2의 uncertain 조임 문구는 이식하지 않는다');
+  // D4 — 결함 판정자는 한 글자도 안 바뀐다: 61g T5의 단언이 그대로 통과한다
+  assert.ok(P.PROMPT_JUDGE.system.includes('가리지 못하면 "uncertain"입니다'));
+  assert.ok(!P.PROMPT_JUDGE.system.includes('escalate'), 'PROMPT_JUDGE에 escalate를 넣지 않는다');
+});
+
+test('61h T8 — indexJudgments: suggestion·escalate·escalateTag (escalate는 === true만)', () => {
+  const m = V.indexJudgments([
+    { id: 'c1', ruling: 'valid', note: 'n', suggestion: '\\frac{1}{2}로', escalate: true, escalate_tag: '충분성미확인' },
+    { id: 'c2', ruling: 'invalid', note: 'n', escalate: 'true' },
+    { id: 'c3', ruling: 'uncertain' },
+  ]);
+  assert.deepEqual(m.c1, { ruling: 'valid', note: 'n', suggestion: '\\frac{1}{2}로', escalate: true, escalateTag: '충분성미확인' });
+  assert.equal(m.c2.escalate, false);            // 문자열 'true'는 거짓
+  assert.equal(m.c2.escalateTag, '');
+  assert.deepEqual(m.c3, { ruling: 'uncertain', note: '', suggestion: '', escalate: false, escalateTag: '' });
+  // 기존 호출부 호환 — ruling·note는 그대로
+  assert.equal(m.c1.ruling, 'valid');
 });

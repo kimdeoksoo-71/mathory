@@ -31,6 +31,9 @@ export interface RawFinding {
   suggestion?: string;
   /** 모델이 준 [블록 n] 힌트 (1-based). 앵커 확정은 anchorByQuote가 한다 */
   blockHint?: number;
+  /** Phase 61h — 군더더기 축. 없음 = 결함. 클라이언트를 **불투명하게 왕복**한다(`verifyFlow`는 후보 배열을
+   *  손대지 않고 되돌린다) → 2차가 `splitBySeverity`로 갈라 판정자를 나눈다. */
+  severity?: 'garbage';
 }
 
 export interface AnchorResult {
@@ -208,6 +211,9 @@ export const SOLUTION_TAGS = [
   '근거없는가정', '충분성미확인',
 ] as const;
 export const COMMON_TAGS = ['정답불일치'] as const;
+/** Phase 61h D1 — 군더더기 태그. **`SOLUTION_TAGS`(결함 어휘)와 섞지 않는다** — 별도 축이라
+ *  `allowedTags`·`normalizeTag`가 이 셋을 알지 못하는 것이 의도다(T2가 격리를 고정). */
+export const GARBAGE_TAGS = ['무관서술', '중복서술', '느슨한서술'] as const;
 
 export function allowedTags(kind: VerifyKind): string[] {
   return kind === 'problem'
@@ -248,10 +254,32 @@ export function normalizeTag(raw: string, kind: VerifyKind): string {
 }
 
 /**
+ * 군더더기 태그 정규화 (Phase 61h). `normalizeTag`와 **별도**다 — 그쪽 폴백은 `논리오류`라
+ * 군더더기가 결함으로 샌다. 시트 STEP4 type 키(`irrelevant`·`redundant`·`loose_equivalence`)와 한글 변형을 받는다.
+ *
+ * ⚠ 힌트 순서는 **무관 → 중복 → 느슨**이고 `'필요'`·`'충분'` 단독 힌트는 두지 않는다 —
+ *   `'불필요'`가 `'필요'`를 품어 무관서술이 느슨한서술로 샜다(61h E3, v2 초안에서 실측). T1이 고정한다.
+ */
+export function normalizeGarbageTag(raw: string): string {
+  const t = String(raw ?? '').trim();
+  if ((GARBAGE_TAGS as readonly string[]).includes(t)) return t;
+  const low = t.toLowerCase();
+  const has = (...ks: string[]) => ks.some((k) => t.includes(k) || low.includes(k));
+  if (has('무관', '불필요', 'irrelev', 'unrelat', 'unnecess')) return '무관서술';
+  if (has('중복', '중언', 'redund', 'repet', 'duplic')) return '중복서술';
+  if (has('느슨', '동치', 'loose', 'equiv', 'necess', 'suffic', 'iff')) return '느슨한서술';
+  return '무관서술';
+}
+
+/**
  * 1차 후보 정제. 시트 `sanitizeCandidates_` 등가.
  * ⚠️ 복구를 trim보다 **먼저** 한다.
+ * @param severity Phase 61h — `'garbage'`면 군더더기 태그로 정규화하고 후보에 `severity`를 싣는다.
+ *   호출부는 `pass.severity`(prompts.ts `FirstPass`)를 그대로 넘긴다 — 결함 패스는 undefined.
  */
-export function sanitizeFindings(arr: unknown, kind: VerifyKind, cap = 8): RawFinding[] {
+export function sanitizeFindings(
+  arr: unknown, kind: VerifyKind, cap = 8, severity?: 'garbage',
+): RawFinding[] {
   if (!Array.isArray(arr)) return [];
   const out: RawFinding[] = [];
   for (const item of arr) {
@@ -268,10 +296,13 @@ export function sanitizeFindings(arr: unknown, kind: VerifyKind, cap = 8): RawFi
 
     out.push({
       id: `c${out.length + 1}`,
-      tag: normalizeTag(String(c.tag ?? c.type ?? ''), kind),
+      tag: severity === 'garbage'
+        ? normalizeGarbageTag(String(c.tag ?? c.type ?? ''))
+        : normalizeTag(String(c.tag ?? c.type ?? ''), kind),
       quote, reason,
       ...(suggestion ? { suggestion } : {}),
       ...(hint !== undefined ? { blockHint: hint } : {}),
+      ...(severity ? { severity } : {}),
     });
     if (out.length >= cap) break;   // 패스별 상한. 기본 8, 호출부가 넘긴다(논리 패스 12).
                                     // 진실은 `lib/verify/prompts.ts`의 CAP_* 하나다(61g D9).
@@ -295,7 +326,9 @@ export function mergeCandidates(lists: RawFinding[][], cap: number): RawFinding[
   const seen = new Set<string>();
   for (const list of lists) {
     for (const c of list) {
-      const key = normalizeForQuoteCheck(c.quote) || `\u0000${c.reason}`;
+      // 61h — 키에 severity를 앞세운다: 같은 인용의 결함 후보와 군더더기 후보는 **둘 다 남는다**
+      //   (두 축은 독립이고 판정자도 다르다). 같은 severity 안에서는 종전과 같다.
+      const key = `${c.severity ?? 'defect'}|${normalizeForQuoteCheck(c.quote) || `\u0000${c.reason}`}`;
       if (seen.has(key)) continue;
       seen.add(key);
       out.push({ ...c, id: `c${out.length + 1}` });
@@ -303,6 +336,18 @@ export function mergeCandidates(lists: RawFinding[][], cap: number): RawFinding[
     }
   }
   return out;
+}
+
+/**
+ * 병합된 후보를 축별로 가른다 (Phase 61h). 순수 함수 — 라우트·프로브 공용(사본 금지).
+ * id는 건드리지 않는다: 2차 판정은 병합 후 id로 맞물리고, 두 판정자가 각자 자기 배열의 id만 본다.
+ * `severity`가 없는 후보(옛 클라이언트가 되돌린 것 포함)는 전부 결함이다.
+ */
+export function splitBySeverity(cands: RawFinding[]): { defect: RawFinding[]; garbage: RawFinding[] } {
+  const defect: RawFinding[] = [];
+  const garbage: RawFinding[] = [];
+  for (const c of cands) (c.severity === 'garbage' ? garbage : defect).push(c);
+  return { defect, garbage };
 }
 
 /* ═══════════════════════════════════════════════════════ */
@@ -437,9 +482,20 @@ export function normalizeRuling(raw: unknown): Ruling {
   return (r === 'valid' || r === 'invalid' || r === 'uncertain') ? r : 'uncertain';
 }
 
-/** 2차 judgments 배열을 id → {ruling, note} 맵으로 */
-export function indexJudgments(arr: unknown): Record<string, { ruling: Ruling; note: string }> {
-  const map: Record<string, { ruling: Ruling; note: string }> = {};
+/** 2차 판정 한 건 (정제 후). 61h가 `suggestion`·`escalate`·`escalateTag`를 더했다 —
+ *  결함 판정자(`PROMPT_JUDGE`)는 뒤 둘을 내지 않으므로 false·''로 온다. */
+export interface Judgment {
+  ruling: Ruling;
+  note: string;
+  suggestion: string;
+  /** 61h D5 — 군더더기 판정자가 "이건 결함"이라 넘긴 것. `=== true`만 참(문자열 'true'는 거짓). */
+  escalate: boolean;
+  escalateTag: string;
+}
+
+/** 2차 judgments 배열을 id → Judgment 맵으로 */
+export function indexJudgments(arr: unknown): Record<string, Judgment> {
+  const map: Record<string, Judgment> = {};
   if (!Array.isArray(arr)) return map;
   for (const item of arr) {
     const j = (item ?? {}) as Record<string, unknown>;
@@ -448,6 +504,9 @@ export function indexJudgments(arr: unknown): Record<string, { ruling: Ruling; n
     map[id] = {
       ruling: normalizeRuling(j.ruling),
       note: repairLatexControlCharsInString(String(j.note ?? '')).trim(),
+      suggestion: repairLatexControlCharsInString(String(j.suggestion ?? '')).trim(),
+      escalate: j.escalate === true,
+      escalateTag: String(j.escalate_tag ?? j.escalateTag ?? '').trim(),
     };
   }
   return map;
