@@ -136,10 +136,13 @@ export function skipLabel(reason: SkipReason): string {
 /**
  * 이 상태 코드면 **이후 전건이 반드시 실패한다** → 즉시 전체 중단.
  *   401 = 토큰 불비·만료 / 403 = `VERIFY_ALLOWED_UIDS` 미등록 (`lib/apiAuth.ts` fail-closed)
- * 429·5xx는 한 건의 사정일 수 있으므로 여기 넣지 않는다 — 그쪽은 연속 카운터가 잡는다.
+ *   429 = AI 제공자 할당량 초과 (2026-09-10 추가 — 실측: Gemini 일일 250회 소진이 "연속 실패"로만 보였다).
+ *         서버(`/api/verify`)가 제공자 429를 429로 옮기고 회복 시각을 메시지에 싣는다 — 배치는 그 메시지를 그대로 보인다.
+ *         분당 제한 같은 짧은 429도 중단되지만 "실패 항목만 다시 실행"이 그 경로다 — 3건을 더 태우고 멈추는 것보다 낫다.
+ * 5xx는 한 건의 사정일 수 있으므로 여기 넣지 않는다 — 그쪽은 연속 카운터가 잡는다.
  */
 export function isFatalStatus(status?: number): boolean {
-  return status === 401 || status === 403;
+  return status === 401 || status === 403 || status === 429;
 }
 
 /**

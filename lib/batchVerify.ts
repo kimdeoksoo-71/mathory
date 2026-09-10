@@ -239,13 +239,15 @@ export async function runBatchVerify(args: {
         const message = err?.message || '검증에 실패했습니다';
         setOutcome(it.problemId, kind, { state: 'failed', message });
 
-        // 401/403은 이후 전건이 반드시 실패한다 → 즉시 전체 중단 (E61d-6)
+        // 401/403/429는 이후 전건이 반드시 실패한다 → 즉시 전체 중단 (E61d-6 · 429는 2026-09-10 추가)
         if (isFatalStatus(err?.status)) {
           return {
             rows, usage, aborted: 'fatal',
             abortMessage: err.status === 403
               ? '이 계정에 검증 권한이 없어 중단했습니다'
-              : '로그인이 만료되어 중단했습니다 — 새로고침 후 다시 시도하세요',
+              : err.status === 429
+                ? `${message} — 중단했습니다`   // 서버가 할당량·회복 시각을 실어 보낸다
+                : '로그인이 만료되어 중단했습니다 — 새로고침 후 다시 시도하세요',
           };
         }
         streak = nextFailureCount(streak, 'fail');

@@ -461,3 +461,11 @@ Stage 1: `npm run test:verify` **87건 통과**(13 + 53 + 21) · `npx tsc --noEm
 5. **문제 검증 1건** — 61h 이전과 같은 카드(무변경 확인)
 6. **그림 문항 1건**(결함 패스 둘 다 그림 의존 skip이 나는 문항) — `skip` 리포트가 여전히 나오는지(E4 게이트 실물 확인)
 7. 폰 기기 모드 댓글 시트에서 같은 카드 1회
+
+### 11-5. 검수 뒤 사고 — Gemini 일일 할당량 소진 (2026-09-10 13:34)
+
+일괄 검증 38문항이 3초 만에 3건 실패 후 "연속 실패가 이어져 중단". dev 로그: `/api/verify 500` · `GoogleGenerativeAIFetchError 429` ·
+`QuotaFailure GenerateRequestsPerDayPerProjectPerModel = 250` · `RetryInfo 69949s`(→ 9/11 09:00 KST). 이날 스모크 3 + Stage 2·3 60 + 검수분이
+250회를 채웠다. **61h가 풀이 검증 1회당 Gemini 호출을 2 → 3으로 늘린 것이 배경이다**(문항당 4 · 38문항 ≈ 152).
+처방(커밋): 라우트가 제공자 429를 `429 + 할당량 + 회복 시각` 메시지로 옮김(`quotaExhaustedMessage`) · `isFatalStatus`에 429 추가(배치 즉시 중단, 서버 문구 그대로) ·
+`test:batch` 갱신. 알고 두는 손실: 분당 제한의 짧은 429도 배치를 멈춘다 — "실패 항목만 다시 실행"이 그 경로.

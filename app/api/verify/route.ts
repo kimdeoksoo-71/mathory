@@ -329,9 +329,61 @@ export async function POST(req: NextRequest) {
     });
   } catch (e) {
     if (e instanceof ApiError) return fail(e.status, e.userMessage);
+    const quota = quotaExhaustedMessage(e);
+    if (quota) {
+      console.error('[verify] AI 할당량 초과:', quota);
+      return fail(429, quota);
+    }
     console.error('[verify] 예상치 못한 오류:', e);
     return fail(500, '검증 중 오류가 발생했습니다');
   }
+}
+
+/**
+ * 제공자 429(할당량 초과)를 사람이 읽을 메시지로 (2026-09-10 실측).
+ *
+ * 실측 사고: Gemini `GenerateRequestsPerDayPerProjectPerModel` = **250회/일**(gemini-3.1-pro)이
+ * 프로브·일괄 검증으로 소진되자 이 라우트가 500 "예상치 못한 오류"를 돌려주고, 일괄 검증은
+ * 429를 "한 건의 사정"으로 보고 3건 연속 실패 뒤 "연속 실패가 이어져 중단"만 남겼다 — 원인(할당량)과
+ * 회복 시각(RetryInfo)이 어디에도 안 보였다. ⚠ 61h로 풀이 검증 1회당 Gemini 호출이 2 → **3**이 됐다
+ * (문제 1 + 풀이 3 = 문항당 4회) — 38문항 배치 ≈ 152회라 250회/일의 6할이다.
+ *
+ * Google SDK 오류는 `status: 429` + `errorDetails[]`(QuotaFailure.violations · RetryInfo.retryDelay "Ns").
+ * 다른 제공자도 `status`/`statusCode` 429면 같이 잡는다(세부는 없을 수 있다).
+ */
+function quotaExhaustedMessage(e: unknown): string | null {
+  const o = (e ?? {}) as Record<string, unknown>;
+  const status = Number(o.status ?? o.statusCode ?? NaN);
+  const msg = String(o.message ?? '');
+  if (status !== 429 && !/\b429\b|Too Many Requests|RESOURCE_EXHAUSTED/.test(msg)) return null;
+
+  let retrySec = 0;
+  let quota = '';
+  const details = Array.isArray(o.errorDetails) ? o.errorDetails as Record<string, unknown>[] : [];
+  for (const d of details) {
+    const t = String(d['@type'] ?? '');
+    if (t.endsWith('RetryInfo')) {
+      const m = String(d.retryDelay ?? '').match(/^(\d+)/);
+      if (m) retrySec = Number(m[1]);
+    } else if (t.endsWith('QuotaFailure')) {
+      const v = (Array.isArray(d.violations) ? d.violations[0] : null) as Record<string, unknown> | null;
+      if (v) {
+        const dims = (v.quotaDimensions ?? {}) as Record<string, unknown>;
+        const perDay = /PerDay/i.test(String(v.quotaId ?? '')) ? '일일 ' : '';
+        quota = ` (${perDay}${String(v.quotaValue ?? '?')}회${dims.model ? ` · ${String(dims.model)}` : ''})`;
+      }
+    }
+  }
+  let when = '잠시 후';
+  if (retrySec >= 3600) {
+    const at = new Date(Date.now() + retrySec * 1000);
+    const hh = String(at.getHours()).padStart(2, '0');
+    const mm = String(at.getMinutes()).padStart(2, '0');
+    when = `약 ${Math.ceil(retrySec / 3600)}시간 뒤(${at.getMonth() + 1}/${at.getDate()} ${hh}:${mm} 이후)`;
+  } else if (retrySec > 0) {
+    when = `${Math.ceil(retrySec)}초 뒤`;
+  }
+  return `AI 할당량 초과${quota} — ${when} 다시 시도하세요`;
 }
 
 /* ═══ 2차: 엄격 판정 (precision) ═══ */

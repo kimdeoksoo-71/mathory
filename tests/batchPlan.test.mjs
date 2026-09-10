@@ -96,10 +96,11 @@ test('skipLabel — 모든 사유에 문구가 있다 (스위치 누락 방지)'
 
 /* ═══ ③ 실패 처리 (E61d-6) ═══ */
 
-test('isFatalStatus — 401·403만 즉시 중단', () => {
+test('isFatalStatus — 401·403·429만 즉시 중단 (429 = 할당량 초과, 2026-09-10)', () => {
   assert.equal(B.isFatalStatus(401), true);
   assert.equal(B.isFatalStatus(403), true);
-  for (const s of [undefined, 400, 404, 429, 500, 502, 504]) {
+  assert.equal(B.isFatalStatus(429), true);
+  for (const s of [undefined, 400, 404, 500, 502, 504]) {
     assert.equal(B.isFatalStatus(s), false, String(s));
   }
 });
