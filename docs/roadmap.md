@@ -2055,7 +2055,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## Phase 61h: 정밀 검증 군더더기(garbage) 검출 ✅ (구현·검수 완료 2026-09-10 · 빌드 통과 · push 대기)
+## Phase 61h: 정밀 검증 군더더기(garbage) 검출 ✅ (구현·검수·배포 완료 2026-09-10)
 
 계획서: `docs/phasedocs/Phase61h 정밀 검증 군더더기 검출 v4 실행판.md`
 (v1 web → v2 web 덕수 확정·착수판 → v3 CLI 실측 교차검토(E1~E9·G1~G10·N1~N5 전부 권장안) → **v4 = 실행판**. §11이 구현·프로브 기록)
