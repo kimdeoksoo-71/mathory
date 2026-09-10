@@ -29,13 +29,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, verifyUid } from '../../../lib/apiAuth';
 import { getVerifyProviders, type AIProvider } from '../../../lib/ai-provider';
 import {
-  PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE, MERGE_CANDIDATE_CAP,
+  PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE, PROMPT_GARBAGE_JUDGE, MERGE_CANDIDATE_CAP,
   fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
-  type LabeledBlock,
+  type LabeledBlock, type FirstPass,
 } from '../../../lib/verify/prompts';
 import {
-  parseAndRepair, sanitizeFindings, mergeCandidates, anchorByQuote, indexJudgments,
-  synthesizeVerdict, compareAnswer, repairLatexControlCharsInString,
+  parseAndRepair, sanitizeFindings, mergeCandidates, splitBySeverity, anchorByQuote, indexJudgments,
+  normalizeTag, synthesizeVerdict, compareAnswer, repairLatexControlCharsInString,
   type RawFinding, type VerifyKind,
 } from '../../../lib/verify/parse';
 import { figureLabel, buildImageNote } from '../../../lib/verify/figures';
@@ -92,6 +92,8 @@ interface VerifyReport {
   kind: VerifyKind;
   verdict: VerifyVerdict;
   findings: VerifyFinding[];
+  /** Phase 61h — 군더더기 절. 종합 판정(`verdict`)에 들어가지 않는다. 비면 필드 자체가 없다. */
+  garbage?: VerifyFinding[];
   derivedAnswer?: string;
   answerCheck?: 'match' | 'mismatch' | 'no_answer';
   models: { first: string; judge: string | null };
@@ -214,9 +216,10 @@ export async function POST(req: NextRequest) {
     }
 
     /* ── ❶ 1차: 후보 생성 (recall) ──
-       문제 검증은 한 패스, 풀이 검증은 **계산·표기 / 논리 두 패스**다(시트 STEP2·STEP3 구조).
-       한 프롬프트에 태그를 다 넣으면 눈에 띄는 표기·계산이 먼저 소모되고 논리가 묻힌다.
-       ⚠ 두 호출은 **병렬**이다 — 직렬로 보내면 300초 예산이 무너진다. */
+       문제 검증은 한 패스, 풀이 검증은 **계산·표기 / 논리 / 군더더기 세 패스**다(앞 둘은 시트
+       STEP2·STEP3 구조, 셋째는 Phase 61h의 별도 축). 한 프롬프트에 태그를 다 넣으면 눈에 띄는
+       표기·계산이 먼저 소모되고 논리가 묻힌다.
+       ⚠ 호출은 **병렬**이다 — 직렬로 보내면 300초 예산이 무너진다. */
     const vars = {
       problem: labelBlocks(problemBlocks),
       solution: labelBlocks(solutionBlocks),
@@ -226,7 +229,7 @@ export async function POST(req: NextRequest) {
         answer: String(body.answer ?? ''),
       }),
     };
-    const passes = kind === 'problem' ? [PROMPT_PROBLEM_FIRST] : SOLUTION_FIRST_PASSES;
+    const passes: FirstPass[] = kind === 'problem' ? [PROMPT_PROBLEM_FIRST] : SOLUTION_FIRST_PASSES;
 
     const firstResults = await Promise.all(passes.map((pr) =>
       first.complete(pr.system, fillTemplate(pr.user, vars) + imageNote, FIRST_MAX_TOKENS, {
@@ -248,35 +251,44 @@ export async function POST(req: NextRequest) {
       pass: passes[i],
       json: parseAndRepair(r.content) as Record<string, unknown> | null,
     }));
-    // 패스가 **전부** 실패했을 때만 오류다. 하나가 살면 그것으로 진행한다 —
-    // 두 패스는 서로 독립이므로 한쪽 실패가 다른 쪽을 버릴 이유가 없다.
-    if (firstParsed.every((p) => p.json === null)) {
+    /* ⚠ 두 게이트(전부 실패 · 전부 skip)는 **결함 패스만** 본다 (Phase 61h E4·N1).
+       군더더기 패스(`severity:'garbage'`)까지 세면 ① 결함 패스 둘이 다 죽어도 군더더기가 살아
+       "ok + 군더더기"가 나오고 ② 결함 패스 둘이 그림 의존 skip이어도 `ok`가 나온다 — 61b D13′·
+       61f B-8 계약이 조용히 깨진다. 군더더기 패스의 실패·skip은 "군더더기 없음"으로 흘린다. */
+    const isParsed = (p: typeof firstParsed[number]): p is { pass: FirstPass; json: Record<string, unknown> } =>
+      p.json !== null;
+    const defectParsed = firstParsed.filter((p) => !p.pass.severity);
+    // 결함 패스가 **전부** 실패했을 때만 오류다. 하나가 살면 그것으로 진행한다 —
+    // 패스는 서로 독립이므로 한쪽 실패가 다른 쪽을 버릴 이유가 없다.
+    if (defectParsed.every((p) => p.json === null)) {
       throw new ApiError(502, '1차 검토 응답을 해석하지 못했습니다 — 잠시 후 다시 시도하세요');
     }
 
     // 그림 의존으로 판단 불가 — AI가 스스로 내린 판정만 skip이 된다 (B-8).
-    // 두 패스가 다 skip일 때만 skip이다(한쪽만이면 나머지 패스의 후보를 살린다).
-    const alive = firstParsed.filter(
-      (p): p is { pass: typeof p.pass; json: Record<string, unknown> } => p.json !== null);
-    if (alive.every((p) => p.json.skip === true)) {
+    // 결함 패스가 다 skip일 때만 skip이다(한쪽만이면 나머지 패스의 후보를 살린다).
+    const alive = firstParsed.filter(isParsed);
+    const defectAlive = alive.filter((p) => !p.pass.severity);
+    if (defectAlive.length > 0 && defectAlive.every((p) => p.json.skip === true)) {
       return NextResponse.json({
         report: report(kind, 'skip', [], {
           models: { first: env.geminiModel, judge: null },
-          note: String(alive[0]?.json.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
+          note: String(defectAlive[0]?.json.skip_reason || '그림을 보아야 판단할 수 있어 검증하지 않았습니다'),
         }),
         usage: { inputTokens, outputTokens, costUsd: round4(usdFirst) },
       });
     }
 
     const derivedAnswer = kind === 'problem'
-      ? repairLatexControlCharsInString(String(alive[0]?.json.derived_answer ?? '')).trim()
+      ? repairLatexControlCharsInString(String(defectAlive[0]?.json.derived_answer ?? '')).trim()
       : undefined;
     const answerCheck = kind === 'problem'
       ? compareAnswer(String(body.answer ?? ''), derivedAnswer)
       : undefined;
 
+    // 61h — 군더더기 패스는 `severity`를 실어 정제한다(태그 정규화가 갈린다). 병합 키에도 severity가 들어가
+    //   같은 인용의 결함·군더더기 후보가 둘 다 남는다. 순서는 이어 붙이기(결함 앞, 군더더기 뒤).
     const candidates = mergeCandidates(
-      alive.map((p) => sanitizeFindings(p.json.candidates, kind, p.pass.cap)),
+      alive.map((p) => sanitizeFindings(p.json.candidates, kind, p.pass.cap, p.pass.severity)),
       MERGE_CANDIDATE_CAP,
     );
 
@@ -344,8 +356,13 @@ async function runJudge(a: {
   let inputTokens = a.carriedIn;
   let outputTokens = a.carriedOut;
 
-  /* 앵커 확정: 모델의 [블록 n] 신고가 아니라 인용 실재성으로 정한다 (D10) */
-  const anchors = candidates.map((c) => anchorByQuote(c.quote, targetBlocks));
+  /* 앵커 확정: 모델의 [블록 n] 신고가 아니라 인용 실재성으로 정한다 (D10).
+     61h — id 키 Map. 병합 후 id는 유일하고(문제 검증의 c0 unshift도 재부여) 두 판정 배열이 공용한다. */
+  const anchors = new Map(candidates.map((c) => [c.id, anchorByQuote(c.quote, targetBlocks)] as const));
+
+  /* Phase 61h — 결함 후보와 군더더기 후보는 **판정자가 다르다**(성향이 반대 — D4).
+     옛 클라이언트가 severity 없이 되돌린 후보는 전부 결함이다(G3). */
+  const { defect, garbage } = splitBySeverity(candidates);
 
   /* 예산 검사 — 이 단계가 시작도 못 할 만큼 늦었으면 부르지 않는다 (D13′) */
   if (PHASE_BUDGET_MS - (Date.now() - a.startedAt) <= 0) {
@@ -353,44 +370,73 @@ async function runJudge(a: {
   }
 
   {
-    const judgeUser = fillTemplate(PROMPT_JUDGE.user, {
+    const judgeVars = {
       problem: labelBlocks(problemBlocks),
       solution: kind === 'problem' ? labelBlocks(problemBlocks) : labelBlocks(solutionBlocks),
-      candidates: formatCandidatesForJudge(candidates),
-    }) + a.imageNote;
-
-    const judgeRes = await judge.complete(PROMPT_JUDGE.system, judgeUser, JUDGE_MAX_TOKENS, {
+    };
+    const judgeOpts = {
       // ⚠ Opus 4.8은 thinking을 생략하면 사고가 꺼진 채 돈다. 시트 STEP3와 같은 설정.
-      thinking: 'adaptive',
-      effort: 'high',
+      thinking: 'adaptive' as const,
+      effort: 'high' as const,
       // F1: 시트에 전례가 없는 신규 요소라 env로 켠다. tool_choice 강제는 절대 하지 않는다
       //     (도구 호출을 강제하면 모델이 최종 JSON 턴을 낼 수 없다).
       enableCodeExecution: env.judgeCodeExec,
       // Phase 61f D3 — 2차도 같은 첨부를 본다. 비면 바디는 기존과 바이트 동일(D10).
       ...(a.figs.parts.length ? { images: a.figs.parts } : {}),
-    });
-    inputTokens += judgeRes.inputTokens;
-    outputTokens += judgeRes.outputTokens;
-    const usdJudge = cost(judgeRes.inputTokens, judgeRes.outputTokens, env.claudeCostIn, env.claudeCostOut);
+    };
 
-    if (judgeRes.truncated) {
-      throw new ApiError(502, '판정이 도구 호출 상한에서 끊겼습니다 — 다시 시도하세요');
+    /* ⚠ 두 판정은 **병렬**이다(61h D3·D4). 결함 판정이 없으면(군더더기 후보만) 그쪽은 부르지 않는다. */
+    const [dRes, gRes] = await Promise.all([
+      defect.length
+        ? judge.complete(PROMPT_JUDGE.system,
+            fillTemplate(PROMPT_JUDGE.user, { ...judgeVars, candidates: formatCandidatesForJudge(defect) }) + a.imageNote,
+            JUDGE_MAX_TOKENS, judgeOpts)
+        : null,
+      garbage.length
+        ? judge.complete(PROMPT_GARBAGE_JUDGE.system,
+            fillTemplate(PROMPT_GARBAGE_JUDGE.user, { ...judgeVars, candidates: formatCandidatesForJudge(garbage) }) + a.imageNote,
+            JUDGE_MAX_TOKENS, judgeOpts)
+        : null,
+    ]);
+    let usdJudge = 0;
+    for (const r of [dRes, gRes]) {
+      if (!r) continue;
+      inputTokens += r.inputTokens;
+      outputTokens += r.outputTokens;
+      usdJudge += cost(r.inputTokens, r.outputTokens, env.claudeCostIn, env.claudeCostOut);
     }
-    const judgeJson = parseAndRepair(judgeRes.content) as Record<string, unknown> | null;
-    const judgments = judgeJson?.judgments;
-    if (!Array.isArray(judgments)) {
-      throw new ApiError(502, '판정 응답을 해석하지 못했습니다 — 다시 시도하세요');
+
+    /* 결함 판정 실패 = 리포트 없음 (D13′ 그대로) */
+    let judgments: unknown[] = [];
+    if (dRes) {
+      if (dRes.truncated) {
+        throw new ApiError(502, '판정이 도구 호출 상한에서 끊겼습니다 — 다시 시도하세요');
+      }
+      const judgeJson = parseAndRepair(dRes.content) as Record<string, unknown> | null;
+      if (!Array.isArray(judgeJson?.judgments)) {
+        throw new ApiError(502, '판정 응답을 해석하지 못했습니다 — 다시 시도하세요');
+      }
+      judgments = judgeJson.judgments;
     }
+    /* 군더더기 판정 실패 = 결함 리포트는 살리고 군더더기 절만 뺀다 (61h N2).
+       별도 축이고 종합 판정 무영향이라 D13′의 보호 대상(결함 판정)은 훼손되지 않고, 1차 후보도 노출하지
+       않는다. 전체 실패로 두면 재시도가 1차 3호출 + 2차 2호출을 통째로 다시 쓴다. */
+    let garbageJudgments: unknown[] | null = null;
+    if (gRes && !gRes.truncated) {
+      const gj = parseAndRepair(gRes.content) as Record<string, unknown> | null;
+      if (Array.isArray(gj?.judgments)) garbageJudgments = gj.judgments;
+    }
+    const garbageJudgeFailed = garbage.length > 0 && garbageJudgments === null;
 
     /* ── ❼ 합성: 코드가 어휘를 정한다 ── */
     const rulings = indexJudgments(judgments);
     const findings: VerifyFinding[] = [];
-    candidates.forEach((c, i) => {
+    defect.forEach((c) => {
       const j = rulings[c.id];
       const ruling = j?.ruling ?? 'uncertain';   // 판정 누락은 uncertain (시트와 동일)
       if (ruling === 'invalid') return;          // 기각된 후보는 사라진다
 
-      const anchor = anchors[i];
+      const anchor = anchors.get(c.id)!;
       // 인용이 원문에서 확인되지 않으면 환각 신호 → 결함 확정으로 올리지 않는다
       const verdict: 'fail' | 'check' =
         ruling === 'valid' && anchor.found ? 'fail' : 'check';
@@ -407,14 +453,53 @@ async function runJudge(a: {
       });
     });
 
+    /* 61h — 군더더기 합성. `report.garbage`는 종합 판정에 들어가지 않는다(D2).
+       escalate(판정자가 "이건 결함")만 `findings`에 **`check`**로 넘어간다 — `fail`은 절대 아니다(D5). */
+    const gRul = indexJudgments(garbageJudgments ?? []);
+    const garbageOut: VerifyFinding[] = [];
+    if (!garbageJudgeFailed) {
+      garbage.forEach((c) => {
+        const j = gRul[c.id];
+        const ruling = j?.ruling ?? 'uncertain';
+        const anchor = anchors.get(c.id)!;
+        if (j?.escalate) {
+          findings.push({
+            tag: normalizeTag(j.escalateTag, 'solution'),   // 빈 값이면 `논리오류` 폴백(G4)
+            verdict: 'check',
+            blockKey: anchor.blockKey,
+            quote: c.quote,
+            reason: `[군더더기 검토에서 격상] ${j.note || c.reason}`,   // N4 — 결함 절에 섞이므로 출처를 남긴다
+            quoteFound: anchor.found,
+          });
+          return;
+        }
+        if (ruling === 'invalid') return;
+        const suggestion = j?.suggestion || c.suggestion || '';
+        garbageOut.push({
+          tag: c.tag,
+          verdict: ruling === 'valid' && anchor.found ? 'fail' : 'check',
+          blockKey: anchor.blockKey,
+          quote: c.quote,
+          reason: j?.note || c.reason,
+          ...(suggestion ? { suggestion } : {}),
+          quoteFound: anchor.found,
+        });
+      });
+    }
+
+    const notes: string[] = [];
+    // Phase 61f — 누락 그림은 사람이 알아야 한다 (Y열 fig_info의 등가물)
+    if (a.figs.missing.length) {
+      notes.push(`첨부되지 않은 그림 ${a.figs.missing.length}장: ${a.figs.missing.map((m) => `[그림 ${m.k} — ${m.reason}]`).join(', ')}`);
+    }
+    if (garbageJudgeFailed) notes.push('군더더기 판정 실패 — 이번 리포트에 군더더기 절 없음');
+
     return NextResponse.json({
       report: report(kind, synthesizeVerdict(findings), findings, {
         models: { first: env.geminiModel, judge: env.claudeModel },
         derivedAnswer: a.derivedAnswer, answerCheck: a.answerCheck,
-        // Phase 61f — 누락 그림은 사람이 알아야 한다 (Y열 fig_info의 등가물)
-        ...(a.figs.missing.length
-          ? { note: `첨부되지 않은 그림 ${a.figs.missing.length}장: ${a.figs.missing.map((m) => `[그림 ${m.k} — ${m.reason}]`).join(', ')}` }
-          : {}),
+        garbage: garbageOut,
+        ...(notes.length ? { note: notes.join(' · ') } : {}),
       }),
       usage: { inputTokens, outputTokens, costUsd: round4(a.carriedUsd + usdJudge) },
     });
@@ -451,10 +536,13 @@ function report(
     note?: string;
     derivedAnswer?: string;
     answerCheck?: 'match' | 'mismatch' | 'no_answer';
+    /** 61h — 비면 필드를 싣지 않는다(옛 리포트와 JSON 동일) */
+    garbage?: VerifyFinding[];
   },
 ): VerifyReport {
   return {
     kind, verdict, findings,
+    ...(extra.garbage && extra.garbage.length ? { garbage: extra.garbage } : {}),
     ...(extra.derivedAnswer ? { derivedAnswer: extra.derivedAnswer } : {}),
     ...(extra.answerCheck ? { answerCheck: extra.answerCheck } : {}),
     models: extra.models,

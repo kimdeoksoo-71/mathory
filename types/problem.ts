@@ -80,6 +80,10 @@ export interface VerifyReport {
   kind: VerifyKind;
   verdict: VerifyVerdict;
   findings: VerifyFinding[];
+  /** Phase 61h — 군더더기(무관·중복·느슨한 서술). **종합 판정 `verdict`에 들어가지 않는다**(판정자가
+   *  결함으로 격상한 것만 `findings`에 `check`로). `verdict`는 fail=확정 / check=확인 필요로 읽는다.
+   *  옛 리포트에는 없고, 비면 서버가 필드 자체를 싣지 않는다. */
+  garbage?: VerifyFinding[];
   /** ⚠️ 카드 토글로만 노출한다. markdown 본문에 넣지 말 것 —
    *  `stripForHistory`가 `<details>`를 "검산 코드 첨부됨"으로 오치환하고,
    *  요약은 공개 뷰어 폴백이라 정답이 그대로 실린다 */
