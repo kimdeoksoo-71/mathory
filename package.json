@@ -24,11 +24,11 @@
     "test:dialogs": "tsc lib/dialogs.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/dialogs.test.mjs",
     "test:list": "tsc lib/listColumns.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/listColumns.test.mjs",
     "test:foldericon": "tsc lib/folderIcon.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/folderIcon.test.mjs",
- "test:device": "tsc lib/device.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/device.test.mjs",
- "test:deeplink": "tsc lib/deepLink.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/deepLink.test.mjs"
+    "test:device": "tsc lib/device.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/device.test.mjs",
+    "test:deeplink": "tsc lib/deepLink.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/deepLink.test.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.1",
+    "@anthropic-ai/sdk": "^0.124.0",
     "@codemirror/commands": "^6.10.2",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/lint": "^6.9.5",

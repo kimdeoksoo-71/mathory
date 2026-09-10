@@ -317,7 +317,8 @@ class OpenAIResponsesProvider implements AIProvider {
 }
 
 /**
- * 신규 content block 타입 (SDK 0.32.1 미정의) — 런타임 형태 기준 좁힘용.
+ * 신규 content block 타입 — 런타임 형태 기준 좁힘용. (0.32.1 시절 SDK에 없어 정의했고, 0.124.0으로 올린 뒤에도
+ *  SDK 타입에 의존하지 않도록 그대로 둔다 — 2026-09-10)
  * code_execution_20250825 / code_execution_20260120 도구 응답 구조.
  *
  * 실제 응답에서 도구가 분기됨:
@@ -377,7 +378,8 @@ class ClaudeProvider implements AIProvider {
     maxTokens = 1024,
     opts?: CompleteOptions, // Anthropic은 JSON mode 미지원. forceCodeExecution은 사용.
   ): Promise<AIProviderResult> {
-    // SDK 0.32.1은 code_execution tool 타입을 모르므로 params를 unknown cast로 전달.
+    // params는 unknown cast로 전달 — 조립이 순수 함수(providerParams)라 SDK 타입과 독립이다.
+    // (0.32.1 시절 code_execution 타입 부재로 시작한 캐스트인데, 0.124.0으로 올린 뒤에도 유지 — 2026-09-10)
     // 조립은 lib/verify/providerParams.ts의 순수 함수에 있다 (Phase 61b — 회귀 스냅샷 대상).
     // code_execution_20250825는 모든 지원 모델에서 사용 가능 (Bash 기반).
     // 호출되는 도구는 bash_code_execution / text_editor_code_execution / (legacy) code_execution
@@ -412,7 +414,7 @@ class ClaudeProvider implements AIProvider {
       inputTokens += turnRes.usage.input_tokens;
       outputTokens += turnRes.usage.output_tokens;
       contentBlocks.push(...(turnRes.content as unknown[]));
-      // SDK 0.32.1의 stop_reason 유니온에는 'pause_turn'이 없다(서버 도구 이후 추가된 값) → 문자열로 넓힌다
+      // stop_reason은 문자열로 넓혀 둔다(0.32.1엔 'pause_turn'이 없었다 — SDK 유니온 변화에 흔들리지 않게 유지)
       lastStopReason = turnRes.stop_reason as string | null;
 
       if (lastStopReason !== 'pause_turn') break;
