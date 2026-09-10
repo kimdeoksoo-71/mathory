@@ -474,7 +474,9 @@ async function runJudge(a: {
           return;
         }
         if (ruling === 'invalid') return;
-        const suggestion = j?.suggestion || c.suggestion || '';
+        // 프로브 실측(Stage 3 행 2001): uncertain인데 suggestion에 "삭제"가 온다 — 프롬프트 [3]의 "valid일 때만"을
+        // 모델이 안 지킨다. 어휘는 코드가 정한다 → 확정(valid)일 때만 제안을 싣는다.
+        const suggestion = ruling === 'valid' ? (j?.suggestion || c.suggestion || '') : '';
         garbageOut.push({
           tag: c.tag,
           verdict: ruling === 'valid' && anchor.found ? 'fail' : 'check',

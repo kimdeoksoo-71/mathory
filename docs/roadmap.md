@@ -2055,6 +2055,25 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 61h: 정밀 검증 군더더기(garbage) 검출 🚧 (구현 완료 2026-09-10 · **덕수 검수 대기**)
+
+계획서: `docs/phasedocs/Phase61h 정밀 검증 군더더기 검출 v4 실행판.md`
+(v1 web → v2 web 덕수 확정·착수판 → v3 CLI 실측 교차검토(E1~E9·G1~G10·N1~N5 전부 권장안) → **v4 = 실행판**. §11이 구현·프로브 기록)
+
+**수정 7파일 · 신규 0 · 커밋 5(S1~S5). Firestore 규칙 0 · 스키마 0(`VerifyReport.garbage` additive) ·
+`VerificationState` 0 · 목록 배지 0 · 일괄 검증(61d) 0 · 그림 경로(61f) 0 · `verifyFlow` 0 · 결함 프롬프트 2개 무변경 ·
+문제 검증 바이트 무변경.** 로직 검증 80 → **87건**(`test:verify` 46 → 53). `tsc --noEmit` 통과.
+
+덕수 정의(결론에 영향 없어도 ① 무관 ② 중복 ③ 느슨한 ⟺)를 결함과 **별도 축**으로 검출한다 — 1차 3번째 패스
+`PROMPT_SOLUTION_FIRST_GARBAGE`(cap 6, `severity:'garbage'`) · 2차 별도 판정자 `PROMPT_GARBAGE_JUDGE`(`PROMPT_JUDGE`와 병렬) ·
+`report.garbage[]`(종합 판정 무영향, escalate만 `check` 결함). **원본이 `prompts.ts`이고 시트 STEP4가 후속 이식**(61g와 반대).
+
+- 태그 `무관서술`·`중복서술`·`느슨한서술`(`GARBAGE_TAGS`, 시트 키 `irrelevant`·`redundant`·`loose_equivalence`) · `normalizeGarbageTag` 별도
+- 1차 게이트(전부 실패·skip)는 **결함 패스 기준**(E4·N1) · 군더더기 판정 실패는 절만 생략+note(N2) · escalate reason 접두 `[군더더기 검토에서 격상]`(N4)
+- 카드: 결함 아래 군더더기 절 · 확정 칩 `--bg-warn` · 요약 폴백 `· 군더더기 n건`
+- 프로브: 패스 3·판정 2병렬·군더더기 요약(태그 분포·판정 시간). Stage 2·3 결과는 실행판 §11
+- **후속**: 시트 STEP4 이식(짝 문서 v2) → Stack Z/AA 30행 뒤 프로브 `--glabel` 대조
+
 ## Phase 61g: 정밀 검증 논리 결함 유형 확장 (시트 STEP3 V2 이식) 🚧 (구현 완료 2026-09-09 · **덕수 검수 대기**)
 
 계획서: `docs/phasedocs/Phase61g 정밀 검증 논리 결함 유형 확장 v5 실행판.md`

@@ -322,7 +322,7 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
         verdict: ruling === 'valid' && a.found ? 'fail' : 'check',
         blockKey: a.blockKey, quoteFound: a.found,
         quote: cand.quote, reason: j?.note || cand.reason,
-        suggestion: j?.suggestion || cand.suggestion || '',
+        suggestion: ruling === 'valid' ? (j?.suggestion || cand.suggestion || '') : '',   // 라우트와 동일 — valid일 때만
       });
     });
   }
