@@ -256,7 +256,7 @@ export function autoFixDeterministicIssues(
 | C | (phasedocs 없음) | 27(:583)·28(:660) |
 | D | `Phase57 …v4.md` P4 | 57(:1404) |
 | E | `Phase57 …v4.md` P5 · `Phase58 ….md` P5 | 57·58(:1431) |
-| G | `Phase59a ….md` 강조 체계 절 · `docs/phasedocs/사용 가이드 — 강조와 키.md` | 59a(:1513) |
+| G | `Phase59a ….md` 강조 체계 절 · `docs/phasedocs/사용 가이드 — 강조와 톤.md` | 59a(:1513) |
 | H | `Phase61b …v4 실행판.md` 후속 절 | 61b(:1658) |
 | 공통 | CLAUDE.md: `case-ref` · `.mathory-range` · proofread 옵션 인자 · 마커 두께 규약(화면 inherit·인쇄 600) · **PrintStyles는 편집 화면에도 로드(import는 `EditorView.tsx:56` — 기존 `:51` 표기 정정, W3)** | 「UI 정리」(:1948)에 M1 표 1개 |
 

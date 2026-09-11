@@ -327,7 +327,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M6 — 디자인·기능 조정** — 구현·**검수 6차까지 종결(2026-09-09)** · push 대기
+## 현재 Phase: **개선묶음 M6 — 디자인·기능 조정** — 구현·**검수 7차까지 종결(2026-09-10)** · **push 완료**(main 자동 배포)
 
 문서: `docs/phasedocs/개선묶음 M6 디자인·기능 조정 v2 실행판.md`
 (계보: 덕수 메모 → v1 web → **v2 CLI 실측 교차검토 = 실행판**(§9가 구현 기록). v2 부록 C가 v1 정정 6·보완 9, §5-0이 실측 3)

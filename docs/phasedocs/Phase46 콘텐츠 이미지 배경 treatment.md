@@ -1,7 +1,7 @@
 # Phase 46 — 콘텐츠 이미지 배경 treatment
 
 > 커밋: `69bd173` · 10개 파일 변경 (+274 / −6)
-> 설계: Claude.ai (스케치 `docs/phaseSketch/Phase46 콘텐츠 이미지 배경 treatment.md`) · 구현: Claude Code CLI · 검수: 덕수 (시각 확인)
+> 설계: Claude.ai (스케치 `docs/phaseSketch/Phase46 콘텐츠 이미지 배경 treatment.md` *(파일 없음 — 이전 phaseSketch 정리에서 삭제)*) · 구현: Claude Code CLI · 검수: 덕수 (시각 확인)
 
 ---
 
@@ -118,4 +118,4 @@ imageTreatmentStyle(b: Pick<Block,'imageTreatment'|'imageGray'>, opts?: { print?
 - `components/print/PrintableContent.tsx` — `PrintImageBlock` + `PrintBlock` 타입
 - `lib/pdfPrint.tsx` — `PdfPrintTab` 타입 필드
 - `lib/firestore.ts` — 복제 저장 필드
-- `docs/phaseSketch/Phase46 콘텐츠 이미지 배경 treatment.md` (스케치)
+- `docs/phaseSketch/Phase46 콘텐츠 이미지 배경 treatment.md` *(파일 없음 — 이전 phaseSketch 정리에서 삭제)* (스케치)

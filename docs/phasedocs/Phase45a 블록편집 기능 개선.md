@@ -2,8 +2,8 @@
 
 > 커밋: `1cd9a18` ~ `c586c7b` (10개) · 6개 파일 변경 (+192 / −76)
 > 설계: web Claude v1·v3·v4 → CLI Claude v2·v5(실코드 검증) · 구현: Claude Code CLI · 검수: 덕수 (시각 확인 4회차)
-> 스케치: `docs/phaseSketch/Phase45a 블록편집 기능 개선 v5 최종.md` — **§0 E1~E12가 v4 대비 정정 목록**
-> 목업: `docs/phaseSketch/P5 E형 최종 확정판.html` — E형 시각 정본. **단 아래 §5의 검수 반영분이 목업보다 우선**
+> 스케치: `docs/phaseSketch/Phase45a 블록편집 기능 개선 v5 최종.md` *(파일 없음 — 이전 phaseSketch 정리에서 삭제)* — **§0 E1~E12가 v4 대비 정정 목록**
+> 목업: `docs/phaseSketch/P5 E형 최종 확정판.html` *(파일 없음 — 이전 phaseSketch 정리에서 삭제)* — E형 시각 정본. **단 아래 §5의 검수 반영분이 목업보다 우선**
 
 신규 Phase 번호를 쓰지 않는다. Phase 45(블록 전체 접기 + 하단 툴바)의 **버그픽스·보강**이기 때문이다.
 
