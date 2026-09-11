@@ -108,6 +108,9 @@ export async function POST(req: NextRequest) {
       .map((b) => `[BLOCK ${b.id}]\n${b.masked}`)
       .join('\n\n---\n\n');
 
+    // max_tokens 4,096이라 SDK 비스트리밍 가드(21,333 초과 시 요청 전 예외)에 걸리지 않는다.
+    // ⚠ 여기를 21,333 위로 올리면 `timeout`을 함께 명시할 것 — lib/ai-provider.ts
+    //   `CLAUDE_REQUEST_TIMEOUT_MS` 주석(2026-09-11 사고).
     const client = new Anthropic({ apiKey });
     const apiResult = await client.messages.create({
       model: MODEL,

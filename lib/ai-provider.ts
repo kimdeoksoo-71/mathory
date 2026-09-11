@@ -360,6 +360,32 @@ function isCodeExecToolName(name: string): boolean {
     || name === 'text_editor_code_execution';
 }
 
+/**
+ * 비스트리밍 요청에 **명시할** 타임아웃. 값은 SDK 기본값과 같은 10분이다 —
+ * 목적은 시간을 바꾸는 것이 아니라 **SDK의 사전 차단을 통과하는 것**이다.
+ *
+ * ⚠ 2026-09-11 사고: `@anthropic-ai/sdk` 0.32.1 → 0.124.0 이후 검증 2차 판정이 전부 500
+ *   "검증 중 오류가 발생했습니다"로 죽었다. 0.124.0의 `messages.create`는 **스트리밍이 아니고
+ *   timeout도 지정되지 않은** 요청에서 `(60분 × max_tokens) / 128k > 10분`이면, 즉
+ *   **`max_tokens > 21,333`**이면 HTTP 요청을 보내기도 전에
+ *   `AnthropicError('Streaming is required for operations that may take longer than 10 minutes')`를
+ *   던진다(`client.js` `calculateNonstreamingTimeout`). 검증 2차의 `JUDGE_MAX_TOKENS = 32,000`이
+ *   정확히 이 가드에 걸린다. 경계는 실측했다 — 21,333 통과 / 21,334 차단.
+ *
+ * ⚠ 프로브(`scripts/verifyProbe.mjs`)는 SDK가 아니라 raw fetch라 이 가드를 안 지난다 →
+ *   **프로브가 정상인데 앱만 죽는다.** 이 비대칭이 원인 규명을 늦춘 이유다.
+ *
+ * ⚠ 값을 300초 밑으로 내려 "Vercel이 죽이기 전에 우리가 먼저 끝내자"고 하지 말 것 —
+ *   SDK는 타임아웃을 **재시도 대상**으로 보므로(maxRetries 기본 2) 첫 시도가 끊기면 한 번 더
+ *   보내고, 합계가 어차피 300초를 넘겨 같은 자리에서 죽는다. 10분은 업그레이드 **이전과
+ *   동일한 실효 동작**이다(0.x 시절에도 기본 10분이었고 `timeout ?? 600000` 폴백이 있다).
+ *
+ * ⚠ SDK에는 조건이 하나 더 있다 — `MODEL_NONSTREAMING_TOKENS[model]`보다 크면 역시 차단.
+ *   현재 그 표에는 Opus 4/4.1의 Vertex·Bedrock 식별자 3개(8,192)뿐이고 `claude-opus-5`는 없다.
+ *   `VERIFY_CLAUDE_MODEL`을 그 계열로 바꾸면 **timeout을 명시해도** 서버가 거절할 수 있다.
+ */
+const CLAUDE_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+
 class ClaudeProvider implements AIProvider {
   private client: Anthropic;
   private modelName: string;
@@ -367,7 +393,10 @@ class ClaudeProvider implements AIProvider {
   private enableCodeExecution: boolean;
 
   constructor(apiKey: string, modelName: string, enableCodeExecution = false) {
-    this.client = new Anthropic({ apiKey });
+    // ⚠ timeout 명시 필수 — 빼면 max_tokens > 21,333인 요청을 SDK가 보내기 전에 던진다
+    //   (위 CLAUDE_REQUEST_TIMEOUT_MS 주석). 호출부가 아니라 여기 둔 것은 pause_turn 재요청
+    //   루프와 앞으로 추가될 호출까지 한 번에 덮기 위해서다.
+    this.client = new Anthropic({ apiKey, timeout: CLAUDE_REQUEST_TIMEOUT_MS });
     this.modelName = modelName;
     this.enableCodeExecution = enableCodeExecution;
   }

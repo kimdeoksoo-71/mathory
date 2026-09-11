@@ -67,12 +67,21 @@ const FIRST_MAX_TOKENS = 8_000;
 /** 시트 QCONFIG.CLAUDE_MAX_TOKENS는 16k였지만, 단계를 쪼개 300초를 온전히 받으므로
  *  판정에 여유를 준다. thinking + 응답 합산 하드캡이라 넉넉해야 판정이 잘리지 않는다. */
 const JUDGE_MAX_TOKENS = 32_000;
+/* ⚠ 이 값은 Anthropic SDK의 비스트리밍 가드 문턱(21,333)을 **넘는다**. 안전한 것은
+   `ClaudeProvider`가 클라이언트에 timeout을 명시해 두었기 때문뿐이다(lib/ai-provider.ts
+   `CLAUDE_REQUEST_TIMEOUT_MS` 주석 = 2026-09-11 사고). 그 명시를 지우면 2차 판정이
+   요청도 못 보내고 전부 죽는다 — 프로브는 raw fetch라 멀쩡해서 더 찾기 어렵다. */
 
 /** 단계별 시간 예산. maxDuration보다 앞에서 멈춰 Vercel의 강제 종료를 피한다.
  *  단계를 쪼갠 뒤로는 한 단계가 이 예산을 통째로 쓴다. */
 const PHASE_BUDGET_MS = 280_000;
 
 const fail = (status: number, error: string) => NextResponse.json({ error }, { status });
+
+/** 클라이언트로 내보낼 오류 문구에서 키처럼 보이는 토큰을 지운다(위 catch 주석 참조). */
+const redactSecrets = (s: string) =>
+  s.replace(/\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{8,})|(?:key|api[_-]?key|token)=[A-Za-z0-9_.-]{8,}/gi,
+            '[redacted]');
 
 /* ═══ 타입 ═══ */
 
@@ -338,7 +347,13 @@ export async function POST(req: NextRequest) {
       return fail(429, quota);
     }
     console.error('[verify] 예상치 못한 오류:', e);
-    return fail(500, '검증 중 오류가 발생했습니다');
+    /* 사유를 함께 준다 — 2026-09-11 SDK 가드 사고 때 UI에도 서버 로그에도 "검증 중 오류가
+       발생했습니다" 한 줄뿐이라 원인을 짚는 데 하루가 걸렸다.
+       ⚠ 오늘의 세 SDK(Anthropic·OpenAI·Google)는 키를 **헤더**로 보내고 오류 메시지에 싣지
+       않는 것을 확인했다(Gemini의 `RequestUrl.toString()`에도 key가 없다). 그래도 그대로
+       흘리지는 않는다 — 이 사고 자체가 SDK 업그레이드로 동작이 바뀐 사례다. */
+    const why = e instanceof Error && e.message ? `: ${redactSecrets(e.message).slice(0, 160)}` : '';
+    return fail(500, `검증 중 오류가 발생했습니다${why}`);
   }
 }
 
