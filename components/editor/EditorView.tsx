@@ -135,6 +135,9 @@ const BLOCK_TYPES: Block['type'][] = [
 ];
 
 /** 블록 생성 시 기본 내용 */
+/** M7 D12 — 자동 저장 간격. dev 확인 시 1분으로 낮췄다가 되돌릴 것 */
+const AUTOSAVE_MS = 30 * 60 * 1000;
+
 const BLOCK_PRESETS: Record<string, string> = {
   text: '',
   heading: '## ',
@@ -3131,6 +3134,29 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   const handleSaveRef = useRef(handleSave);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+
+  /* ─── M7 D12·D13 — 30분 자동 저장 (Phase 55 D2 "Firestore 상시 저장은 하지 않는다"의 개정) ───
+     기준점은 **마지막 저장**(lastSavedAt — 어떤 종류든)이라 수동 저장 직후 또 돌지 않는다.
+     silent 저장 = 스냅샷 없음(D13 — 버전 기록은 사람의 의도만 남긴다). 숨김 탭도 저장한다.
+     발화 조건: dirty · 저장 중 아님 · 복원 중 아님. 실패하면 handleSave의 기존 에러 status가 뜨고
+     다음 틱에 재시도. 드래프트(500ms·크래시 안전망)는 그대로 별개 계층이다. */
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+  const restoringRef = useRef(false);
+  useEffect(() => {
+    if (!problem?.id) return;
+    const h = setInterval(() => {
+      if (!dirtyRef.current || savingRef.current || restoringRef.current) return;
+      handleSaveRef.current(true).then(() => {
+        if (!lastSaveOkRef.current) return;
+        const d = new Date();
+        const hhmm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        setStatus(`자동 저장됨 ${hhmm}`);
+        setTimeout(() => setStatus(''), 2000);
+      });
+    }, AUTOSAVE_MS);
+    return () => clearInterval(h);
+  }, [problem?.id, lastSavedAt]);   // lastSavedAt이 바뀔 때마다 30분을 다시 센다
   useEffect(() => {
     return () => {
       if (skipUnmountSaveRef.current) return;
@@ -3271,10 +3297,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleRestore = async (target: ProblemVersion, targetContent: VersionContent) => {
     if (!problem || !user) return;
     const actor: Participant = { uid: user.uid, display_name: user.displayName || user.email || '사용자' };
-    await snapshotCurrent('manual_save');                 // 1) 복원 직전 보존(무변경이면 dedup)
-    applyVersionContent(targetContent);                   // 2) 대상 적용(라이브 쓰기는 이후 저장이 수행)
-    const snap = await createSnapshot(problem.id, targetContent, 'restore', actor, { restoredFrom: target.id }); // 3) 복원 스냅샷
-    if (snap.status === 'error') console.error('[Phase55] 복원 스냅샷 실패:', snap.error);
+    restoringRef.current = true;   // M7 D12 — 두 await 사이에 자동 저장 틱이 끼어들지 않게
+    try {
+      await snapshotCurrent('manual_save');                 // 1) 복원 직전 보존(무변경이면 dedup)
+      applyVersionContent(targetContent);                   // 2) 대상 적용(라이브 쓰기는 이후 저장이 수행)
+      const snap = await createSnapshot(problem.id, targetContent, 'restore', actor, { restoredFrom: target.id }); // 3) 복원 스냅샷
+      if (snap.status === 'error') console.error('[Phase55] 복원 스냅샷 실패:', snap.error);
+    } finally {
+      restoringRef.current = false;
+    }
     setLastSavedAt(Date.now());
     setVersionDrawerOpen(false);
     setStatus(`v${target.seq}(으)로 복원됨 — 저장하면 반영됩니다`);

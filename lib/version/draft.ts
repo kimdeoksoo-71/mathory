@@ -2,7 +2,8 @@ import type { VersionContent } from '../../types/version';
 
 /**
  * Phase 55 계층1 — localStorage 드래프트(크래시 안전망).
- * Firestore 상시 저장은 하지 않는다(D2). 저장/이탈은 명시 트리거로만.
+ * Firestore 상시 저장은 하지 않는다(D2) — ⚠ M7 D12(2026-09-12)가 개정: **30분 자동 저장**(silent · 스냅샷 없음,
+ * 기준점 = 마지막 저장)이 EditorView에 있다. 드래프트는 그대로 크래시 직전 500ms 안전망이고, 두 계층은 별개다.
  * 드래프트는 미저장 편집을 보관하고, 다음 진입 시 서버본과 다르면 복구 배너로 노출.
  */
 
