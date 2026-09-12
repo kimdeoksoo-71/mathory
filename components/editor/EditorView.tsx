@@ -1063,6 +1063,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   });
   // 초기 load 시 effect 1회 skip + 저장 성공 후 skip용 플래그
   const skipDirtyRef = useRef(true);
+  /* M7 D11 — dirty 판정. 사용자 편집(블록·메타)마다 ++. 저장은 시작값과 끝값이 같을 때만 dirty를 푼다
+     → 저장 중(await 구간)에 친 글자는 로컬에 남고 dirty도 남아 다음 저장이 싣는다. */
+  const editSeqRef = useRef(0);
+  /* dirty effect의 로드 가드용 미러 — `problem`을 deps에서 빼기 위해(아래 effect 주석) */
+  const problemRef = useRef<ProblemWithBlocks | null>(null);
   const [status, setStatus] = useState('');
 
   // 메타 편집
@@ -1225,15 +1230,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     document.documentElement.style.setProperty('--content-font-size', size + 'px');
   }, []);
 
-  /* ─── dirty 추적: 블록/메타 변경 시 setDirty(true) ─── */
+  /* ─── dirty 추적: 블록/메타 변경 시 setDirty(true) ───
+     M7 D11 — deps에 **`problem`이 없다.** 저장(`setProblem(refreshed)`)과 검증 완료(`setProblem(prev => …)`)가
+     problem을 갈아 끼우는데, 그것은 편집이 아니다. problem이 deps에 있던 때의 잠복 버그 2건(2026-09-12):
+       ① 저장의 setProblem 뒤 await 사이에 이 effect가 먼저 돌아 dirty를 찍고, 뒤늦게 온 `skipDirtyRef=true`가
+          소비되지 않은 채 남아 **저장 직후 첫 편집의 dirty를 삼켰다**(검증 기록이 있는 문항)
+       ② 검증 완료의 setProblem이 편집 없이 dirty를 찍어 저장 아이콘이 다시 빨개졌다
+     `allBlocks`는 setCurrentBlocks 래퍼 밖의 직접 호출(undo·redo·탭 추가/삭제·버전 복원·드래프트 복구)도
+     바꾸므로 여기(effect)에서 세야 빠지는 경로가 없다. 초기 로드(setProblem+setAllBlocks 한 배치)는
+     종전대로 skipDirtyRef 초기값 true가 한 번 삼킨다. ⚠ problem을 deps에 되돌리지 말 것. */
+  problemRef.current = problem;
   useEffect(() => {
-    if (!problem) return; // load 전 무시
+    if (!problemRef.current) return; // load 전 무시
     if (skipDirtyRef.current) {
       skipDirtyRef.current = false;
       return;
     }
+    editSeqRef.current++;
     setDirty(true);
-  }, [problem, allBlocks, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId]);
+  }, [allBlocks, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId]);
 
   const handleFontSizeChange = (delta: number) => {
     setContentFontSize((prev) => {
@@ -2842,6 +2857,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     if (!problem) return;
     if (savingRef.current) return;
     savingRef.current = true;
+    const seq0 = editSeqRef.current;   // M7 D11 — 저장 중 편집 감지
     setSaving(true);
     if (!silent) setStatus('');
     try {
@@ -2915,25 +2931,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setTabs(loadedTabs);
         setOrigTabs(loadedTabs);
 
-        const toLocal = (blocks: Block[]): LocalBlock[] =>
-          blocks.map((b, i) => ({
-            ...b,
-            block_key: b.block_key || nanoid(),
-            type: normalizeBlockType(b.type),
-            collapsed: (allBlocks[activeTab] || [])
-              .find((lb) => lb.order === i)?.collapsed ?? false,
-            title: b.title || '',
-          }));
-
-        const blocksMap: Record<string, LocalBlock[]> = {};
+        /* M7 D11 — **로컬 블록을 서버본으로 교체하지 않는다.** 옛 코드는 여기서 `setAllBlocks(서버본)`을
+           해 모든 블록 id가 새 doc id로 바뀌었고, React key가 block.id라 **모든 CodeMirror가 리마운트**되어
+           포커스·커서·CM undo가 사라지고 저장 중 친 글자가 서버본에 덮여 사라졌다. 이제 로컬 id는 세션
+           내내 유지되고 서버 id는 `origBlockIds`(다음 저장의 delete-all 대상)만 안다.
+           ⚠ `setAllBlocks(refreshed…)`를 되살리지 말 것. undo·redo·복원의 세대 id 재생성은 별개(의도). */
         const newOrigIds: Record<string, string[]> = {};
         for (const tab of loadedTabs) {
-          blocksMap[tab.id] = toLocal(refreshed.tabBlocks[tab.id] || []);
           newOrigIds[tab.id] = (refreshed.tabBlocks[tab.id] || []).map((b) => b.id);
         }
-        setAllBlocks(blocksMap);
         setOrigBlockIds(newOrigIds);
-        // 저장 시 블록 ID가 갱신되어 교정 결과 매칭이 깨지므로 초기화
+        // 교정 결과는 저장 시점 텍스트 기준이라 초기화(안전, 종전과 같다)
         setProofreadResults({});
 
         /* ─── Phase 61b: 검증 stale 판정 ───
@@ -2946,7 +2954,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         if (verif && (verif.problem || verif.solution)) {
           try {
             const hashes = await computeVerifyHashes({
-              tabs: loadedTabs, blocksByTab: blocksMap,
+              tabs: loadedTabs, blocksByTab: allBlocks,   // M7 D11 — 저장한 클로저 값(정규화는 toPersistedBlock 경유)
               title: editTitle, answer: editAnswer,
               tabLoadErrors: refreshed.tabLoadErrors || {},
             });
@@ -2965,10 +2973,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
       }
 
-      // 저장 성공: dirty 해제. setAllBlocks가 effect를 다시 트리거할 수 있으므로
-      // skipDirtyRef로 그 한 번을 무시.
-      skipDirtyRef.current = true;
-      setDirty(false);
+      /* 저장 성공: 저장 중 편집이 없었을 때만 dirty 해제(M7 D11). 편집이 있었으면 dirty가 남아
+         다음 저장이 싣는다. ⚠ 여기서 skipDirtyRef를 세우지 말 것 — dirty effect는 이제 `problem`을
+         보지 않으므로 소비할 트리거가 없고, 남은 skip은 다음 편집의 dirty를 삼킨다. */
+      if (editSeqRef.current === seq0) setDirty(false);
       lastSaveOkRef.current = true;
 
       // Phase 55 계층1: 저장 성공 → 상태 갱신 + 드래프트 정리 (서버본과 동기화됨)
