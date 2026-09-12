@@ -67,9 +67,32 @@ const WRAP_ON: Extension = [
    ⚠ CM 의 `scrollMargins` 제공자(dist 11282)는 `fixed` 플래그(=unfixGutters 미설정)만 보고
      `dom.offsetWidth` 를 왼쪽 마진으로 내보내므로, 타자·화살표의 캐럿 노출도 거터 폭을 그대로 뺀다.
    ⚠ `.cm-editor` 에 transform 이 생기면 거기 마운트되는 CM 툴팁(자동완성·lint, 기본 `view.dom`)이
-     `position: fixed` 좌표를 잃고 래퍼 `overflow:hidden` 에 갇힌다 → `tooltips({ parent: document.body })`
-     로 툴팁을 body 로 뺀다(CM 공식 옵션). z-index 는 테마의 `.cm-tooltip` 이 준다.
+     `position: fixed` 좌표를 잃고 래퍼 `overflow:hidden` 에 갇힌다 → `tooltips({ parent })` 로 툴팁을
+     에디터 밖으로 뺀다(CM 공식 옵션). z-index 는 테마의 `.cm-tooltip` 이 준다.
+   ⚠ 그 parent 는 **body 가 아니라 아래 `tooltipHost()`(0×0 fixed)** 다 (M7 D25′, 2026-09-12 사고):
+     CM 은 parent 안에 컨테이너 div 를 만들고 `className = view.themeClasses` 를 통째로 붙인다(dist 10143-10146).
+     그래서 `EditorView.theme({ '&': … })` 의 **모든 `&` 규칙이 그 컨테이너에도 적용**된다 — body 직속이던
+     때 아래 테마의 `'&': { height: '100%' }` 가 뷰포트 높이 div 를 블록 수만큼 body 끝에 쌓아
+     문서가 넘쳤다(실측: 블록 3개 → 713px × 3 = 2139px 넘침, 켬·끔 동일 — 편집창 휠 끝에서 화면
+     전체가 밀려 올라가던 버그). 호스트가 0×0 이면 `height:100%` 는 0 의 100% 이고 transform 이 새도
+     문서 높이에 닿을 수 없다. ⚠ 호스트에 `overflow`·`transform` 을 주지 말 것 — 툴팁이 잘리거나
+     좌표를 잃는다.
    ⚠ 켬 모드는 손대지 않는다 — 튕길 스크롤이 없고, 기본값은 현행과 바이트 단위로 같아야 한다(D2). */
+/* M7 D25′ — CM 툴팁 전용 호스트. 위 주석 참조. 마운트 effect 안에서만 부른다(SSR 에 document 가 없다).
+   top/left 0 이라 CM 의 두 갈래(켬: fixed 그대로 / 끔: 컨테이너 transform → makeAbsolute, 컨테이너 rect 기준)가
+   같은 좌표로 수렴한다. z-index 는 `.cm-tooltip` 테마와 같은 10200 — 드로어(50) 위·다이얼로그(10500) 아래. */
+const TOOLTIP_HOST_ID = 'cm-tooltip-host';
+function tooltipHost(): HTMLElement {
+  let el = document.getElementById(TOOLTIP_HOST_ID);
+  if (!el) {
+    el = document.createElement('div');
+    el.id = TOOLTIP_HOST_ID;
+    Object.assign(el.style, { position: 'fixed', top: '0', left: '0', width: '0', height: '0', zIndex: '10200' });
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 const WRAP_OFF: Extension = EditorView.theme({
   '.cm-content': { whiteSpace: 'pre' },
   /* ⚠ transform 은 스크롤러가 아니라 **.cm-editor(&)** 에 둔다. 스크롤러에 두면 fixed 거터의
@@ -844,10 +867,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           metaListener,
           tabHandler,
           basicSetup,
-          /* 툴팁을 body 로 — 끔 모드에서 .cm-editor 에 transform 이 걸리므로(fixed 거터의 containing
-             block) 에디터 안의 fixed 툴팁은 좌표를 잃는다. body 컨테이너는 view.themeClasses 를
-             그대로 받아 아래 .cm-tooltip 테마가 계속 적용된다. */
-          tooltips({ parent: document.body, position: 'fixed' }),
+          /* 툴팁을 에디터 밖 전용 호스트로(M7 D25′) — 끔 모드에서 .cm-editor 에 transform 이 걸리므로
+             (fixed 거터의 containing block) 에디터 안의 fixed 툴팁은 좌표를 잃는다. 컨테이너는
+             view.themeClasses 를 그대로 받아 아래 .cm-tooltip 테마가 계속 적용된다.
+             ⚠ parent 를 document.body 로 되돌리지 말 것 — 파일 상단 tooltipHost() 주석(문서 높이 누수). */
+          tooltips({ parent: tooltipHost(), position: 'fixed' }),
           latexAutocompletion,
           // ── 괄호 자동닫기 제어 ──
           Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {

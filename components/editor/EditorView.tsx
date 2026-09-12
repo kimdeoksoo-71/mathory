@@ -2617,6 +2617,29 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => els.forEach((el) => el.removeEventListener('scroll', onScroll));
   }, []);
 
+  /* ─── 문서 트립와이어 (M7 D23): 앱 셸은 100dvh + overflow hidden 이라 문서(window)는 세로로
+     스크롤되면 안 된다. 2026-09-12 사고 — CM 툴팁 컨테이너가 body 끝에 뷰포트 높이로 쌓여 문서가
+     넘쳤고(MarkdownEditor tooltipHost() 주석), 트립와이어가 없어 어떤 요소 탓인지 아무 데도 남지 않았다.
+     `tall` 목록이 body 직속 요소 중 뷰포트 아래로 삐져나온 것을 지목한다. 프로덕션에서도 되돌리기는 한다. */
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.scrollY === 0) return;
+      if (process.env.NODE_ENV !== 'production') {
+        const de = document.documentElement;
+        console.warn('[M7] 문서가 세로 스크롤됨 — body 직속 요소가 문서 높이를 키우고 있다:', {
+          scrollY: window.scrollY,
+          over: de.scrollHeight - de.clientHeight,
+          tall: Array.from(document.body.children)
+            .filter((el) => el.getBoundingClientRect().bottom > window.innerHeight + 1)
+            .map((el) => `${el.tagName}.${el.className}`),
+        });
+      }
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
   /* ─── 탭 전환 시 activeBlockId 갱신 + 전체접기/선택 초기화 ─── */
   useEffect(() => {
     const blocks = allBlocks[activeTab] || [];
@@ -3680,6 +3703,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                편집창의 가로 스크롤은 블록 안 `.cm-scroller`가 담당한다(줄바꿈 끔) — 이 패널이
                아니다. 여기서 밀리면 행번호 거터까지 함께 밀린다. */
             overflowX: 'hidden',
+            /* M7 D22 — 끝에 닿아도 뷰포트(문서)로 체이닝하지 않는다. 원인(CM 툴팁 컨테이너의
+               문서 높이 누수)은 MarkdownEditor 의 tooltipHost() 가 막았고, 이건 이중 안전이다. */
+            overscrollBehaviorY: 'contain',
             padding: '0 0 8px',
             minHeight: 0,
           }}>
@@ -3790,7 +3816,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0,
           fontSize: contentFontSize,
         }}>
-          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned tone-baseline" style={{ flex: 1, overflowY: 'auto', padding: '20px 32px 20px 3.5em', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
+          <div ref={previewRef} className="scaled-preview no-scrollbar problem-content-toned tone-baseline" style={{ flex: 1, overflowY: 'auto', overscrollBehaviorY: 'contain' /* M7 D22 */, padding: '20px 32px 20px 3.5em', background: 'var(--bg-content)', minHeight: 0, ['--content-font-size' as any]: `${contentFontSize}px` }}>
             {/* Phase 58 P2 — 톤 스코프. 미리보기는 활성 탭 하나만 렌더하므로 activeTab으로 판정한다 */}
             <div className={toneClass(activeTab)} style={activeTab === 'question' ? {
               background: 'var(--bg-content)', padding: '20px 24px', borderRadius: 8,
