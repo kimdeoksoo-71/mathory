@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
-import { IconChevron, IconShare, IconShareBold, IconBazaar } from '../ui/Icons';
+import { IconChevron, IconShare, IconBazaar } from '../ui/Icons';
 import SidebarSectionHeader from './SidebarSectionHeader';
 
 export interface ShareGroup {
@@ -44,7 +44,7 @@ export default function ShareTree({
     <div>
       {/* 공유 카테고리 헤더 — M6 D22: My·최근 문항과 같은 SidebarSectionHeader(동렬 최상위) */}
       <SidebarSectionHeader
-        icon={<IconShareBold size={16} />}
+        icon={<IconShare size={16} />}
         label="공유"
         open={open}
         onToggle={() => setOpen((v) => !v)}

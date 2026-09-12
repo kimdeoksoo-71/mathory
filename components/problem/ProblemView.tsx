@@ -795,44 +795,13 @@ export default function ProblemView({
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0,
             }}>{problem.title}</span>
             <BlockchainBadge problem={problem} size={16} />
-            {/* Phase 47: 댓글 버튼 — 오너 OR (멤버 && 댓글 보임) */}
-            {user && (isOwnerView || (isMemberView && problem.commentsVisible !== false)) && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setPanelMode((m) => m === 'comments' ? null : 'comments'); }}
-                title="댓글 열기"
-                style={{
-                  marginLeft: 10, display: 'inline-flex', alignItems: 'center', gap: 3,
-                  flexShrink: 0,   // ⚠ 긴 제목이 폭을 다 먹어도 버튼은 살아남아야 한다(D-17)
-                  border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
-                  borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
-                  color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
-                }}
-              >
-                <IconComment size={14} />{commentCount ? ` ${commentCount}` : ''}
-              </button>
-            )}
-            {/* Phase 47: agent 버튼 — 오너 전용 */}
-            {user && isOwnerView && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setPanelMode((m) => m === 'agent' ? null : 'agent'); }}
-                title="agent 열기"
-                style={{
-                  marginLeft: 2, display: 'inline-flex', alignItems: 'center', gap: 3,
-                  flexShrink: 0,
-                  border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
-                  borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
-                  color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
-                }}
-              >
-                {/* M5 D8 — 옆 IconComment 14와 같은 규격 */}
-                <IconAgent size={14} />{agentCount ? ` ${agentCount}` : ''}
-              </button>
-            )}
+            {/* M7 D26·D27 — 댓글·agent 버튼은 제목행 우단 클러스터(아래 절대배치 래퍼)로 갔다.
+                h1엔 제목 + 원본인증 배지만(배지는 제목의 속성). */}
           </h1>
         </div>
       </div>
 
-      {/* ═══ M6 D12·D13 — 폭·글자 스테퍼: 제목행 우단 절대배치 ═══
+      {/* ═══ M6 D12·D13 → M7 D26 — 댓글·agent·폭·글자 스테퍼: 제목행 우단 절대배치 ═══
           루트(position:relative) 기준이라 '열기' 버튼(right 16 · 26×26 · top 16)과 같은 좌표계다.
           right = 16 + 26 + 8 → 열기 버튼 왼쪽에 나란히. 세로는 제목행 전체 높이(57)에서 중앙 정렬.
           ⚠ rightReserve를 더하지 않는다 — 드로어가 열리면 카드(z 40/50) 밑으로 들어가는 것이
@@ -846,10 +815,44 @@ export default function ProblemView({
       <div style={{
         position: 'absolute', top: 0, height: HEADER_H - 1,
         right: OUTER_PAD + 26 + 8,
-        display: 'flex', alignItems: 'center',
+        display: 'flex', alignItems: 'center', gap: 4,
         zIndex: 10,
         background: 'var(--bg-functional)', paddingLeft: 8,
       }}>
+        {/* M7 D26 — 댓글·agent 버튼(옛 h1 안)을 여기 스테퍼 왼쪽으로. 제목은 핵심, 아이콘은 부가(덕수) —
+            드로어가 열리면 스테퍼처럼 셋이 함께 그 밑으로 들어간다(패널엔 자체 닫기 X). */}
+        {/* Phase 47 → M7 D26: 댓글 버튼 — 오너 OR (멤버 && 댓글 보임). 제목행 우단, 스테퍼 왼쪽 */}
+        {user && (isOwnerView || (isMemberView && problem.commentsVisible !== false)) && (
+          <button
+            onClick={() => setPanelMode((m) => m === 'comments' ? null : 'comments')}
+            title="댓글 열기"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+              border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
+              borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
+              color: panelMode === 'comments' ? 'var(--accent-primary)' : 'var(--text-muted)',
+            }}
+          >
+            <IconComment size={14} />{commentCount ? ` ${commentCount}` : ''}
+          </button>
+        )}
+        {/* Phase 47 → M7 D26: agent 버튼 — 오너 전용 */}
+        {user && isOwnerView && (
+          <button
+            onClick={() => setPanelMode((m) => m === 'agent' ? null : 'agent')}
+            title="agent 열기"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3, flexShrink: 0,
+              border: 'none', background: 'none', cursor: 'pointer', padding: '2px 6px',
+              borderRadius: 6, fontSize: 13, fontFamily: 'var(--font-ui)',
+              color: panelMode === 'agent' ? 'var(--accent-primary)' : 'var(--text-muted)',
+            }}
+          >
+            {/* M5 D8 — 옆 IconComment 14와 같은 규격 */}
+            <IconAgent size={14} />{agentCount ? ` ${agentCount}` : ''}
+          </button>
+        )}
+        <div style={{ width: 8 }} />
         {viewControls}
       </div>
 

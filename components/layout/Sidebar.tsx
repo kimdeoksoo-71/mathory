@@ -10,7 +10,7 @@ import SidebarSectionHeader from './SidebarSectionHeader';
 import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
 import {
-  IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle, IconUserCircleBold, IconRecentBold,
+  IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle,
   IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
 } from '../ui/Icons';
 import { TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID } from '../../lib/firestore';
@@ -801,7 +801,7 @@ export default function Sidebar({
           {/* M6 D22 — 세 섹션 헤더(My·공유·최근 문항)는 SidebarSectionHeader 한 벌 */}
           {!collapsed ? (
             <SidebarSectionHeader
-              icon={<IconUserCircleBold size={16} />}
+              icon={<IconUserCircle size={16} />}
               label="My"
               open={foldersOpen}
               onToggle={() => setFoldersOpen(!foldersOpen)}
@@ -975,7 +975,7 @@ export default function Sidebar({
         <div style={{ flex: 1, padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
           {!collapsed ? (
             <SidebarSectionHeader
-              icon={<IconRecentBold size={16} />}
+              icon={<IconRecent size={16} />}
               label="최근 문항"
               open={recentOpen}
               onToggle={() => setRecentOpen(!recentOpen)}

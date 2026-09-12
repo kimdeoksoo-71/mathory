@@ -94,11 +94,8 @@ const ICONS = {
   cloudArrowUp: ['cloud-arrow-up', 'regular'],             // IconSave 미저장 (M6 D20 — Feather 자체 도안 폐기)
   cloudCheck: ['cloud-check', 'regular'],                  // IconSave 저장됨 (M6 D20)
   userCircle: ['user-circle', 'regular'],                  // 사이드바 'My' 섹션 헤더 (M6 검수 5차 — 폴더 아이콘과 겹치던 folder 대체)
-  // M6 검수 6차(덕수) — 사이드바 최상위 카테고리 3종(My·공유·최근 문항) 헤더만 **bold** weight. "regular 단일" 규약의 명시 예외:
-  // 헤더는 항목보다 한 급 위라는 것을 아이콘 굵기·글자(13.5/700)로 함께 나른다. 다른 자리에 bold를 쓰지 말 것.
-  userCircleBold: ['user-circle', 'bold'],
-  shareBold: ['share-fat', 'bold'],
-  clockBold: ['clock', 'bold'],
+  // M6 검수 6차의 헤더 전용 bold 3종(userCircleBold·shareBold·clockBold)은 M7 K(덕수 2026-09-12)에서 삭제 —
+  // "regular 단일" 규약에 예외 0. 되살리지 말 것(위계는 아이콘 톤으로).
   chatDots: ['chat-dots', 'regular'],                      // IconComment (M6 D21 — chat-text 대체, Tip의 chat-centered-text와 분리)
   // ── M7 (편집창 블록 정돈·복사/붙여넣기) ──
   broom: ['broom', 'regular'],                             // 블록 정돈 (M7 D19-7) — Row 2
