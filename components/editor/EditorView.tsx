@@ -2754,7 +2754,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
          e.code를 쓰는 이유는 아래 ⌘Z 분기와 같다(C5 — 한글 IME에서 e.key가 흔들린다).
          !e.ctrlKey가 Windows AltGr(=Ctrl+Alt)을, !e.shiftKey가 ⌥⇧Z('¸')를 흘려보낸다.
          ⌘Z와 달리 텍스트 편집 중에도 동작한다 — 텍스트 undo와 겹칠 일이 없고,
-         Row 2 버튼은 showToolbar 게이트에 막히므로(그림 블록 활성 시) 이쪽이 대체 경로다. */
+         (M7 후속 — Row 2의 탭 단위 버튼은 이제 블록 게이트를 받지 않아 그림 블록이 활성이어도 눌린다; ⌥Z는 그대로 대체 경로다.) */
       if (e.altKey && !e.metaKey && !e.ctrlKey && !e.shiftKey && e.code === 'KeyZ') {
         e.preventDefault();
         toggleLineWrap();

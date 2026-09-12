@@ -512,9 +512,11 @@ function buildMarkdownTable(r: number, c: number): string {
 // ═══════════════════════════════════════════════
 
 function OverflowItems({
-  items, leftWidth, rootRef,
+  items, leftWidth, rootRef, blockActive,
 }: {
-  items: { key: string; node: React.ReactNode }[];
+  items: { key: string; node: React.ReactNode; blockScoped?: boolean }[];
+  /** 활성 블록이 텍스트 계열인가 — blockScoped 항목만 이 게이트를 받는다(M7 후속) */
+  blockActive: boolean;
   leftWidth: number;
   rootRef: React.RefObject<HTMLDivElement>;
 }) {
@@ -567,7 +569,11 @@ function OverflowItems({
         <div
           key={it.key}
           ref={(el) => { itemRefs.current[i] = el; }}
-          style={{ display: i < visibleEnd ? 'flex' : 'none', alignItems: 'center' }}
+          style={{
+            display: i < visibleEnd ? 'flex' : 'none', alignItems: 'center',
+            ...(it.blockScoped && !blockActive ? { opacity: 0.35, pointerEvents: 'none' as const } : null),
+            transition: 'opacity 0.15s',
+          }}
         >
           {it.node}
         </div>
@@ -643,13 +649,17 @@ export default function UnifiedToolbar({
     <div key={key} style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
   );
 
-  const rightItems: { key: string; node: React.ReactNode }[] = [
+  /* M7 후속(덕수 2026-09-12) — 게이트를 항목별로: **블록에 넣는 것**(강조·상용구·특수문자·표·AI 완성)만
+     활성 텍스트 블록이 필요하고, **탭 단위 동작**(정돈·교정·찾기·전체 접기·블록 복사/붙여넣기·줄바꿈)은
+     활성 블록이 그림이거나 없어도 눌려야 한다. 옛 루트 전체 게이트는 시트로 가져온 문항(첫 블록이 그림)에서
+     정돈 버튼까지 흐리게 만들었다. 좌측 컨텍스트 영역($·$$·팔레트)은 여전히 블록 게이트다. */
+  const rightItems: { key: string; node: React.ReactNode; blockScoped?: boolean }[] = [
     {
       /* Phase 58 P3 — 강조 토글(구 '핵심문장'). rightItems는 폭이 좁아지면 끝부터
          hide되므로 맨 앞에 둬야 좁은 화면에서 살아남는다.
          ⚠ Phase 59a에서 이름만 '강조'로 바꿨다 — 내부 식별자(KeySentenceIcon·
            keyToggle*)는 그대로 두었으니 이름으로 검색할 때 주의. */
-      key: 'keysent',
+      key: 'keysent', blockScoped: true,
       node: (
         <IconButton
           title={keyToggleRejected ? '감쌀 수 없는 선택입니다 (문단·수식 경계 확인)' : '강조 (**…**)'}
@@ -668,7 +678,7 @@ export default function UnifiedToolbar({
       ),
     },
     {
-      key: 'snippet',
+      key: 'snippet', blockScoped: true,
       node: (
         <>
           <IconButton
@@ -693,9 +703,9 @@ export default function UnifiedToolbar({
         </>
       ),
     },
-    { key: 'special', node: <SpecialCharDropdown onInsert={onInsert} /> },
+    { key: 'special', blockScoped: true, node: <SpecialCharDropdown onInsert={onInsert} /> },
     {
-      key: 'table',
+      key: 'table', blockScoped: true,
       node: (
         <IconButton title="표 삽입" onClick={() => setTableDialogOpen(true)}>
           <TableAddIcon />
@@ -721,7 +731,7 @@ export default function UnifiedToolbar({
       ),
     },
     {
-      key: 'ai',
+      key: 'ai', blockScoped: true,
       node: (
         <IconButton title="AI 완성 (⌘J)" onClick={onAIComplete} disabled={aiLoading}>
           {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
@@ -793,15 +803,17 @@ export default function UnifiedToolbar({
         display: 'flex',
         alignItems: 'center',
         gap: 4,
-        opacity: showToolbar ? 1 : 0.35,
-        pointerEvents: showToolbar ? 'auto' : 'none',
-        transition: 'opacity 0.15s',
         flex: 1,
         minWidth: 0,
       }}
     >
-      {/* ── 좌측: 컨텍스트 영역 (항상 보임, 자기 폭 유지) ── */}
-      <div ref={leftRef} style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+      {/* ── 좌측: 컨텍스트 영역 (항상 보임, 자기 폭 유지) — 블록 게이트(활성 텍스트 블록 필요) ── */}
+      <div ref={leftRef} style={{
+        display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+        opacity: showToolbar ? 1 : 0.35,
+        pointerEvents: showToolbar ? 'auto' : 'none',
+        transition: 'opacity 0.15s',
+      }}>
         {cursorInMath ? (
           <>
             {/* Phase 40: 수식 기호 팔레트 (단일 패널 + 탭 + KaTeX 하이브리드 렌더) */}
@@ -840,7 +852,7 @@ export default function UnifiedToolbar({
       </div>
 
       {/* ── 우측: overflow 처리 (전체 접기 토글 포함) ── */}
-      <OverflowItems items={rightItems} leftWidth={leftWidth} rootRef={rootRef} />
+      <OverflowItems items={rightItems} leftWidth={leftWidth} rootRef={rootRef} blockActive={showToolbar} />
 
       {/* 표 삽입 다이얼로그 (fixed overlay) */}
       <TableInsertDialog
