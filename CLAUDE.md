@@ -61,6 +61,7 @@ hooks/useListPrefs.ts     — 칼럼 prefs 폴더별 localStorage 영속 (Phase 
 components/ui/dnd.tsx     — 전역 DnD 공용: 계약·id 네임스페이스·충돌 판정·DragKindContext (Phase 63)
 lib/device.ts             — 폰 판별 순수 함수(뷰포트식·UA 태블릿 제외, Phase 64, import 0 · test:device)
 lib/deepLink.ts           — `?view=…&id=` 파싱 (Phase 64, import 0 · test:deeplink)
+lib/chromeAutoHide.ts     — 폰 가로 보기 크롬 자동 숨김 판정(4중 가드) (M8, import 0 · test:chrome)
 hooks/useIsPhone.ts       — 폰 셸 단일 판별자(forceDesktop → initialPhone → matchMedia 보정) (Phase 64)
 components/layout/
   ResponsiveShell.tsx      — 공개 라우트·'/'의 폰/데스크톱 셸 스위치 (Phase 64)
@@ -139,9 +140,11 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 - **폰 셸 여부는 `useIsPhone` 하나가 정하고 CSS는 `[data-phone]`만 본다 (Phase 64)**: 판별식 `w≤599 ∨ (h≤599 ∧ coarse)`(`lib/device.ts` — coarse 결합이 "폰 가로는 폰, PC 낮은 창은 데스크톱"을 가른다) · 서버 UA 추정은 **태블릿(`iPad`·`Tablet`·`Mobile` 없는 `Android`) 제외**(오탐 = 태블릿 깜빡임) · `Sec-CH-UA-Mobile`이 있으면 그것만 믿는다. **판별용 `@media` 금지** — 허용은 `@media (hover: hover)`(입력 장치 질의, `:hover` 7종 격리) 하나뿐. `[data-phone]` 규칙을 더할 때는 같은 특이도의 기존 규칙(예 `.callout-block .katex-display`)에 **취소 규칙**을 함께 둘 것(순서 의존 차단). ⚠ hydration: `useIsPhone` 초기 상태는 반드시 서버 추정값(`initialPhone`)이고 `matchMedia`·forceDesktop은 effect에서만 — **forceDesktop을 matchMedia보다 먼저** 읽고 참이면 구독 자체를 건너뛴다(순서가 뒤집히면 "PC 화면으로 보기" 직후 change 이벤트가 폰으로 되돌린다). 탈출구 키는 sessionStorage(탭 수명)
 - **폰 분기는 `ResponsiveShell` 스위치이지 AppShell 조기 반환이 아니다 (Phase 64 R1)**: `if (isPhone) return` 뒤에 훅이 이어지면 isPhone이 바뀔 때(리사이즈·forceDesktop) 훅 수가 변해 **Rules of Hooks를 깬다**. 스위치는 언마운트/마운트라 안전하고 AppShell은 0줄. ⚠ **라우트 `page.tsx`는 서버 컴포넌트로 둔다**(`/`·`/bazaar` 서버화 — `headers()`로 첫 렌더 선택) — 클라 로직은 `components/`(`BazaarLanding` 등)로, 되돌리지 말 것. `next/dynamic`은 **뷰어 2종(SvgViewer·GgbViewer)에만, 반드시 `ssr:false`** — `/p`(36)·`/shared`(29) 번들 closure에 뷰어가 없어야 한다. 그래서 `CARD_RADIUS`·`CARD_RADIUS_QUESTION`·`FONT_SIZE_*`는 TabBody·ProblemView가 아니라 **`lib/constants.ts`가 소유**한다(TabBody는 뷰어를 정적 import라 상수만 가지러 가도 딸려온다). 폰 카드는 그 상수 + `isToneScoped`를 import한다 — 리터럴 사본 금지(M6 위계 개정 시 자동 추종)
-- **폰 리더는 풀이 탭을 볼 때 문제 카드를 `visibility:hidden + position:absolute`로 DOM에 남긴다 (Phase 64 R4)**: 폰은 탭을 하나만 그리므로 참조 말풍선 정의부(M2 C — 언마운트 금지)가 계획에 없던 필수 처방이었다. `[data-ref-tooltip]` 게이트는 본문 래퍼 하나에만 — **시트(overlay)는 게이트 밖**(안이면 정의부가 두 벌이 되어 "참조보다 앞선 것 중 가장 가까운 것" 탐색이 흔들린다). 그래서 `PhoneShell`의 시트는 본문(children)이 아니라 **루트 직계 `overlay` 슬롯**에 마운트한다
-- **폰 우측 드로어 = `BottomSheet` 하나 (Phase 64 D9)**: `position:absolute`(기준 상자 = `PhoneShell` 루트 `position:relative` — 밖에서 쓰지 말 것) · `Z_SHEET 9500`은 **다이얼로그(10500)·말풍선(10400) 아래**(시트 안에서 띄운 confirm·참조 말풍선이 시트를 덮어야 한다) · 스크롤 잠금은 **딤이 담당**(딤이 본문 스크롤러의 형제라 휠·터치가 새지 않는다) · 닫기 3경로(딤·그립 드래그 60px `setPointerCapture`·X). `CommentPanel`은 시트 안에서 `selectionPopup={false}`(터치 네이티브 선택 UI와 겹친다) · agent는 `canComment={false}` 고정. ⚠ 폰 agent 노출 = 오너 OR (멤버 ∧ commentsVisible) — 데스크톱(오너 전용)과의 **비대칭은 의도**(Q9), 규칙 0
+- **폰 리더는 풀이 탭을 볼 때 문제 카드를 `visibility:hidden + position:absolute`로 DOM에 남긴다 (Phase 64 R4)**: 폰은 탭을 하나만 그리므로 참조 말풍선 정의부(M2 C — 언마운트 금지)가 계획에 없던 필수 처방이었다. `[data-ref-tooltip]` 게이트는 본문 래퍼 하나에만 — **시트(overlay)는 게이트 밖**(안이면 정의부가 두 벌이 되어 "참조보다 앞선 것 중 가장 가까운 것" 탐색이 흔들린다). 그래서 `PhoneShell`의 시트는 본문(children)이 아니라 **루트 직계 `overlay` 슬롯**에 마운트한다. ⚠ **폰 리더의 이동 경로는 탭 행 하나다(M8 D2)** — Phase 64 D10의 `[풀이 보기]` 버튼·`[문제 보기]` 알약·시트는 탭 행과 같은 목적지의 두 번째 경로라 삭제했다. 되살리지 말 것. 그 대가(읽던 위치)는 탭별 `scrollTop` 기억(D4)이 되돌리며, **복원은 반드시 `PhoneShell` 핸들의 `scrollTo`**(무시 창 동반)로 — `el.scrollTop = y`를 직접 쓰면 가로 보기에서 탭을 누른 순간 크롬이 접힌다. 정의부 보존 div는 그 시트와 무관한 필수 장치다
+- **폰 우측 드로어 = `BottomSheet` 하나 (Phase 64 D9)**: `position:absolute`(기준 상자 = `PhoneShell` 루트 `position:relative` — 밖에서 쓰지 말 것) · `Z_SHEET 9500`은 **다이얼로그(10500)·말풍선(10400) 아래**(시트 안에서 띄운 confirm·참조 말풍선이 시트를 덮어야 한다) · 스크롤 잠금은 **딤이 담당**(딤이 본문 스크롤러의 형제라 휠·터치가 새지 않는다) · 닫기 3경로(딤·그립 드래그 60px `setPointerCapture`·X). `CommentPanel`은 시트 안에서 **`chrome="sheet"`**(M8 D6 — 드로어 크롬(인셋 8·radius·테두리·그림자·`maxWidth 90vw`·1행 X) 없이 시트를 꽉 채운다. 기본 `'drawer'`는 데스크톱 바이트 동일. ⚠ sheet 갈래는 `height:100%` 필수 — 없으면 루트가 내용 높이로 자라 시트 바깥 스크롤러가 대신 스크롤해 입력창이 화면 밖으로 나간다. ⚠ drawer 갈래의 `maxWidth 90vw`는 리사이즈 상한이라 지우지 말 것) · `selectionPopup={false}`(터치 네이티브 선택 UI와 겹친다) · agent는 `canComment={false}` 고정. 시트의 그립 행 X가 유일한 X다(시트 공통 닫기 경로). ⚠ 폰 agent 노출 = 오너 OR (멤버 ∧ commentsVisible) — 데스크톱(오너 전용)과의 **비대칭은 의도**(Q9), 규칙 0
 - **폰 검수 순서 (Phase 64 §8-0)**: Chrome 기기 모드(iPhone 15 393×852 · UA·`?1` 재현, 서버 분기까지 검증됨) 먼저, **실기기로만** 보이는 것 — `100dvh` 주소창 · safe-area(기기 모드는 항상 0) · 키보드·IME · 안드로이드 ①~⑳ gstatic 폴백(Mac은 "Disable local fonts") · GeoGebra 터치. 실기기 로그인은 Tailscale 도메인을 Firebase 승인 도메인에 등록. **폰 편집은 하지 않는다**(E4 — 문항 메뉴 '편집'은 비활성 "PC·태블릿에서")
+- **폰 가로 보기의 크롬(상단 바+탭 행) 자동 숨김은 `lib/chromeAutoHide.ts` 리듀서가 소유한다 (M8 D5)**: `PhoneShell chromeAutoHide`(리더만 켬) · **가로 보기에서만**(JS `matchMedia('(orientation: landscape)')` — CSS `@media` 금지 규약 그대로) · 세로·리스트·Bazaar·로그인 화면은 바이트 동일(transition도 활성일 때만). **4중 가드가 진동을 막는다** — ① 러버밴드 무시(`y<0 ∨ y>max`) ② 토글·프로그램적 스크롤 뒤 **300ms 무시 창**(크롬이 접히면 clientHeight가 늘어 브라우저가 scrollTop을 클램프하며 **역방향 scroll 이벤트**를 낸다 — 이것을 '위로 밀었다'로 읽으면 접자마자 펼친다; 창은 transition 200ms보다 길어야 한다) ③ 히스테리시스 24px(방향 반전 시 누적 리셋) ④ 접어서 남는 여지 < 40px이면 금지. 맨 위는 항상 표시. ⚠ **초기 `lastY 0` 함정**: 기능이 켜지는 순간(세로→가로) 현재 scrollTop을 기준점으로 잡지 않으면 첫 scroll 이벤트가 그 위치만큼의 하향으로 읽혀 즉시 접힌다(테스트 표본 3건이 같은 이유로 처음에 틀렸다). ⚠ 크롬은 `transform`이 아니라 **`margin-top` 음수**로 접는다(transform은 자리를 남긴다) · 높이는 상수 96이 아니라 `ResizeObserver` 실측. 데스크톱 ProblemView의 "스크롤로 레이아웃 불변" 조항은 별개 컴포넌트라 그대로다. 루트 `paddingLeft/Right: env(safe-area-inset-*)`(D9)는 세로 0 — BottomSheet는 패딩 상자 기준이라 시트는 전폭(시트 내용 좌우 인셋은 후속)
+- **워드마크 사양은 두 벌뿐이다 (M8 D1·Q3)**: 작은 **19/400/`--wordmark-small`(#944728)/그림자** = Sidebar · PhoneShell 상단 바 · MiniShell / 큰 **48/400/`--mathory-red-dark`/그림자** = AppShell 홈 히어로 · 폰 로그인 화면. 옛 MiniShell 사양(600·`--mathory-red`·무그림자)은 소비처 0. 3번째 사양을 만들지 말 것. 작은 글자가 한 단계 더 진한 이유는 `1c171ad`(획이 얇아 배경이 비쳐 같은 색이 더 밝아 보인다) — 토큰 주석이 그 근거를 든다
 - **편집창 CodeMirror 스크롤 — 세로는 없고 가로만 조건부다 (Phase 65에서 개정)**: `.cm-scroller`에 **세로 스크롤은 어느 모드에서도 없다**(줄바꿈 켬 = `overflow:visible` · 끔 = `overflow-y:hidden`, 양쪽 다 여지 0) → CM의 `EditorView.scrollIntoView` 사용 금지는 그대로이고, 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것. **가로**는 줄바꿈을 끄면(⌥Z · `mathory-editor-wrap`) 블록 스크롤러가 담당한다 — 타자·화살표·드래그는 CM이 알아서 따라가고(`scrollRectIntoView` · `scrollParents.x`), **프로그램적 커서 이동**(찾기/바꾸기 · 미리보기 수식 클릭)만 `revealCursorX()`가 맡는다(그 두 경로엔 `scrollIntoView`가 없다). ⚠ `revealCursorX`는 반드시 `focus()` **뒤**에 — CM의 focus 관찰자가 `scrollTop===0`이면 이전 `scrollLeft`를 복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. ⚠ 켬/끔 세 속성(`white-space`·`word-break`·`overflow`)은 `MarkdownEditor` 상단의 **Compartment 하나**가 소유한다 — 테마에 다시 적으면 같은 셀렉터가 두 벌이 되어 토글이 조용히 죽는다. ⚠ 거터는 끔 모드에서 **fixed**(아래 절)로 본문 위에 떠 있으므로 **`--block-surface`**(블록 래퍼가 공급)로 불투명해야 한다 — 투명이면 글자가 줄 번호 위로 지나가고, `var()` 폴백을 빼면 CM base의 `#f5f5f5` 회색 띠가 나온다. ⚠ **거터 폭·구분선을 손대지 말 것 (2026-09-08 원복됨)**: 한 번 "폭 2/3(49→33px) + 구분선 강화"를 넣었다가 되돌렸다 — ① 폭을 줄이며 `minWidth`를 **2자리 글자 폭 아래**로 내리자 블록마다 번호 열이 갈렸다(1자리 블록은 minWidth가, 2자리 블록은 글자 폭이 이겨서). `minWidth: 1.8em`(15px에서 27px)은 여유가 아니라 **2자리가 꽉 채우는 값**이고(한 자 ≈ 9.2px → 18.4 + 패딩 8 = 26.4px) 그래서 "2자리까지 폭 통일"이 성립한다 ② 선을 진하게 하니 **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보였다**(거터 선은 CM 높이만큼만 그려지는데 바가 그 위를 차지한다). 숫자가 들쭉날쭉해 보이는 것은 폭이 아니라 **글꼴의 비례 숫자** 탓이라 `font-variant-numeric: tabular-nums`가 답이다(오른쪽 정렬 유지 — 자릿수가 달라도 1의 자리가 같은 세로선에 선다)
 - **⚠ 줄바꿈 끔 모드의 행번호 거터는 `position: sticky`가 아니라 `fixed`다 (Phase 65 후속, 2026-09-09 해결)**:
   증상은 "스크롤에 따라 움직인다"가 아니라 **끝에 닿았을 때의 튕김(러버밴드)에 거터가 본문과 함께 튕긴다**였다
@@ -345,7 +348,20 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M6 — 디자인·기능 조정** — 구현·**검수 7차까지 종결(2026-09-10)** · **push 완료**(main 자동 배포)
+## 현재 Phase: **개선묶음 M8 — 모바일 웹 디자인·기능 개선** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · push 대기
+
+문서: `docs/phasedocs/개선묶음 M8 모바일 웹 디자인·기능 개선 v1 실행판.md`
+(계보: 덕수 메모 `docs/phaseSketch/M8-mobileWeb-design-improving.md` → **v1 CLI 실측 = 실행판**(§9가 구현·검수 기록). 별도 검증 턴 없이 착수 — v1이 이미 CLI 실측판)
+
+Phase 64 폰 셸을 실사용한 덕수 판정 4건 — 로고 사양 뒤처짐 · 탭 행과 중복된 이동 버튼 2종 · 시트 속 상자(이중 크롬) · 가로 보기에서 크롬이 화면의 1/4 — 을 닫았다.
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 데스크톱 픽셀 0.** 수정 10 · 신설 2(`lib/chromeAutoHide.ts` · 테스트) · 커밋 S1~S4 · 로직 검증 387 → **398건**(`test:chrome` 11).
+**규약은 위 「핵심 패턴」의 폰 셸 절이 소유한다**(정의부 보존 절의 "이동 경로는 탭 행 하나" · BottomSheet 절의 `chrome="sheet"` · "크롬 자동 숨김" 절 · "워드마크 사양은 두 벌" 절).
+
+- **D1·Q3** 워드마크: `--wordmark-small` 토큰 하나, 세 소비처(Sidebar·PhoneShell·MiniShell) 동일 사양 · **D2~D4** 리더: `[풀이 보기]`·`[문제 보기]`·문제 보기 시트 삭제, 탭별 읽던 위치 기억, PhoneShell `forwardRef` 핸들 · **D6~D8** 시트: CommentPanel `chrome` prop(기본 drawer), PhoneApp·PhoneReader 래퍼 여백 제거, 공개 PublicComments는 PublicProblemView가 12px로 감쌈, BottomSheet 무변경 · **D5·D9** 가로: 크롬 자동 숨김 리듀서 + safe-area 좌우
+- ⚠ 판정 Q1~Q4 전부 권장안(위로 24px 즉시 복귀 · 위치 기억 포함 · MiniShell 포함 · safe-area 포함)
+- 알고 두는 손실: 접힌 상태에서 탭을 바꾸려면 위로 24px 밀어야 한다 · 시트 내용의 가로 safe-area는 후속(함정 9) · 세로 보기 크롬 숨김은 메모 범위 밖
+
+### 이전: **개선묶음 M6 — 디자인·기능 조정** — 구현·**검수 7차까지 종결(2026-09-10)** · **push 완료**(main 자동 배포)
 
 문서: `docs/phasedocs/개선묶음 M6 디자인·기능 조정 v2 실행판.md`
 (계보: 덕수 메모 → v1 web → **v2 CLI 실측 교차검토 = 실행판**(§9가 구현 기록). v2 부록 C가 v1 정정 6·보완 9, §5-0이 실측 3)
@@ -395,7 +411,7 @@ ICONS 56 → **61종**(+9/−4, toggle 2종은 후속 철회 · user-circle 5차
 **규약은 위 「핵심 패턴」의 폰 셸 절 5개("폰 셸 여부는 `useIsPhone` 하나가" ~ "폰 검수 순서")가 소유한다.**
 
 - ⚠ 계획 개정 R1~R5 중 값비싼 둘: **AppShell 조기 반환은 훅 규칙 위반**(→ ResponsiveShell) · **풀이 탭에서 문제 카드를 DOM에 남겨야 참조 말풍선이 산다**(계획서에 없었다)
-- 후속 **M8(모바일 웹 디자인·기능 개선)** 계획서 v1 작성됨(`docs/phaseSketch/M8-mobileWeb-plan-v1.md`, 덕수 판정 Q1~Q4 대기) — 워드마크 사양 · 리더 이동 버튼 삭제 · 시트 속 `CommentPanel` 크롬 제거 · 가로 보기 크롬 자동 숨김. Phase 64의 D3("가로 레이아웃 없음")·D10·D16·§7-4는 M8이 개정한다
+- 후속 **M8(모바일 웹 디자인·기능 개선)** 이 같은 날 구현·검수 종결(위 현재 Phase 절) — Phase 64의 D3("가로 레이아웃 없음")·D10(이동 버튼)·D16(시트 속 드로어 크롬)·§7-4(폰은 MiniShell 사양)는 **M8 실행판이 이긴다**
 - 알고 두는 것: 홈 상단 검색 미구현 · 받은 문항 보조줄에 공유자 닉네임 없음(수정일만) · 참조 말풍선은 폰에서도 500ms(검수 정상 판정으로 단축 안 함)
 
 ### 이전: **Phase 61h — 정밀 검증 군더더기(garbage) 검출** — 구현·프로브·덕수 검수·**배포 완료(2026-09-10)** — 배포본 검증 확인
