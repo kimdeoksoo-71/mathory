@@ -363,19 +363,20 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현 완료(2026-09-12, S0~S11 12커밋) · **덕수 검수 대기 · push 대기**
+## 현재 Phase: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · 후속 4건 반영 · **push 대기**
 
 문서: `docs/phasedocs/개선묶음 M7 기능 개선·버그 수정 v4 실행판.md`
 (계보: 덕수 스케치 9항 + 추가 2항 → v1 web → v2 착수판(P1~P19 확정) → v3 CLI 실측 교차검토(정정 11·보완 10·N1~N5 확정·J·K 편입) → **v4 web 재검증 = 실행판**(정정 3·보완 6, §9가 CLI 구현 기록))
 
 편집창 마찰 8항(`$` 삽입·끔 모드 가로 스크롤·드로어 열림 시 저장/탭·30분 자동 저장·블록 복사/붙여넣기·블록 정돈·`⇒`·AI 경우 라벨) + 스크롤 버그 1항 + 추가(ProblemView 아이콘 이동·사이드바 헤더 bold 철회).
 **서버 로직 0(검증 라우트 `caseLabel` 통과만) · Firestore 규칙 0 · Storage 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0.**
-신규 3(`lib/mathRegions.ts` · `lib/blockTidy.ts` · `lib/blockClipboard.ts`) + 테스트 2 · ICONS 61 → **60**(+broom·clipboardText −bold 3) · 로직 검증 398 → **437건**.
+신규 3(`lib/mathRegions.ts` · `lib/blockTidy.ts` · `lib/blockClipboard.ts`) + 테스트 2 · ICONS 61 → **60**(+broom·clipboardText −bold 3) · 로직 검증 398 → **439건**.
 **규약은 위 「핵심 패턴」 맨 앞의 M7 절 11개가 소유한다.**
 
 - **가장 값비싼 발견(I3′)**: 스크롤 버그의 원인은 v2 후보(transform)가 아니라 **CM 툴팁 body 컨테이너에 새는 `'&': { height: '100%' }`** — 정적으로 지목하고 임시 라우트 + headless Chrome으로 확정(713 × 3 = 2139px). 처방은 D25′ 0×0 fixed 호스트
 - **D11 dirty 산식은 세 판본을 거쳤다**: v2 `contentVersionRef`(저장의 `setProblem`이 어긋나게 함) → v3 `setCurrentBlocks` 래퍼(undo·복원 등 `setAllBlocks` 직접 호출 7곳을 놓침) → **v4 dirty effect 자체가 세되 `problem`을 deps에서 제외** — 그 김에 잠복 버그 2건(§1-D7·D8)이 사라졌다
 - **CLI 실측으로 닫힌 것**: A-1~A-3 · B-1·B-2(⚠ 표본은 줄 중간에서) · I-1(켬·끔) · S2 `$y$ $x$`. **덕수 검수 항목**: C(드로어 열림 Row 1·2) · D-1~D-5(리마운트 없음·저장 중 타자·자동 저장 1분 확인·dirty 2건) · E(⌘C/⌘V) · F-1(시트 예제 정돈)·F-2(교정에 자동수정 없음) · H-1(검증 `(case C1)`) · J-1·J-2 · K-1
+- **덕수 검수 후속 4건(2026-09-12)**: ① 붙여넣기 버튼 hover 회전 커서 — `IconButton.disabled`(작업 중 전용 `wait`)가 아니라 **`inactive`**(흐림·기본 커서)로 ② 편집창 정돈 버튼 비활성 — 툴바 게이트를 **항목별**로(탭 단위 버튼은 그림 블록 활성·활성 없음에도 눌린다) ③ 화살표 규칙 확장(`\rightarrow`·`\implies`·`\Longrightarrow`·`\Leftrightarrow`) ④ 검증 공통 규약에 텍스트 논리기호 문장. ⚠ "클립보드 아이콘 = 정돈"은 오해였다 — 정돈은 빗자루(첫 구분선 오른쪽), 클립보드는 붙여넣기
 - ⚠ 남은 일: 임시 라우트 `app/dev-m7/page.tsx` 삭제(dev 종료 후) · dev 종료 → `npm run build` → push · Vercel 빌드 로그 `[icons:check] OK — 60종`
 
 ### 이전: **개선묶음 M8 — 모바일 웹 디자인·기능 개선** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · **배포 완료(2026-09-12)** — 배포본 검수 정상
