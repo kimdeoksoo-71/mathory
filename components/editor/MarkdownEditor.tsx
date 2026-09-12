@@ -24,7 +24,7 @@ import {
 } from '../../lib/math-highlight';
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
-import { computeRevealScrollLeft } from '../../lib/editorScroll';
+import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/editorScroll';
 
 /* ═══ Phase 65 — 줄바꿈 켬/끔 (⌥Z) ═══════════════════════════════════
    CodeMirror의 "줄을 접는가"는 **클래스가 아니라 computed white-space**로 정해진다
@@ -954,6 +954,37 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           EditorView.updateListener.of((update) => {
             if (update.docChanged && onChange) {
               onChange(update.state.doc.toString());
+            }
+            /* M7 D5·D6 — 끔 모드 타자·삭제: 커서가 가로 경계에 닿으면 중앙으로(centerCursorOnEdge).
+               requestMeasure의 write는 CM 자신의 scrollIntoView(nearest)보다 **먼저** 돈다
+               (dist 8054-8067) → 우리가 중앙으로 옮기면 nearest는 "이미 보인다"로 no-op.
+               가로 여지가 없으면(켬 모드 · 짧은 줄) read가 null을 내 아무 일도 없다.
+               `input.type`은 `input.type.compose`(IME)를 포함하고 `input.paste`·`select`는 안 맞는다.
+               ⚠ scrollDOM.scrollLeft만 쓴다 — `EditorView.scrollIntoView` 금지 규약(CLAUDE.md). */
+            if (update.docChanged && update.transactions.some(
+              (tr) => tr.isUserEvent('input.type') || tr.isUserEvent('delete'),
+            )) {
+              update.view.requestMeasure({
+                read: (v) => {
+                  const s = v.scrollDOM;
+                  if (s.scrollWidth <= s.clientWidth) return null;
+                  const c = v.coordsAtPos(v.state.selection.main.head);
+                  if (!c) return null;
+                  const r = s.getBoundingClientRect();
+                  const g = s.querySelector('.cm-gutters') as HTMLElement | null;
+                  return {
+                    cursorLeft: c.left,
+                    left: g ? g.getBoundingClientRect().right : r.left,
+                    right: r.right,
+                    scrollLeft: s.scrollLeft,
+                  };
+                },
+                write: (m, v) => {
+                  if (!m) return;
+                  const next = computeCenterScrollLeft({ left: m.left, right: m.right }, m.cursorLeft, m.scrollLeft);
+                  if (next !== m.scrollLeft) v.scrollDOM.scrollLeft = next;
+                },
+              });
             }
             if (update.selectionSet || update.docChanged) {
               if (cursorCallbackRef.current) {

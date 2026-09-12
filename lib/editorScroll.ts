@@ -113,3 +113,19 @@ export function computeRevealScrollLeft(
   }
   return scrollLeft;
 }
+
+/* M7 D5·D6 — 줄바꿈 끔 모드에서 **타자·삭제**로 커서가 가시폭 경계(margin 안쪽)를 벗어나면
+   커서가 가시폭 **중앙**에 오도록 scrollLeft를 되돌려 준다(즉시 점프 · 좌우 대칭).
+   위 `computeRevealScrollLeft`("경계까지만" — 프로그램적 이동)와 정책이 다르다 — 합치지 말 것.
+   경계 안이면 현재값 그대로 → CM의 nearest 스크롤도 no-op가 되어 타자마다 한 칸씩 밀리지 않는다.
+   ⚠ `scroller.left`에는 거터의 **오른쪽 변**을 넘긴다(거터가 본문 앞을 가린다). */
+export function computeCenterScrollLeft(
+  scroller: { left: number; right: number },
+  cursorLeft: number,
+  scrollLeft: number,
+  margin = 24,
+): number {
+  if (cursorLeft >= scroller.left + margin && cursorLeft <= scroller.right - margin) return scrollLeft;
+  const center = (scroller.left + scroller.right) / 2;
+  return Math.max(0, scrollLeft + (cursorLeft - center));
+}
