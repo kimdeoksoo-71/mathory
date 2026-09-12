@@ -290,6 +290,12 @@ test('M7 D20 labelBlocks — caseLabel이 없으면 종전 형식 그대로 · �
   assert.ok(P.PROMPT_JUDGE.system.includes('(case C1)'), '2차 판정 프롬프트에 라벨 규약');
 });
 
+test('M7 후속 — 공통 규약: 텍스트 화살표 ⇒·⇔·→는 논리기호와 같은 뜻(1차·2차·군더더기 전부)', () => {
+  const all = [P.PROMPT_PROBLEM_FIRST, ...P.SOLUTION_FIRST_PASSES, P.PROMPT_JUDGE, P.PROMPT_GARBAGE_JUDGE]
+    .map((pr) => pr.system + pr.user);
+  for (const t of all) assert.ok(t.includes('⇒ $x=1$') && t.includes('논리기호와 같은 뜻'), '공통 규약 누락');
+});
+
 /* ═══ Phase 61f — 그림 첨부 후의 프롬프트·라벨 ═══ */
 
 test('61f labelBlocks — image 블록이 (image) 라벨과 자리표시자로 나온다', async () => {
