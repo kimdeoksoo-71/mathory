@@ -29,6 +29,7 @@ import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultB
 import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
+import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib/blockClipboard';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
 import CoachBlock from '../ui/CoachBlock';
@@ -2369,6 +2370,56 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, [setCurrentBlocks, selectedBlockIds, currentBlocks, pushUndo]);
 
+  /* ─── M7 D15~D18: 블록 복사·붙여넣기 ─── */
+  const [clipTick, setClipTick] = useState(0);   // 복사할 때마다 ++ → 붙여넣기 버튼 활성 재계산
+  const handleCopyBlocks = useCallback(() => {
+    const targets = selectedBlockIds.size
+      ? currentBlocks.filter((b) => selectedBlockIds.has(b.id))   // 문서 순서
+      : currentBlocks.filter((b) => b.id === activeBlockId);
+    if (!targets.length) return;
+    const n = copyBlocks(targets.map((b) => toClipBlock(b as unknown as Record<string, unknown>)));
+    setClipTick((t) => t + 1);
+    setStatus(`블록 ${n}개 복사됨`);
+    setTimeout(() => setStatus(''), 2000);
+  }, [selectedBlockIds, currentBlocks, activeBlockId]);
+  const handlePasteBlocks = useCallback(() => {
+    if (!collapseModeRef.current) return;                    // D16 — 접힘 모드에서만
+    const clip = readClipboard();
+    if (!clip.length) return;
+    /* 대상 = 단일 선택 그것 / 선택 0이면 활성 블록 / 2개 이상이면 없음. 빈 탭은 맨 앞(D16 예외) */
+    const targetId = selectedBlockIds.size === 1 ? Array.from(selectedBlockIds)[0]
+      : selectedBlockIds.size === 0 ? activeBlockId : null;
+    const targetIdx = targetId ? currentBlocks.findIndex((b) => b.id === targetId) : -1;
+    if (currentBlocks.length > 0 && targetIdx < 0) {
+      setStatus('블록을 붙여 넣을 위치를 선택해 주세요');
+      setTimeout(() => setStatus(''), 2500);
+      return;
+    }
+    pushUndo();
+    const stamp = Date.now();
+    const pasted: LocalBlock[] = clip.map((b, k) => ({
+      ...(b as unknown as Block),
+      id: `new-${stamp}-${k}`,          // 인덱스 접미 — Date.now() 충돌 방지
+      block_key: nanoid(),
+      order: 0,
+      type: normalizeBlockType(b.type as Block['type']),
+      title: b.title || '',
+      raw_text: b.raw_text,
+      collapsed: true,
+      isNew: true,
+    }));
+    setCurrentBlocks((prev) => {
+      const next = [...prev];
+      next.splice(targetIdx + 1, 0, ...pasted);
+      return next;
+    });
+    setActiveBlockId(pasted[0].id);
+    setSelectedBlockIds(new Set(pasted.map((b) => b.id)));
+    selectionAnchorRef.current = pasted[0].id;
+  }, [selectedBlockIds, activeBlockId, currentBlocks, pushUndo, setCurrentBlocks]);
+  const canCopyBlocks = selectedBlockIds.size > 0 || !!activeBlockId;
+  const canPasteBlocks = collapseMode && clipboardSize() > 0 && clipTick >= 0;
+
   /* ─── MathToolbar ─── */
   const handleInsert = (template: string, cursorOffset: number) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
@@ -2715,6 +2766,27 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
         return;
       }
+      /* M7 D18·D18′ — ⌘C/⌘V 블록 복사·붙여넣기. 텍스트 편집 중이면 CM·브라우저에 위임(⌘Z와 같은 가드).
+         ⌘C는 **선택 텍스트가 있으면 네이티브 복사에 양보**(미리보기 문단을 긁어 복사하는 일상 동작).
+         ⌘V는 접힘 모드에서만 — 아니면 preventDefault 없이 흘려 네이티브 붙여넣기가 산다. */
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.code === 'KeyC' || e.code === 'KeyV')) {
+        if (e.repeat) return;
+        const el = document.activeElement as HTMLElement | null;
+        const inTextEditing = !!el && (
+          el.closest('.cm-editor') !== null || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable
+        );
+        if (inTextEditing) return;
+        if (e.code === 'KeyC') {
+          const sel = window.getSelection();
+          if (sel && !sel.isCollapsed) return;
+          e.preventDefault();
+          handleCopyBlocks();
+        } else if (collapseModeRef.current) {
+          e.preventDefault();
+          handlePasteBlocks();
+        }
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
         e.preventDefault();
         setSearchOpen(true);
@@ -2734,7 +2806,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks, toggleLineWrap]);
+  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks, toggleLineWrap, handleCopyBlocks, handlePasteBlocks]);
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
@@ -3619,6 +3691,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           aiLoading={aiLoadingBlockId !== null}
           collapseMode={collapseMode}
           onToggleCollapseAll={handleToggleCollapseAll}
+          onCopyBlocks={handleCopyBlocks}
+          onPasteBlocks={handlePasteBlocks}
+          canCopy={canCopyBlocks}
+          canPaste={canPasteBlocks}
           lineWrap={lineWrap}
           onToggleLineWrap={toggleLineWrap}
           onToggleKey={handleToggleKey}

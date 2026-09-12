@@ -100,6 +100,9 @@ const ICONS = {
   shareBold: ['share-fat', 'bold'],
   clockBold: ['clock', 'bold'],
   chatDots: ['chat-dots', 'regular'],                      // IconComment (M6 D21 — chat-text 대체, Tip의 chat-centered-text와 분리)
+  // ── M7 (편집창 블록 정돈·복사/붙여넣기) ──
+  broom: ['broom', 'regular'],                             // 블록 정돈 (M7 D19-7) — Row 2
+  clipboardText: ['clipboard-text', 'regular'],            // 블록 붙여넣기 (M7 D18) — Row 2 · 복사는 기존 copy
   // toggleOff/toggleOn(toggle-left/right)은 M6 D17에서 넣었다가 덕수 검수(2026-09-09)로 철회 —
   // ToggleSwitch가 트랙+손잡이 도안으로 복귀해 소비처 0. 되살리지 말 것.
 };

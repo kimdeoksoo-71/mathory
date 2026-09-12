@@ -83,6 +83,14 @@ function ProofreadIcon() {
   return <PhIcon d={PH.listChecks} size={ICON_SIZE} />;
 }
 
+/** M7 D18 — 블록 복사·붙여넣기 */
+function CopyBlocksIcon() {
+  return <PhIcon d={PH.copy} size={ICON_SIZE} />;
+}
+function PasteBlocksIcon() {
+  return <PhIcon d={PH.clipboardText} size={ICON_SIZE} />;
+}
+
 function SpecialCharIcon() {
   return <PhIcon d={PH.numberCircleOne} size={ICON_SIZE} />;
 }
@@ -186,6 +194,11 @@ interface UnifiedToolbarProps {
   aiLoading: boolean;
   collapseMode: boolean;
   onToggleCollapseAll: () => void;
+  /** M7 D18 — 블록 복사·붙여넣기(⌘C/⌘V와 같은 동작). 붙여넣기는 접힘 모드 + 클립보드 비어 있지 않을 때만 */
+  onCopyBlocks: () => void;
+  onPasteBlocks: () => void;
+  canCopy: boolean;
+  canPaste: boolean;
   /** Phase 65 — 편집창 줄바꿈 켬/끔 (⌥Z). 끄면 긴 줄이 블록 안에서 좌우 스크롤된다. */
   lineWrap: boolean;
   onToggleLineWrap: () => void;
@@ -575,6 +588,10 @@ export default function UnifiedToolbar({
   aiLoading,
   collapseMode,
   onToggleCollapseAll,
+  onCopyBlocks,
+  onPasteBlocks,
+  canCopy,
+  canPaste,
   lineWrap,
   onToggleLineWrap,
   onToggleKey,
@@ -707,6 +724,23 @@ export default function UnifiedToolbar({
           active={collapseMode}
         >
           <CollapseAllIcon collapsed={collapseMode} />
+        </IconButton>
+      ),
+    },
+    /* M7 D18 — 블록 복사·붙여넣기. collapseAll 바로 뒤·lineWrap 앞(끝에서부터 숨으므로 lineWrap → paste → copy 순으로 사라진다) */
+    {
+      key: 'copyBlocks',
+      node: (
+        <IconButton title="블록 복사 (⌘C — 접힘 모드에서 선택한 블록들, 아니면 활성 블록)" onClick={onCopyBlocks} disabled={!canCopy}>
+          <CopyBlocksIcon />
+        </IconButton>
+      ),
+    },
+    {
+      key: 'pasteBlocks',
+      node: (
+        <IconButton title="블록 붙여넣기 (⌘V — 접힘 모드에서 선택한 블록 아래)" onClick={onPasteBlocks} disabled={!canPaste}>
+          <PasteBlocksIcon />
         </IconButton>
       ),
     },
