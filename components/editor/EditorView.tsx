@@ -26,7 +26,8 @@ import BlockBottomToolbar from '../editor/BlockBottomToolbar';
 import FolderPathBar from '../editor/FolderPathBar';
 import FindReplacePanel from '../editor/FindReplacePanel';
 import ProofreadResultBox, { ProofreadBoxData } from '../editor/ProofreadResultBox';
-import { maskForProofread, autoFixDeterministicIssues, ProofreadIssue } from '../../lib/proofread';
+import { maskForProofread, ProofreadIssue } from '../../lib/proofread';
+import { tidyBlocks } from '../../lib/blockTidy';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib/blockClipboard';
@@ -1503,35 +1504,50 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return out;
   }, []);
 
-  /* 결정적 규칙(josa-space, latex-brace) 자동 적용 후, 수정된 rawText 배열 반환 */
-  const applyDeterministicAutoFix = useCallback((
-    blocks: { id: string; raw_text: string; type: string }[],
-  ): { targets: { id: string; rawText: string }[]; autoFixCount: number } => {
-    let autoFixCount = 0;
-    const targets: { id: string; rawText: string }[] = [];
-    for (const b of blocks) {
-      /* 개선묶음 M1 D12′: `(ㄱ)`→`(1)`는 보기 라벨을 그렇게 적는 블록에서만 끈다.
-         ⚠ OCR 삽입 경로(lib/ocr.ts)는 블록 타입을 모르므로 기본(변환)으로 돈다 — 알고 두는 한계다. */
-      const { fixed, count } = autoFixDeterministicIssues(b.raw_text, {
-        skipJamoRefs: b.type === 'roman' || b.type === 'choices',
-      });
-      if (count > 0) {
-        autoFixCount += count;
-        const editor = editorRefs.current[b.id];
-        autoFixInProgressRef.current = true;
-        try {
-          if (editor) editor.setContent(fixed);
-        } finally {
-          autoFixInProgressRef.current = false;
-        }
-        setCurrentBlocks((prev) =>
-          prev.map((pb) => (pb.id === b.id ? { ...pb, raw_text: fixed } : pb))
-        );
-      }
-      targets.push({ id: b.id, rawText: fixed });
+  /* ─── M7 D19 — 블록 정돈(현재 탭): 분할 + 결정적 정형화. `lib/blockTidy.ts`가 규칙을 소유한다.
+     옛 `applyDeterministicAutoFix`(교정 버튼의 무확인 자동수정)는 여기로 **이전**됐다 — 교정은 API 내용 검토만.
+     첫 조각은 원 블록의 id·block_key를 잇고(활성 유지·리마운트 없음), 이후 조각은 새 id·nanoid. */
+  const handleTidyBlocks = useCallback(() => {
+    const blocks = allBlocks[activeTab] || [];
+    if (!blocks.length) return;
+    const tab = activeTab === 'question' ? 'question' : activeTab === 'solution' ? 'solution' : 'extra';
+    const { blocks: out, stats } = tidyBlocks(
+      blocks.map((b) => ({ type: b.type, raw_text: b.raw_text, title: b.title })), { tab },
+    );
+    if (!stats.split && !stats.fixed && !stats.removed) {
+      setStatus('정돈할 것이 없습니다');
+      setTimeout(() => setStatus(''), 2000);
+      return;
     }
-    return { targets, autoFixCount };
-  }, [setCurrentBlocks]);
+    pushUndo();
+    const activeIdx = blocks.findIndex((b) => b.id === activeBlockId);
+    const seen = new Set<number>();
+    const stamp = Date.now();
+    let nextActive: string | null = null;
+    const next: LocalBlock[] = out.map((o, k) => {
+      const src = blocks[o.origin];
+      const first = !seen.has(o.origin);
+      seen.add(o.origin);
+      const type = normalizeBlockType(o.type as Block['type']);
+      if (first) {
+        if (o.origin === activeIdx) nextActive = src.id;
+        if (o.raw_text !== src.raw_text) {
+          const editor = editorRefs.current[src.id];
+          autoFixInProgressRef.current = true;
+          try { if (editor) editor.setContent(o.raw_text); } finally { autoFixInProgressRef.current = false; }
+        }
+        return { ...src, type, raw_text: o.raw_text };
+      }
+      return {
+        ...src, id: `new-${stamp}-${k}`, block_key: nanoid(), order: 0,
+        type, raw_text: o.raw_text, title: '', showInSummary: undefined, isNew: true,
+      };
+    });
+    setCurrentBlocks(next);
+    if (nextActive) setActiveBlockId(nextActive);
+    setStatus(`정돈: 분할 ${stats.split} · 정형화 ${stats.fixed} · 제거 ${stats.removed}`);
+    setTimeout(() => setStatus(''), 3000);
+  }, [allBlocks, activeTab, activeBlockId, pushUndo, setCurrentBlocks]);
 
   const handleRunProofread = useCallback(async () => {
     if (proofreading) return;
@@ -1546,14 +1562,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
     const tabIdAtStart = activeTab;
 
-    // 결정적 규칙 자동 적용 (choices 포함)
-    const { targets, autoFixCount } = applyDeterministicAutoFix(autoFixBlocks);
-
-    // Claude API 호출 대상: choices 추가 제외
-    const apiTargets = targets.filter((t) => {
-      const b = autoFixBlocks.find((bb) => bb.id === t.id);
-      return b && !API_EXCLUDED_TYPES.has(b.type);
-    });
+    /* M7 D19-4 — 결정적 자동수정은 [정돈]으로 이전됐다. 교정 = 마스킹 + API 내용 검토만.
+       Claude API 호출 대상: choices 추가 제외 */
+    const apiTargets = autoFixBlocks
+      .filter((b) => !API_EXCLUDED_TYPES.has(b.type))
+      .map((b) => ({ id: b.id, rawText: b.raw_text }));
 
     // 로딩 박스 즉시 표시 (API 호출 대상에 한해)
     setProofreadResults((prev) => {
@@ -1573,20 +1586,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return { ...prev, [tabIdAtStart]: tab };
     });
     setProofreading(false);
-    if (autoFixCount > 0) {
-      setStatus(`문법 자동 수정 ${autoFixCount}건`);
-      setTimeout(() => setStatus(''), 2000);
-    }
-  }, [proofreading, allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix, AUTOFIX_EXCLUDED_TYPES, API_EXCLUDED_TYPES]);
+  }, [proofreading, allBlocks, activeTab, callProofreadApi, AUTOFIX_EXCLUDED_TYPES, API_EXCLUDED_TYPES]);
 
   const handleRetryProofreadBlock = useCallback(async (blockId: string) => {
     const block = (allBlocks[activeTab] || []).find((b) => b.id === blockId);
     if (!block) return;
     const tabIdAtStart = activeTab;
 
-    const { targets, autoFixCount } = applyDeterministicAutoFix([
-      { id: block.id, raw_text: block.raw_text, type: block.type },
-    ]);
+    const targets = [{ id: block.id, rawText: block.raw_text }];   // M7 D19-4 — 자동수정 없이 API만
 
     setProofreadResults((prev) => ({
       ...prev,
@@ -1601,11 +1608,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       ...prev,
       [tabIdAtStart]: { ...(prev[tabIdAtStart] || {}), [blockId]: out[blockId] },
     }));
-    if (autoFixCount > 0) {
-      setStatus(`문법 자동 수정 ${autoFixCount}건`);
-      setTimeout(() => setStatus(''), 2000);
-    }
-  }, [allBlocks, activeTab, callProofreadApi, applyDeterministicAutoFix]);
+  }, [allBlocks, activeTab, callProofreadApi]);
 
   const handleDismissProofreadIssue = useCallback((blockId: string, issueIndex: number) => {
     setProofreadResults((prev) => {
@@ -3685,6 +3688,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onToggleSearch={() => setSearchOpen(!searchOpen)}
           proofreading={proofreading}
           onRunProofread={handleRunProofread}
+          onTidyBlocks={handleTidyBlocks}
           ocrLoading={ocrLoading}
           onOcrClick={handleOcrClick}
           onAIComplete={() => handleAIComplete()}

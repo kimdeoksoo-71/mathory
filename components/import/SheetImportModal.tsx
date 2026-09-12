@@ -34,7 +34,7 @@ import {
   type ImportRow, type ProblemDraft, type DraftBlock,
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
-import { autoFixDeterministicIssues } from '../../lib/proofread';
+import { tidyBlocks } from '../../lib/blockTidy';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { uploadImage, deleteUploadedFile } from '../../lib/storage';
 import { createProblem, saveTabBlock, deleteProblem, createFolder, listProblems, TRASH_FOLDER_ID } from '../../lib/firestore';
@@ -93,27 +93,21 @@ const SAVE_CONCURRENCY = 4;
 const dupeKey = (sourceId: string, stemHash: string) => `${sourceId}|${stemHash}`;
 
 /**
- * 편집창 [교정]의 **결정적 자동 수정**을 가져오기 경로에도 태운다(Phase 61e D8·D9).
- *
- * 제외 규칙은 편집창(`EditorView.AUTOFIX_EXCLUDED_TYPES` = image·svg·ggb)과 같다.
- * `choices`는 `skipJamoRefs`로 `(ㄱ)→(1)`만 끄고 숫자 수식화 등은 받는다(편집창과 동일).
- *
- * ⚠ **그림이 남은 choices 블록은 통째로 건너뛴다**(D3′). 선택지 셀 안 그림은
- *   실측 0건이라 인라인 처리를 만들지 않았고, 문자열로 남은 것을 자동 수정에 넣을 이유가 없다.
- *   (제어열 보호는 `lib/proofread.ts`가 이미 하지만, 손댈 이유가 없는 블록은 손대지 않는다.)
- * ⚠ **두 형식을 함께 본다**(61e-2차) — 구형 태그와 GAS 패치 11의 `![이름](Drive링크)`.
- *   ⚠ 근거는 **기존 가드와의 대칭**이지 "수식화 방지"가 아니다. 마크다운 이미지의 alt·URL은
- *     `lib/proofread.ts:342·403`(`!?\[…\](…)` 보호)이 이미 지킨다 — 실행 프로브로 확인했고
- *     `tests/proofread.test.mjs` P-9·P-10이 고정한다. 거짓 근거를 남기면 나중에 이 가드를
- *     지우려는 사람이 없는 위험과 씨름한다.
+ * M7 D19-6 — 가져오는 김에 **블록 정돈**(분할 + 결정적 정형화)을 탭마다 태운다. 옛 `applyAutoFix`(정형화만)의 대체.
+ * image 드래프트는 `tidyBlocks`가 무접촉으로 통과시키므로(origin 그대로) `figName`을 잃지 않고,
+ * `persisted[tab][i] ↔ blocksByTab[tab][i]` 인덱스 정렬 계약(위 ⚠)은 persisted 생성 **이전**에 배열을 바꾸므로 지켜진다.
+ * 그림 든 choices 제외(옛 CHOICE_FIG_RE)는 blockTidy가 소유한다.
  */
-const CHOICE_FIG_RE = /\\includegraphics|!\[[^\]\n]*\]\([ \t]*https:\/\/drive\.google\.com\//;
-
-function applyAutoFix(b: DraftBlock, enabled: boolean): { text: string; count: number } {
-  if (!enabled || b.type === 'image') return { text: b.raw_text, count: 0 };
-  if (b.type === 'choices' && CHOICE_FIG_RE.test(b.raw_text)) return { text: b.raw_text, count: 0 };
-  const { fixed, count } = autoFixDeterministicIssues(b.raw_text, { skipJamoRefs: b.type === 'choices' });
-  return { text: fixed, count };
+function tidyDrafts(blocks: DraftBlock[], tabId: string): { blocks: DraftBlock[]; count: number } {
+  const tab = tabId === 'question' ? 'question' : tabId === 'solution' ? 'solution' : 'extra';
+  const { blocks: out, stats } = tidyBlocks(blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab });
+  return {
+    blocks: out.map((o) => {
+      const src = blocks[o.origin];
+      return src.type === 'image' ? src : { type: o.type as DraftBlock['type'], raw_text: o.raw_text };
+    }),
+    count: stats.split + stats.fixed + stats.removed,
+  };
 }
 
 /**
@@ -165,7 +159,7 @@ async function fetchFigures(
  * 그림을 받지 못했으면 **`\includegraphics{…}` 리터럴을 넣은 text 블록으로 되돌린다**(D5) —
  * `(이미지 없음)`만 남기면 원인 추적이 안 되고, 리터럴이면 나중에 검색으로 되찾을 수 있다.
  *
- * ⚠ 이 리터럴 자체는 autoFix **이후**에 삽입되므로 `lib/proofread.ts`를 지나지 않는다.
+ * ⚠ 이 리터럴 자체는 정돈(tidy) **이후**에 삽입되므로 `lib/proofread.ts`를 지나지 않는다.
  *   제어열 보호(D15)가 실제로 일하는 자리는 **분할하지 않는 텍스트에 남은 그림 표기**다 —
  *   O열(AI 정답)·선택지의 구형 `\includegraphics{…}`는 `collectControlSeqRanges`가,
  *   같은 자리의 신형 `![이름](링크)`는 `proofread.ts:342·403`이 지킨다. 그 보호를 걷어내면
@@ -267,8 +261,8 @@ export default function SheetImportModal({
   const [progress, setProgress] = useState(0);
   const [outcomes, setOutcomes] = useState<SaveOutcome[]>([]);
 
-  /** Phase 61e D9 — 가져오면서 편집창과 같은 결정적 자동 수정을 태운다. 기본 ON. */
-  const [autoFix, setAutoFix] = useState(true);
+  /** Phase 61e D9 → M7 D19-6 — 가져오면서 편집창 [정돈]과 같은 블록 정돈(분할 + 정형화)을 태운다. 기본 ON. */
+  const [tidy, setTidy] = useState(true);
 
   /** 파일명 → 그림. state로 두어야 다운로드가 끝나면 미리보기가 다시 그려진다. */
   const [figs, setFigs] = useState<Map<string, FigEntry>>(new Map());
@@ -368,18 +362,21 @@ export default function SheetImportModal({
                    figNames: [], autoFixCount: 0, dupe: 'none' as const };
         }
         // Y1·Y2·Y3 — 저장형을 여기서 확정하고 화면이 그것을 그린다.
-        // 순서가 규칙이다: rowToDraft → splitFigures(라이브러리) → autoFix → toPersistedBlock.
-        //   autoFix가 `\[..\]`·tabular를 새 `$$`로 바꾸고, `toPersistedBlock`이 그 `$$` 앞뒤
-        //   빈 줄을 소유한다. 뒤집으면 새로 생긴 `$$`가 정규화를 못 받는다.
+        // 순서가 규칙이다: rowToDraft → splitFigures(라이브러리) → **정돈(tidyDrafts, M7)** → toPersistedBlock.
+        //   정돈이 `\[..\]`·tabular를 새 `$$`로 바꾸고 블록을 분할하며, `toPersistedBlock`이 그 `$$` 앞뒤
+        //   빈 줄을 소유한다. 뒤집으면 새로 생긴 `$$`가 정규화를 못 받는다. stemHash는 rowToDraft 안(정돈 전)이라 불변.
         const persisted: Record<string, PersistedBlockData[]> = {};
         const figNames: string[] = [];
         let autoFixCount = 0;
-        for (const [tabId, blocks] of Object.entries(d.blocksByTab)) {
-          persisted[tabId] = blocks.map((b, i) => {
+        for (const tabId of Object.keys(d.blocksByTab)) {
+          if (tidy) {
+            const r = tidyDrafts(d.blocksByTab[tabId], tabId);
+            d.blocksByTab[tabId] = r.blocks;
+            autoFixCount += r.count;
+          }
+          persisted[tabId] = d.blocksByTab[tabId].map((b, i) => {
             if (b.type === 'image' && b.figName && !figNames.includes(b.figName)) figNames.push(b.figName);
-            const { text, count } = applyAutoFix(b, autoFix);
-            autoFixCount += count;
-            return toPersistedBlock({ id: '', order: i, type: b.type, raw_text: text } as Block, i);
+            return toPersistedBlock({ id: '', order: i, type: b.type, raw_text: b.raw_text } as Block, i);
           });
         }
         const key = dupeKey(d.sourceId, d.stemHash);
@@ -545,7 +542,7 @@ export default function SheetImportModal({
               sheet={sheet} setSheet={setSheet}
               rowsText={rowsText} setRowsText={setRowsText}
               includePreselected={includePreselected} setIncludePreselected={setIncludePreselected}
-              autoFix={autoFix} setAutoFix={setAutoFix}
+              tidy={tidy} setTidy={setTidy}
               folders={folders} folderId={folderId} setFolderId={setFolderId}
               onNewFolder={handleNewFolder}
               onEnter={() => { if (canSubmit && !busy) fetchRows(); }}
@@ -634,12 +631,12 @@ export default function SheetImportModal({
 
 function FormPane({
   sheet, setSheet, rowsText, setRowsText, includePreselected, setIncludePreselected,
-  autoFix, setAutoFix, folders, folderId, setFolderId, onNewFolder, onEnter, error,
+  tidy, setTidy, folders, folderId, setFolderId, onNewFolder, onEnter, error,
 }: {
   sheet: SheetName; setSheet: (s: SheetName) => void;
   rowsText: string; setRowsText: (s: string) => void;
   includePreselected: boolean; setIncludePreselected: (b: boolean) => void;
-  autoFix: boolean; setAutoFix: (b: boolean) => void;
+  tidy: boolean; setTidy: (b: boolean) => void;
   folders: Folder[]; folderId: string | null; setFolderId: (id: string | null) => void;
   onNewFolder: () => void; onEnter: () => void; error: string | null;
 }) {
@@ -705,12 +702,12 @@ function FormPane({
       </label>
 
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: 18 }}>
-        <input type="checkbox" checked={autoFix} onChange={(e) => setAutoFix(e.target.checked)} style={{ marginTop: 2 }} />
+        <input type="checkbox" checked={tidy} onChange={(e) => setTidy(e.target.checked)} style={{ marginTop: 2 }} />
         <span style={{ fontSize: 13, color: 'var(--text-primary, #222)' }}>
-          가져오면서 문법 자동 수정 적용
+          가져오면서 블록 정돈(분할·정형화) 적용
           <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 2 }}>
-            편집창 [교정]의 결정적 규칙과 같습니다 — 지수 중괄호, 맨 숫자·영문자 수식화,
-            수식 뒤 조사 공백, tabular → 표, (ㄱ) → (1). 결과는 미리보기에서 확인하세요.
+            편집창 [블록 정돈]과 같습니다 — 경우 문장·[참고]·STEP 행을 자기 블록으로 분할, 풀이 첫머리 번호·정답 행 제거,
+            지수 중괄호, 맨 숫자·영문자 수식화, 수식 뒤 조사 공백, tabular → 표, (ㄱ) → (1), 앞머리 ⇒. 결과는 미리보기에서 확인하세요.
           </span>
         </span>
       </label>
@@ -837,7 +834,7 @@ function PreviewRow({
               {draft.answer && <span style={badge('muted')}>정답 {draft.answer}</span>}
               {item.figNames.length > 0 && <span style={badge('muted')}>그림 {item.figNames.length}</span>}
               {item.figNames.length >= 3 && <span style={badge('warn')}>그림 많음</span>}
-              {item.autoFixCount > 0 && <span style={badge('ok')}>자동 수정 {item.autoFixCount}</span>}
+              {item.autoFixCount > 0 && <span style={badge('ok')}>정돈 {item.autoFixCount}</span>}
               {draft.warnings.length > 0 && <span style={badge('warn')}>경고 {draft.warnings.length}</span>}
               {dupe === 'existing' && <span style={badge('warn')}>이미 가져옴</span>}
               {dupe === 'inSelection' && <span style={badge('warn')}>선택 안 중복</span>}

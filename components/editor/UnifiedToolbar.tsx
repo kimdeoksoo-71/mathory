@@ -83,6 +83,11 @@ function ProofreadIcon() {
   return <PhIcon d={PH.listChecks} size={ICON_SIZE} />;
 }
 
+/** M7 D19-7 — 블록 정돈(broom) */
+function TidyIcon() {
+  return <PhIcon d={PH.broom} size={ICON_SIZE} />;
+}
+
 /** M7 D18 — 블록 복사·붙여넣기 */
 function CopyBlocksIcon() {
   return <PhIcon d={PH.copy} size={ICON_SIZE} />;
@@ -187,6 +192,8 @@ interface UnifiedToolbarProps {
   onInsertInlineMath: () => void;
   proofreading: boolean;
   onRunProofread: () => void;
+  /** M7 D19 — 블록 정돈(현재 탭): 분할 + 결정적 정형화. 교정은 이제 API 내용 검토만 한다 */
+  onTidyBlocks: () => void;
   ocrLoading: boolean;
   onOcrClick: () => void;
   // 블록 영역 — AI 완성은 맞춤법 검사 우측, 전체 접기 토글은 신설
@@ -582,6 +589,7 @@ export default function UnifiedToolbar({
   onInsertInlineMath,
   proofreading,
   onRunProofread,
+  onTidyBlocks,
   ocrLoading,
   onOcrClick,
   onAIComplete,
@@ -690,6 +698,15 @@ export default function UnifiedToolbar({
       ),
     },
     { key: 'd1', node: divider('d1') },
+    /* M7 D19-7 — 정돈은 교정보다 자주 쓸 것이라 앞(넘침 시 더 오래 남는다) */
+    {
+      key: 'tidy',
+      node: (
+        <IconButton title="블록 정돈 (현재 탭) — 분할 · 정형화" onClick={onTidyBlocks}>
+          <TidyIcon />
+        </IconButton>
+      ),
+    },
     {
       key: 'proofread',
       node: (

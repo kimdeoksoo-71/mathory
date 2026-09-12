@@ -69,7 +69,8 @@ export interface ImportRow {
 
 /** 순서는 배열 인덱스가 소유한다 — `order` 필드를 두지 않는다(계획서 Y3). */
 export interface DraftBlock {
-  type: 'text' | 'choices' | 'image';
+  /** M7 D19-6 — 정돈(blockTidy)이 text를 case·subcase·heading으로 분할할 수 있다. rowToDraft·splitFigures는 여전히 셋만 낸다 */
+  type: 'text' | 'choices' | 'image' | 'case' | 'subcase' | 'heading';
   /** image 블록은 **저장 직전까지 빈 문자열**이다 — Storage URL이 그때 정해진다.
    *  미리보기는 blob URL을, 저장본은 Storage URL을 넣는다(Y1의 유일한 예외). */
   raw_text: string;
