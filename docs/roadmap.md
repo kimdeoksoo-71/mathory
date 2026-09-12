@@ -1877,6 +1877,26 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## 개선묶음 M7: 기능 개선·버그 수정 — 편집창 9항 + 추가 2항 (구현 완료 2026-09-12 · 덕수 검수 대기 · push 대기)
+
+계획서: `docs/phasedocs/개선묶음 M7 기능 개선·버그 수정 v4 실행판.md`
+(덕수 스케치 9항 + 추가 2항 → v1 web → v2 착수판 → v3 CLI 실측 교차검토 → **v4 web 재검증 = 실행판**. §9가 CLI 구현 기록)
+
+**서버 로직 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0.** 신규 3(`lib/mathRegions.ts` · `lib/blockTidy.ts` · `lib/blockClipboard.ts`) · 커밋 S0~S11 · ICONS 61 → **60** · 로직 검증 398 → **437건**(`test:mathregions` 10 · `test:tidy` 14 · proofread +6 · verify +2).
+
+- **S0 스크롤 버그(I)**: 원인 = CM 툴팁 body 컨테이너에 새는 `'&': { height: '100%' }`(블록 수 × 뷰포트 높이) → 툴팁 전용 0×0 fixed 호스트(D25′) + `overscroll-behavior-y: contain` + window 트립와이어. 실측 2139px → 0
+- **S1·S2 `$` 삽입(A)**: `lib/mathRegions.ts` R-$$(빈 `$$` = 빈 인라인 쌍) 6 소비처 통일 · 스마트 삽입(선택 감싸기 · 인접 `$` 공백) — `$ $` 대체안 기각
+- **S3 끔 모드 가로(B)**: 타자·삭제로 경계에 닿으면 커서 중앙(`centerCursorOnEdge`, 즉시·대칭)
+- **S4 드로어 열림(C)**: Row 1은 저장까지·Row 2는 탭까지 밀고 클러스터(버전·댓글·Agent·스테퍼)는 덮인다 · nowrap · 제목/폴더 경로 잘라내기
+- **S5 저장(D)**: 저장 후 편집기 리마운트 제거(로컬 id 유지 · dirty effect가 `problem`을 안 본다 — 잠복 버그 2건 해소) · 30분 silent 자동 저장
+- **S6 블록 복사·붙여넣기(E)**: 메모리 싱글턴 · Row 2 버튼 2 · ⌘C/⌘V(접힘 모드 · 선택 텍스트 양보)
+- **S7·S8 정돈·`⇒`(F·G)**: `lib/blockTidy.ts` 분할(경우 문장·`[참고]`·STEP·`\begin` 다행 display)·머리 정리(`15.`·`정답 ③`)·정형화(교정의 결정적 규칙 전부 이전 + `⇒`)·trim — 편집창 broom 버튼 · 시트 가져오기 '블록 정돈'
+- **S9 AI 경우 라벨(H)**: raw_text 주입·편집 잠금 기각 → AI 경계 4곳에서 `buildCaseLabels`로 주입(검증은 `[블록 n] (case C1)` 헤더)
+- **S11 추가 요청(J·K)**: ProblemView 댓글·agent → 우단 클러스터(스테퍼 왼쪽) · 사이드바 헤더 bold 철회(regular·톤)
+- 남은 일: 덕수 검수(C·D·E·F·H·J·K) · 임시 라우트 `app/dev-m7` 삭제 · dev 종료 → build → push
+
+---
+
 ## 개선묶음 M8: 모바일 웹 디자인·기능 개선 ✅ (구현·덕수 검수 종결 2026-09-12 "모두 정상" · **배포 완료 2026-09-12** — 배포본 검수 정상)
 
 계획서: `docs/phasedocs/개선묶음 M8 모바일 웹 디자인·기능 개선 v1 실행판.md`
