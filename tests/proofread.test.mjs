@@ -239,3 +239,30 @@ test('P-12 배점 보호가 다른 대괄호 숫자까지 번지지 않는다 �
   const { fixed } = P.autoFixDeterministicIssues('구간 [3, 5] 에서');
   assert.ok(fixed.includes('$3$') && fixed.includes('$5$'), fixed);
 });
+
+/* ═══ M7 G·G′ — 인라인 수식 앞머리 \Rightarrow → ⇒ ═══ */
+const F = (t) => P.autoFixDeterministicIssues(t).fixed;
+
+test('⇒: 앞머리 \\Rightarrow는 텍스트로 꺼낸다', () => {
+  assert.equal(F('$\\Rightarrow x=1$이므로'), '⇒ $x=1$이므로');
+});
+test('⇒: 간격 명령 잔재 없음(G′)', () => {
+  assert.equal(F('$\\Rightarrow\\ x=1$'), '⇒ $x=1$');
+  assert.equal(F('$\\Rightarrow\\quad x=1$'), '⇒ $x=1$');
+  assert.equal(F('$\\Rightarrow~x=1$'), '⇒ $x=1$');
+});
+test('⇒: 단독 $\\Rightarrow$ → ⇒', () => {
+  assert.equal(F('$\\Rightarrow$ 성립'), '⇒ 성립');
+});
+test('⇒: 수식 중간의 \\Rightarrow는 무접촉', () => {
+  assert.equal(F('$x=1 \\Rightarrow y=2$'), '$x=1 \\Rightarrow y=2$');
+});
+test('⇒: display $$…$$ 무접촉 · \\Leftrightarrow·\\iff 무접촉', () => {
+  assert.equal(F('$$\n\\Rightarrow x=1\n$$'), '$$\n\\Rightarrow x=1\n$$');
+  assert.equal(F('$\\iff x=1$'), '$\\iff x=1$');
+  assert.equal(F('$\\Leftrightarrow x=1$'), '$\\Leftrightarrow x=1$');
+});
+test('⇒: 조사 공백 규칙과 비간섭 — `⇒ $x$이므로`가 그대로', () => {
+  assert.equal(F('$\\Rightarrow x$ 이므로'), '⇒ $x$이므로');
+  assert.equal(F('⇒ $x$이므로'), '⇒ $x$이므로');
+});
