@@ -2343,6 +2343,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       editorRefs.current[activeBlockId]?.insertText(template, cursorOffset);
     }
   };
+  /* M7 D1·D4 — `$` 버튼: 스마트 삽입(선택 감싸기 · 인접 `$` 공백). MarkdownEditor가 소유한다 */
+  const handleInsertInlineMath = () => {
+    if (activeBlockId) editorRefs.current[activeBlockId]?.insertInlineMath();
+  };
 
   /* ─── Phase 61c: agent 대화 선택 영역 → 활성 블록에 삽입 ─── */
   const handleInsertFromChat = useCallback((text: string): 'inserted' | 'no-target' => {
@@ -3525,6 +3529,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           cursorInMath={cursorInMath}
           showToolbar={!!showToolbar}
           onInsert={handleInsert}
+          onInsertInlineMath={handleInsertInlineMath}
           snippets={snippets}
           onSnippetInsert={handleSnippetInsert}
           onSnippetAdd={addSnippet}

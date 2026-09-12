@@ -156,6 +156,10 @@ interface MarkdownEditorProps {
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
+  /** M7 D1·D4 — 인라인 수식 스마트 삽입(`$` 버튼 · Ctrl+N,M 공용). 선택이 있으면 `$sel$`로 감싸고
+   *  커서는 닫는 `$` 뒤, 없으면 `$|$`. 삽입 지점 바로 앞/뒤 글자가 `$`이면 그쪽에 공백 1을 함께 넣는다
+   *  (마크다운은 `$a$$b$`를 수식 하나 `a$$b`로 읽는다 — micromark 실측). 단일 dispatch = undo 1스텝. */
+  insertInlineMath: () => void;
   /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 탭스톱·커서 점프가 없다 */
   insertPlainText: (text: string) => void;
   getCursorPosition: () => number;
@@ -192,6 +196,21 @@ export interface MarkdownEditorHandle {
 }
 
 export type KeyWrapResult = 'wrapped' | 'unwrapped' | 'rejected';
+
+/* M7 D1·D4 — 인라인 수식 스마트 삽입. 핸들(`$` 버튼)과 chord(Ctrl+N,M)가 같은 함수를 쓴다.
+   ⚠ `$ $`(안쪽 공백)로 바꾸지 말 것 — 소스에 공백이 영구히 남고 인접 `$` 문제는 그대로다(M7 P1 기각).
+   공백은 **인접 `$`일 때만**: `$x$` 바로 앞에서 누르면 `$|$ $x$`, 바로 뒤면 `$x$ $|$`. */
+function insertInlineMathIn(view: EditorView) {
+  const { from, to } = view.state.selection.main;
+  const doc = view.state.doc;
+  const pre = from > 0 && doc.sliceString(from - 1, from) === '$' ? ' ' : '';
+  const post = to < doc.length && doc.sliceString(to, to + 1) === '$' ? ' ' : '';
+  const sel = doc.sliceString(from, to);
+  const insert = `${pre}$${sel}$${post}`;
+  const anchor = sel ? from + pre.length + sel.length + 2 : from + pre.length + 1;
+  view.dispatch({ changes: { from, to, insert }, selection: { anchor }, userEvent: 'input' });
+  view.focus();
+}
 
 // ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
 // 커서를 감싸는 가장 안쪽 괄호 또는 수식 기호의 닫는 위치+1 반환
@@ -468,6 +487,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             텍스트에 `{}`가 있으면 커서를 그 안으로 점프시키고, 2개 이상이면 탭스톱을 무장해
             이후 Tab 키 동작이 바뀐다. AI 대화문에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
             채팅 삽입에는 쓰면 안 된다. 이쪽은 선택 대체 + 커서 이동 + 포커스만 한다. */
+      insertInlineMath() {
+        const view = viewRef.current;
+        if (!view) return;
+        insertInlineMathIn(view);
+      },
       insertPlainText(text: string) {
         const view = viewRef.current;
         if (!view) return;
@@ -802,14 +826,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             chordPendingRef.current = false;
             if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
 
-            const { from, to } = view.state.selection.main;
-            const insertText = '$$';
-            view.dispatch({
-              changes: { from, to, insert: insertText },
-            });
-            view.dispatch({
-              selection: { anchor: from + 1 },
-            });
+            insertInlineMathIn(view);   // M7 D4 — `$` 버튼과 같은 스마트 삽입(선택 감싸기 · 인접 `$` 공백)
             return true;
           }
 

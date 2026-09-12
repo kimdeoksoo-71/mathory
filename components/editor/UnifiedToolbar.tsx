@@ -174,6 +174,9 @@ interface UnifiedToolbarProps {
   onSnippetDelete: (snippetId: string) => void;
   searchOpen: boolean;
   onToggleSearch: () => void;
+  /** M7 D1·D4 — `$` 버튼. 템플릿 삽입(`onInsert`)이 아니라 MarkdownEditor.insertInlineMath()로
+   *  간다(선택 감싸기 · 인접 `$` 공백). `$$` 블록 버튼은 종전대로 onInsert. */
+  onInsertInlineMath: () => void;
   proofreading: boolean;
   onRunProofread: () => void;
   ocrLoading: boolean;
@@ -563,6 +566,7 @@ export default function UnifiedToolbar({
   onSnippetDelete,
   searchOpen,
   onToggleSearch,
+  onInsertInlineMath,
   proofreading,
   onRunProofread,
   ocrLoading,
@@ -580,7 +584,7 @@ export default function UnifiedToolbar({
   const snippetBtnRef = useRef<HTMLButtonElement>(null);
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
 
-  const insertInlineMath = () => onInsert('$$', 1);
+  const insertInlineMath = () => onInsertInlineMath();
   const insertBlockMath = () => onInsert('$$\n\n$$', 3);
 
   const insertTable = (rows: number, cols: number) => {
