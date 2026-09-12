@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection, VerifyKind, VerifyReport } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem, setVerification,
@@ -1150,18 +1150,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         ? 'version' : 'comment';
   const rightPanelDragging = comment.dragging || version.dragging;
   /* M7 D7 — Row 1 우단 클러스터(버전·댓글·Agent·스테퍼 2)의 실측 폭. 클러스터는 절대배치라
-     흐름의 paddingRight 로 자리를 비워 줘야 한다. useLayoutEffect + ResizeObserver 라 첫 페인트
-     전에 실측값이 들어간다(초기 0 은 화면에 나타나지 않는다 — v4 §8-0 M2 는 이로써 무의미). */
-  const clusterRef = useRef<HTMLDivElement>(null);
+     흐름의 paddingRight 로 자리를 비워 줘야 한다.
+     ⚠ 콜백 ref 여야 한다(덕수 2026-09-12 "저장 아이콘이 안 보여"): 마운트 effect([] deps)로 재면 그 시점엔
+       문항 로딩 중이라 Row 1 이 렌더되지 않아 ref 가 비어 있고, 폭이 0 으로 남아 저장 버튼이 클러스터
+       (불투명 · zIndex 10) 밑에 깔렸다. 요소가 실제로 붙는 순간 ResizeObserver 를 건다 — 첫 페인트 전
+       (커밋 단계)에 실측값이 들어가므로 초기 0 은 화면에 나타나지 않는다. */
   const [clusterW, setClusterW] = useState(0);
-  useLayoutEffect(() => {
-    const el = clusterRef.current;
+  const clusterRoRef = useRef<ResizeObserver | null>(null);
+  const clusterRef = useCallback((el: HTMLDivElement | null) => {
+    clusterRoRef.current?.disconnect();
+    clusterRoRef.current = null;
     if (!el) return;
-    const update = () => setClusterW(el.offsetWidth);
-    update();
-    const ro = new ResizeObserver(update);
+    setClusterW(el.offsetWidth);
+    const ro = new ResizeObserver(() => setClusterW(el.offsetWidth));
     ro.observe(el);
-    return () => ro.disconnect();
+    clusterRoRef.current = ro;
   }, []);
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
