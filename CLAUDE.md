@@ -59,6 +59,18 @@ components/problem/
 lib/listColumns.ts        — 칼럼 레지스트리·prefs 검증·정렬 서열 (Phase 63, import 0)
 hooks/useListPrefs.ts     — 칼럼 prefs 폴더별 localStorage 영속 (Phase 63)
 components/ui/dnd.tsx     — 전역 DnD 공용: 계약·id 네임스페이스·충돌 판정·DragKindContext (Phase 63)
+lib/device.ts             — 폰 판별 순수 함수(뷰포트식·UA 태블릿 제외, Phase 64, import 0 · test:device)
+lib/deepLink.ts           — `?view=…&id=` 파싱 (Phase 64, import 0 · test:deeplink)
+hooks/useIsPhone.ts       — 폰 셸 단일 판별자(forceDesktop → initialPhone → matchMedia 보정) (Phase 64)
+components/layout/
+  ResponsiveShell.tsx      — 공개 라우트·'/'의 폰/데스크톱 셸 스위치 (Phase 64)
+  PhoneShell.tsx           — 폰 프레임: 상단 바 52 · 탭 행 · 본문 단일 스크롤러 · safe-area footer · `data-phone` (Phase 64)
+components/ui/
+  BottomSheet.tsx          — 폰 바텀 시트(Z_SHEET 9500 · 딤 스크롤 차단 · 그립 드래그 닫기) (Phase 64)
+  Wordmark.tsx             — 워드마크 공용(3벌 사양 픽셀 재현) (Phase 64)
+components/phone/         — 폰 화면 전부(Phase 64): PhoneApp(하단 탭 3·로그인 화면) · PhoneReader(문항 열람) ·
+                            PhoneList · PhoneBazaar · PhoneItemMenu · PhoneMoreSheet. 편집 진입점 없음
+components/share/BazaarLanding.tsx — 옛 `/bazaar` 클라 본문(page.tsx 서버화로 추출, Phase 64)
 docs/roadmap.md            — 개발 로드맵 (Phase 1~21)
 ```
 
@@ -121,9 +133,15 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
    ⚠ 옮기지 않으면 phaseSketch 정리 때 **그 Phase의 유일한 사양이 사라진다** —
    2026-08-27에 Phase 60·61a~61d가 실제로 그랬고(포인터 5개가 끊겼다) 복구했다.
    중간 판본(v1~vN-1)은 phaseSketch에 두거나 지운다. **확정본만 phasedocs로.**
+8. **폰 화면을 만진 커밋은 기기 모드(A) → 실기기(R) 순으로 검수한다** — 위 「폰 검수 순서」 절. 데스크톱 픽셀 무변경이 기본 계약이라 데스크톱 3곳 워드마크·드로어를 함께 본다
 
 ## 핵심 패턴 & 주의사항
 
+- **폰 셸 여부는 `useIsPhone` 하나가 정하고 CSS는 `[data-phone]`만 본다 (Phase 64)**: 판별식 `w≤599 ∨ (h≤599 ∧ coarse)`(`lib/device.ts` — coarse 결합이 "폰 가로는 폰, PC 낮은 창은 데스크톱"을 가른다) · 서버 UA 추정은 **태블릿(`iPad`·`Tablet`·`Mobile` 없는 `Android`) 제외**(오탐 = 태블릿 깜빡임) · `Sec-CH-UA-Mobile`이 있으면 그것만 믿는다. **판별용 `@media` 금지** — 허용은 `@media (hover: hover)`(입력 장치 질의, `:hover` 7종 격리) 하나뿐. `[data-phone]` 규칙을 더할 때는 같은 특이도의 기존 규칙(예 `.callout-block .katex-display`)에 **취소 규칙**을 함께 둘 것(순서 의존 차단). ⚠ hydration: `useIsPhone` 초기 상태는 반드시 서버 추정값(`initialPhone`)이고 `matchMedia`·forceDesktop은 effect에서만 — **forceDesktop을 matchMedia보다 먼저** 읽고 참이면 구독 자체를 건너뛴다(순서가 뒤집히면 "PC 화면으로 보기" 직후 change 이벤트가 폰으로 되돌린다). 탈출구 키는 sessionStorage(탭 수명)
+- **폰 분기는 `ResponsiveShell` 스위치이지 AppShell 조기 반환이 아니다 (Phase 64 R1)**: `if (isPhone) return` 뒤에 훅이 이어지면 isPhone이 바뀔 때(리사이즈·forceDesktop) 훅 수가 변해 **Rules of Hooks를 깬다**. 스위치는 언마운트/마운트라 안전하고 AppShell은 0줄. ⚠ **라우트 `page.tsx`는 서버 컴포넌트로 둔다**(`/`·`/bazaar` 서버화 — `headers()`로 첫 렌더 선택) — 클라 로직은 `components/`(`BazaarLanding` 등)로, 되돌리지 말 것. `next/dynamic`은 **뷰어 2종(SvgViewer·GgbViewer)에만, 반드시 `ssr:false`** — `/p`(36)·`/shared`(29) 번들 closure에 뷰어가 없어야 한다. 그래서 `CARD_RADIUS`·`CARD_RADIUS_QUESTION`·`FONT_SIZE_*`는 TabBody·ProblemView가 아니라 **`lib/constants.ts`가 소유**한다(TabBody는 뷰어를 정적 import라 상수만 가지러 가도 딸려온다). 폰 카드는 그 상수 + `isToneScoped`를 import한다 — 리터럴 사본 금지(M6 위계 개정 시 자동 추종)
+- **폰 리더는 풀이 탭을 볼 때 문제 카드를 `visibility:hidden + position:absolute`로 DOM에 남긴다 (Phase 64 R4)**: 폰은 탭을 하나만 그리므로 참조 말풍선 정의부(M2 C — 언마운트 금지)가 계획에 없던 필수 처방이었다. `[data-ref-tooltip]` 게이트는 본문 래퍼 하나에만 — **시트(overlay)는 게이트 밖**(안이면 정의부가 두 벌이 되어 "참조보다 앞선 것 중 가장 가까운 것" 탐색이 흔들린다). 그래서 `PhoneShell`의 시트는 본문(children)이 아니라 **루트 직계 `overlay` 슬롯**에 마운트한다
+- **폰 우측 드로어 = `BottomSheet` 하나 (Phase 64 D9)**: `position:absolute`(기준 상자 = `PhoneShell` 루트 `position:relative` — 밖에서 쓰지 말 것) · `Z_SHEET 9500`은 **다이얼로그(10500)·말풍선(10400) 아래**(시트 안에서 띄운 confirm·참조 말풍선이 시트를 덮어야 한다) · 스크롤 잠금은 **딤이 담당**(딤이 본문 스크롤러의 형제라 휠·터치가 새지 않는다) · 닫기 3경로(딤·그립 드래그 60px `setPointerCapture`·X). `CommentPanel`은 시트 안에서 `selectionPopup={false}`(터치 네이티브 선택 UI와 겹친다) · agent는 `canComment={false}` 고정. ⚠ 폰 agent 노출 = 오너 OR (멤버 ∧ commentsVisible) — 데스크톱(오너 전용)과의 **비대칭은 의도**(Q9), 규칙 0
+- **폰 검수 순서 (Phase 64 §8-0)**: Chrome 기기 모드(iPhone 15 393×852 · UA·`?1` 재현, 서버 분기까지 검증됨) 먼저, **실기기로만** 보이는 것 — `100dvh` 주소창 · safe-area(기기 모드는 항상 0) · 키보드·IME · 안드로이드 ①~⑳ gstatic 폴백(Mac은 "Disable local fonts") · GeoGebra 터치. 실기기 로그인은 Tailscale 도메인을 Firebase 승인 도메인에 등록. **폰 편집은 하지 않는다**(E4 — 문항 메뉴 '편집'은 비활성 "PC·태블릿에서")
 - **편집창 CodeMirror 스크롤 — 세로는 없고 가로만 조건부다 (Phase 65에서 개정)**: `.cm-scroller`에 **세로 스크롤은 어느 모드에서도 없다**(줄바꿈 켬 = `overflow:visible` · 끔 = `overflow-y:hidden`, 양쪽 다 여지 0) → CM의 `EditorView.scrollIntoView` 사용 금지는 그대로이고, 모든 세로 스크롤은 외곽 `.scaled-editor`가 담당하며 `lib/editorScroll.ts`를 거칠 것. **가로**는 줄바꿈을 끄면(⌥Z · `mathory-editor-wrap`) 블록 스크롤러가 담당한다 — 타자·화살표·드래그는 CM이 알아서 따라가고(`scrollRectIntoView` · `scrollParents.x`), **프로그램적 커서 이동**(찾기/바꾸기 · 미리보기 수식 클릭)만 `revealCursorX()`가 맡는다(그 두 경로엔 `scrollIntoView`가 없다). ⚠ `revealCursorX`는 반드시 `focus()` **뒤**에 — CM의 focus 관찰자가 `scrollTop===0`이면 이전 `scrollLeft`를 복원하는데(dist 5124-5129) 우리는 scrollTop이 늘 0이다. ⚠ 켬/끔 세 속성(`white-space`·`word-break`·`overflow`)은 `MarkdownEditor` 상단의 **Compartment 하나**가 소유한다 — 테마에 다시 적으면 같은 셀렉터가 두 벌이 되어 토글이 조용히 죽는다. ⚠ 거터는 끔 모드에서 **fixed**(아래 절)로 본문 위에 떠 있으므로 **`--block-surface`**(블록 래퍼가 공급)로 불투명해야 한다 — 투명이면 글자가 줄 번호 위로 지나가고, `var()` 폴백을 빼면 CM base의 `#f5f5f5` 회색 띠가 나온다. ⚠ **거터 폭·구분선을 손대지 말 것 (2026-09-08 원복됨)**: 한 번 "폭 2/3(49→33px) + 구분선 강화"를 넣었다가 되돌렸다 — ① 폭을 줄이며 `minWidth`를 **2자리 글자 폭 아래**로 내리자 블록마다 번호 열이 갈렸다(1자리 블록은 minWidth가, 2자리 블록은 글자 폭이 이겨서). `minWidth: 1.8em`(15px에서 27px)은 여유가 아니라 **2자리가 꽉 채우는 값**이고(한 자 ≈ 9.2px → 18.4 + 패딩 8 = 26.4px) 그래서 "2자리까지 폭 통일"이 성립한다 ② 선을 진하게 하니 **'요약에 넣기' 블록의 얇은 바에서 선이 끊겨 보였다**(거터 선은 CM 높이만큼만 그려지는데 바가 그 위를 차지한다). 숫자가 들쭉날쭉해 보이는 것은 폭이 아니라 **글꼴의 비례 숫자** 탓이라 `font-variant-numeric: tabular-nums`가 답이다(오른쪽 정렬 유지 — 자릿수가 달라도 1의 자리가 같은 세로선에 선다)
 - **⚠ 줄바꿈 끔 모드의 행번호 거터는 `position: sticky`가 아니라 `fixed`다 (Phase 65 후속, 2026-09-09 해결)**:
   증상은 "스크롤에 따라 움직인다"가 아니라 **끝에 닿았을 때의 튕김(러버밴드)에 거터가 본문과 함께 튕긴다**였다
@@ -366,6 +384,19 @@ ICONS 56 → **61종**(+9/−4, toggle 2종은 후속 철회 · user-circle 5차
 - **덕수 검수 4차(2026-09-09)**: ① 체크박스를 `appearance:none` 커스텀 도안으로(네이티브는 accent-color로 켜짐 색만 바뀐다) —
   테두리 `--border-content` · 안쪽 흰색 35% 반투명(바탕보다 조금만 밝게) · 켜짐 로고 레드 62% + 다크 레드 테두리 55%(톤 다운) ·
   indeterminate 막대 · 14px ② 파비콘 'M' **Bold(700) · 캡높이 30**(SemiBold·26에서 굵기·크기 각 한 단계 — "왜소해 보인다")
+
+### 이전: **Phase 64 — 휴대폰 열람 전용 화면(모바일 웹)** — 구현(2026-09-09) · 덕수 검수 종결(2026-09-12, "모두 정상") · **Stage 5 완료**
+
+문서: `docs/phasedocs/Phase64 휴대폰 열람 전용 화면(모바일 웹) v4 실행판.md`
+(계보: v1 web → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 착수판 = 실행판**. §12가 구현 기록·계획 개정 R1~R5, §12-1·12-2가 검수)
+
+같은 Next.js 앱 안에서 휴대폰이면 `PhoneShell`을, 그 외는 현행 화면을 낸다. **편집 없음** — 공개 라우트 3 + 로그인 앱의 열람만.
+**서버 0 · 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 데스크톱 픽셀 0.** 신규 13 · 수정 15 · 커밋 S1~S8 · 로직 검증 373 → **387건**.
+**규약은 위 「핵심 패턴」의 폰 셸 절 5개("폰 셸 여부는 `useIsPhone` 하나가" ~ "폰 검수 순서")가 소유한다.**
+
+- ⚠ 계획 개정 R1~R5 중 값비싼 둘: **AppShell 조기 반환은 훅 규칙 위반**(→ ResponsiveShell) · **풀이 탭에서 문제 카드를 DOM에 남겨야 참조 말풍선이 산다**(계획서에 없었다)
+- 후속 **M8(모바일 웹 디자인·기능 개선)** 계획서 v1 작성됨(`docs/phaseSketch/M8-mobileWeb-plan-v1.md`, 덕수 판정 Q1~Q4 대기) — 워드마크 사양 · 리더 이동 버튼 삭제 · 시트 속 `CommentPanel` 크롬 제거 · 가로 보기 크롬 자동 숨김. Phase 64의 D3("가로 레이아웃 없음")·D10·D16·§7-4는 M8이 개정한다
+- 알고 두는 것: 홈 상단 검색 미구현 · 받은 문항 보조줄에 공유자 닉네임 없음(수정일만) · 참조 말풍선은 폰에서도 500ms(검수 정상 판정으로 단축 안 함)
 
 ### 이전: **Phase 61h — 정밀 검증 군더더기(garbage) 검출** — 구현·프로브·덕수 검수·**배포 완료(2026-09-10)** — 배포본 검증 확인
 
@@ -792,7 +823,7 @@ Phase 59 = 풀이 **요약 보기(outline)** + **'경우(case)' 블록**.
 - **경우 제목행을 누르면 '구역'이 열린다 (Phase 59a 후속)**: 펼침 단위는 경우 블록 하나가 아니라 **그 경우 + 다음 '제목행 있는' 경우 직전까지의 모든 블록**이다. 경계는 제목 블록에서도 끊기고, **이어짓기는 경계가 아니다**(직전 경우의 연속이므로 딸려 들어간다 — 덕분에 이어짓기 내용이 요약에서 다시 닿는다). 이유: 경우 본문의 일부를 들여쓰기 블록으로 떼어내면 예전 방식에서는 뒷부분이 요약에서 영영 사라져 **"분리하면 요약이 망가지니 분리를 못 하는"** 상태였다. `OutlineItem.segment`(구역 전체)와 `.pinned`(그중 스위치 켠 것)를 `buildOutline`이 만들고, 렌더는 **접힘 = pinned / 펼침 = segment 배타**다(동시에 그리면 같은 블록이 두 번 나온다)
 - **스켈레톤에서 블록을 div로 감싸지 말 것 (Phase 59 D15′ · 59a에서 재확인)**: 렌더는 사이트별 `renderBlock`을 그대로 재사용하는데, 결과를 한 번 더 감싸면 `.case-gap` 형제 인접이 깨져 rail이 그 블록 앞뒤로 끊긴다. 구역 블록을 `CaseItem` **안에** 넣지 않고 `React.Fragment`로 형제로 흘리는 이유가 이것이다(Fragment는 DOM 노드를 만들지 않는다). 실측: 펼친 구역에서 rail 조각 7개가 끊김 0으로 이어졌다
 - **on/off 컨트롤은 공용 `components/ui/ToggleSwitch` 하나**(Phase 59 §11-10): 블록 상단바 '요약에 넣기' · 열람뷰 '요약' · 댓글 패널 '보이기/쓰기 허용'. 사본을 만들지 말 것 — 치수·색이 두 벌로 갈린다. ⚠ M6 D17~D19가 Phosphor `toggle-left/right` 글리프로 바꿨다가 **덕수 검수로 철회**됐다("변경 전 디자인이 더 자연스럽다") — 트랙+손잡이 도안 그대로, 크기만 22×13 → **18×11**(손잡이 7). Phosphor 토글 글리프를 되살리지 말 것
-- **우측 패널은 4종이고 '떠 있는 카드'다 (개선묶음 M2)**: 우측 단(ProblemView 메뉴·메타) · 댓글 · agent · 버전 드로어. 넷 다 `DRAWER_INSET 8`(사면) · `DRAWER_RADIUS 10` · `DRAWER_BORDER 1px --border-content` · 2겹 그림자 · 폭 `PANEL_WIDTH_DEFAULT 420`. 값은 전부 `components/ui/dialogStyles.ts`가 소유한다. ⚠ **한 변이라도 여백이 0이면** "붙어 있는 패널"로 읽혀 3단 구분이 무너진다. ⚠ **`DRAWER_ROW1_H = 57 − DRAWER_INSET − DRAWER_BORDER_W`(=48)** — 중앙 컨텐츠의 두 가로선(y=57·98)과 정렬하기 위한 값이다. 48을 숫자로 굳히지 말 것이고, 2행(41)은 두 선의 간격이므로 건드리지 말 것. ⚠ **컨텐츠 예약 폭의 정의는 "드로어 카드의 좌측 경계선까지"** 다 — 그보다 크면 그 차이만큼 빈 띠가 생겨 컨텐츠가 잘려 나간 것처럼 보인다. 두 경우의 식이 다르다: 댓글·agent `width + 8`, 우측 단 `width − 8`(우측 단만 바깥 자리를 width로 잡고 카드를 그 안에 넣기 때문)
+- **우측 패널은 4종이고 '떠 있는 카드'다 (개선묶음 M2) — ⚠ 이 규약은 데스크톱 한정이다. 폰은 `BottomSheet`(Phase 64, 위 폰 셸 절)**: 우측 단(ProblemView 메뉴·메타) · 댓글 · agent · 버전 드로어. 넷 다 `DRAWER_INSET 8`(사면) · `DRAWER_RADIUS 10` · `DRAWER_BORDER 1px --border-content` · 2겹 그림자 · 폭 `PANEL_WIDTH_DEFAULT 420`. 값은 전부 `components/ui/dialogStyles.ts`가 소유한다. ⚠ **한 변이라도 여백이 0이면** "붙어 있는 패널"로 읽혀 3단 구분이 무너진다. ⚠ **`DRAWER_ROW1_H = 57 − DRAWER_INSET − DRAWER_BORDER_W`(=48)** — 중앙 컨텐츠의 두 가로선(y=57·98)과 정렬하기 위한 값이다. 48을 숫자로 굳히지 말 것이고, 2행(41)은 두 선의 간격이므로 건드리지 말 것. ⚠ **컨텐츠 예약 폭의 정의는 "드로어 카드의 좌측 경계선까지"** 다 — 그보다 크면 그 차이만큼 빈 띠가 생겨 컨텐츠가 잘려 나간 것처럼 보인다. 두 경우의 식이 다르다: 댓글·agent `width + 8`, 우측 단 `width − 8`(우측 단만 바깥 자리를 width로 잡고 카드를 그 안에 넣기 때문)
 - **⚠ EditorView Row1·Row2는 '덮는다' (개선묶음 M2 R6)**: 아래 "덮지 않고 밀어낸다" 규약을 그 두 행에 한해 의도적으로 깼다 — 패널을 여닫을 때마다 제목·탭이 줄었다 늘었다 하며 "편집 대상이 바뀐 것처럼" 보였다. **Row3(content-frame)의 밀어내기는 그대로**다(본문까지 덮으면 편집이 막힌다). 대가로 Row1 우측 끝의 버전 기록·글꼴 조절이 패널 뒤로 숨는다
 - **좌·중·우 3단은 밝기 서열로 가른다 (개선묶음 M2 R7)**: 상대휘도 실측 — 사이드바 `--bg-sidebar #FAF7F2` 0.9326 < 중앙 `--bg-functional #FCFAF6` 0.9572 < 드로어 `--bg-drawer #FFFFFF` 1.0000. 여기에 사이드바 우변 `--rail-hairline`(0.25pt)이 더해진다. ⚠ **서열이 뒤집히면 3단 구분이 통째로 무너진다** — 셋을 함께 볼 것. ⚠ 중앙을 더 낮추지 말 것(`#FBF8F3` 0.9412면 사이드바와의 차가 0.009로 줄어 사실상 사라진다). ⚠ 셋 다 아이보리 계열이라 **명암비 최악값(FolderView 카드 hover `#E8DFCE`)은 불변** — Phase 58·59a 계산은 그대로 유효하다
 - ~~**우측 패널 3종은 한 규약이다 (2026-08-18)**~~: 댓글·agent(`CommentPanel`)와 버전 기록(`VersionDrawer`)은 **덮지 않고 밀어낸다** — EditorView 루트 기준 `absolute`이고, 미는 쪽은 `rightPanelWidth`/`rightPanelOpen` 하나가 Row1·Row2·Row3의 `paddingRight`를 공급한다(둘 다 열리면 넓은 쪽). 드로어 폭은 `VERSION_DRAWER_WIDTH`를 export해 공유한다. 바탕은 셋 다 `--bg-panel-agent`(아이보리 — 클레이 컨텐츠와 역할로 구분). **행 규격도 공유**: 1행 = 제목+닫기(`minHeight 57` · `padding '0 16px'` · `gap 12`), 2행 = 부가 컨트롤(`minHeight 41` · `padding '0 12px'` · `gap 6` · `--bg-primary`) — 한 곳만 바꾸면 패널을 오갈 때 헤더가 흔들린다

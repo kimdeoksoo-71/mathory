@@ -1877,6 +1877,25 @@ CDP 재현으로 본문/카드 양쪽 드래그 유지·DOM 변경 0건·no-targ
 
 ---
 
+## Phase 64: 휴대폰 열람 전용 화면(모바일 웹) ✅ (구현 2026-09-09 · 덕수 검수 종결 2026-09-12 "모두 정상" · Stage 5 완료)
+
+계획서: `docs/phasedocs/Phase64 휴대폰 열람 전용 화면(모바일 웹) v4 실행판.md`
+(v1 web → v2 CLI 실측 → v3 web 재검증 → **v4 CLI 착수판 = 실행판**. §12가 구현 기록·계획 개정 R1~R5, §12-1·12-2가 검수)
+
+**서버 0 · Firestore 규칙 0 · 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 데스크톱 픽셀 0.** 네이티브 앱이 아니라 **같은 Next.js 앱의 폰 셸 분기**다.
+휴대폰(`w≤599 ∨ (h≤599 ∧ coarse)`)이면 `PhoneShell`, 그 외(PC·태블릿·폴더블 펼침)는 현행 화면. **편집 없음**(E4) — 공개 라우트(`/p`·`/shared`·`/bazaar`)와 로그인 앱(`/`)의 열람(내 문항·받은 문항·Bazaar·agent 열람)만.
+신규 13파일 · 수정 15 · 커밋 S1~S8 · 로직 검증 373 → **387건**(`test:device` 10 · `test:deeplink` 4 신설).
+
+- **판별 두 겹**: 서버 `page.tsx`(`/`·`/bazaar` 서버화)가 UA·`Sec-CH-UA-Mobile`로 첫 렌더를 고르고(태블릿 명시 제외), 클라 `useIsPhone`이 `matchMedia`로 보정. 탈출구 = ⋯ 시트 "PC 화면으로 보기"(sessionStorage · forceDesktop이 matchMedia보다 먼저)
+- **셸**: `PhoneShell`(상단 바 52 · 탭 행 44 · 본문 단일 스크롤러 · safe-area footer · `data-phone`) · `BottomSheet`(`Z_SHEET 9500` — 다이얼로그·말풍선 아래, 딤 스크롤 차단, 그립 드래그 닫기) · `Wordmark` 공용(3벌 픽셀 재현)
+- **리더** `PhoneReader`: 탭 2등분 · 카드는 M6 위계 그대로(문제 12+그림자 / 풀이 직각 — `lib/constants` 상수 import) · 좌 2.2em rail 거터 · 글자 크기 PC와 공유(`FONT_SIZE_*` constants 이관) · 수식만 가로 스크롤(`[data-phone]` 3규칙) · svg/ggb는 `next/dynamic ssr:false`(저장소 첫 도입)
+- **앱** `PhoneApp`: 하단 탭 3(내 문항·받은 문항·Bazaar) · 자체 데이터 로드 · 비로그인 `/` = 로그인 화면(Q11) · 댓글/agent = `CommentPanel`을 시트 안에(`selectionPopup=false` · agent `canComment=false`, 게이트 오너 OR 멤버∧commentsVisible — 데스크톱 오너 전용과의 비대칭은 의도 Q9)
+- ⚠ **계획 개정 R1~R5**: AppShell 조기 반환은 훅 규칙을 깨서 폐기 → `ResponsiveShell` 스위치(AppShell 0줄) · 카드 상수는 TabBody import가 아니라 `lib/constants` 이관(TabBody가 뷰어를 정적 import라 `/p` 번들에 딸려온다) · 댓글/agent 슬롯은 render-prop · **풀이 탭을 볼 때 문제 카드를 `visibility:hidden`으로 DOM에 남긴다**(M2 C 정의부 — 계획에 없던 필수 처방) · Bazaar 내 게시물 액션은 상시 버튼
+- 덕수 검수 1차(2026-09-09): 카드 위계 정상 · 참조 말풍선 탭에서 뜸(D15 (a) 코드 0 종결). **검수 종결(2026-09-12)**: 실기기 잔여(안드로이드 ①~⑳ · 카톡 인앱 로그인 · iOS 키보드 · 댓글 IME · 딥링크 · safe-area) 전항 정상
+- 후속: **M8(모바일 웹 디자인·기능 개선)** 이 D10 이동 버튼 · D16 시트 크롬 · 워드마크 사양 · 가로 보기(D3)를 개정한다 — `docs/phaseSketch/M8-mobileWeb-plan-v1.md`. 그 외 PWA · 홈 상단 검색 · 공유자 닉네임 · 큰/작은 폰 튜닝
+
+---
+
 ## 개선묶음 M6: 디자인·기능 조정 ✅ (구현·검수 6차 종결 2026-09-09 · push 대기)
 
 계획서: `docs/phasedocs/개선묶음 M6 디자인·기능 조정 v2 실행판.md`

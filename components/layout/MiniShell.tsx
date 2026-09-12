@@ -11,7 +11,8 @@ import Wordmark from '../ui/Wordmark';
  * - 비로그인·로그인-비멤버가 `/bazaar`·`/p`·`/shared`를 열 때 공용으로 감싸는 좌측 사이드바.
  * - 로고(→앱) · 공유 라벨 · Bazaar 행(→/bazaar) · sidebarExtra(옵션) · 로그인/작업실 진입.
  * - 콘텐츠는 children으로 우측 main 영역에 렌더.
- * - 모바일(소형 화면) 대응은 후속 과제(U8) — 현재 데스크톱·태블릿 기준 고정 232px.
+ * - 모바일(U8)은 Phase 64가 해소했다 — 폰은 ResponsiveShell이 PhoneShell로 분기하므로 이 셸은
+ *   데스크톱·태블릿 전용이다(고정 232px). 폰 대응을 여기에 넣지 말 것.
  */
 export default function MiniShell({
   children, active, sidebarExtra,
