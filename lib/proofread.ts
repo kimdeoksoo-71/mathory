@@ -7,6 +7,7 @@
  */
 
 import { readGroup, skipEnvArgs } from './latexScan';
+import { scanMathRegions } from './mathRegions';
 
 export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'latex-comma' | 'other';
 
@@ -51,6 +52,13 @@ export function maskForProofread(text: string): { masked: string; placeholders: 
     return token;
   };
 
+  /* M7 D3 — 수식 영역 판정은 `lib/mathRegions.ts` 하나(R-$$). 닫힌 영역만 마스킹하고,
+     빈 인라인 쌍(`$$` = 빈 `$|$`)·미닫힘은 마스킹하지 않는다(종전과 같다 — 리터럴로 흘린다). */
+  const mathAt = new Map<number, { to: number }>();
+  for (const r of scanMathRegions(text)) {
+    if (r.closed && !r.empty) mathAt.set(r.from, { to: r.to });
+  }
+
   // 라인 선두 마커 (가)/(i) 처리: 라인 시작에서만 매칭
   // 라인 단위로 처리하기 위해 우선 한 번 walk
   while (i < text.length) {
@@ -75,47 +83,12 @@ export function maskForProofread(text: string): { masked: string; placeholders: 
       }
     }
 
-    // $$ 블록
-    if (text[i] === '$' && text[i + 1] === '$') {
-      const close = text.indexOf('$$', i + 2);
-      if (close !== -1) {
-        out += push(text.slice(i, close + 2));
-        i = close + 2;
-        continue;
-      }
-    }
-    // $ 인라인
-    if (text[i] === '$') {
-      let j = i + 1;
-      let found = -1;
-      while (j < text.length) {
-        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
-        if (text[j] === '\n' && text[j + 1] === '\n') break;
-        j++;
-      }
-      if (found !== -1) {
-        out += push(text.slice(i, found + 1));
-        i = found + 1;
-        continue;
-      }
-    }
-    // \[ ... \]
-    if (text[i] === '\\' && text[i + 1] === '[') {
-      const close = text.indexOf('\\]', i + 2);
-      if (close !== -1) {
-        out += push(text.slice(i, close + 2));
-        i = close + 2;
-        continue;
-      }
-    }
-    // \( ... \)
-    if (text[i] === '\\' && text[i + 1] === '(') {
-      const close = text.indexOf('\\)', i + 2);
-      if (close !== -1) {
-        out += push(text.slice(i, close + 2));
-        i = close + 2;
-        continue;
-      }
+    // 수식 영역 ($$..$$ · $..$ · \[..\] · \(..\)) — 위 mathAt
+    const mr = mathAt.get(i);
+    if (mr) {
+      out += push(text.slice(i, mr.to));
+      i = mr.to;
+      continue;
     }
     // \tag{..} / \ref{..} (수식 밖에 있을 수 있음)
     const tagRefMatch = text.slice(i).match(/^\\(?:tag|ref)\{[^}]*\}/);
@@ -176,55 +149,11 @@ export function detectJosaSpacing(text: string): ProofreadIssue[] {
 
 /** 수식 영역을 [start, end) 쌍으로 추출. $$...$$, $...$, \[..\], \(..\) */
 function extractMathRegions(text: string): Array<{ start: number; end: number }> {
-  const regions: Array<{ start: number; end: number }> = [];
-  let i = 0;
-  while (i < text.length) {
-    // $$ 블록
-    if (text[i] === '$' && text[i + 1] === '$') {
-      const close = text.indexOf('$$', i + 2);
-      if (close !== -1) {
-        regions.push({ start: i + 2, end: close });
-        i = close + 2;
-        continue;
-      }
-      break;
-    }
-    // $ 인라인
-    if (text[i] === '$') {
-      let j = i + 1;
-      let found = -1;
-      while (j < text.length) {
-        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
-        if (text[j] === '\n' && text[j + 1] === '\n') break;
-        j++;
-      }
-      if (found !== -1) {
-        regions.push({ start: i + 1, end: found });
-        i = found + 1;
-        continue;
-      }
-    }
-    // \[..\]
-    if (text[i] === '\\' && text[i + 1] === '[') {
-      const close = text.indexOf('\\]', i + 2);
-      if (close !== -1) {
-        regions.push({ start: i + 2, end: close });
-        i = close + 2;
-        continue;
-      }
-    }
-    // \(..\)
-    if (text[i] === '\\' && text[i + 1] === '(') {
-      const close = text.indexOf('\\)', i + 2);
-      if (close !== -1) {
-        regions.push({ start: i + 2, end: close });
-        i = close + 2;
-        continue;
-      }
-    }
-    i++;
-  }
-  return regions;
+  // M7 D3 — 판정은 `lib/mathRegions.ts`(R-$$). 닫힌 영역의 안쪽만. 옛 구현은 미닫힘 `$$`에서 `break`해
+  // 그 뒤 모든 인라인 수식을 놓쳤다(마스킹 경로와 다르게 읽던 잠복 버그).
+  return scanMathRegions(text)
+    .filter((r) => r.closed && !r.empty)
+    .map((r) => ({ start: r.innerFrom, end: r.innerTo }));
 }
 
 /**
@@ -582,34 +511,11 @@ function collectControlSeqRanges(text: string): Array<[number, number]> {
  *   같은 판정을 써야 한다. 갈리면 "숫자는 보호되는데 자모는 아닌" 식으로 조용히 어긋난다.
  */
 function collectMathRanges(text: string): Array<[number, number]> {
-  const ranges: Array<[number, number]> = [];
-  let i = 0;
-  while (i < text.length) {
-    if (text[i] === '$' && text[i + 1] === '$') {
-      const close = text.indexOf('$$', i + 2);
-      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
-      break;
-    }
-    if (text[i] === '$') {
-      let j = i + 1, found = -1;
-      while (j < text.length) {
-        if (text[j] === '$' && text[j - 1] !== '\\') { found = j; break; }
-        if (text[j] === '\n' && text[j + 1] === '\n') break;
-        j++;
-      }
-      if (found !== -1) { ranges.push([i, found + 1]); i = found + 1; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '[') {
-      const close = text.indexOf('\\]', i + 2);
-      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    if (text[i] === '\\' && text[i + 1] === '(') {
-      const close = text.indexOf('\\)', i + 2);
-      if (close !== -1) { ranges.push([i, close + 2]); i = close + 2; continue; }
-    }
-    i++;
-  }
-  return ranges;
+  // M7 D3 — 판정은 `lib/mathRegions.ts`(R-$$). 구분자 포함 범위. 빈 쌍(`$$`)도 보호 범위에 넣는다
+  // (그 두 글자를 감싸기 대상으로 보지 않게). 옛 구현의 미닫힘 `$$` `break`는 사라졌다.
+  return scanMathRegions(text)
+    .filter((r) => r.closed)
+    .map((r) => [r.from, r.to] as [number, number]);
 }
 
 /* ─── 개선묶음 M1 D12′: (ㄱ) → (1) ─── */

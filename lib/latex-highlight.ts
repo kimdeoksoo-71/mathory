@@ -1,5 +1,6 @@
 import { EditorView, Decoration, DecorationSet, ViewPlugin, ViewUpdate } from '@codemirror/view';
 import { RangeSetBuilder } from '@codemirror/state';
+import { scanMathRegions } from './mathRegions';
 
 // 스타일 정의
 const baseTextStyle = Decoration.mark({ class: 'cm-base-text' });
@@ -15,131 +16,38 @@ function buildDecorations(view: EditorView): DecorationSet {
   const doc = view.state.doc.toString();
   const decorations: { from: number; to: number; deco: Decoration }[] = [];
 
-  let i = 0;
   let lastMathEnd = 0;
 
-  while (i < doc.length) {
-    // \[...\] 블록 수식
-    if (doc[i] === '\\' && doc[i + 1] === '[') {
-      const start = i;
-      const innerStart = i + 2;
-      const endIdx = doc.indexOf('\\]', innerStart);
-      if (endIdx === -1) { i++; continue; }
-
-      if (start > lastMathEnd) {
-        decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
-      }
-
-      decorations.push({ from: start, to: endIdx + 2, deco: mathRegionStyle });
-      decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-      decorations.push({ from: endIdx, to: endIdx + 2, deco: delimiterStyle });
-
-      highlightMathContent(doc, innerStart, endIdx, decorations);
-
-      lastMathEnd = endIdx + 2;
-      i = endIdx + 2;
+  /* M7 D3 — 영역 판정은 `lib/mathRegions.ts` 하나다(R-$$: 같은 행에 닫는 `$$`가 없는 `$$`는 빈 인라인 쌍).
+     `inlineSingleLine`: 단일 `$`의 닫는 짝을 같은 행에서만 — 아래 줄의 `$`를 닫힘으로 오인해
+     활성 행 이하가 통째로 수식 색이 되어 타이핑마다 요동치는 것을 막는다(하이라이터 전용 옵션).
+     미닫힘은 종전대로 **행 끝까지만** 수식 색(여는 구분자 직후부터 즉시 → 닫을 때 요동 없음). */
+  for (const r of scanMathRegions(doc, { inlineSingleLine: true })) {
+    if (r.from > lastMathEnd) {
+      decorations.push({ from: lastMathEnd, to: r.from, deco: baseTextStyle });
+    }
+    if (r.empty) {
+      // 빈 `$|$` — 두 `$`만 구분자 색
+      decorations.push({ from: r.from, to: r.to, deco: mathRegionStyle });
+      decorations.push({ from: r.from, to: r.to, deco: delimiterStyle });
+      lastMathEnd = r.to;
       continue;
     }
-
-    // \(...\) 인라인 수식
-    if (doc[i] === '\\' && doc[i + 1] === '(') {
-      const start = i;
-      const innerStart = i + 2;
-      const endIdx = doc.indexOf('\\)', innerStart);
-      if (endIdx === -1) { i++; continue; }
-
-      if (start > lastMathEnd) {
-        decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
-      }
-
-      decorations.push({ from: start, to: endIdx + 2, deco: mathRegionStyle });
-      decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-      decorations.push({ from: endIdx, to: endIdx + 2, deco: delimiterStyle });
-
-      highlightMathContent(doc, innerStart, endIdx, decorations);
-
-      lastMathEnd = endIdx + 2;
-      i = endIdx + 2;
+    const delimLen = r.delimiter.length;
+    if (r.closed) {
+      decorations.push({ from: r.from, to: r.to, deco: mathRegionStyle });
+      decorations.push({ from: r.from, to: r.innerFrom, deco: delimiterStyle });
+      decorations.push({ from: r.innerTo, to: r.innerTo + delimLen, deco: delimiterStyle });
+      highlightMathContent(doc, r.innerFrom, r.innerTo, decorations);
+      lastMathEnd = r.to;
       continue;
     }
-
-    // $$ 블록 수식 — $$ 도 예외 없이 항상 수식 구분자로 취급
-    if (doc[i] === '$' && doc[i + 1] === '$') {
-      const start = i;
-      const innerStart = i + 2;
-      const end = doc.indexOf('$$', innerStart);
-
-      if (start > lastMathEnd) {
-        decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
-      }
-
-      if (end !== -1) {
-        // 닫는 $$ 있음 → 정상 블록 수식
-        decorations.push({ from: start, to: end + 2, deco: mathRegionStyle });
-        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-        decorations.push({ from: end, to: end + 2, deco: delimiterStyle });
-        highlightMathContent(doc, innerStart, end, decorations);
-        lastMathEnd = end + 2;
-        i = end + 2;
-      } else {
-        // 닫는 $$ 없음 → 여는 $$ 로 보고 줄 끝까지 수식 영역으로 일관 처리.
-        // (인라인 $ 와 동일한 경계 규칙 — 아래 줄까지 번지는 요동 방지)
-        let lineEnd = innerStart;
-        while (lineEnd < doc.length && doc[lineEnd] !== '\n') lineEnd++;
-        decorations.push({ from: start, to: lineEnd, deco: mathRegionStyle });
-        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-        highlightMathContent(doc, innerStart, lineEnd, decorations);
-        lastMathEnd = lineEnd;
-        i = lineEnd;
-      }
-      continue;
-    }
-
-    // $ 인라인 수식 — $ 는 예외 없이 항상 수식 구분자로 취급 (통화 기호로 쓰지 않음).
-    // ($$ 는 위에서 이미 처리되므로 여기서는 단일 $ 만 남음)
-    if (doc[i] === '$' && doc[i - 1] !== '$' && doc[i + 1] !== '$') {
-      const start = i;
-      const innerStart = i + 1;
-      let end = -1;
-
-      for (let j = innerStart; j < doc.length; j++) {
-        // 인라인 수식($...$)은 한 줄 안으로 제한 — 줄을 넘으면 닫힘으로 보지 않음.
-        // (줄 넘김 허용 시, 타이핑 중 $ 짝이 잠깐 어긋나면 아래 줄의 $를 닫힘으로 오인해
-        //  활성 행 이하가 통째로 수식으로 칠해져 색·글꼴이 매 타이핑마다 요동침)
-        if (doc[j] === '\n') break;
-        if (doc[j] === '$' && doc[j - 1] !== '\\' && doc[j + 1] !== '$') {
-          end = j;
-          break;
-        }
-      }
-
-      if (start > lastMathEnd) {
-        decorations.push({ from: lastMathEnd, to: start, deco: baseTextStyle });
-      }
-
-      if (end !== -1) {
-        // 닫는 $ 있음 → 정상 인라인 수식
-        decorations.push({ from: start, to: end + 1, deco: mathRegionStyle });
-        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-        decorations.push({ from: end, to: end + 1, deco: delimiterStyle });
-        highlightMathContent(doc, innerStart, end, decorations);
-        lastMathEnd = end + 1;
-        i = end + 1;
-      } else {
-        // 닫는 $ 없음 → 열린 $ 로 보고 줄 끝까지 수식 영역으로 일관 처리.
-        // (타이핑 중이라도 여는 $ 직후부터 즉시 수식 색·글꼴 → 닫을 때 요동 없음)
-        let lineEnd = innerStart;
-        while (lineEnd < doc.length && doc[lineEnd] !== '\n') lineEnd++;
-        decorations.push({ from: start, to: lineEnd, deco: mathRegionStyle });
-        decorations.push({ from: start, to: innerStart, deco: delimiterStyle });
-        highlightMathContent(doc, innerStart, lineEnd, decorations);
-        lastMathEnd = lineEnd;
-        i = lineEnd;
-      }
-      continue;
-    }
-
-    i++;
+    let lineEnd = r.innerFrom;
+    while (lineEnd < doc.length && doc[lineEnd] !== '\n') lineEnd++;
+    decorations.push({ from: r.from, to: lineEnd, deco: mathRegionStyle });
+    decorations.push({ from: r.from, to: r.innerFrom, deco: delimiterStyle });
+    highlightMathContent(doc, r.innerFrom, lineEnd, decorations);
+    lastMathEnd = lineEnd;
   }
 
   if (lastMathEnd < doc.length) {

@@ -6,6 +6,7 @@
  */
 
 import { ALL_SYMBOLS } from './math-symbols';
+import { scanMathRegions, mathRegionAt } from './mathRegions';
 
 export interface LatexCompletionItem {
   /** 매칭 라벨 (예: '\\frac') */
@@ -93,42 +94,10 @@ function buildCompletions(): LatexCompletionItem[] {
 
 
 /**
- * 커서가 수식 모드 ($...$ 또는 $$...$$) 내부에 있는지 판별합니다.
+ * 커서가 수식 모드 ($...$ · $$...$$ · \(..\) · \[..\]) 내부에 있는지 판별합니다.
+ * M7 D3 — 판정은 `lib/mathRegions.ts`(R-$$)가 한다. `$` 버튼이 넣은 빈 `$|$`도 **안**이다(툴바 팔레트 전환 유지).
+ * 미닫힘 `$`는 그 행 끝까지만 안이다(옛 토글 구현은 문서 끝까지 안이었다).
  */
 export function isInsideMath(doc: string, pos: number): boolean {
-  let inDisplay = false;
-  let inInline = false;
-  let i = 0;
-
-  while (i < pos) {
-    // 이스케이프 처리 (\$)
-    if (doc[i] === '\\' && i + 1 < doc.length && doc[i + 1] === '$') {
-      i += 2;
-      continue;
-    }
-
-    // $$ (display math)
-    if (doc[i] === '$' && i + 1 < doc.length && doc[i + 1] === '$') {
-      if (inDisplay) {
-        inDisplay = false;
-      } else if (!inInline) {
-        inDisplay = true;
-      }
-      i += 2;
-      continue;
-    }
-
-    // $ (inline math)
-    if (doc[i] === '$') {
-      if (!inDisplay) {
-        inInline = !inInline;
-      }
-      i += 1;
-      continue;
-    }
-
-    i++;
-  }
-
-  return inInline || inDisplay;
+  return mathRegionAt(scanMathRegions(doc), pos) !== null;
 }

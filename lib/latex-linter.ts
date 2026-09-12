@@ -20,6 +20,7 @@
  */
 
 import { Diagnostic } from '@codemirror/lint';
+import { scanMathRegions } from './mathRegions';
 
 // ── 알려진 LaTeX 명령어 목록 ──────────────────────────────────
 // latex-completions.ts의 항목 + KaTeX에서 지원하는 추가 명령어
@@ -304,122 +305,20 @@ export interface MathRegion {
   delimiter: '$' | '$$' | '\\(' | '\\[';
 }
 
+/** M7 D3 — 스캐너는 `lib/mathRegions.ts` 하나다(R-$$ 규칙 포함). 여기서는 옛 모양(`to: -1` = 미닫힘)으로
+ *  옮기고, 빈 인라인 쌍(`$$`를 빈 `$|$`로 읽은 것)은 **진단 대상이 아니므로** 뺀다.
+ *  ⚠ 여기 `$$`·`$` char scan을 다시 만들지 말 것 — 6 소비처의 판정이 갈린다. */
 export function findMathRegions(doc: string): MathRegion[] {
-  const regions: MathRegion[] = [];
-  let i = 0;
-
-  while (i < doc.length) {
-    // ── \[...\] 블록 수식 ──
-    if (doc[i] === '\\' && doc[i + 1] === '[') {
-      const start = i;
-      const innerStart = i + 2;
-      const closeIdx = doc.indexOf('\\]', innerStart);
-
-      if (closeIdx === -1) {
-        regions.push({
-          from: start, to: -1,
-          innerFrom: innerStart, innerTo: doc.length,
-          type: 'display', delimiter: '\\[',
-        });
-        break;
-      }
-
-      regions.push({
-        from: start, to: closeIdx + 2,
-        innerFrom: innerStart, innerTo: closeIdx,
-        type: 'display', delimiter: '\\[',
-      });
-      i = closeIdx + 2;
-      continue;
-    }
-
-    // ── \(...\) 인라인 수식 ──
-    if (doc[i] === '\\' && doc[i + 1] === '(') {
-      const start = i;
-      const innerStart = i + 2;
-      const closeIdx = doc.indexOf('\\)', innerStart);
-
-      if (closeIdx === -1) {
-        regions.push({
-          from: start, to: -1,
-          innerFrom: innerStart, innerTo: doc.length,
-          type: 'inline', delimiter: '\\(',
-        });
-        break;
-      }
-
-      regions.push({
-        from: start, to: closeIdx + 2,
-        innerFrom: innerStart, innerTo: closeIdx,
-        type: 'inline', delimiter: '\\(',
-      });
-      i = closeIdx + 2;
-      continue;
-    }
-
-    // ── $$ 블록 수식 ──
-    if (doc[i] === '$' && doc[i + 1] === '$') {
-      const start = i;
-      const innerStart = i + 2;
-      const closeIdx = doc.indexOf('$$', innerStart);
-
-      if (closeIdx === -1) {
-        regions.push({
-          from: start, to: -1,
-          innerFrom: innerStart, innerTo: doc.length,
-          type: 'display', delimiter: '$$',
-        });
-        break;
-      }
-
-      regions.push({
-        from: start, to: closeIdx + 2,
-        innerFrom: innerStart, innerTo: closeIdx,
-        type: 'display', delimiter: '$$',
-      });
-      i = closeIdx + 2;
-      continue;
-    }
-
-    // ── $ 인라인 수식 ──
-    if (doc[i] === '$' && (i === 0 || doc[i - 1] !== '\\')) {
-      const start = i;
-      const innerStart = i + 1;
-      let closeIdx = -1;
-
-      for (let j = innerStart; j < doc.length; j++) {
-        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
-          closeIdx = j;
-          break;
-        }
-        // 빈 줄을 만나면 인라인 수식 종료
-        if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
-      }
-
-      if (closeIdx === -1) {
-        const lineEnd = doc.indexOf('\n', innerStart);
-        regions.push({
-          from: start, to: -1,
-          innerFrom: innerStart, innerTo: lineEnd === -1 ? doc.length : lineEnd,
-          type: 'inline', delimiter: '$',
-        });
-        i = (lineEnd === -1 ? doc.length : lineEnd);
-        continue;
-      }
-
-      regions.push({
-        from: start, to: closeIdx + 1,
-        innerFrom: innerStart, innerTo: closeIdx,
-        type: 'inline', delimiter: '$',
-      });
-      i = closeIdx + 1;
-      continue;
-    }
-
-    i++;
-  }
-
-  return regions;
+  return scanMathRegions(doc)
+    .filter((r) => !r.empty)
+    .map((r) => ({
+      from: r.from,
+      to: r.closed ? r.to : -1,
+      innerFrom: r.innerFrom,
+      innerTo: r.innerTo,
+      type: r.kind,
+      delimiter: r.delimiter,
+    }));
 }
 
 // ══════════════════════════════════════════════════
