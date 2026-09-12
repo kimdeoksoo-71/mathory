@@ -174,10 +174,10 @@ export default function PhoneReader({
       overlay={
         <>
           {commentsSlot && (
+            /* M8 D7 — 슬롯은 맨몸으로(여백은 슬롯 제공자 몫: 앱 CommentPanel은 chrome='sheet'로 0,
+               공개 PublicComments는 PublicProblemView가 12px을 감싼다) */
             <BottomSheet open={sheet === 'comments'} height="78%" onClose={() => setSheet(null)}>
-              <div style={{ padding: '0 12px 12px', height: '100%', boxSizing: 'border-box' }}>
-                {typeof commentsSlot === 'function' ? commentsSlot(() => setSheet(null)) : commentsSlot}
-              </div>
+              {typeof commentsSlot === 'function' ? commentsSlot(() => setSheet(null)) : commentsSlot}
             </BottomSheet>
           )}
           {agentSlot && (

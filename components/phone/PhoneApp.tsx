@@ -360,11 +360,11 @@ function PhoneProblemScreen({ problemId, uid, onBack }: {
     ? `${typeof window !== 'undefined' ? window.location.origin : ''}/p/${data.id}`
     : undefined;
 
-  /* 함정 3 — CommentPanel 루트가 top/right/bottom:8을 스스로 갖는다 →
-     우·상하 8은 시트 여백으로 흡수, 좌측만 paddingLeft:8로 대칭 */
+  /* M8 D6·D7 — 패널은 chrome='sheet'로 상자 없이 시트를 꽉 채운다(옛 '함정 3' paddingLeft:8 래퍼 폐기).
+     래퍼는 높이 100%만 공급 */
   const panelSlot = (mode: 'comments' | 'agent', canComment: boolean) =>
     (close: () => void) => (
-      <div style={{ position: 'relative', height: '100%', paddingLeft: 8, boxSizing: 'border-box' }}>
+      <div style={{ height: '100%' }}>
         <CommentPanel
           problemId={data.id}
           ownerUid={data.authorUid || ''}
@@ -376,6 +376,7 @@ function PhoneProblemScreen({ problemId, uid, onBack }: {
           onClose={close}
           width="100%"
           selectionPopup={false}
+          chrome="sheet"
         />
       </div>
     );

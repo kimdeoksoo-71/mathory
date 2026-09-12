@@ -96,6 +96,10 @@ interface CommentPanelProps {
   /** Phase 64 §5-3 ③ — 폰 바텀 시트에서 false: 터치의 네이티브 선택 UI와 겹치는
    *  SelectionInsertPopup을 렌더하지 않는다. 기본 true = 데스크톱 무변경. */
   selectionPopup?: boolean;
+  /** M8 D6 — 크롬. 'drawer'(기본) = 데스크톱 떠 있는 카드(인셋 8·radius·테두리·그림자·1행 X).
+   *  'sheet' = 폰 BottomSheet 안 — 상자·테두리·그림자·maxWidth·1행 X 없이 시트를 꽉 채운다
+   *  (닫기는 시트의 딤·그립·X가 담당, `onClose`는 시트가 받는다). 1행·2행·행 구분선은 그대로. */
+  chrome?: 'drawer' | 'sheet';
 }
 
 interface DisplayInfo {
@@ -149,6 +153,7 @@ export default function CommentPanel({
   onRunVerify, onJumpToBlock, verifyCharCount, onInsertToEditor,
   width = '35em',
   selectionPopup = true,
+  chrome = 'drawer',
 }: CommentPanelProps) {
   const commentFontSize = Math.max(9, bodyFontSize - 2);
   const isOwner = currentUid === ownerUid;
@@ -884,12 +889,21 @@ export default function CommentPanel({
          (밝기 서열: 사이드바 < 중앙 < 드로어 — 이 서열이 3단 구분의 전부다)
          ⚠ 리사이즈 활성선은 이제 이 카드의 **좌측 경계선**이다 — 여백 때문에 카드 변과
            패널 폭이 어긋나므로, 핸들 offset은 카드 변에 맞춰야 한다. */
-      position: 'absolute', top: DRAWER_INSET, right: DRAWER_INSET, bottom: DRAWER_INSET,
-      width: width, maxWidth: '90vw',
-      background: 'var(--bg-drawer)',
-      borderRadius: DRAWER_RADIUS,
-      border: DRAWER_BORDER,
-      boxShadow: 'var(--drawer-shadow)',
+      /* M8 D6 — 'sheet'(폰)는 상자·테두리·그림자·maxWidth 없이 시트 내용 상자를 꽉 채운다.
+         ⚠ height:100%가 없으면 루트가 내용 높이로 자라 BottomSheet 바깥 스크롤러가 대신 스크롤한다
+           (입력창이 화면 밖으로). ⚠ drawer 갈래의 maxWidth 90vw는 리사이즈 상한 — 지우지 말 것.
+         prop은 인스턴스 수명 동안 바뀌지 않으므로 두 갈래의 키가 달라도 구멍이 남지 않는다. */
+      ...(chrome === 'sheet' ? {
+        position: 'relative' as const, width: '100%', height: '100%',
+        background: 'var(--bg-drawer)',
+      } : {
+        position: 'absolute' as const, top: DRAWER_INSET, right: DRAWER_INSET, bottom: DRAWER_INSET,
+        width: width, maxWidth: '90vw',
+        background: 'var(--bg-drawer)',
+        borderRadius: DRAWER_RADIUS,
+        border: DRAWER_BORDER,
+        boxShadow: 'var(--drawer-shadow)',
+      }),
       overflow: 'hidden',
       display: 'flex', flexDirection: 'column',
       zIndex: 50,
@@ -962,14 +976,16 @@ export default function CommentPanel({
             이 세션: ${sessionCostUsd.toFixed(4)}
           </span>
         )}
-        <button
-          onClick={onClose}
-          style={{
-            border: 'none', background: 'transparent', cursor: 'pointer',
-            color: 'var(--text-muted)', fontSize: 20, padding: 0, lineHeight: 1,
-          }}
-          title="토론 사이드바 닫기"
-        >×</button>
+        {chrome === 'drawer' && (
+          <button
+            onClick={onClose}
+            style={{
+              border: 'none', background: 'transparent', cursor: 'pointer',
+              color: 'var(--text-muted)', fontSize: 20, padding: 0, lineHeight: 1,
+            }}
+            title="토론 사이드바 닫기"
+          >×</button>
+        )}
       </div>
 
       {/* ═══ 오너 제어 바 (댓글 모드 전용) — agent 모드의 세션 바와 같은 자리·같은 규격 ═══

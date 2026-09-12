@@ -93,11 +93,14 @@ export default function PublicProblemView({
         shareUrl={url}
         onBack={onBack}
         commentsSlot={problem.commentsVisible !== false ? (
-          <PublicComments
-            problemId={problemId}
-            commentSessionId={problem.commentSessionId ?? null}
-            writeEnabled={problem.publicCommentsEnabled === true}
-          />
+          /* M8 D7 — 카드형 스레드의 좌우 여백 12는 여기서(PhoneReader는 슬롯을 맨몸으로 그린다) */
+          <div style={{ padding: '0 12px 12px' }}>
+            <PublicComments
+              problemId={problemId}
+              commentSessionId={problem.commentSessionId ?? null}
+              writeEnabled={problem.publicCommentsEnabled === true}
+            />
+          </div>
         ) : undefined}
       />
     );
