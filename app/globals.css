@@ -130,6 +130,9 @@
   /* Brand — 로고 레드 (로고 handoff 스펙). 소비처: 로고 워드마크 3곳 + --case-dot */
   --mathory-red: #D97757;
   --mathory-red-dark: #BC5F3F;
+  /* M8 G1 — 작은(19px) 워드마크 전용 색. 1c171ad: 작은 글자는 획이 얇아 배경이 비쳐 같은 색이
+     더 밝아 보이므로 --mathory-red-dark보다 한 단계 진하게. 소비처: Sidebar · PhoneShell · MiniShell */
+  --wordmark-small: #944728;
 
   /* Accent — Phase 43: 클레이 → 테라코타 */
   --accent-primary: #c96442;

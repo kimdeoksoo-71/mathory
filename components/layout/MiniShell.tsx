@@ -32,7 +32,8 @@ export default function MiniShell({
       {/* ── 미니 사이드바 ── */}
       <aside style={sidebarStyle}>
         <a href="/" title="Mathory 메인으로" style={{ textDecoration: 'none' }}>
-          <Wordmark as="div" size={19} weight={600} color="var(--mathory-red, #D97757)"
+          {/* M8 Q3 — 작은 워드마크 사양(Sidebar·PhoneShell과 동일) */}
+          <Wordmark as="div" size={19} color="var(--wordmark-small, #944728)" shadow
             style={{ marginBottom: 18 }} />
         </a>
 

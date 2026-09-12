@@ -62,8 +62,8 @@ export default function PhoneShell({
           </button>
         ) : (
           <a href="/" title="Mathory 메인으로" style={{ textDecoration: 'none', display: 'flex', flexShrink: 0 }}>
-            {/* MiniShell 사양(19/600/red) — 4번째 워드마크 사양을 만들지 않는다(§7-4) */}
-            <Wordmark as="div" size={19} weight={600} color="var(--mathory-red, #D97757)" />
+            {/* M8 D1 — 작은 워드마크 사양(Sidebar와 동일: 19/400/--wordmark-small/그림자) */}
+            <Wordmark as="div" size={19} color="var(--wordmark-small, #944728)" shadow />
           </a>
         )}
         {title ? (

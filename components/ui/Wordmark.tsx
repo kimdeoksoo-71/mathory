@@ -1,10 +1,10 @@
 import type React from 'react';
 
 /**
- * Phase 64 §7-4 — 워드마크 공용. 인라인 3벌을 픽셀 무변경으로 재현한다:
- *   MiniShell 19/600/`--mathory-red`/무그림자 · Sidebar 19/400/`#944728`/그림자 ·
- *   AppShell HomeView 48/400/`--mathory-red-dark`/그림자.
- * ⚠ 4번째 사양을 만들지 말 것 — 폰(PhoneShell·로그인 화면)은 MiniShell·HomeView 사양을 쓴다.
+ * Phase 64 §7-4 — 워드마크 공용. 사양은 두 벌뿐이다(M8 D1·Q3에서 옛 MiniShell 사양 폐기):
+ *   작은 19/400/`--wordmark-small`/그림자 — Sidebar · PhoneShell 상단 바 · MiniShell
+ *   큰   48/400/`--mathory-red-dark`/그림자 — AppShell HomeView · 폰 로그인 화면
+ * ⚠ 3번째 사양을 만들지 말 것. weight 600 갈래는 소비처 0이지만 prop은 남겨 둔다.
  * ⚠ shadow는 조건부 스프레드가 아니라 항상 명시한다('none') — 값이 사라질 때 구멍이
  *   남는 함정(CLAUDE.md shorthand/longhand 절)의 예방과 같은 방침.
  */

@@ -769,7 +769,7 @@ export default function Sidebar({
         }}
       >
         {!collapsed && (
-          <Wordmark size={19} color="#944728" shadow />
+          <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
         )}
         <button
           onClick={onToggle}
