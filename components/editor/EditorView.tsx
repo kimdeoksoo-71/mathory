@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection, VerifyKind, VerifyReport } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem, setVerification,
@@ -1139,6 +1139,20 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       : (versionDrawerOpen && version.width >= (discussionOpen ? comment.width : 0))
         ? 'version' : 'comment';
   const rightPanelDragging = comment.dragging || version.dragging;
+  /* M7 D7 — Row 1 우단 클러스터(버전·댓글·Agent·스테퍼 2)의 실측 폭. 클러스터는 절대배치라
+     흐름의 paddingRight 로 자리를 비워 줘야 한다. useLayoutEffect + ResizeObserver 라 첫 페인트
+     전에 실측값이 들어간다(초기 0 은 화면에 나타나지 않는다 — v4 §8-0 M2 는 이로써 무의미). */
+  const clusterRef = useRef<HTMLDivElement>(null);
+  const [clusterW, setClusterW] = useState(0);
+  useLayoutEffect(() => {
+    const el = clusterRef.current;
+    if (!el) return;
+    const update = () => setClusterW(el.offsetWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const [allComments, setAllComments] = useState<ProblemComment[]>([]);
   const [sessions, setSessions] = useState<DiscussionSession[]>([]);
   const commentSessionId = useMemo(
@@ -3332,19 +3346,22 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         padding: '0 16px',
-        minHeight: 57, boxSizing: 'border-box',
-        /* 덕수 요청(2026-08-28) — Row1·Row2는 **밀려나지 않는다**. 우측 패널이 그 위를
-           덮는다(CLAUDE.md의 "우측 패널 3종은 덮지 않고 밀어낸다" 규약을 이 두 행에
-           한해 의도적으로 깬 자리다).
-           이유: 패널을 여닫을 때마다 제목·탭이 줄었다 늘었다 하며 자리를 옮겨,
-           "패널을 열었을 뿐인데 편집 대상이 바뀐 것처럼" 보였다.
-           ⚠ Row3(content-frame)의 밀어내기는 그대로다 — 본문까지 덮으면 편집이 막힌다. */
-        paddingRight: 16,
+        height: 57, boxSizing: 'border-box',   // M6 R6 — 57은 앱 전역 1행 높이. nowrap이라 height로 고정
+        position: 'relative',
+        /* M7 D7~D10 (2026-08-28 결정의 부분 철회) — **Row 1은 저장 버튼까지, Row 2는 탭까지 민다.**
+           우측 드로어가 열리면 흐름(뒤로·폴더 경로·제목·status·저장 상태·저장)은 드로어 왼쪽으로
+           밀리고, 우단 **클러스터**(버전·댓글·Agent·스테퍼 2 — 아래 절대배치)는 종전대로 드로어
+           밑으로 들어간다. 2026-08-28의 "덮는다"는 실사용에서 "저장이 안 되고 탭 전환이 안 된다"로
+           드러났다(덕수). 닫혀 있을 때는 paddingRight = 클러스터 폭 + 여백이라 시각이 종전과 같다.
+           ⚠ Row3(content-frame)의 밀어내기는 그대로다 — 본문까지 덮으면 편집이 막힌다.
+           ⚠ nowrap — 좁으면 2줄로 꺾는 대신 제목·폴더 경로가 잘린다(D8). */
+        paddingRight: rightPanelOpen ? rightPanelWidth + 8 + 16 : clusterW + 16 + 3,
+        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
         borderBottom: '1px solid var(--border-light)', background: 'var(--bg-functional)',
-        flexShrink: 0, flexWrap: 'wrap',
+        flexShrink: 0, flexWrap: 'nowrap',
       }}>
         <button onClick={handleBackWithSave} style={{
-          border: 'none', cursor: 'pointer',
+          border: 'none', cursor: 'pointer', flexShrink: 0,
           background: 'var(--accent-primary)', color: '#fff',
           display: 'inline-flex', alignItems: 'center', gap: 2,
           padding: '4px 10px 4px 6px', borderRadius: 999,
@@ -3360,15 +3377,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           <span>보기</span>
         </button>
 
-        <FolderPathBar
-          folders={folders}
-          currentFolderId={editFolderId}
-          onMove={(folderId) => setEditFolderId(folderId || '')}
-        />
+        {/* M7 D8 — 좁을 때 폴더 경로는 가로로 잘린다. overflow:hidden 이면 칩의 드롭다운(top:100%)까지
+            잘리므로 clip-path 로 **가로만** 자르고 아래 320px(드롭다운 maxHeight 280 + 여백)은 열어 둔다.
+            clip-path 는 스태킹 컨텍스트를 만들어 드롭다운(z 1000)이 그 안에 갇히므로 래퍼 자체를
+            Row 3(비positioned)·클러스터(10) 위인 z 20 으로 올린다. */}
+        <div style={{ minWidth: 0, flexShrink: 1, position: 'relative', zIndex: 20, clipPath: 'inset(0 0 -320px 0)' }}>
+          <FolderPathBar
+            folders={folders}
+            currentFolderId={editFolderId}
+            onMove={(folderId) => setEditFolderId(folderId || '')}
+          />
+        </div>
 
         <input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
           placeholder="문제 제목" onFocus={focusHandler} onBlur={blurHandler}
-          style={{ ...metaInputStyle, flex: 1, minWidth: 120, fontSize: 15, fontWeight: 600 }}
+          style={{ ...metaInputStyle, flex: 1, minWidth: 0, fontSize: 15, fontWeight: 600 }}   // M7 D8 — 제목이 먼저 잘린다
         />
 
         {status && (
@@ -3383,10 +3406,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           lastSavedAt={lastSavedAt}
         />
 
-        {/* 저장 · 버전 기록 묶음 (Phase 55c 후속)
-            한 쌍으로 묶은 이유: ① 둘의 간격만 좁히려면 행의 gap:8과 분리돼야 한다
-            (여기 gap 3 + 각 버튼 padding 4 = 글리프 사이 11px, 묶기 전 16px의 약 2/3)
-            ② flexWrap 시 둘이 갈라지지 않는다. 순서는 저장 → 버전 기록. */}
+        {/* 저장 버튼 — 흐름에 남는 마지막 요소(M7 D7). 드로어가 열리면 이것까지 밀린다.
+            버전·댓글·Agent 는 아래 클러스터로 갔다(옛 "저장·버전 묶음 gap 3"의 간격은
+            행 paddingRight 의 +3 이 잇는다). */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
           {/* 저장 버튼 — 아이콘만. dirty면 빨강·구름만, 저장 완료면 회색·구름+체크. */}
           <button
@@ -3404,7 +3426,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             {/* 색은 버튼 style의 color가 currentColor로 전달. 체크 유무만 checked prop으로 분기(Phase 55c) */}
             {saving ? <IconLoader size={16} /> : <IconSave size={18} checked={!dirty} />}
           </button>
+        </div>
 
+        {/* ═══ 우단 클러스터 (M7 D7) — 절대배치 · 드로어 밑으로 들어간다(ProblemView 스테퍼 전례 M6 D12).
+            height 56 = 57 − 아래 1px 선(M6 검수 1차 ④ — 불투명 래퍼가 border-box 헤더의 선을 덮는다). */}
+        <div ref={clusterRef} style={{
+          position: 'absolute', right: 16, top: 0, height: 56,
+          display: 'flex', alignItems: 'center', gap: 8,
+          zIndex: 10, background: 'var(--bg-functional)',
+        }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
           {/* 버전 기록 열기 — 아이콘은 IconRestore
               (Phase 55c: 사이드바 '최근 문항'과 같은 IconRecent였던 것을 교체. 이력 복원 의미) */}
           <button
@@ -3421,8 +3452,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
               Row2 탭 줄 오른쪽 끝(marginLeft:auto)에 있던 것을 **Row1의 버전 기록 오른쪽**으로 옮겼다.
               ⚠ 같은 묶음(gap 3) 안에 둔다 — 저장·버전과 함께 "문항 단위 동작"이고,
                 flexWrap 시 갈라지지 않아야 한다.
-              ⚠ 우측 패널이 열리면 Row1 우측 끝이 패널에 덮이는 규약은 그대로다(R6) —
-                이 두 버튼은 묶음 안쪽(왼쪽)이라 가려지지 않는다. */}
+              ⚠ M7 D7 — 이제 저장 버튼과 갈라져 **우단 클러스터**(절대배치) 안이다. 우측 드로어가
+                열리면 스테퍼·버전 기록과 함께 드로어 밑으로 들어간다(패널엔 자체 닫기 X가 있다). */}
           {user && problem && (
             <>
               <button
@@ -3498,6 +3529,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             numberStyle={{ fontSize: 13.5, minWidth: 22 }}
           />
         </div>
+        </div>{/* /클러스터 */}
       </div>
 
       {/* ═══ Row 2: Toolbar (좌) + Tabs (우) ═══
@@ -3506,7 +3538,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         display: 'flex', alignItems: 'center',
         padding: '0 16px',
         minHeight: 41, boxSizing: 'border-box',
-        paddingRight: 16,           // Row1과 같은 이유로 밀려나지 않는다(위 주석 참조)
+        /* M7 D9 — 드로어가 열리면 행 전체가 밀린다(툴바 오른쪽은 탭뿐이라 "탭까지 민다"와 같다).
+           툴바는 minWidth 0 + OverflowItems 가 뒤에서부터 숨기고, 탭·탭 추가는 flexShrink 0. 2줄로 꺾이지 않는다(nowrap). */
+        paddingRight: rightPanelOpen ? rightPanelWidth + 8 + 16 : 16,
+        transition: rightPanelDragging ? 'none' : 'padding-right 0.2s',
         background: 'var(--bg-functional)', flexShrink: 0,
         gap: 4,
       }}>
@@ -3563,7 +3598,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             onMouseEnter={tabIdx >= 2 ? () => enterTab(tab.id) : undefined}
             onMouseLeave={tabIdx >= 2 ? leaveTab : undefined}
             style={{
-              display: 'flex', alignItems: 'center', gap: 2,
+              display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0,   // M7 D9
               borderBottom: activeTab === tab.id ? '2px solid var(--accent-primary)' : '2px solid transparent',
               transition: 'all var(--transition-fast)',
               position: 'relative',
@@ -3647,7 +3682,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           title="탭 추가"
           style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            width: 28, height: 28, border: 'none', background: 'none',
+            width: 28, height: 28, border: 'none', background: 'none', flexShrink: 0,   // M7 D9
             cursor: 'pointer', borderRadius: 6, padding: 0,
             color: 'var(--text-faint)', marginLeft: 4,
             transition: 'color 0.2s, background 0.15s',
