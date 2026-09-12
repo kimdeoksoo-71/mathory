@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Block, TabMeta } from '../../types/problem';
-import PhoneShell from '../layout/PhoneShell';
+import PhoneShell, { PhoneShellHandle } from '../layout/PhoneShell';
 import BottomSheet from '../ui/BottomSheet';
 import PhoneMoreSheet from './PhoneMoreSheet';
 import ProblemTabContent from '../share/ProblemTabContent';
@@ -28,6 +28,11 @@ import { IconComment, IconAgent, IconDots } from '../ui/Icons';
    - 참조 말풍선(M2 C): 정의부는 문제 탭에 산다 — 풀이 탭을 볼 때 문제 카드를
      visibility:hidden + position:absolute로 **DOM에 남긴다**(언마운트 금지 함정).
      [data-ref-tooltip] 게이트는 본문 래퍼 하나에만 — 시트(overlay)는 게이트 밖(P13).
+
+   M8 D2~D4 — 이동 경로는 **탭 행 하나**다. Phase 64 D10의 `[풀이 보기]` 버튼과
+   `[문제 보기]` 알약·시트는 탭 행과 같은 목적지로 가는 두 번째 경로라 삭제했다(되살리지 말 것).
+   그 대가(읽던 위치 손실)는 탭별 scrollTop 기억(D4)이 되돌린다 — 복원은 반드시
+   PhoneShell 핸들의 `scrollTo`(무시 창 동반)로.
    ═══════════════════════════════════════════════════════════════ */
 
 export default function PhoneReader({
@@ -49,8 +54,11 @@ export default function PhoneReader({
   onBack?: () => void;
 }) {
   const [activeTabId, setActiveTabId] = useState<string>(tabs[0]?.id ?? 'question');
-  const [sheet, setSheet] = useState<null | 'comments' | 'agent' | 'more' | 'question'>(null);
+  const [sheet, setSheet] = useState<null | 'comments' | 'agent' | 'more'>(null);
   const [fontSize, setFontSize] = useState(FONT_SIZE_DEFAULT);
+  const shellRef = useRef<PhoneShellHandle>(null);
+  /* D4 — 탭별 읽던 위치. 떠날 때 저장, 들어올 때 복원(없으면 0) */
+  const posRef = useRef<Record<string, number>>({});
 
   /* 글자 크기 — ProblemView와 같은 키·클램프(D12·Q7). 폰이 쓰면 PC도 같은 값을 본다 */
   useEffect(() => {
@@ -76,12 +84,20 @@ export default function PhoneReader({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabs.map((t) => t.id).join(',')]);
 
+  const selectTab = (id: string) => {
+    if (id === activeTabId) return;
+    posRef.current[activeTabId] = shellRef.current?.getScrollTop() ?? 0;
+    setActiveTabId(id);
+  };
+  /* 새 탭의 카드가 그려진 뒤(paint 전) 위치 복원 — 첫 마운트의 scrollTo(0)은 무해 */
+  useLayoutEffect(() => {
+    shellRef.current?.scrollTo(posRef.current[activeTabId] ?? 0);
+  }, [activeTabId]);
+
   const questionTab = tabs.find((t) => t.id === 'question') ?? tabs[0];
   const activeTab = tabs.find((t) => t.id === activeTabId) ?? tabs[0];
   if (!activeTab) return null;
   const isQuestionActive = !!questionTab && activeTab.id === questionTab.id;
-  const activeIdx = tabs.findIndex((t) => t.id === activeTab.id);
-  const nextTab = tabs[activeIdx + 1];
 
   /* D11 — 탭 카드. 좌표는 전부 fontSize 기준 px */
   const renderCard = (tab: TabMeta) => {
@@ -111,6 +127,7 @@ export default function PhoneReader({
 
   return (
     <PhoneShell
+      ref={shellRef}
       left={onBack ? 'back' : 'wordmark'}
       onBack={onBack}
       title={title}
@@ -139,7 +156,7 @@ export default function PhoneReader({
             return (
               <button
                 key={t.id}
-                onClick={() => setActiveTabId(t.id)}
+                onClick={() => selectTab(t.id)}
                 style={{
                   flex: 1, height: 44, border: 'none', cursor: 'pointer', background: 'none',
                   fontSize: 14, fontWeight: active ? 700 : 500, fontFamily: 'var(--font-ui)',
@@ -168,13 +185,6 @@ export default function PhoneReader({
               {typeof agentSlot === 'function' ? agentSlot(() => setSheet(null)) : agentSlot}
             </BottomSheet>
           )}
-          {questionTab && (
-            /* [문제 보기] — 풀이를 읽다 문제를 잠깐 본다(hold-to-peek의 폰 번역, D10).
-               ⚠ 이 카드는 [data-ref-tooltip] 밖이다(P13 — 정의부 두 벌 금지) */
-            <BottomSheet open={sheet === 'question'} height="80%" onClose={() => setSheet(null)}>
-              <div style={{ paddingBottom: 12 }}>{renderCard(questionTab)}</div>
-            </BottomSheet>
-          )}
           <PhoneMoreSheet
             open={sheet === 'more'}
             onClose={() => setSheet(null)}
@@ -187,46 +197,15 @@ export default function PhoneReader({
     >
       {/* 참조 말풍선 게이트 — 탭 전체를 감싸는 래퍼 하나(M2 C) */}
       <div data-ref-tooltip="">
-        {/* 정의부 보존: 풀이 계열을 볼 때 문제 카드를 숨긴 채 DOM에 남긴다(M2 C — 언마운트 금지) */}
+        {/* 정의부 보존: 풀이 계열을 볼 때 문제 카드를 숨긴 채 DOM에 남긴다(M2 C — 언마운트 금지).
+            ⚠ M8 D2가 지운 '문제 보기' 시트와 무관한 필수 장치다 — 함께 지우지 말 것 */}
         {!isQuestionActive && questionTab && (
           <div aria-hidden style={{ visibility: 'hidden', position: 'absolute', pointerEvents: 'none' }}>
             {renderCard(questionTab)}
           </div>
         )}
 
-        {/* 풀이 계열 상단: [문제 보기] 알약(32px) */}
-        {!isQuestionActive && questionTab && (
-          <div style={{ padding: '10px 10px 0' }}>
-            <button
-              onClick={() => setSheet('question')}
-              style={{
-                height: 32, padding: '0 14px', borderRadius: 999, border: 'none',
-                background: 'var(--accent-primary)', color: '#fff',
-                fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-ui)',
-              }}
-            >
-              문제 보기
-            </button>
-          </div>
-        )}
-
         {renderCard(activeTab)}
-
-        {/* 문제 탭 하단: [다음 탭 보기](48px) */}
-        {isQuestionActive && nextTab && (
-          <div style={{ padding: '12px 10px 0' }}>
-            <button
-              onClick={() => setActiveTabId(nextTab.id)}
-              style={{
-                width: '100%', height: 48, border: '1px solid var(--border-light, #ddd)',
-                borderRadius: 10, background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-ui)',
-              }}
-            >
-              {nextTab.label} 보기
-            </button>
-          </div>
-        )}
       </div>
 
       {meta && (
