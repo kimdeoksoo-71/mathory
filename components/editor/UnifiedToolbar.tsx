@@ -238,12 +238,16 @@ const ICON_BTN_BASE: React.CSSProperties = {
 /* 툴팁은 M6 D5′에서 components/ui/HoverTip.tsx의 useHoverTip으로 뽑아냈다(시각 불변 —
    600ms · fixed · 11px). 리스트 헤더 아이콘 칼럼과 공유한다. ⚠ 네이티브 title 병기 금지. */
 function IconButton({
-  title, onClick, active, disabled, children, buttonRef,
+  title, onClick, active, disabled, inactive, children, buttonRef,
 }: {
   title: string;
   onClick: () => void;
   active?: boolean;
+  /** 작업 중(교정·AI 로딩) — 커서 `wait`(macOS 회전 커서). "지금은 해당 없음"에는 쓰지 말 것 → `inactive` */
   disabled?: boolean;
+  /** M7 후속(덕수 2026-09-12) — 해당 없음(붙여넣기: 접힘 모드 아님·클립보드 비어 있음). 흐리게 + 커서 기본,
+   *  hover 배경 없음. `disabled`로 두면 회전 커서가 떠 "뭔가 돌고 있다"로 읽힌다. */
+  inactive?: boolean;
   children: React.ReactNode;
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
@@ -261,17 +265,18 @@ function IconButton({
       <button
         ref={setBtnRef}
         onClick={() => { hideTip(); onClick(); }}
-        disabled={disabled}
+        disabled={disabled || inactive}
         aria-label={title}
+        aria-disabled={inactive || undefined}
         style={{
           ...ICON_BTN_BASE,
           border: active ? '1px solid var(--accent-primary)' : '1px solid transparent',
           background: active ? ACTIVE_BG : 'transparent',
-          color: active ? 'var(--accent-primary)' : 'var(--text-muted)',
-          cursor: disabled ? 'wait' : 'pointer',
+          color: active ? 'var(--accent-primary)' : inactive ? 'var(--text-faint)' : 'var(--text-muted)',
+          cursor: disabled ? 'wait' : inactive ? 'default' : 'pointer',
         }}
         onMouseEnter={(e) => {
-          if (!active && !disabled) e.currentTarget.style.background = 'var(--bg-hover, #f0f0f0)';
+          if (!active && !disabled && !inactive) e.currentTarget.style.background = 'var(--bg-hover, #f0f0f0)';
           showTip();
         }}
         onMouseLeave={(e) => {
@@ -748,7 +753,7 @@ export default function UnifiedToolbar({
     {
       key: 'copyBlocks',
       node: (
-        <IconButton title="블록 복사 (⌘C — 접힘 모드에서 선택한 블록들, 아니면 활성 블록)" onClick={onCopyBlocks} disabled={!canCopy}>
+        <IconButton title="블록 복사 (⌘C — 접힘 모드에서 선택한 블록들, 아니면 활성 블록)" onClick={onCopyBlocks} inactive={!canCopy}>
           <CopyBlocksIcon />
         </IconButton>
       ),
@@ -756,7 +761,7 @@ export default function UnifiedToolbar({
     {
       key: 'pasteBlocks',
       node: (
-        <IconButton title="블록 붙여넣기 (⌘V — 접힘 모드에서 선택한 블록 아래)" onClick={onPasteBlocks} disabled={!canPaste}>
+        <IconButton title="블록 붙여넣기 (⌘V — 접힘 모드에서 선택한 블록 아래)" onClick={onPasteBlocks} inactive={!canPaste}>
           <PasteBlocksIcon />
         </IconButton>
       ),
