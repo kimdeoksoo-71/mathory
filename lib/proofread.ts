@@ -771,22 +771,25 @@ export function autoFixDeterministicIssues(
     return pre + p;
   });
 
-  /* Step 3 (M7 G·G′): 인라인 수식 **앞머리**의 `\Rightarrow`를 텍스트 `⇒`로 꺼낸다 — `$\Rightarrow x=1$` → `⇒ $x=1$`.
-     수식 **중간**의 `\Rightarrow`는 무접촉(구조가 무너질 수 있다 — 덕수) · display `$$…$$` 무접촉 ·
-     `\Leftrightarrow`·`\iff`·`\Longrightarrow` 제외(검증 프롬프트가 `$\iff$`를 권장 표기로 쓴다).
+  /* Step 3 (M7 G·G′): 인라인 수식 **앞머리**의 화살표 명령을 텍스트 화살표로 꺼낸다 — `$\Rightarrow x=1$` → `⇒ $x=1$`.
+     대상(덕수 2026-09-12 확장): `\Rightarrow`·`\implies`·`\Longrightarrow` → `⇒` · `\rightarrow` → `→` · `\Leftrightarrow` → `⇔`.
+     수식 **중간**의 화살표는 무접촉(구조가 무너질 수 있다 — 덕수) · display `$$…$$` 무접촉 ·
+     `\iff`는 제외(검증 프롬프트가 `$\iff$`를 권장 표기로 쓴다).
      G′: 뒤에 붙은 간격 명령(`\ `·`\,`·`\;`·`\!`·`\quad`·`\qquad`·`~`)을 함께 걷는다 — 안 걷으면 `⇒ $\ x$` 잔재.
      `$\Rightarrow$` 단독은 `⇒`. 뒤에서 앞으로 치환한다(좌표 보존). 조사 규칙(Step 2)이 이미 돌았고
      `⇒ $x$이므로` 꼴은 그 규칙의 패턴(`[^$\n]$` + 공백 + 조사)에 안 걸린다 — 테스트가 고정. */
   {
-    const RIGHTARROW_HEAD = /^\s*\\Rightarrow(?![A-Za-z])(?:\s|\\[ ,;!]|\\quad|\\qquad|~)*/;
+    const ARROW_HEAD = /^\s*\\(Rightarrow|implies|Longrightarrow|rightarrow|Leftrightarrow)(?![A-Za-z])(?:\s|\\[ ,;!]|\\quad|\\qquad|~)*/;
+    const ARROW_TEXT: Record<string, string> = { Rightarrow: '⇒', implies: '⇒', Longrightarrow: '⇒', rightarrow: '→', Leftrightarrow: '⇔' };
     const inl = scanMathRegions(fixed).filter((r) => r.kind === 'inline' && r.delimiter === '$' && r.closed && !r.empty);
     for (let k = inl.length - 1; k >= 0; k--) {
       const r = inl[k];
       const inner = fixed.slice(r.innerFrom, r.innerTo);
-      const m = inner.match(RIGHTARROW_HEAD);
+      const m = inner.match(ARROW_HEAD);
       if (!m) continue;
+      const arrow = ARROW_TEXT[m[1]];
       const rest = inner.slice(m[0].length);
-      const rep = rest.trim() ? `⇒ $${rest}$` : '⇒';
+      const rep = rest.trim() ? `${arrow} $${rest}$` : arrow;
       fixed = fixed.slice(0, r.from) + rep + fixed.slice(r.to);
       count++;
     }

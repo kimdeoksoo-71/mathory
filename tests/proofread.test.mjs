@@ -257,10 +257,17 @@ test('⇒: 단독 $\\Rightarrow$ → ⇒', () => {
 test('⇒: 수식 중간의 \\Rightarrow는 무접촉', () => {
   assert.equal(F('$x=1 \\Rightarrow y=2$'), '$x=1 \\Rightarrow y=2$');
 });
-test('⇒: display $$…$$ 무접촉 · \\Leftrightarrow·\\iff 무접촉', () => {
+test('⇒: display $$…$$ 무접촉 · \\iff 무접촉', () => {
   assert.equal(F('$$\n\\Rightarrow x=1\n$$'), '$$\n\\Rightarrow x=1\n$$');
   assert.equal(F('$\\iff x=1$'), '$\\iff x=1$');
-  assert.equal(F('$\\Leftrightarrow x=1$'), '$\\Leftrightarrow x=1$');
+});
+test('화살표 확장(덕수 2026-09-12): \\rightarrow → → · \\implies·\\Longrightarrow → ⇒ · \\Leftrightarrow → ⇔', () => {
+  assert.equal(F('$\\rightarrow x=1$'), '→ $x=1$');
+  assert.equal(F('$\\implies x=1$'), '⇒ $x=1$');
+  assert.equal(F('$\\Longrightarrow x=1$'), '⇒ $x=1$');
+  assert.equal(F('$\\Leftrightarrow x=1$'), '⇔ $x=1$');
+  assert.equal(F('$\\Leftrightarrow$'), '⇔');
+  assert.equal(F('$x \\rightarrow y$'), '$x \\rightarrow y$');   // 중간은 무접촉
 });
 test('⇒: 조사 공백 규칙과 비간섭 — `⇒ $x$이므로`가 그대로', () => {
   assert.equal(F('$\\Rightarrow x$ 이므로'), '⇒ $x$이므로');
