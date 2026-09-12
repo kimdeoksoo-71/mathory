@@ -49,16 +49,19 @@ export interface LabeledBlock {
   /** Phase 61f — image 블록의 Storage URL. 서버(`route.ts`)가 실물을 첨부한다.
    *  ⚠ `normalizeBlocks`(route.ts)는 받은 객체를 재구성하므로 **거기서도 이 필드를 실어야** 한다. */
   imageUrl?: string;
+  /** M7 D20 — 경우·하위 경우 블록의 화면 라벨(C1·C2a). 헤더에만 싣는다 — 본문(text)에 넣으면 인용 앵커가 빗나간다.
+   *  ⚠ `normalizeBlocks`(route.ts)에서도 통과시켜야 한다(재구성). */
+  caseLabel?: string;
 }
 
 /**
- * 블록마다 `[블록 n]` 라벨을 붙여 한 덩어리로.
+ * 블록마다 `[블록 n]` 라벨을 붙여 한 덩어리로. 경우 블록은 `[블록 n] (case C1)`(M7 D20).
  * 라벨은 모델이 위치를 가리키게 하는 **힌트일 뿐**이다 — 실제 앵커는
  * `anchorByQuote`가 인용 실재성으로 확정한다(모델의 자기 신고를 믿지 않는다).
  */
 export function labelBlocks(blocks: LabeledBlock[]): string {
   return blocks
-    .map((b, i) => `[블록 ${i + 1}]${b.type && b.type !== 'text' ? ` (${b.type})` : ''}\n${b.text}`)
+    .map((b, i) => `[블록 ${i + 1}]${b.type && b.type !== 'text' ? ` (${b.type}${b.caseLabel ? ` ${b.caseLabel}` : ''})` : ''}\n${b.text}`)
     .join('\n\n');
 }
 
@@ -100,6 +103,8 @@ const COMMON_RULES = `### 공통 규약
   - ⚠️ 원문에 있는 \`$\` 구분자를 **빼지 마십시오.** 수식이 \`$...$\`로 감싸여 있으면 그 \`$\`까지
     포함해 옮깁니다. 구분자를 떨어뜨리면 화면에서 수식이 아니라 LaTeX 소스로 보입니다.
 - 각 지적에는 그 내용이 있는 \`[블록 n]\`의 번호 n을 \`block\` 필드로 함께 적습니다.
+- \`[블록 n] (case C1)\`·\`(subcase C1a)\`의 **C1·C1a는 그 경우 블록의 이름**입니다. 본문의 "C1에 의하여", "C2에서"는
+  그 블록 전체(경우 나눔)를 가리키는 정당한 인용이며, 정의되지 않은 기호가 아닙니다.
 - 그림이 이미지로 첨부되어 있으면(본문의 \`[그림 k]\` = 첨부된 k번째 이미지) **그림을 직접 보고
   판단합니다.** \`[그림 k — 첨부되지 않음]\`으로 표시된 그림을 보아야만 판단할 수 있으면
   판정하지 말고 \`skip\`을 택하고 이유를 적습니다. 보이지 않는 것을 추측해 지적하지 마십시오.`;

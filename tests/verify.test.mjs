@@ -274,6 +274,22 @@ test('labelBlocks — [블록 n] 라벨과 총 글자 수', () => {
   assert.equal(P.totalChars(bs), '첫째'.length + '① 1 ② 2'.length);
 });
 
+test('M7 D20 labelBlocks — caseLabel은 헤더에만 (case C1) 로 실리고 본문은 그대로', () => {
+  const s = P.labelBlocks([
+    { blockKey: 'k1', type: 'case', text: '$a>0$인 경우\n본문', caseLabel: 'C1' },
+    { blockKey: 'k2', type: 'subcase', text: '세부', caseLabel: 'C1a' },
+    { blockKey: 'k3', type: 'text', text: 'C1에 의하여' },
+  ]);
+  assert.match(s, /\[블록 1\] \(case C1\)\n\$a>0\$인 경우\n본문/);
+  assert.match(s, /\[블록 2\] \(subcase C1a\)\n세부/);
+  assert.match(s, /\[블록 3\]\nC1에 의하여/);
+});
+
+test('M7 D20 labelBlocks — caseLabel이 없으면 종전 형식 그대로 · 공통 규약에 라벨 문장', () => {
+  assert.equal(P.labelBlocks([{ blockKey: 'k', type: 'case', text: 'x' }]), '[블록 1] (case)\nx');
+  assert.ok(P.PROMPT_JUDGE.system.includes('(case C1)'), '2차 판정 프롬프트에 라벨 규약');
+});
+
 /* ═══ Phase 61f — 그림 첨부 후의 프롬프트·라벨 ═══ */
 
 test('61f labelBlocks — image 블록이 (image) 라벨과 자리표시자로 나온다', async () => {

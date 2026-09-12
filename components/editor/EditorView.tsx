@@ -34,7 +34,7 @@ import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
 import CoachBlock from '../ui/CoachBlock';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock, caseLabelPrefix } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
@@ -1408,13 +1408,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── AI 자동완성 ─── */
   const collectAIContext = useCallback((blockId: string) => {
+    /* M7 D20 — 경우 블록엔 화면과 같은 라벨(C1. )을 접두해 모델이 "C1에 의하여" 인용을 알아보게 한다 */
+    const withLabel = (list: LocalBlock[]) => {
+      const labels = buildCaseLabels(list);
+      return list.map((b) => { const l = labels.get(blockKeyOf(b)); return (l ? caseLabelPrefix(l) : '') + b.raw_text; });
+    };
     const questionBlocks = allBlocks['question'] || [];
-    const questionContext = questionBlocks.map((b) => b.raw_text).filter(Boolean).join('\n');
+    const questionContext = withLabel(questionBlocks).filter(Boolean).join('\n');
 
     const blocks = allBlocks[activeTab] || [];
     const activeIdx = blocks.findIndex((b) => b.id === blockId);
     const previousBlocks = activeIdx > 0
-      ? blocks.slice(0, activeIdx).map((b) => b.raw_text).filter(Boolean)
+      ? withLabel(blocks.slice(0, activeIdx)).filter(Boolean)
       : [];
 
     const ref = editorRefs.current[blockId];

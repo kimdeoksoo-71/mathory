@@ -13,7 +13,7 @@
 import type { Block, TabMeta, VerifyKind, VerifyReport } from '../types/problem';
 import { addComment } from './comments';
 import { setVerification } from './firestore';
-import { blockKeyOf } from './caseBlock';
+import { blockKeyOf, buildCaseLabels } from './caseBlock';
 import { FIG_PLACEHOLDER, imageSrcOf } from './verify/figures';
 import { collectCurrentContent } from './version/adapter';
 import { hashPerTab, sha256 } from './version/hash';
@@ -27,19 +27,23 @@ import { hashPerTab, sha256 } from './version/hash';
  *
  * ⚠ 부수 효과(의도됨): `batchVerify`의 `questionBlockCount`가 이 함수 길이라, 그림뿐인
  *   문항의 61d `empty_question` 사전 차단이 저절로 풀린다(batchPlan은 수치 주입형 — 무변경). */
-export interface VerifyBlockPayload { blockKey: string; type: string; text: string; imageUrl?: string }
+/** M7 D20 — `caseLabel`(C1·C2a)은 서버 `labelBlocks`가 **헤더**(`[블록 n] (case C1)`)에 싣는다. text엔 넣지 않는다(인용 앵커). */
+export interface VerifyBlockPayload { blockKey: string; type: string; text: string; imageUrl?: string; caseLabel?: string }
 
 export function verifyBlocksOf(blocks: Block[]): VerifyBlockPayload[] {
+  const labels = buildCaseLabels(blocks);   // M7 D20 — 전체 목록 기준(빈 블록 필터 전)으로 번호를 매긴다
   return blocks
     .map((b) => {
       if (b.type === 'image' || b.type === 'svg' || b.type === 'ggb') {
         const src = b.type === 'image' ? imageSrcOf(b.raw_text || '') : '';
         return { blockKey: blockKeyOf(b), type: b.type, text: FIG_PLACEHOLDER, ...(src ? { imageUrl: src } : {}) };
       }
+      const caseLabel = labels.get(blockKeyOf(b));
       return {
         blockKey: blockKeyOf(b),
         type: b.type,
         text: (b.title ? `### ${b.title}\n` : '') + (b.raw_text || ''),
+        ...(caseLabel ? { caseLabel } : {}),
       };
     })
     .filter((b) => b.text.trim());

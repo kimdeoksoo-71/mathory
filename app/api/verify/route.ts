@@ -589,11 +589,14 @@ function normalizeBlocks(raw: unknown): LabeledBlock[] {
       //   화이트리스트 판정은 여기서 하지 않는다: planSlots가 하면 탈락 사유가
       //   "허용되지 않는 그림 주소"로 정확히 남는다.
       const imageUrl = typeof o.imageUrl === 'string' && o.imageUrl ? { imageUrl: o.imageUrl } : {};
+      // M7 D20 — 경우 라벨(C1·C2a)도 같은 이유로 여기서 실어야 한다
+      const caseLabel = typeof o.caseLabel === 'string' && o.caseLabel ? { caseLabel: o.caseLabel } : {};
       return {
         blockKey: String(o.blockKey ?? ''),
         type: String(o.type ?? 'text'),
         text: String(o.text ?? ''),
         ...imageUrl,
+        ...caseLabel,
       };
     })
     .filter((b) => b.blockKey && b.text.trim());

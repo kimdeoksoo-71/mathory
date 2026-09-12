@@ -19,6 +19,7 @@ import {
 } from '../../lib/discussion-sessions';
 import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
 import { FIG_PLACEHOLDER, imageSrcOf, scanImgTags, countPlaceholders } from '../../lib/verify/figures';
+import { buildCaseLabels, blockKeyOf, caseLabelPrefix } from '../../lib/caseBlock';
 import EditorPreview from '../editor/EditorPreview';
 import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
@@ -521,7 +522,11 @@ export default function CommentPanel({
       const snap = await getDocs(
         query(collection(db, 'problems', problemId, tabSubcollection(tabId)), orderBy('order')),
       );
-      const blocks = snap.docs.map((d) => d.data() as Block);
+      // ⚠ d.data()엔 doc id가 없다 — block_key 없는 옛 블록의 라벨 키(blockKeyOf = block_key || id)가 충돌하지 않게 id를 싣는다
+      const blocks = snap.docs.map((d) => ({ ...(d.data() as Block), id: d.id }));
+      /* M7 D20 — 경우 블록 라벨(C1·C2a)을 **여기서** 붙인다(raw_text엔 없다 — 렌더가 붙이는 번호).
+         모델이 풀이의 "C1에 의하여" 인용을 알아보게 한다. 원천은 화면과 같은 buildCaseLabels 하나 */
+      const labels = buildCaseLabels(blocks);
       const slots: (string | null)[] = [];
       const text = blocks
         .map((b) => {
@@ -531,7 +536,8 @@ export default function CommentPanel({
             return FIG_PLACEHOLDER;
           }
           const title = b.title ? `### ${b.title}\n` : '';
-          return title + (b.raw_text || '');
+          const label = labels.get(blockKeyOf(b));
+          return title + (label ? caseLabelPrefix(label) : '') + (b.raw_text || '');
         })
         .filter(Boolean)
         .join('\n\n');

@@ -139,6 +139,12 @@ export function buildCaseLabels(blocks: CaseBlockLike[]): Map<string, string> {
  * 행 선두 인라인 <span> 주입은 marker-gana·marker-circled·marker-case-sub가
  * 쓰는 확립된 방식이고 rehypeRaw가 파싱한다. raw_text는 불변이다.
  */
+/** M7 D20 — AI 경계(토론 · ⌘J · 검증 헤더)에 붙이는 라벨 접두. 화면 표기(`injectCaseLabel`의 `C1.`)와 같다.
+ *  ⚠ raw_text·검증 `text`에는 넣지 말 것 — 인용 앵커(`findQuoteRange`)가 본문에서 인용을 찾는다. */
+export function caseLabelPrefix(label: string): string {
+  return `${label}. `;
+}
+
 export function injectCaseLabel(raw: string, label: string | null): string {
   const nl = raw.indexOf('\n');
   const first = nl === -1 ? raw : raw.slice(0, nl);
