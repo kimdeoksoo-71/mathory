@@ -102,6 +102,9 @@ const ICONS = {
   clipboardText: ['clipboard-text', 'regular'],            // 블록 붙여넣기 (M7 D18) — Row 2 · 복사는 기존 copy
   // toggleOff/toggleOn(toggle-left/right)은 M6 D17에서 넣었다가 덕수 검수(2026-09-09)로 철회 —
   // ToggleSwitch가 트랙+손잡이 도안으로 복귀해 소비처 0. 되살리지 말 것.
+  // ── Phase 66a (문답 검증 질문 리스트) ──
+  listDashes: ['list-dashes', 'regular'],                  // IconQuestionList — agent 탭 질문 목록.
+  // ⚠ listChecks(교정)를 재사용하지 말 것 — EditorView는 Row 2 툴바와 agent 드로어가 동시에 보인다.
 };
 
 const assetFile = (name, w) =>

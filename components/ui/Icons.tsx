@@ -114,6 +114,9 @@ export const IconRobot = phIcon(PH.robot, 14);
 /** M6 D6·D7 — 정렬 방향(리스트 헤더 · 카드 보기 SortControls). 기본 12는 † 예외(덕수 판정). */
 export const IconSortAsc = phIcon(PH.arrowUp, 12);
 export const IconSortDesc = phIcon(PH.arrowDown, 12);
+/** Phase 66a — agent 탭 문답 검증 질문 목록. ⚠ listChecks(교정)와 도안을 공유하지 말 것:
+ *  EditorView는 Row 2 툴바(교정)와 agent 드로어(질문)가 동시에 화면에 있다. */
+export const IconQuestionList = phIcon(PH.listDashes, 16);
 
 /** 로딩 스피너 — circle-notch 회전. animateTransform은 회전 대상(<path>)의 자식이어야 한다(D14). */
 export function IconLoader({ size = 14, color = 'currentColor', className }: IconProps) {
