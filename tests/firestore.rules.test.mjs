@@ -38,6 +38,8 @@
  *   58) 오너 LIST 허용(F11)  59) 제3자 LIST 거부  60) 비로그인 LIST 거부
  *   [Phase 55b: GitHub 내보내기 기록]
  *   61) github_export 단독 update 허용  62) name 동반 update 허용  63) content_hash 동반 update 거부
+ *   [Phase 66a: 문답 검증 질문 users/{uid}/ask_questions]
+ *   64) 본인 read/write 허용  65) 타인 read/write 거부
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -491,4 +493,23 @@ test('63. github_export + content_hash 동반 update 거부 (불변성 유지)',
   await assertFails(updateDoc(
     doc(as(OWNER), 'problems/pub/versions/v1'),
     { github_export: ghExport, content_hash: 'tampered' }));
+});
+
+// ── Phase 66a: 문답 검증 질문 (users/{uid}/ask_questions — math_snippets와 같은 규칙) ──
+const askQ = { label: 'q', target: 'solution', text: 't', order: 10, enabled: true, rev: 1 };
+
+test('64. 본인 uid의 ask_questions read/write 허용', async () => {
+  await assertSucceeds(setDoc(doc(as(OWNER), `users/${OWNER}/ask_questions/q1`), askQ));
+  await assertSucceeds(getDoc(doc(as(OWNER), `users/${OWNER}/ask_questions/q1`)));
+  await assertSucceeds(updateDoc(doc(as(OWNER), `users/${OWNER}/ask_questions/q1`), { rev: 2 }));
+  await assertSucceeds(deleteDoc(doc(as(OWNER), `users/${OWNER}/ask_questions/q1`)));
+});
+test('65. 타인 uid의 ask_questions read/write 거부', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `users/${OWNER}/ask_questions/q2`), askQ);
+  });
+  await assertFails(getDoc(doc(as(STRANGER), `users/${OWNER}/ask_questions/q2`)));
+  await assertFails(setDoc(doc(as(STRANGER), `users/${OWNER}/ask_questions/q3`), askQ));
+  await assertFails(deleteDoc(doc(as(STRANGER), `users/${OWNER}/ask_questions/q2`)));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), `users/${OWNER}/ask_questions/q2`)));
 });
