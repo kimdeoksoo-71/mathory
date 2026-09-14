@@ -33,6 +33,12 @@ import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H } from '../ui
 
 const HISTORY_LIMIT = 5;
 
+/** Phase 66a — 문답 검증에서 참고 탭이 있을 때 컨텍스트 맨 앞에 붙는 범위 안내.
+ *  세 질문에 똑같이 붙는 통제 조건이다(질문 문안이라는 실험 변수와 분리). */
+const ASK_SCOPE_NOTE =
+  '※ 검증·지적 대상은 [문제]와 "검증 대상" 표시가 붙은 탭뿐입니다. ' +
+  '"참고 자료" 표시가 붙은 탭은 풀이를 이해하는 데만 쓰고, 그 탭의 서술·계산·표기는 지적하지 마세요.';
+
 /** Phase 42: 다음 라운드 AI 입력으로 보내는 히스토리에서 대용량 첨부 제거.
  *  그래프 펜스·검산 <details> 부록이 그대로 역류하면 토큰 낭비 + 펜스 모방을 유발.
  *  ⚠️ Firestore 저장본(표시용 content)은 건드리지 않음 — 히스토리 조립 시에만 적용. */
@@ -558,27 +564,44 @@ export default function CommentPanel({
   // Phase 47: agent 컨텍스트 = 문제 탭 + 풀이/extra 탭(들) 전체. 합산 15,000자 상한.
   // question은 보존하고, 초과 시 나머지(풀이/참고)를 뒤에서 자른다.
   const CONTEXT_CHAR_CAP = 15000;
-  /* Phase 66a — `solutionOnly`면 문제 탭 + **기본 풀이 탭(id 'solution')만** 보낸다.
-     문답 검증은 사람이 쓴 풀이를 검증하는 일이라, 사용자가 추가한 탭(extra_N — 'AI 풀이'·'참고' 등)이
-     섞이면 모델이 AI 풀이의 군더더기를 지적하거나 두 풀이를 뒤섞는다. 교차 검증 칩(61b)도
-     question + solution만 보낸다(`verifyFlow.ts` solutionBlocks) — 같은 기준이다.
-     ⚠ 탭 **라벨**('AI 풀이')로 거르지 말 것 — 라벨은 사용자가 짓는 값이고 id만 고정이다.
-     ⚠ 타이핑 대화는 그대로 전체 탭이다(Phase 47 — 참고 탭까지 보고 토론한다). */
-  const buildContext = useCallback(async (opts?: { solutionOnly?: boolean }) => {
+  /* Phase 66a — `solutionTarget`(문답 검증 전용): **지적 대상은 문제 + 기본 풀이 탭(id 'solution')**,
+     사용자가 추가한 탭(extra_N — 'AI 풀이'·'참고' 등)은 **참고 자료**로만 함께 보낸다(덕수 2026-09-15).
+     서버(`buildUserPrompt`)는 탭 내용을 전부 "## 현재 풀이" 한 제목 아래 붙이므로, 표시 없이 보내면
+     모델이 AI 풀이까지 검증할 풀이로 읽는다 → 클라가 절마다 "검증 대상/참고 자료" 표시와 맨 위 범위
+     안내를 단다(서버 0).
+     ⚠ 풀이 탭을 **맨 앞**에 둔다 — 15,000자 자르기가 뒤에서 자르므로 넘치면 참고 자료가 먼저 잘린다.
+       그림 슬롯도 같은 순서로 쌓아야 [그림 k] 번호가 어긋나지 않는다(61f D19).
+     ⚠ 범위 안내는 질문 문안이 아니라 **컨텍스트**에 둔다 — 세 질문에 똑같이 붙는 통제 조건이라
+       문안(실험 변수)을 바꾸지 않는다.
+     ⚠ 탭 **라벨**로 거르지 말 것 — 라벨은 사용자가 짓는 값이고 id만 고정이다.
+     ⚠ 타이핑 대화는 그대로 전체 탭·표시 없음(Phase 47). */
+  const buildContext = useCallback(async (opts?: { solutionTarget?: boolean }) => {
+    const target = !!opts?.solutionTarget;
     const q = await fetchTabBlocksForModel('question');
-    const otherTabs = opts?.solutionOnly
-      ? tabs.filter((t) => t.id === 'solution')
-      : tabs.filter((t) => t.id !== 'question');
+    const nonQuestion = tabs.filter((t) => t.id !== 'question');
+    const otherTabs = target
+      ? [...nonQuestion.filter((t) => t.id === 'solution'), ...nonQuestion.filter((t) => t.id !== 'solution')]
+      : nonQuestion;
     const parts: string[] = [];
     const tabSlots: (string | null)[] = [];
+    let hasReference = false;
     for (const t of otherTabs) {
       const r = await fetchTabBlocksForModel(t.id);
       if (r.text) {
-        parts.push(`### [${t.label}]\n${r.text}`);
+        const isRef = target && t.id !== 'solution';
+        if (isRef) hasReference = true;
+        const head = !target ? `### [${t.label}]`
+          : isRef ? `### [${t.label}] — 참고 자료 (검증 대상 아님)`
+          : `### [${t.label}] — 검증 대상`;
+        parts.push(`${head}\n${r.text}`);
         tabSlots.push(...r.slots);
       }
     }
     let otherContent = parts.join('\n\n');
+    if (hasReference) {
+      // 자르기 전에 붙인다 — 맨 앞이라 잘리지 않고, 자리표시자(⟦)가 없어 슬롯 수에도 영향이 없다
+      otherContent = ASK_SCOPE_NOTE + '\n\n' + otherContent;
+    }
     const room = Math.max(0, CONTEXT_CHAR_CAP - q.text.length);
     if (otherContent.length > room) {
       otherContent = otherContent.slice(0, room)
@@ -589,7 +612,7 @@ export default function CommentPanel({
     return {
       problemContent: q.text,
       currentTabContent: otherContent || undefined,
-      currentTabLabel: otherContent ? (opts?.solutionOnly ? '풀이' : '풀이·참고 전체') : undefined,
+      currentTabLabel: otherContent ? (target ? (hasReference ? '풀이 · 참고 탭 포함' : '풀이') : '풀이·참고 전체') : undefined,
       problemSlots: q.slots,
       // ⚠ Phase 61f D19 — 번호·첨부는 **자르고 남은** 자리표시자 기준이다. 여기서 슬롯을
       //   함께 자르지 않으면 잘려 나간 그림이 그대로 첨부돼 k 번호가 밀린다(v2 C2).
@@ -698,7 +721,7 @@ export default function CommentPanel({
      ⚠ `noHistory`는 D15′ — 한 세션에 질문 셋을 나란히 쌓으면서도 앞 답이 뒤 질문을 오염시키지 않는다. */
   const handleSendMessage = async (
     content: string,
-    opts?: { modelIds?: string[]; noHistory?: boolean; solutionOnly?: boolean },
+    opts?: { modelIds?: string[]; noHistory?: boolean; solutionTarget?: boolean },
   ) => {
     const myNickname = myProfile?.nickname || 'KDS';
 
@@ -757,7 +780,7 @@ export default function CommentPanel({
     if (invokedIds.length === 0) return;
 
     // 3. 컨텍스트 조립
-    const ctx = await buildContext({ solutionOnly: opts?.solutionOnly });
+    const ctx = await buildContext({ solutionTarget: opts?.solutionTarget });
     /* D15′ — 문답 검증은 히스토리를 싣지 않는다. `historySlots`가 []면 아래 `hasAnyFig`의
        `some(...)`이 false가 되고 `images.history`도 []가 되어 61f의 그림 번호가 밀리지 않는다.
        서버도 빈 배열이면 "## 토론 히스토리" 절 자체를 넣지 않는다(route.ts:408). */
@@ -867,7 +890,7 @@ export default function CommentPanel({
        **return**해 AI가 한 번도 호출되지 않는다(조용한 실패). */
   const handleAskSend = async (message: string, modelIds: string[]) => {
     setReplyingTo(null);
-    await handleSendMessage(message, { modelIds, noHistory: true, solutionOnly: true });
+    await handleSendMessage(message, { modelIds, noHistory: true, solutionTarget: true });
   };
 
   const handleRetryAI = async (modelId: string, sessionId: string) => {
