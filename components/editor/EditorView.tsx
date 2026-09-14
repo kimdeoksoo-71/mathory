@@ -3095,6 +3095,37 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setActiveTab(nextTabId);
   }, [activeTab, handleSave]);
 
+  /* ─── AI 경로 공용: "보내기 전에 저장본을 맞춘다" (Phase 66a D12″ · Q5) ───
+     소비처 둘 — 61b 검증 칩(handleRunVerify)과 66a 문답 전송(CommentPanel onBeforeAskSend).
+     둘 다 **저장본**을 읽는 서버 경로라 미저장 편집이 있으면 "지금 화면"을 보냈다고 믿는데
+     서버본이 나간다(검증은 지적 위치까지 어긋난다).
+
+     ⚠ 세 함정이 전부 **조용한 실패**라 ref로만 쓴다:
+       ① `handleSave`는 throw하지 않는다 — catch에서 status·saveError·lastSaveOkRef=false로 삼킨다.
+          try/catch로 감싸 봐야 아무것도 못 잡는다. 유일한 신호는 await 뒤의 lastSaveOkRef.
+       ② `handleSave` 머리의 `if (savingRef.current) return;`이 **즉시 반환**한다. 이때
+          lastSaveOkRef는 직전 성공값(초깃값도 true)이라 가드가 통과해 **미저장분이 그대로 나간다**.
+          저장이 도는 경우는 흔하다 — 탭 전환 자동 저장·30분 자동 저장·저장 버튼 직후.
+          그래서 먼저 가라앉기를 기다린다.
+       ③ 기다린 **뒤**에는 클로저 `dirty`가 반드시 낡았다(그 사이 사용자가 친 글자). deps를 채워도
+          못 막는다 — `dirtyRef.current`를 대기 뒤에 읽어야 한다. 그래서 deps가 []다. */
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+  const dirtyRef = useRef(dirty);
+  dirtyRef.current = dirty;
+
+  const ensureSavedForAI = useCallback(async () => {
+    // 진행 중 저장이 가라앉을 때까지. 상한이 없으면 네트워크가 죽었을 때 영원히 걸린다
+    for (let i = 0; savingRef.current; i++) {
+      if (i >= 300) throw new Error('저장이 끝나지 않아 중단했습니다');   // 50ms × 300 = 15초
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    if (dirtyRef.current) {
+      await handleSaveRef.current(true);
+      if (!lastSaveOkRef.current) throw new Error('저장에 실패해 중단했습니다');
+    }
+  }, []);
+
   /* ═══ Phase 61b: 정밀 검증 ═══ */
 
   /** 칩이 팝오버를 열기 **전에** 부른다 — 비용 0으로 막을 수 있는 것을 호출 뒤에 알리지 않는다 */
@@ -3106,14 +3137,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleRunVerify = useCallback(async (kind: VerifyKind, sessionId: string) => {
     if (!problem || !user) throw new Error('문항 정보를 불러오지 못했습니다');
 
-    /* ⚠ 검증 대상은 **저장본**이다. 미저장 편집이 있으면 "지금 화면"을 검증했다고 믿는데
-         서버본이 검증되고 지적 위치도 어긋난다. 저장이 실패하면 실행하지 않는다.
-         덤으로 toPersistedBlock이 block_key를 영속시켜 리포트 앵커가 안정된다.
-         (열람뷰에는 이 단계가 없다 — 거기서는 애초에 저장본만 보인다) */
-    if (dirty) {
-      await handleSave(true);
-      if (!lastSaveOkRef.current) throw new Error('저장에 실패해 검증을 중단했습니다');
-    }
+    /* 검증 대상은 **저장본**이다 — 위 ensureSavedForAI 주석 참조.
+       덤으로 toPersistedBlock이 block_key를 영속시켜 리포트 앵커가 안정된다.
+       (열람뷰에는 이 단계가 없다 — 거기서는 애초에 저장본만 보인다) */
+    await ensureSavedForAI();
 
     const { report, commentId } = await runVerifyFlow({
       kind, problemId: problem.id, sessionId, tabId: activeTab,
@@ -3134,7 +3161,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         },
       },
     } : prev));
-  }, [problem, user, dirty, handleSave, allBlocks, editAnswer, editTitle, tabs, activeTab]);
+  }, [problem, user, ensureSavedForAI, allBlocks, editAnswer, editTitle, tabs, activeTab]);
 
   /**
    * 리포트 지적 → **그 인용이 있는 자리**로.
@@ -3215,16 +3242,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     onBack();
   }, [handleSave, onBack, snapshotCurrent]);
 
-  const handleSaveRef = useRef(handleSave);
-  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
 
   /* ─── M7 D12·D13 — 30분 자동 저장 (Phase 55 D2 "Firestore 상시 저장은 하지 않는다"의 개정) ───
      기준점은 **마지막 저장**(lastSavedAt — 어떤 종류든)이라 수동 저장 직후 또 돌지 않는다.
      silent 저장 = 스냅샷 없음(D13 — 버전 기록은 사람의 의도만 남긴다). 숨김 탭도 저장한다.
      발화 조건: dirty · 저장 중 아님 · 복원 중 아님. 실패하면 handleSave의 기존 에러 status가 뜨고
      다음 틱에 재시도. 드래프트(500ms·크래시 안전망)는 그대로 별개 계층이다. */
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  /* dirtyRef·handleSaveRef는 ensureSavedForAI가 먼저 쓰므로 위(switchTab 뒤)에서 선언한다 */
   const restoringRef = useRef(false);
   useEffect(() => {
     if (!problem?.id) return;
@@ -4135,6 +4159,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onInsertGraphBlock={handleInsertGraphBlock}
           onInsertToEditor={handleInsertFromChat}
           onRunVerify={handleRunVerify}
+          onBeforeAskSend={ensureSavedForAI}
           onJumpToBlock={handleJumpToBlock}
           verifyCharCount={verifyCharCount}
           width={comment.width}
