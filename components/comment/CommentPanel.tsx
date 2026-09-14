@@ -25,6 +25,7 @@ import CommentEditor, { type CommentEditorHandle } from './CommentEditor';
 import { AIBrandIcon, providerFromModelName } from './AIBrandIcon';
 import VerifyReportCard, { extractVerifyReport } from './VerifyReportCard';
 import SelectionInsertPopup from './SelectionInsertPopup';
+import AskListPopover from './AskListPopover';
 import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../viewer/GgbGraphView';
 import { IconDownload, IconComment, IconAgent } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
@@ -97,6 +98,11 @@ interface CommentPanelProps {
   /** Phase 64 §5-3 ③ — 폰 바텀 시트에서 false: 터치의 네이티브 선택 UI와 겹치는
    *  SelectionInsertPopup을 렌더하지 않는다. 기본 true = 데스크톱 무변경. */
   selectionPopup?: boolean;
+  /** Phase 66a D12″ — 문답 검증 전송 직전 훅. **편집 화면에서만 전달**한다
+   *  (열람뷰는 저장본만 보이므로 해당 없음 — `onInsertToEditor` 선례).
+   *  ⚠ 실패는 **throw**로 알린다(EditorView `ensureSavedForAI`). 저장이 실패했는데 전송이 이어지면
+   *  옛 저장본이 검증된다 — 팝오버가 잡아 안내하고 중단한다(D21). */
+  onBeforeAskSend?: () => Promise<void>;
   /** M8 D6 — 크롬. 'drawer'(기본) = 데스크톱 떠 있는 카드(인셋 8·radius·테두리·그림자·1행 X).
    *  'sheet' = 폰 BottomSheet 안 — 상자·테두리·그림자·maxWidth·1행 X 없이 시트를 꽉 채운다
    *  (닫기는 시트의 딤·그립·X가 담당, `onClose`는 시트가 받는다). 1행·2행·행 구분선은 그대로. */
@@ -152,6 +158,7 @@ export default function CommentPanel({
   bodyFontSize = 15,
   onClose, onCommentsChange, onInsertGraphBlock,
   onRunVerify, onJumpToBlock, verifyCharCount, onInsertToEditor,
+  onBeforeAskSend,
   width = '35em',
   selectionPopup = true,
   chrome = 'drawer',
@@ -402,7 +409,7 @@ export default function CommentPanel({
       if (c.authorType === 'ai' && c.modelId) {
         // Phase 61b: 검증 리포트는 env 고정 모델이라 ai_models 문서가 없다 → 이름이 '?'가 된다
         if (c.modelId === 'verify') {
-          return { name: '검증', provider: 'verify', isAI: true, modelDisplayName: '정밀 검증' };
+          return { name: '검증', provider: 'verify', isAI: true, modelDisplayName: '교차 검증' };
         }
         const model = aiModels.find((m) => m.modelId === c.modelId);
         return {
@@ -677,7 +684,14 @@ export default function CommentPanel({
   );
 
   // ─── 메시지 전송 (Phase 37-F 핵심) ───
-  const handleSendMessage = async (content: string) => {
+  /* Phase 66a — `opts`는 문답 검증 전용이다(타이핑 경로는 안 넘긴다).
+     ⚠ `modelIds`는 칩 선택의 **대체**다(합집합 금지) — 합치면 켜 둔 모델까지 같은 질문을 받아
+       비용이 배가 되고 "고정 모델로 비교한다"는 실험 전제가 깨진다.
+     ⚠ `noHistory`는 D15′ — 한 세션에 질문 셋을 나란히 쌓으면서도 앞 답이 뒤 질문을 오염시키지 않는다. */
+  const handleSendMessage = async (
+    content: string,
+    opts?: { modelIds?: string[]; noHistory?: boolean },
+  ) => {
     const myNickname = myProfile?.nickname || 'KDS';
 
     // 쓰기 대상 세션: 댓글 모드 = 댓글 세션(없으면 legacy null), agent = 선택된 세션
@@ -718,7 +732,7 @@ export default function CommentPanel({
     }
 
     // 일반 세션 — AI 호출 가능
-    const invokedIds = isAISession ? [...selectedModelIds] : [];
+    const invokedIds = isAISession ? [...(opts?.modelIds ?? selectedModelIds)] : [];
     const invokedModels = invokedIds
       .map((id) => aiModels.find((m) => m.modelId === id))
       .filter((m): m is AIModelConfig => !!m);
@@ -736,7 +750,12 @@ export default function CommentPanel({
 
     // 3. 컨텍스트 조립
     const ctx = await buildContext();
-    const { history, slots: historySlots } = buildHistory();
+    /* D15′ — 문답 검증은 히스토리를 싣지 않는다. `historySlots`가 []면 아래 `hasAnyFig`의
+       `some(...)`이 false가 되고 `images.history`도 []가 되어 61f의 그림 번호가 밀리지 않는다.
+       서버도 빈 배열이면 "## 토론 히스토리" 절 자체를 넣지 않는다(route.ts:408). */
+    const { history, slots: historySlots } = opts?.noHistory
+      ? { history: [] as ReturnType<typeof buildHistory>['history'], slots: [] as (string | null)[][] }
+      : buildHistory();
     const participantNicknames = [myNickname, ...invokedModels.map((m) => m.nickname)];
 
     // Phase 61f — 방금 쓴 메시지의 <img>도 자리표시자로 (D12-②).
@@ -834,6 +853,14 @@ export default function CommentPanel({
       );
     }
   }, [onRunVerify, refreshComments]);
+
+  /* Phase 66a — 문답 검증 전송. 팝오버가 D21로 감싸므로 여기서는 throw를 그대로 흘린다.
+     ⚠ D17 `setReplyingTo(null)` — 답글 모드면 `handleSendMessage`의 첫 분기가 답글로 저장하고
+       **return**해 AI가 한 번도 호출되지 않는다(조용한 실패). */
+  const handleAskSend = async (message: string, modelIds: string[]) => {
+    setReplyingTo(null);
+    await handleSendMessage(message, { modelIds, noHistory: true });
+  };
 
   const handleRetryAI = async (modelId: string, sessionId: string) => {
     const pending = pendingAI.find((p) => p.modelId === modelId && p.sessionId === sessionId);
@@ -1157,6 +1184,18 @@ export default function CommentPanel({
               /* ⚠️ AIChipBar는 전폭 <div>다 — fragment로 나란히 두면 검증 칩이 아랫줄로 밀린다.
                     한 줄에 흐르도록 flex 컨테이너로 감싼다. */
               <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+                {/* Phase 66a: 문답 검증 질문 리스트 — 검증 칩과 같은 게이트(오너 + AI 세션).
+                    ⚠ 이 flex 컨테이너 **안**에 둘 것 — fragment로 나란히 두면 아랫줄로 밀린다. */}
+                {currentUid === ownerUid && (
+                  <AskListPopover
+                    uid={currentUid}
+                    models={aiModels}
+                    busy={pendingAI.some((p) => p.sessionId === activeSessionId && !p.error)}
+                    canSend={!!activeSessionId}
+                    onSend={handleAskSend}
+                    onBeforeSend={onBeforeAskSend}
+                  />
+                )}
                 <AIChipBar
                   models={aiModels}
                   selectedIds={selectedModelIds}
