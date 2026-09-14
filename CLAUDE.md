@@ -51,6 +51,9 @@ lib/chatExtract.ts        — 대화 선택 → 마크다운 직렬화 (Phase 61
 components/comment/
   SelectionInsertPopup.tsx — 선택 감지·DOM 어댑터·팝업 (Phase 61c)
 lib/latexScan.ts          — LaTeX 중괄호 균형 스캔 (M1, import 0 · mathSplit·proofread 공용)
+lib/ask/seed.ts           — 문답 검증 질문 씨앗·트리거 정규식 (Phase 66a, import 0 · test:ask)
+lib/askQuestions.ts       — ask_questions CRUD·씨앗 (Phase 66a, firestore 접촉 — lib/ask/에 두지 말 것)
+components/comment/AskListPopover.tsx — 질문 목록·전송·편집 모달 (Phase 66a)
 lib/verify/batchPlan.ts   — 일괄 검증 판정 (Phase 61d, import 0 순수 모듈)
 lib/batchVerify.ts        — 일괄 검증 오케스트레이터 (Phase 61d, firestore 접촉)
 components/problem/
@@ -89,7 +92,8 @@ Firestore:
 │   ├── solution_blocks/{blockId}
 │   └── extra_N_blocks/{blockId}    (동적 탭)
 ├── folders/{id}: {name, user_id, order}
-└── users/{uid}/math_snippets/{id}: {name, shortcutIndex, content}
+├── users/{uid}/math_snippets/{id}: {name, shortcutIndex, content}
+└── users/{uid}/ask_questions/{id}: {label, target, text, order, enabled, rev}   (Phase 66a)
 ```
 
 ## 전처리 파이프라인
@@ -141,6 +145,52 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
+- **문답 검증의 질문은 코드가 아니라 Firestore가 소유한다 (Phase 66a)**: `lib/ask/seed.ts`의
+  `SEED_QUESTIONS`는 **최초 1회 복사본**이고(컬렉션이 비었을 때만 쓰인다) 이후 진실은
+  `users/{uid}/ask_questions`다 — 씨앗을 고쳐도 이미 만들어진 문서는 안 바뀐다(의도).
+  꼬리(출력 형식 지시)도 **본문의 일부**라 코드가 붙이지 않는다(그것도 실험 변수다).
+  ⚠ **`order`가 없는 문서는 `orderBy` 쿼리에서 조용히 사라진다** — 콘솔에서 손으로 만들지 말 것.
+- **⚠ 질문 본문은 `/api/discuss`의 트리거 낱말을 피한다 (Phase 66a D20)**: `CODE_EXEC_TRIGGER_RE`
+  (`route.ts:256` — `검산`·`sympy`·`코드로 확인/검증/계산`·`파이썬으로`·`계산해 확인`)가
+  **`currentMessage` 전체**를 보고, 걸리면 ① 메시지 끝에 *"반드시 SymPy를 실제로 실행하라,
+  코드 없이 답하면 무효"*가 부착되고 ② `forceCodeExecution` → `tool_choice:{type:'any'}`로 도구가
+  **강제**된다. 씨앗 G2가 *묻던* 것("검산이 군더더기인가")이 모델에겐 *요청*("검산해 달라")으로
+  도착했다 — 측정 대상이 문안의 질이 아니라 서버 접미사의 압력이 된다. 정규식 사본은
+  `lib/ask/seed.ts`의 `DISCUSS_TRIGGER_RES`(**의도적 이중** — import 0이라 라우트를 못 읽는다.
+  전례: `listColumns` verifyRank ↔ `VERIFY_VERDICT_META`)이고 `triggerWarnings`가 **경고만** 한다
+  (차단 아님 — 진짜 검산을 시켜 보는 질문을 만들 수도 있다). `tests/ask.test.mjs` T7이 씨앗의 회귀를 고정한다.
+- **⚠ discuss의 Claude는 한 요청 안에서 Anthropic을 최대 4회 부른다 (Phase 66a)**: `getProviderForModel`이
+  `enableCodeExecution: true`로 만들고(`ai-provider.ts:556` — 검증 판정자는 `:592`에서 false, **비대칭**)
+  `buildClaudeParams`가 **트리거와 무관하게** `params.tools`를 싣는다(`providerParams.ts:63-65`;
+  트리거는 `tool_choice`만 좌우). `stop_reason === 'pause_turn'`이면 assistant 턴을 이어 붙여 재요청하고
+  상한이 `DEFAULT_MAX_TOOL_TURNS = 3`이라 turn 0~3, **각 턴이 같은 `max_tokens`를 받는다**.
+  라우트 예산은 `maxDuration 300` · `TIMEOUT_MS 280_000`이다 → **위험은 토큰이 아니라 턴이다.**
+  ⚠ 잘림은 눈에 보인다 — `stop_reason === 'max_tokens'`면 *"…응답이 토큰 한도로 잘렸습니다"*,
+  턴 상한이면 *"…도구 호출이 상한에 도달해 응답이 미완성입니다"*를 **답 본문에 직접 붙인다**
+  (`ai-provider.ts:508-513`). 자발적 코드 실행은 답의 `<details>` 검산 코드로 사후 관측한다.
+  (그래프 잘림 안내 `route.ts:342`는 `isGraphModel` = google·openai 전용이라 Claude 경로엔 없다)
+- **AI 전송 전 저장 가드는 `ensureSavedForAI` 하나다 (Phase 66a D12″ · Q5)**: 소비처 둘 —
+  61b 검증 칩(`handleRunVerify`)과 66a 문답 전송(`onBeforeAskSend`). **ref 4종만 읽고 deps는 `[]`다.**
+  함정 셋이 전부 조용한 실패라서다 — ① **`handleSave`는 throw하지 않는다**(catch에서 삼킨다.
+  try/catch로 감싸 봐야 못 잡고 유일한 신호는 `await` 뒤의 `lastSaveOkRef`) ② 머리의
+  `if (savingRef.current) return;`이 **즉시 반환**하는데 이때 `lastSaveOkRef`는 직전 성공값
+  (초깃값도 `true`)이라 **가드가 통과해 미저장분이 그대로 나간다**(탭 전환·30분 자동 저장·저장 버튼
+  직후가 전부 해당) → 먼저 가라앉기를 기다린다(50ms × 300 = 15초, 상한이 없으면 네트워크가 죽었을 때
+  영원히 걸린다) ③ **기다린 뒤에는 클로저 `dirty`가 반드시 낡았다**(그 사이 친 글자) — deps를 채워도
+  못 막고 `dirtyRef.current`를 대기 뒤에 읽어야 한다. ⚠ ②는 **61b에 있던 잠복 버그**이고 66a가 동반 수정했다.
+- **문답 전송은 히스토리를 싣지 않는다 (Phase 66a D15′)**: `handleSendMessage(content, opts)`의
+  `noHistory`가 `buildHistory()`를 건너뛴다. `HISTORY_LIMIT 5`가 앞 답을 뒤 질문에 실어 보내면
+  **한 문항에 문안 셋을 돌리는 비교가 성립하지 않는다**. `historySlots`가 `[]`면 `hasAnyFig`의
+  `some(...)`이 false라 `images.history`도 `[]`가 되어 61f 그림 번호가 밀리지 않고, 서버는 빈 배열이면
+  "## 토론 히스토리" 절 자체를 넣지 않으며(`route.ts:408`), 시스템 규칙 10이 "히스토리가 비어있으면
+  첫 발언으로 간주"라 모델도 정상으로 읽는다. ⚠ **타이핑 전송의 히스토리는 끄지 말 것**(그건 대화다).
+  ⚠ `opts.modelIds`는 칩 선택의 **대체**다 — 합집합이면 켜 둔 모델까지 같은 질문을 받아 비용이 배가 되고
+  "고정 모델로 비교한다"는 실험 전제가 깨진다. 재시도는 `retryContext`를 재사용하므로 D15′를 보존한다.
+- **⚠ `handleSendMessage`의 첫 분기는 답글이다 (Phase 66a D17)**: `if (replyingTo)`가 답글로 저장하고
+  **`return`**해 AI가 한 번도 호출되지 않는다. 컴포저를 거치지 않고 그 함수를 직접 부르는 경로는
+  전송 직전에 `setReplyingTo(null)`을 해야 한다. ⚠ 같은 이유로 **전송 전체를 try/catch**할 것 —
+  `CommentEditor.handleSubmit`은 `try/finally`뿐이라(`:140-144`) 타이핑 경로는 `addComment` 실패가
+  조용히 사라진다(기존 잠복). 컴포저를 안 거치면 그 구멍을 그대로 물려받는다.
 - **편집창 수식 스캐너는 `lib/mathRegions.ts` 하나다 (M7 D2·D3)**: 같은 행에 닫는 `$$`가 없는 `$$`는 **빈 인라인 쌍**(길이 0, 진단 없음, `isInsideMath` true). 소비처 6곳(linter·highlight·completions·proofread 3 스캐너)에 `$$` 정규식·char scan 사본을 다시 만들지 말 것. 하이라이터만 `inlineSingleLine`(단일 `$`의 짝을 같은 행에서만 — 타이핑 요동 방지). 렌더·저장 경로(`locale.ts`·`preprocess.ts`·`mathIndex.ts`)와 사본 5곳(`math-editor-extensions`·MarkdownEditor `findInnermostExit`·`mathSplit`·`chatExtract`·`katex-render`)은 범위 밖으로 남아 있다
 - **`$` 버튼은 인접 `$`일 때만 공백을 붙인다 (M7 D1·D4)** — micromark는 `$a$$b$`를 수식 하나(`a$$b`)로, `$$$x$`를 리터럴로 읽는다(실측). `$ $`(안쪽 공백)로 바꾸지 말 것. 선택이 있으면 `$sel$`로 감싼다. 버튼·Ctrl+N,M은 `MarkdownEditor.insertInlineMathIn` 하나
 - **끔 모드 가로 추적은 두 정책이다 (M7 D5·D6)**: 타자·삭제 = 경계에 닿으면 **중앙**(`centerCursorOnEdge` — updateListener의 `requestMeasure` write가 CM의 nearest `scrollIntoView`보다 먼저 돈다, dist 8054-8067) / 프로그램적 이동 = 경계까지만(`revealCursorX`). ⚠ 검증 표본은 줄 **중간**에서 — 가장 긴 줄 끝에서는 오른쪽에 내용이 없어 중앙 정렬이 원리상 불가능하다(nearest와 구별 안 됨). `EditorView.scrollIntoView` 금지는 그대로
@@ -363,7 +413,29 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · 후속 4건 반영 · **push 대기**
+## 현재 Phase: **Phase 66a — 문답 검증 1단계: agent 탭 질문 리스트** — 구현 완료(2026-09-15) · **덕수 준비물 3 + 실물 검수 대기**
+
+문서: `docs/phasedocs/Phase66a 문답 검증 1단계 agent 탭 질문 리스트 v6 착수판.md`
+(계보: 66 v1 구상 → 브레인스토밍 → 66a v1 web → v2 CLI → v3 web → v4 CLI → v5 web → **v6 CLI = 착수판**.
+ 부록 B~D가 판본별 정정·보완, §0이 덕수 확정 Q1~Q6)
+
+agent 대화창 입력 상단의 질문 리스트에서 고른 검증 질문을 선택한 AI에게 보낸다. 질문은
+`users/{uid}/ask_questions`에 살며 앱 안에서 편집한다. **목적은 기능 완성이 아니라 실험이다** —
+문안을 고치는 왕복이 배포 없이 돌아야 한다.
+**서버 0 · 프롬프트 0 · 61d/61h 0 · 문항 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0**
+(61b는 서버 0 · 클라 저장 가드 1곳 공유 — Q5). 신규 3 · 수정 7 · 커밋 S1~S5 ·
+ICONS 60 → **61종** · 로직 검증 439 → **446건** · 규칙 블록 65 → **67**.
+**규약은 위 「핵심 패턴」 맨 앞의 66a 절 5개가 소유한다.**
+
+- **덕수 확정(2026-09-15) Q1~Q6 전항 권장안**: ref 폴링 대기 · 씨앗 G2 "맞는지 확인하는 절차" 승인 ·
+  `maxTokens 8192` 유지 · 트리거는 경고 · 저장 가드를 61b와 공유 · 라벨 개명 소급 수용
+- **가장 값비싼 발견 둘**: ① 씨앗 G2의 낱말 **"검산"**이 서버 정규식에 걸려 *묻는* 질문이 *요청*으로
+  도착했다(v5 X2 — 실험 자체가 무효가 될 뻔했다) ② `handleSave`가 진행 중이면 **가드가 조용히 통과**해
+  미저장분이 나간다(v5 X5 — 61b에 이미 있던 잠복 버그)
+- ⚠ 남은 일: **덕수 준비물 3**(실험용 `ai_models` 문서 · 문항 3~5개 · 규칙 배포) → 실물 검수 11항 →
+  실험 §10 → 66b 설계. dev 종료 → `npm run build` → push. 빌드 로그 `[icons:check] OK — 61종`
+
+### 이전: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · 후속 4건 반영 · **push 대기**
 
 문서: `docs/phasedocs/개선묶음 M7 기능 개선·버그 수정 v4 실행판.md`
 (계보: 덕수 스케치 9항 + 추가 2항 → v1 web → v2 착수판(P1~P19 확정) → v3 CLI 실측 교차검토(정정 11·보완 10·N1~N5 확정·J·K 편입) → **v4 web 재검증 = 실행판**(정정 3·보완 6, §9가 CLI 구현 기록))
