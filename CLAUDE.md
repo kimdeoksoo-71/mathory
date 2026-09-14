@@ -186,6 +186,10 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   첫 발언으로 간주"라 모델도 정상으로 읽는다. ⚠ **타이핑 전송의 히스토리는 끄지 말 것**(그건 대화다).
   ⚠ `opts.modelIds`는 칩 선택의 **대체**다 — 합집합이면 켜 둔 모델까지 같은 질문을 받아 비용이 배가 되고
   "고정 모델로 비교한다"는 실험 전제가 깨진다. 재시도는 `retryContext`를 재사용하므로 D15′를 보존한다.
+  ⚠ **문답 전송은 문제 탭 + 기본 풀이 탭(id `solution`)만 보낸다**(`solutionOnly`, 덕수 2026-09-15) —
+  사용자가 추가한 `extra_N` 탭('AI 풀이'·'참고' 등)이 섞이면 모델이 AI 풀이의 군더더기를 지적하거나 두 풀이를
+  뒤섞는다. 교차 검증 칩(61b `verifyFlow`)과 같은 기준이다. **라벨로 거르지 말 것**(사용자가 짓는 값이다).
+  타이핑 대화는 그대로 전체 탭이다(Phase 47).
 - **⚠ `handleSendMessage`의 첫 분기는 답글이다 (Phase 66a D17)**: `if (replyingTo)`가 답글로 저장하고
   **`return`**해 AI가 한 번도 호출되지 않는다. 컴포저를 거치지 않고 그 함수를 직접 부르는 경로는
   전송 직전에 `setReplyingTo(null)`을 해야 한다. ⚠ 같은 이유로 **전송 전체를 try/catch**할 것 —

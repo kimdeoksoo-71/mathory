@@ -263,7 +263,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                 })}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
-                이 전송은 이전 대화를 참조하지 않습니다.
+                문제와 풀이 탭만 보냅니다. 이전 대화와 다른 탭은 참조하지 않습니다.
               </div>
               {triggerWarnings(sendTarget.text).map((w) => (
                 <div key={w} style={{
