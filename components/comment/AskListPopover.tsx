@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * Phase 66a — 문답 검증 질문 리스트 (agent 대화창 입력 상단)
+ * Phase 66a·66b — 문답 검증 질문 리스트 (agent 대화창 입력 상단)
  *
- * 1단 목록(선택·수정·복제·삭제) → 2단 전송 → 편집 모달. 질문의 진실은 Firestore이고
- * 씨앗(`lib/ask/seed.ts`)은 최초 1회 복사본이다.
+ * 1단 목록([문제]·[풀이] 탭 · 선택·수정·복제·삭제) → 2단 전송 → 편집 모달. 질문의 진실은 Firestore이고
+ * 씨앗(`lib/ask/seed.ts`)은 최초 1회 복사본이다. 카테고리는 질문의 `target`이다(66b D1).
  *
  * ⚠ 이 컴포넌트에 `position: relative`를 두지 말 것 — 팝오버의 기준 상자는 **컴포저 래퍼**
  *   (`CommentPanel.tsx:1100-1104`)여야 한다. 여기에 두면 기준이 "칩 묶음"이 되어 패널 밖으로 넘친다
@@ -31,28 +31,57 @@ import {
 import { IconQuestionList, IconDots } from '../ui/Icons';
 import { AIBrandIcon } from './AIBrandIcon';
 
-/** D9 — 모델 선택만 기억한다(질문은 매번 고르는 것이 목적이다). */
+/** 66a D9 · 66b D1 — 모델 선택과 마지막 카테고리 탭을 기억한다(질문 자체는 매번 고른다).
+ *  ⚠ 66b Z1 — **한 키에 병합 객체로 쓴다.** 66a는 `setItem(KEY, { modelIds })`로 키 전체를 덮어써서,
+ *  같은 키에 카테고리를 넣으면 질문을 보낼 때마다 탭 기억이 지워졌다. 쓰는 쪽은 반드시 `savePrefs(patch)`로. */
 const LS_KEY = 'mathory.ask.v1';
 
-function loadRememberedModels(): string[] {
+interface AskPrefs { modelIds: string[]; category?: AskTarget }
+
+function loadPrefs(): AskPrefs {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return [];
+    if (!raw) return { modelIds: [] };
     const v = JSON.parse(raw);
-    return Array.isArray(v?.modelIds) ? v.modelIds.filter((x: unknown) => typeof x === 'string') : [];
-  } catch { return []; }
+    return {
+      modelIds: Array.isArray(v?.modelIds) ? v.modelIds.filter((x: unknown) => typeof x === 'string') : [],
+      category: v?.category === 'problem' || v?.category === 'solution' ? v.category : undefined,
+    };
+  } catch { return { modelIds: [] }; }
 }
-function rememberModels(modelIds: string[]): void {
-  try { localStorage.setItem(LS_KEY, JSON.stringify({ modelIds })); } catch { /* 사파리 프라이빗 등 */ }
+function savePrefs(patch: Partial<AskPrefs>): void {
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ ...loadPrefs(), ...patch })); } catch { /* 사파리 프라이빗 등 */ }
 }
 
-/** D8 — 기억값 → 없으면 anthropic 중 order가 가장 작은 문서(실험 문서를 order로 앞세운다). */
+/** 66a D8 — 기억값 → 없으면 anthropic 중 order가 가장 작은 문서(실험 문서를 order로 앞세운다). */
 function defaultModelIds(models: AIModelConfig[]): string[] {
-  const remembered = loadRememberedModels().filter((id) => models.some((m) => m.modelId === id));
+  const remembered = loadPrefs().modelIds.filter((id) => models.some((m) => m.modelId === id));
   if (remembered.length) return remembered;
   const claude = models.filter((m) => m.provider === 'anthropic').sort((a, b) => a.order - b.order)[0];
   return claude ? [claude.modelId] : [];
 }
+
+/** 66b D1 — 탭 순서 = 문제 · 풀이. 이름은 앱 전체의 탭 이름과 같은 '풀이'(옛 모달의 '해설' 폐기) */
+const CATEGORIES: readonly { target: AskTarget; label: string }[] = [
+  { target: 'problem', label: '문제' },
+  { target: 'solution', label: '풀이' },
+];
+
+/** 66b D10 — 무엇이 보내지는지가 질문마다 달라서 안내도 세 갈래다. 판단은 `effectiveWithTabs` 하나 */
+function scopeNotice(q: AskQuestion): string {
+  const tail = ' 이전 대화는 참조하지 않습니다.';
+  if (q.target === 'solution') return '문제와 풀이 탭만 지적합니다. AI 풀이 등 다른 탭은 참고로만 보냅니다.' + tail;
+  return effectiveWithTabs(q)
+    ? '문제만 지적합니다. 풀이와 다른 탭은 참고로만 보냅니다.' + tail
+    : '문제만 보냅니다. 풀이 탭은 보내지 않습니다.' + tail;
+}
+
+type EditDraft = {
+  id: string | null; rev: number; label: string; target: AskTarget; text: string; enabled: boolean; withTabs: boolean;
+};
+const toDraft = (q: AskQuestion): EditDraft => ({
+  id: q.id, rev: q.rev, label: q.label, target: q.target, text: q.text, enabled: q.enabled, withTabs: q.withTabs,
+});
 
 interface Props {
   uid: string;
@@ -79,9 +108,16 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
   const [sendTarget, setSendTarget] = useState<AskQuestion | null>(null);
   const [sendModelIds, setSendModelIds] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
-  const [editing, setEditing] = useState<{ id: string | null; rev: number; label: string; target: AskTarget; text: string; enabled: boolean } | null>(null);
+  const [editing, setEditing] = useState<EditDraft | null>(null);
+  const [category, setCategoryState] = useState<AskTarget>(() => loadPrefs().category ?? 'problem');
   const [saving, setSaving] = useState(false);
   const rootRef = useRef<HTMLSpanElement>(null);
+
+  const setCategory = (c: AskTarget) => {
+    setCategoryState(c);
+    setMenuFor(null);
+    savePrefs({ category: c });
+  };
 
   const reload = useCallback(async () => {
     setQuestions(await listAskQuestions(uid));
@@ -139,7 +175,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
     const ids = [...sendModelIds];
     const sent = sendTarget;   // 아래에서 상태를 비우기 전에 붙잡는다
     const message = buildAskMessage(sent);
-    rememberModels(ids);
+    savePrefs({ modelIds: ids });
     setOpen(false);
     setSendTarget(null);
     try {
@@ -160,16 +196,18 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
       if (editing.id) {
         await updateAskQuestion(uid, editing.id, {
           label: editing.label.trim(), target: editing.target,
-          text: editing.text, enabled: editing.enabled,
+          text: editing.text, enabled: editing.enabled, withTabs: editing.withTabs,
         }, editing.rev);
       } else {
         await createAskQuestion(uid, {
           label: editing.label.trim(), target: editing.target, text: editing.text,
           order: nextOrder(questions, editing.target), enabled: editing.enabled, rev: 1,
-          withTabs: true,
+          withTabs: editing.withTabs,
         });
       }
       await reload();
+      // 66b Z3 — 대상을 바꿔 저장하면 질문이 지금 탭에서 사라진다(삭제로 오해하기 쉽다) → 그 탭으로 넘어간다
+      if (editing.target !== category) setCategory(editing.target);
       setEditing(null);
     } catch (e) {
       await alertDialog(e instanceof Error ? e.message : '저장에 실패했습니다');
@@ -186,7 +224,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
       setQuestions(fresh);
       // 방금 만든 사본을 곧바로 고칠 수 있게 연다(D6 — 복제는 "조금 바꿔 비교"가 목적이다)
       const made = fresh.find((x) => x.id === newId);
-      if (made) setEditing({ id: made.id, rev: made.rev, label: made.label, target: made.target, text: made.text, enabled: made.enabled });
+      if (made) setEditing(toDraft(made));
     } catch (e) {
       await alertDialog(e instanceof Error ? e.message : '복제에 실패했습니다');
     }
@@ -211,7 +249,9 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
   };
 
   // 사용 안 함은 맨 아래 흐리게(완전히 숨기면 되살릴 길이 없다)
-  const ordered = [...questions].sort((a, b) => (Number(b.enabled) - Number(a.enabled)) || (a.order - b.order));
+  const ordered = questions
+    .filter((q) => q.target === category)
+    .sort((a, b) => (Number(b.enabled) - Number(a.enabled)) || (a.order - b.order));
   const editWarnings = editing ? triggerWarnings(editing.text) : [];
 
   return (
@@ -268,7 +308,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                 })}
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.5, marginBottom: 8 }}>
-                문제와 풀이 탭만 지적합니다. AI 풀이 등 다른 탭은 참고로만 보냅니다. 이전 대화는 참조하지 않습니다.
+                {scopeNotice(sendTarget)}
               </div>
               {triggerWarnings(sendTarget.text).map((w) => (
                 <div key={w} style={{
@@ -303,6 +343,32 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
           ) : (
             /* ── 1단: 목록 ── */
             <div>
+              {/* 66b D1 — 카테고리 탭. 목록이 스크롤돼도 남도록 sticky(팝오버 자체가 스크롤러다) */}
+              <div role="tablist" style={{
+                position: 'sticky', top: 0, zIndex: 3, display: 'flex', gap: 4,
+                padding: '0 10px', background: 'var(--bg-card)',
+                borderBottom: '1px solid var(--border-light, #eee)',
+              }}>
+                {CATEGORIES.map((c) => {
+                  const on = c.target === category;
+                  return (
+                    <button
+                      key={c.target}
+                      role="tab"
+                      aria-selected={on}
+                      onClick={() => setCategory(c.target)}
+                      style={{
+                        border: 'none', background: 'transparent', cursor: 'pointer',
+                        padding: '7px 8px 6px', fontSize: 12, fontFamily: 'var(--font-ui)',
+                        fontWeight: on ? 700 : 500,
+                        color: on ? 'var(--text-primary)' : 'var(--text-muted)',
+                        borderBottom: `2px solid ${on ? 'var(--accent-primary)' : 'transparent'}`,
+                        marginBottom: -1,
+                      }}
+                    >{c.label}</button>
+                  );
+                })}
+              </div>
               {loading && <div style={{ padding: 12, color: 'var(--text-muted)' }}>불러오는 중…</div>}
               {loadError && (
                 <div style={{ padding: 12, color: 'var(--accent-danger)', lineHeight: 1.5 }}>
@@ -310,7 +376,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                 </div>
               )}
               {!loading && !loadError && ordered.length === 0 && (
-                <div style={{ padding: 12, color: 'var(--text-muted)' }}>질문이 없습니다.</div>
+                <div style={{ padding: 12, color: 'var(--text-muted)' }}>이 카테고리에 질문이 없습니다.</div>
               )}
               {ordered.map((q) => {
                 const warn = triggerWarnings(q.text).length > 0;
@@ -355,7 +421,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                           padding: 4,
                         }}>
                           {[
-                            { label: '수정', run: () => { setMenuFor(null); setEditing({ id: q.id, rev: q.rev, label: q.label, target: q.target, text: q.text, enabled: q.enabled }); } },
+                            { label: '수정', run: () => { setMenuFor(null); setEditing(toDraft(q)); } },
                             { label: '복제', run: () => onDuplicate(q) },
                             { label: q.enabled ? '사용 안 함' : '사용', run: () => onToggleEnabled(q) },
                             { label: '삭제', run: () => onDelete(q), danger: true },
@@ -379,7 +445,7 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
               })}
               <div style={{ padding: 8 }}>
                 <button
-                  onClick={() => setEditing({ id: null, rev: 1, label: '', target: 'solution', text: '', enabled: true })}
+                  onClick={() => setEditing({ id: null, rev: 1, label: '', target: category, text: '', enabled: true, withTabs: true })}
                   style={{
                     border: '1px dashed var(--border-primary)', background: 'transparent',
                     borderRadius: 4, padding: '4px 10px', fontSize: 11, cursor: 'pointer',
@@ -410,8 +476,8 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                 onChange={(e) => setEditing({ ...editing, target: e.target.value as AskTarget })}
                 style={{ ...dialogInput, marginBottom: 12 }}
               >
-                <option value="solution">해설</option>
                 <option value="problem">문제</option>
+                <option value="solution">풀이</option>
               </select>
               <label style={{ display: 'block', fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>질문 본문</label>
               <textarea
@@ -426,6 +492,18 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
                   background: 'var(--bg-warn)', color: 'var(--text-primary)',
                 }}>⚠ {w}</div>
               ))}
+              {/* 66b Z2 — 탭 전송 여부는 문제 질문에만 의미가 있다. 풀이 질문에서 끄면 풀이 없이 풀이를 검증한다.
+                  저장값은 대상과 무관하게 보존한다(대상을 다시 문제로 바꾸면 되살아난다). */}
+              {editing.target === 'problem' && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5, marginBottom: 6 }}>
+                  <input
+                    type="checkbox"
+                    checked={editing.withTabs}
+                    onChange={(e) => setEditing({ ...editing, withTabs: e.target.checked })}
+                  />
+                  풀이·참고 탭 함께 보내기
+                </label>
+              )}
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12.5 }}>
                 <input
                   type="checkbox"
