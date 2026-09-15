@@ -169,6 +169,18 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   턴 상한이면 *"…도구 호출이 상한에 도달해 응답이 미완성입니다"*를 **답 본문에 직접 붙인다**
   (`ai-provider.ts:508-513`). 자발적 코드 실행은 답의 `<details>` 검산 코드로 사후 관측한다.
   (그래프 잘림 안내 `route.ts:342`는 `isGraphModel` = google·openai 전용이라 Claude 경로엔 없다)
+- **⚠ 콘솔로 만든 `ai_models` 문서는 유형까지 맞아야 한다 (Phase 66a 첫 실험 E1·E2)**: `mapDoc`(`lib/ai-models.ts`)은
+  `typeof === 'number'`·`=== true`로 읽어서, 콘솔에서 **string으로 저장한 숫자는 오류 없이 기본값으로 떨어진다** —
+  `maxTokens` → 1024 · `order` → 999 · 단가 → 0(비용이 $0으로 찍힌다) · `enabled`(string "true") → 꺼짐. 실험 문서의
+  `maxTokens`가 실제로 1024가 됐고, 청구액을 1024 산식으로 역산해 짚었다. 그리고 **Opus 5는 사고가 기본으로 켜져**
+  사고 토큰도 `max_tokens`에서 깎이는데 `ClaudeProvider`의 텍스트 추출은 `text` 블록만 모은다 → 사고 중 한도에 닿으면
+  **본문 0자 + 잘림 문구만** 남는다. "잘림 문구만 보이는 답"은 한도(와 그 유형)부터 볼 것
+- **⚠ 사람 메시지의 `$…$`도 수식으로 렌더되고, 백틱으로 감싸도 막히지 않는다 (Phase 66a 첫 실험 E3)**: 대화 말풍선은
+  `EditorPreview`로 그린다. 그 인라인 `\displaystyle` 주입(`EditorPreview.tsx:228-233`)은 코드**펜스**만 보호하고
+  (`protectFences` `:80`) **인라인 코드는 보호하지 않아** `` `$...$` ``가 `` `$\displaystyle ...$` ``로 보인다(실행 확인).
+  질문 문안에서 "수식은 …로 감싸"를 쓰려면 **`수식은 달러 기호($) 한 쌍으로 감싸.`**처럼 본문 전체의 `$`를 **하나**로 둘 것.
+  ⚠ AI가 받는 원문은 전처리 전이라 멀쩡하다 — 대화 기록에서만 틀려 보인다. 렌더러에 인라인 코드 보호를 넣는 근본 처방은
+  렌더 5사이트·인쇄에 번지므로 따로 다룬다
 - **AI 전송 전 저장 가드는 `ensureSavedForAI` 하나다 (Phase 66a D12″ · Q5)**: 소비처 둘 —
   61b 검증 칩(`handleRunVerify`)과 66a 문답 전송(`onBeforeAskSend`). **ref 4종만 읽고 deps는 `[]`다.**
   함정 셋이 전부 조용한 실패라서다 — ① **`handleSave`는 throw하지 않는다**(catch에서 삼킨다.
@@ -341,7 +353,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **특이도는 "그 규칙이 이기는가"가 아니라 "그 규칙을 이겨야 하는 규칙들이 여전히 이기는가"까지 봐야 한다 (Phase 59a F1)**: 톤 dim이 기준선과 동률이 되자 dim을 `.solution-tone.solution-tone`으로 **올리는** 처방이 나왔는데, 그 순간 dim을 되이겨야 하는 복귀 규칙들(`strong .katex`·`h1~h3 .katex` = 둘 다 (0,2,1))이 (0,3,0)에 져서 **강조 안 수식과 제목 안 수식이 dim으로 죽는다**(클래스 수가 자릿수보다 먼저다). 답은 반대 방향 — 기준선을 `:where()`로 (0,1,0)까지 **내리는** 것이다. 올리는 쪽은 파급이 번지고 내리는 쪽은 나머지를 그대로 둔다. `:where()`는 이미 무방비로 쓰는 `:has()`보다 지원이 넓어 추가 가드가 필요 없다
 - **강조 톤 시스템 (Phase 58 P2 · Phase 59a 기본화)**: 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기 블록(callout)은 위치만 담당하고 톤과 무관하므로 `.callout-block`에 톤 규칙을 두지 않는다(D13). ⚠ **Phase 58의 D4("`**`가 없는 풀이는 미발동" = opt-in)는 Phase 59a에서 폐기됐다** — 마커 유무가 문항 인상을 좌우해 들쭉날쭉했고 레거시 `**Case n.**`의 `**`가 강조로 오인돼 톤이 제멋대로 켜졌다. 이제 풀이 탭이면 **항상** dim이고 `.has-key` 클래스·`solutionHasKey`·`KEY_STRONG_RE`가 전부 사라졌다. 스코프는 `tabId !== 'question'`(D9) — 판정은 `lib/keyTone.ts`가 5개 사이트에 공급한다. 톤 기준선 색은 `.tone-baseline`에 있고 `.problem-content-toned`는 타이포만 담는다(D14 — 공유뷰에 후자를 통째로 붙이면 `letter-spacing`이 딸려와 공개 페이지 줄바꿈이 바뀐다). **인쇄는 의도적 예외**: 전체 100% 톤 복원 + key만 굵게(D6)
 - **KaTeX 글리프는 조상의 굵기를 상속하지 않는다**: katex.min.css `.katex { font: normal 1.21em … }`의 `font` shorthand가 `font-weight`를 normal로 리셋한다. 그래서 "가짜 볼드"는 애초에 생기지 않고, 반대로 **key 안 수식은 굵게 만들 수 없다**(색으로만 구분된다)
-- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(현재 **60종** · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). ⚠ **bold 예외는 0종** — M6 검수 6차의 사이드바 헤더 bold 3종은 **M7 K에서 철회**(덕수 2026-09-12 "굵기가 부담스럽다"; 위계는 아이콘 톤 `--text-primary` vs 행 `--text-secondary`로). 다른 자리에 bold를 들이지 말 것. **최소 렌더 14px** — † 예외 9곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12 · **리스트 정렬 화살표 `IconSortAsc/Desc` 12** — M6 D7 덕수 판정 "작아도 충분하다")은 검수 통과로 regular 유지, **유지 예외 3종**(`IconGoogle` / `IconGithub` / AI 로고 `<img>` — ⚠ `IconSave`는 M6 D20에서 Phosphor `cloud-arrow-up`/`cloud-check`로 편입돼 유지 예외에서 빠졌다. `checked` prop·시그니처는 그대로라 `VersionTimeline.TRIGGER_ICON` 값 참조가 무변경)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
+- **아이콘 체계는 Phosphor regular 단일이다 (M4)**: 도안은 생성 파일 `components/ui/phosphorPaths.ts`(현재 **61종** · viewBox 256 · fill `currentColor`)가 공급하고, 진실은 `scripts/gen-phosphor-paths.mjs`의 ICONS 표 하나다 — 생성 파일 **수동 편집 금지**(`icons:gen` 재생성), `prebuild`의 `icons:check`가 드리프트를 빌드 실패로 만든다(**바이트 diff라 헤더에 생성 시각을 넣지 않는다**). 획은 weight 파일이 정하고(CSS·strokeWidth로 못 바꿈) **켜짐은 fill weight**(IconPin). ⚠ **bold 예외는 0종** — M6 검수 6차의 사이드바 헤더 bold 3종은 **M7 K에서 철회**(덕수 2026-09-12 "굵기가 부담스럽다"; 위계는 아이콘 톤 `--text-primary` vs 행 `--text-secondary`로). 다른 자리에 bold를 들이지 말 것. **최소 렌더 14px** — † 예외 9곳(FolderPathBar 10×2 · MiniShell·ShareTree·ProofreadResultBox·탭 hover×2 11 · AIBrandIcon 12 · **리스트 정렬 화살표 `IconSortAsc/Desc` 12** — M6 D7 덕수 판정 "작아도 충분하다")은 검수 통과로 regular 유지, **유지 예외 3종**(`IconGoogle` / `IconGithub` / AI 로고 `<img>` — ⚠ `IconSave`는 M6 D20에서 Phosphor `cloud-arrow-up`/`cloud-check`로 편입돼 유지 예외에서 빠졌다. `checked` prop·시그니처는 그대로라 `VersionTimeline.TRIGGER_ICON` 값 참조가 무변경)과 별칭 2개(`IconDots`=`IconDotsVertical` — 옛 도안도 세로 점이었다 / `IconSearchPlain`=`IconSearch`). Row 2는 전 버튼 20px(획 1.25px)·**코너 브라켓 폐기** — 브랜드 모티프는 로고·favicon·빈 화면에만. ⚠ **Row 2 예외 2종(M5 후속, 덕수 판정)**: `$`·`$$`(Inline/BlockMathIcon)는 Phosphor currency-dollar-simple이 어색해 **M3 자체 stroke 도안으로 복원**했다(UnifiedToolbar `LEGACY_MATH_SVG_PROPS` — viewBox 64·stroke 4 = 시각 1.25px로 Phosphor와 동일 굵기, **브라켓은 없음**). M4 D7의 비등방 x0.62 합성은 폐기 — 되살리지 말 것. **별도 `.svg` 파일로 빼면 `currentColor`가 끊긴다.** `IconButton`의 hover는 배경만 바꾸고 색은 `active`일 때만 액센트로 간다(Phase 58 P3 — active 배경은 M4에서 accent 틴트). ⚠ **아이콘·컴포넌트 미사용 판별은 `grep -rnw`(단어 경계)로 — JSX 태그 검색 금지**: 트리거 맵·`ComponentType` 값 참조를 놓친다(`VersionTimeline.TRIGGER_ICON`의 `IconExit`가 실제로 두 판본 연속 오판돼 삭제 직전까지 갔다, M4 N8)
 - **hover 말풍선은 `useHoverTip`(`components/ui/HoverTip.tsx`) 하나다 (M6 D5′)**: 툴바 `IconButton`의 툴팁(600ms · fixed · 11px · `Z_TOOLTIP`)을 훅으로 뽑아 리스트 헤더 아이콘 칼럼과 공유한다. ⚠ **네이티브 `title`과 병기하지 말 것** — 600ms 커스텀과 ~1s 네이티브가 둘 다 떠 이중 툴팁이 된다. 접근성은 `aria-label`. ⚠ 말풍선은 `position:fixed`라 **transform 조상 밑에서 좌표를 잃는다**(Phase 65 S11의 CM 툴팁이 그랬다) — 새 소비처는 transform 조상이 없는지 확인. 앵커 ref는 소비처가 자기 ref와 **병합**해 넣는다(`bind.ref`를 그대로 쓰면 기존 ref를 덮어쓴다)
 - **색 팔레트는 아이보리·클레이·빨강 셋이다 (M6 색 정리, 덕수 2026-09-09)**: 상태·강조·선택·하이라이트에 파랑·초록·노랑·구글 레드를
   새로 들이지 말 것. 대응표 — 오류·삭제·위험 버튼 = `--accent-danger`(#C0392B, 옛 `#e53935`·`#c33`·`#d33`·`#721c24` 전부 폐기) ·
@@ -420,17 +432,17 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 66a — 문답 검증 1단계: agent 탭 질문 리스트** — 구현 완료(2026-09-15) · **덕수 준비물 3 + 실물 검수 대기**
+## 현재 Phase: **Phase 66a — 문답 검증 1단계: agent 탭 질문 리스트** — 구현 완료(2026-09-15) · 후속 2 · **실험·검수 진행 중** · 66b 계획 v1 검증 중
 
 문서: `docs/phasedocs/Phase66a 문답 검증 1단계 agent 탭 질문 리스트 v6 착수판.md`
 (계보: 66 v1 구상 → 브레인스토밍 → 66a v1 web → v2 CLI → v3 web → v4 CLI → v5 web → **v6 CLI = 착수판**.
- 부록 B~D가 판본별 정정·보완, §0이 덕수 확정 Q1~Q6)
+ 부록 B~D가 판본별 정정·보완, §0이 덕수 확정 Q1~Q6, **§13이 구현·후속·첫 실험 기록**)
 
 agent 대화창 입력 상단의 질문 리스트에서 고른 검증 질문을 선택한 AI에게 보낸다. 질문은
 `users/{uid}/ask_questions`에 살며 앱 안에서 편집한다. **목적은 기능 완성이 아니라 실험이다** —
 문안을 고치는 왕복이 배포 없이 돌아야 한다.
 **서버 0 · 프롬프트 0 · 61d/61h 0 · 문항 스키마 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0**
-(61b는 서버 0 · 클라 저장 가드 1곳 공유 — Q5). 신규 3 · 수정 7 · 커밋 S1~S5 ·
+(61b는 서버 0 · 클라 저장 가드 1곳 공유 — Q5). 신규 3 · 수정 7 · 커밋 S1~S5 + 후속 2 ·
 ICONS 60 → **61종** · 로직 검증 439 → **446건** · 규칙 블록 65 → **67**.
 **규약은 위 「핵심 패턴」 맨 앞의 66a 절 5개가 소유한다.**
 
@@ -439,8 +451,14 @@ ICONS 60 → **61종** · 로직 검증 439 → **446건** · 규칙 블록 65 �
 - **가장 값비싼 발견 둘**: ① 씨앗 G2의 낱말 **"검산"**이 서버 정규식에 걸려 *묻는* 질문이 *요청*으로
   도착했다(v5 X2 — 실험 자체가 무효가 될 뻔했다) ② `handleSave`가 진행 중이면 **가드가 조용히 통과**해
   미저장분이 나간다(v5 X5 — 61b에 이미 있던 잠복 버그)
-- ⚠ 남은 일: **덕수 준비물 3**(실험용 `ai_models` 문서 · 문항 3~5개 · 규칙 배포) → 실물 검수 11항 →
-  실험 §10 → 66b 설계. dev 종료 → `npm run build` → push. 빌드 로그 `[icons:check] OK — 61종`
+- **후속 2건(덕수 요청)**: 문답 전송의 지적 대상은 **문제 + 기본 풀이 탭**, 추가 탭('AI 풀이' 등)은 **참고 자료** 표시로
+  함께 간다(`5aeae5f` — 규약은 위 「문답 전송은 히스토리를 싣지 않는다」 절). 중간 판 `7a50cdd`(추가 탭 제외)는 대체됐다
+- **첫 실험의 발견 셋(§13-3)**: 콘솔 `maxTokens` string → 조용히 1024 · Opus 5 사고가 한도를 먹으면 본문 0자 ·
+  `$…$` 말풍선 표시(백틱도 실패) — 규약은 위 「콘솔로 만든 `ai_models` 문서」·「사람 메시지의 `$…$`」 두 절
+- **이탈 R1**: `dirtyRef`·`handleSaveRef` 선언을 `switchTab` 뒤로 올렸다(자동 저장 블록에 있으면 `handleRunVerify` deps가 TDZ로 터진다)
+- ⚠ 남은 일: 실험 §10 재개 · 실물 검수 11항 · **66b 계획 v1 검증 턴**(`docs/phaseSketch/phase66b-problem-questions-plan-v1.md` —
+  질문 카테고리 [문제]·[풀이] · 문제 검증 질문 P1~P4 · 옛 예약 66b 폴더뷰·66c 칩 정리는 Q8에 따라 66c·66d로 밀릴 수 있다) ·
+  ⚠ `npm run build`는 로컬 미실행(dev 서버 가동 중) — push 후 Vercel 빌드 로그 `[icons:check] OK — 61종` 확인
 
 ### 이전: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · 후속 4건 반영 · **push 대기**
 
