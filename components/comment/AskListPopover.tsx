@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AIModelConfig } from '../../types/problem';
 import {
-  buildAskMessage, nextOrder, triggerWarnings, validateQuestion,
+  buildAskMessage, nextOrder, triggerWarnings, validateQuestion, effectiveWithTabs,
   type AskQuestion, type AskTarget,
 } from '../../lib/ask/seed';
 import {
@@ -62,7 +62,10 @@ interface Props {
   /** 보낼 세션이 있는가 (`!!activeSessionId`) */
   canSend: boolean;
   /** CommentPanel이 D15′(히스토리 미첨부)·D17(답글 해제)을 담당한다 */
-  onSend: (message: string, modelIds: string[]) => Promise<void>;
+  onSend: (
+    message: string, modelIds: string[],
+    scope: { target: AskTarget; withTabs: boolean },
+  ) => Promise<void>;
   /** D12″ — 편집창이면 저장 먼저. **실패는 throw**한다 */
   onBeforeSend?: () => Promise<void>;
 }
@@ -134,12 +137,13 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
       return;   // 팝오버는 열어 둔다 — 고친 뒤 다시 누를 수 있게
     }
     const ids = [...sendModelIds];
-    const message = buildAskMessage(sendTarget);
+    const sent = sendTarget;   // 아래에서 상태를 비우기 전에 붙잡는다
+    const message = buildAskMessage(sent);
     rememberModels(ids);
     setOpen(false);
     setSendTarget(null);
     try {
-      await onSend(message, ids);
+      await onSend(message, ids, { target: sent.target, withTabs: effectiveWithTabs(sent) });
     } catch (e) {
       await alertDialog(e instanceof Error ? e.message : '전송에 실패했습니다');
     } finally {
