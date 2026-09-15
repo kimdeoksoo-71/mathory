@@ -451,7 +451,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · **덕수 준비물 · 실물 검수 대기**
+## 현재 Phase: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · 덕수 실사용 전송 확인 · **실물 검수·실험 진행 중**
 
 문서: `docs/phasedocs/Phase66b 문답 검증 질문 카테고리·문제 검증 질문 v3 착수판.md`
 (계보: 질문 목록 v2 초안 web → 66b v1 CLI → v2 web → **v3 CLI 착수판**. §11이 구현 기록)
@@ -468,6 +468,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **결정을 그대로 구현하면 깨지던 셋(v3 Z1~Z3)**: 보낼 때마다 탭 기억이 지워짐 · 풀이 질문에서 탭 전송을 끄면 풀이 없이 검증 ·
   대상을 바꾸면 질문이 사라진 것처럼 보임
 - **이름 확정(Q8)**: 폴더뷰 순차 실행 → **66c** · 검증 칩 정리 → **66d**
+- **덕수 실사용 확인(2026-09-15)**: 전송 정상. 직전의 "응답 실패: Failed to fetch"는 **dev 서버가 꺼져 있던 것**(코드 무관) —
+  그 문구는 서버에 닿지 못했다는 뜻이고, 서버 오류라면 사유가 보인다(확정본 §11-4에 짚는 순서)
+- phaseSketch 정리(2026-09-15): 66a·66b 계획 작업물 9개 삭제 — 확정본은 phasedocs 두 파일(git에서 복구 가능)
 - ⚠ 남은 일: 덕수 준비물(기존 G1~G3 "수식은 …" 부분 앱에서 삭제 · 문항 선정 — `maxTokens` 16000은 완료) · 실물 검수 10항 ·
   실험(P는 각각 쓸 만한가, G는 판본 비교 · 시간 초과 기록) · `npm run build`는 로컬 미실행(dev 가동 중) — push 후 Vercel 빌드 로그 확인
 
