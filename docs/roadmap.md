@@ -2291,6 +2291,12 @@ TDZ `ReferenceError`가 될 뻔했다(컴파일은 통과한다) → `containsFi
 **실데이터에 없었다**(패치 11의 링크 짝이 온전했다는 뜻) → 표본 없음으로 종결, 논리는 테스트 F10이
 고정한다. 그림 수신은 1차 실측에서 이미 확인됐다(36건 200, NFD 파일명 18건 포함).
 
+**후속 수정(2026-09-15, 계획서 §11)** — 로직 검증 `test:sheet` 67 → **72**:
+① `3f973a6` 파일명에 대괄호(`[2027]…_fig1.jpg`)가 든 링크가 첫 `]`에서 끊겨 텍스트로 남던 것 → alt 균형 대괄호 · `FIG_NAME_RE`에 `[`·`]`.
+② `1a193a0` **좌우 배치 그림**: Mathpix `\begin{figure}…{https://cdn.mathpix.com/cropped/…}…\caption{…}`은 GAS가 Drive로 옮기지 않는다(Stack 4행·8장) →
+figure 환경을 [그림·캡션] 블록으로 **위아래** 배열, 프록시 `?url=` 갈래(`MATHPIX_FIG_URL_RE` · `redirect:'error'` · image content-type).
+⚠ Mathpix 주소는 만료될 수 있다(그 그림만 리터럴로 남는다).
+
 ---
 
 ## Phase 61e: 시트 가져오기 × 그림 블록 · 교정 연동 ✅ (구현·검수 완료 2026-08-30 · **배포 완료 2026-09-06**)

@@ -266,6 +266,52 @@ C4가 "61e에 잠복해 있던 버그"라고 한 것이 실데이터로 확인�
 마법사 안내문(D27+N8)은 2026-09-04 반영 완료 — Data_DS 힌트 "마지막 검증 실행분 (불러올 때마다 교체됨)" +
 사전 선별 안내에 "M열 체크까지 비워집니다 — 체크는 Stack에서" 한 줄.
 
+
+## 11. 후속 수정 (2026-09-15) — 실데이터가 드러낸 형식 2건
+
+둘 다 **시트 가져오기에서 그림이 텍스트로 남는** 같은 증상이었고, 원인은 계약 밖의 표기였다.
+**서버 신규 0 · 규칙 0 · 스키마 0 · 렌더 5사이트 0.** 로직 검증 `test:sheet` 67 → **72**(F19~F23).
+
+### 11-1. 파일명에 대괄호 — `3f973a6`
+
+증상: `![[2027]강대모의고사X(15회)_…_fig1.jpg](Drive링크)`가 `[\displaystyle 2027]강대모의고사…`로 부서져 보였다.
+
+- `FIG_SCAN_RE`의 alt `[^\]\n]*`가 **첫 `]`에서 끊겨** 분할이 안 됐고, `FIG_NAME_RE`에도 `[`·`]`가 없어
+  분할됐더라도 프록시가 400을 냈을 것이다. 텍스트로 남은 링크를 자동 수정이 `\displaystyle` 조각으로 부쉈다
+- 처방: alt를 **한 단계 균형 대괄호**로 받는다(`FIG_SCAN_RE`·`FOREIGN_IMG_RE`·`blockTidy.CHOICE_FIG_RE`) ·
+  `FIG_NAME_RE`에 `[`·`]` 허용(Drive `q`의 `'…'` 안에서 무해 — `'` 배제 방어는 그대로)
+- ⚠ 균형이 안 맞는 alt(`![a]b]_fig1.jpg](…)`)는 여전히 경계가 아니다(F19)
+
+### 11-2. 좌우 배치 그림 — Mathpix figure 환경 — `1a193a0`
+
+증상: 원본에서 그림 둘이 **나란히** 놓인 자리에 `\begin{figure}` · Mathpix 링크 · `\caption{…}`이 글자로 남았다.
+
+- Mathpix는 나란한 그림을 각각
+  `\begin{figure}\includegraphics[alt={},max width=\textwidth]{https://cdn.mathpix.com/cropped/…}\caption{$[a<0$ 인 경우 $]$}\end{figure}`로 낸다.
+  **GAS는 이것을 Drive `IMAGE_FIG`로 옮기지 않는다** — 실측(Stack 전 5,113행): figure 환경 4행 · 8장, Drive 짝 파일 **0**
+  (행 4356·4584·4784·5096 — 같은 행의 단독 그림은 정상적으로 `![…_figN.jpg](Drive)`다)
+- 파일명이 없으므로 **CDN 주소 자체를 키**로 쓴다. CDN은 무인증 200(image/jpeg)이었다
+- 처방:
+  - `lib/sheetImport.ts` — 스캔 **맨 앞 갈래**로 figure 환경을 잡아 그림 1장 + 캡션으로 읽는다(`readFigureEnv`, 캡션은
+    균형 스캔 — `\frac{1}{2}` 중첩). 블록은 **[그림 · 캡션 text]** → 나란했던 둘이 위아래 `[그림·캡션·그림·캡션]`.
+    캡션 정규화 `normalizeMathpixCaption`: `$[a<0$ 인 경우 $]$` → `[$a<0$ 인 경우]`, `\left[ … \right.` 변형 포함,
+    `$`가 홀수가 되면 원문 유지. 그림 없는 figure 환경은 본문에 두고 경고(F23)
+  - `app/api/sheet-import/figure/route.ts` — `?url=` 갈래. 인증·허용목록 **뒤에서만**, SSRF 방어 셋:
+    `MATHPIX_FIG_URL_RE`(https · `cdn.mathpix.com/cropped/` · 쿼리 문자 집합 제한) · `redirect: 'error'` ·
+    image/jpeg|png content-type(+10MB 상한)
+  - `SheetImportModal.tsx` — Mathpix 키는 `url` 파라미터로, 저장 alt·업로드 파일명은 `mathpix_<basename>`
+    (주소의 `?`·`&`를 HTML 속성·파일명에 섞지 않는다). 폴백 리터럴은 종전대로 `\includegraphics{키}`
+- 실데이터 검증: 위 4행 전부 순서대로 변환 · 잔재 0 · 8장 전부 수신 200
+- ⚠ **갈래 순서가 규칙이다** — figure 환경이 구형 `\includegraphics` 갈래보다 **앞**이어야 한다. 뒤면 안의 태그를 구형 갈래가
+  먼저 먹어 `\begin{figure}`·`\caption` 잔재가 남는다(수정 전 증상 그대로)
+- ⚠ **`MATHPIX_FIG_URL_RE`는 프록시의 유일한 주소 게이트다 — 넓히지 말 것.** 클라와 서버가 같은 상수를 공유한다(`FIG_NAME_RE`와 같은 방식)
+- ⚠ 알고 두는 손실: **Mathpix 주소는 만료될 수 있다** — 그러면 그 그림만 `\includegraphics{주소}` 리터럴로 남고 미리보기가 오류를 보인다.
+  시트 처리 직후 가져오는 편이 안전하다. 근본 처방은 GAS가 figure 환경도 Drive로 옮기는 것(audition 쪽 후속)
+- ⚠ 이 절로 §0의 "그림 표기 계약 다섯 자리"에 **세 번째 형식**(figure 환경)과 **두 번째 소스**(Mathpix CDN)가 더해졌다.
+  캡션 text 블록은 figure 환경에서만 생긴다
+
+이미 가져온 문항은 저절로 고쳐지지 않는다 — 지우고 다시 가져올 것.
+
 ---
 
 *v5 최종 실행판 — 구현 완료. 인용: mathory `466d347` · latex-convert `7719d12` · audition `8ebb218`.*
