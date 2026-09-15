@@ -161,7 +161,8 @@ export default function AskListPopover({ uid, models, busy, canSend, onSend, onB
       } else {
         await createAskQuestion(uid, {
           label: editing.label.trim(), target: editing.target, text: editing.text,
-          order: nextOrder(questions), enabled: editing.enabled, rev: 1,
+          order: nextOrder(questions, editing.target), enabled: editing.enabled, rev: 1,
+          withTabs: true,
         });
       }
       await reload();

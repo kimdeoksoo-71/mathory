@@ -1,5 +1,5 @@
 /**
- * Phase 66a — 문답 검증 질문 CRUD (`users/{uid}/ask_questions`)
+ * Phase 66a·66b — 문답 검증 질문 CRUD (`users/{uid}/ask_questions`)
  *
  * `lib/snippets.ts:16-64`(math_snippets)의 형태를 그대로 복제했다 — 규칙도 같은 문법이다
  * (`firestore.rules`의 `match /users/{userId}` 안, 본인만 read/write).
@@ -11,12 +11,12 @@
  */
 
 import {
-  collection, doc, getDocs, addDoc, updateDoc, deleteDoc,
+  collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc,
   query, orderBy, serverTimestamp, Timestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 import {
-  SEED_QUESTIONS, nextRev,
+  nextRev, planSeedTopUp,
   type AskQuestion, type AskQuestionInput,
 } from './ask/seed';
 
@@ -37,15 +37,25 @@ export async function listAskQuestions(userId: string): Promise<AskQuestion[]> {
       order: typeof data.order === 'number' ? data.order : 0,
       enabled: data.enabled !== false,
       rev: typeof data.rev === 'number' ? data.rev : 1,
+      // 66b — 필드 없는 66a 문서 = true(명시 매핑이라 기본값을 주지 않으면 undefined로 읽힌다)
+      withTabs: data.withTabs !== false,
       created_at: (data.created_at as Timestamp)?.toDate() || new Date(),
       updated_at: (data.updated_at as Timestamp)?.toDate() || new Date(),
     } as AskQuestion;
   });
 }
 
+/** 문서에 쓰는 필드만 골라낸다 — 씨앗의 `seedKey` 같은 코드 전용 키가 새지 않게(66b D13) */
+function toDocFields(data: AskQuestionInput): AskQuestionInput {
+  return {
+    label: data.label, target: data.target, text: data.text,
+    order: data.order, enabled: data.enabled, rev: data.rev, withTabs: data.withTabs,
+  };
+}
+
 export async function createAskQuestion(userId: string, data: AskQuestionInput): Promise<string> {
   const ref = await addDoc(askCollection(userId), {
-    ...data,
+    ...toDocFields(data),
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
@@ -55,7 +65,7 @@ export async function createAskQuestion(userId: string, data: AskQuestionInput):
 /** 저장 = rev+1. 호출부가 현재 rev를 넘긴다(문서를 다시 읽지 않는다 — 1인 사용). */
 export async function updateAskQuestion(
   userId: string, qid: string,
-  data: Partial<Pick<AskQuestion, 'label' | 'target' | 'text' | 'order' | 'enabled'>>,
+  data: Partial<Pick<AskQuestion, 'label' | 'target' | 'text' | 'order' | 'enabled' | 'withTabs'>>,
   currentRev: number,
 ): Promise<void> {
   await updateDoc(doc(db, 'users', userId, 'ask_questions', qid), {
@@ -74,7 +84,7 @@ export async function setAskQuestionEnabled(
   });
 }
 
-/** D6·D18 — 복제본은 `rev 1`로 시작하고 원본 바로 아래에 선다. */
+/** 66a D6·D18 — 복제본은 `rev 1`로 시작하고 원본 바로 아래에 선다. target을 복사하므로 같은 탭 안에 선다(66b D11). */
 export async function duplicateAskQuestion(userId: string, src: AskQuestion): Promise<string> {
   return createAskQuestion(userId, {
     label: `${src.label} 사본`,
@@ -83,6 +93,7 @@ export async function duplicateAskQuestion(userId: string, src: AskQuestion): Pr
     order: src.order + 1,
     enabled: src.enabled,
     rev: 1,
+    withTabs: src.withTabs,
   });
 }
 
@@ -90,28 +101,46 @@ export async function deleteAskQuestion(userId: string, qid: string): Promise<vo
   await deleteDoc(doc(db, 'users', userId, 'ask_questions', qid));
 }
 
-/* ── 씨앗 (D4) ─────────────────────────────────────────────────
+/* ── 씨앗 보충 (66a D4 → 66b D4) ───────────────────────────────
    트리거는 **팝오버 첫 열기**다(패널 마운트가 아니다) — 패널은 EditorView·ProblemView·
    폰에서 마운트되므로 마운트 훅이면 문항을 열 때마다 읽기가 돈다.
-   ⚠ in-flight 약속은 **uid별**로 들 것. 전역 하나면 계정 전환 시 남의 약속을 재사용한다. */
+   ⚠ in-flight 약속은 **uid별**로 들 것. 전역 하나면 계정 전환 시 남의 약속을 재사용한다.
+
+   66b — 목록이 비었을 때만 쓰던 66a 방식으로는 **기존 사용자에게 새 씨앗(P1~P4)이 들어가지 않는다.**
+   그렇다고 "없는 씨앗을 채운다"로 바꾸면 **지운 질문이 되살아난다.** 그래서 사용자 문서
+   `users/{uid}.askSeedKeys`에 "이미 제안한 키"를 기록하고 판정은 `planSeedTopUp`(순수 · T8)이 한다.
+   ⚠ 읽기는 `getDoc` 직접 — `getUserProfile`은 필드를 명시 매핑해 `askSeedKeys`가 늘 undefined로 읽힌다.
+   ⚠ 쓰기는 `{ merge: true }` — 빼면 nickname·email·createdAt이 날아간다.
+   ⚠ 질문 생성과 기록을 **한 배치**로 — 둘 중 하나만 성공하면 다음 열기에 중복되거나 영영 안 생긴다. */
 const seeding = new Map<string, Promise<AskQuestion[]>>();
 
-/** 비어 있으면 씨앗 3개를 만들고, 어느 쪽이든 현재 목록을 돌려준다. */
+function readSeedKeys(raw: unknown): string[] | undefined {
+  return Array.isArray(raw) ? raw.filter((x): x is string => typeof x === 'string') : undefined;
+}
+
+/** 아직 제안하지 않은 씨앗을 만들고 기록한 뒤 현재 목록을 돌려준다. */
 export async function ensureSeeded(userId: string): Promise<AskQuestion[]> {
   const inFlight = seeding.get(userId);
   if (inFlight) return inFlight;
 
   const p = (async () => {
-    const existing = await listAskQuestions(userId);
-    if (existing.length > 0) return existing;
+    const userRef = doc(db, 'users', userId);
+    const [userSnap, existing] = await Promise.all([getDoc(userRef), listAskQuestions(userId)]);
+    const plan = planSeedTopUp({
+      offered: readSeedKeys(userSnap.exists() ? userSnap.data().askSeedKeys : undefined),
+      collectionEmpty: existing.length === 0,
+    });
+    if (plan.toCreate.length === 0 && !plan.record) return existing;
+
     const batch = writeBatch(db);
-    for (const s of SEED_QUESTIONS) {
+    for (const s of plan.toCreate) {
       batch.set(doc(askCollection(userId)), {
-        ...s, created_at: serverTimestamp(), updated_at: serverTimestamp(),
+        ...toDocFields(s), created_at: serverTimestamp(), updated_at: serverTimestamp(),
       });
     }
+    batch.set(userRef, { askSeedKeys: plan.nextOffered }, { merge: true });
     await batch.commit();
-    return listAskQuestions(userId);
+    return plan.toCreate.length > 0 ? listAskQuestions(userId) : existing;
   })();
 
   seeding.set(userId, p);
