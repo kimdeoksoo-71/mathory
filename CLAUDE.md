@@ -51,7 +51,7 @@ lib/chatExtract.ts        — 대화 선택 → 마크다운 직렬화 (Phase 61
 components/comment/
   SelectionInsertPopup.tsx — 선택 감지·DOM 어댑터·팝업 (Phase 61c)
 lib/latexScan.ts          — LaTeX 중괄호 균형 스캔 (M1, import 0 · mathSplit·proofread 공용)
-lib/ask/seed.ts           — 문답 검증 질문 씨앗·트리거 정규식 (Phase 66a, import 0 · test:ask)
+lib/ask/seed.ts           — 문답 검증 질문 씨앗 7(문제 4·풀이 3)·보충 계획·트리거 정규식 (Phase 66a·66b, import 0 · test:ask)
 lib/askQuestions.ts       — ask_questions CRUD·씨앗 (Phase 66a, firestore 접촉 — lib/ask/에 두지 말 것)
 components/comment/AskListPopover.tsx — 질문 목록·전송·편집 모달 (Phase 66a)
 lib/verify/batchPlan.ts   — 일괄 검증 판정 (Phase 61d, import 0 순수 모듈)
@@ -93,7 +93,8 @@ Firestore:
 │   └── extra_N_blocks/{blockId}    (동적 탭)
 ├── folders/{id}: {name, user_id, order}
 ├── users/{uid}/math_snippets/{id}: {name, shortcutIndex, content}
-└── users/{uid}/ask_questions/{id}: {label, target, text, order, enabled, rev}   (Phase 66a)
+└── users/{uid}/ask_questions/{id}: {label, target, text, order, enabled, rev, withTabs}   (Phase 66a·66b)
+    (users/{uid}.askSeedKeys: string[] — 이미 제안한 씨앗 키, Phase 66b)
 ```
 
 ## 전처리 파이프라인
@@ -145,11 +146,18 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
-- **문답 검증의 질문은 코드가 아니라 Firestore가 소유한다 (Phase 66a)**: `lib/ask/seed.ts`의
-  `SEED_QUESTIONS`는 **최초 1회 복사본**이고(컬렉션이 비었을 때만 쓰인다) 이후 진실은
-  `users/{uid}/ask_questions`다 — 씨앗을 고쳐도 이미 만들어진 문서는 안 바뀐다(의도).
-  꼬리(출력 형식 지시)도 **본문의 일부**라 코드가 붙이지 않는다(그것도 실험 변수다).
+- **문답 검증의 질문은 코드가 아니라 Firestore가 소유한다 (Phase 66a → 66b 개정)**: `lib/ask/seed.ts`의
+  `SEED_QUESTIONS`(문제 P1~P4 · 풀이 G1~G3)는 **1회 복사본**이고 이후 진실은 `users/{uid}/ask_questions`다 —
+  씨앗을 고쳐도 이미 만들어진 문서는 안 바뀐다(의도). 꼬리(출력 형식 지시)도 **본문의 일부**라 코드가 붙이지 않는다.
+  ⚠ **새 씨앗이 기존 사용자에게 들어가는 길은 `planSeedTopUp` 하나다(66b D4)** — 사용자 문서 `askSeedKeys`가 "이미
+  제안한 키"를 기록한다. 66a 방식(목록이 빌 때만)으로는 새 씨앗이 안 들어가고, "없는 씨앗을 채운다"로 바꾸면 **지운
+  질문이 되살아난다**. 필드가 없고 목록이 있으면 66a 씨앗(G1~G3)을 받은 사용자로 본다(`undefined`와 `[]`는 다르다).
+  씨앗을 더할 때는 **`SEED_QUESTIONS`에 새 `seedKey`로 추가**만 하면 다음 열기에 한 번 제안된다. ⚠ `askSeedKeys`는
+  **`getDoc` 직접**으로 읽을 것(`getUserProfile`은 명시 매핑이라 늘 undefined) · **`{ merge: true }`로** 쓸 것(빼면
+  nickname·email·createdAt이 날아간다) · 질문 생성과 **한 배치**로. `seedKey`는 코드 전용 키라 문서에 쓰지 않는다(읽는 곳이 없다).
   ⚠ **`order`가 없는 문서는 `orderBy` 쿼리에서 조용히 사라진다** — 콘솔에서 손으로 만들지 말 것.
+  ⚠ **씨앗 본문에 `$`를 쓰지 않는다**(66b D5′ · T9) — 아래 「사람 메시지의 `$…$`」 절. 수식 표기는 discuss 시스템 프롬프트가
+  "최우선 출력 규칙"으로 이미 강제한다(`route.ts:62-68`)
 - **⚠ 질문 본문은 `/api/discuss`의 트리거 낱말을 피한다 (Phase 66a D20)**: `CODE_EXEC_TRIGGER_RE`
   (`route.ts:256` — `검산`·`sympy`·`코드로 확인/검증/계산`·`파이썬으로`·`계산해 확인`)가
   **`currentMessage` 전체**를 보고, 걸리면 ① 메시지 끝에 *"반드시 SymPy를 실제로 실행하라,
@@ -198,13 +206,24 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   첫 발언으로 간주"라 모델도 정상으로 읽는다. ⚠ **타이핑 전송의 히스토리는 끄지 말 것**(그건 대화다).
   ⚠ `opts.modelIds`는 칩 선택의 **대체**다 — 합집합이면 켜 둔 모델까지 같은 질문을 받아 비용이 배가 되고
   "고정 모델로 비교한다"는 실험 전제가 깨진다. 재시도는 `retryContext`를 재사용하므로 D15′를 보존한다.
-  ⚠ **문답 전송의 지적 대상은 문제 + 기본 풀이 탭(id `solution`)이고, 나머지 탭은 참고 자료로 함께 간다**
-  (`solutionTarget`, 덕수 2026-09-15). 서버 `buildUserPrompt`는 탭 내용을 전부 "## 현재 풀이" 한 제목 아래
-  붙이므로 표시 없이 보내면 모델이 'AI 풀이'까지 검증할 풀이로 읽는다 → 클라가 절마다 `— 검증 대상` /
-  `— 참고 자료 (검증 대상 아님)` 표시와 맨 앞 `ASK_SCOPE_NOTE`를 단다(서버 0). ⚠ **풀이 탭을 맨 앞에** 둘 것 —
+  ⚠ **문답 전송의 범위는 질문의 target이 정한다**(`buildContext`의 `ask: { target, withTabs }` — 66a `5aeae5f` → 66b S3).
+  **풀이 질문**: 지적 대상 = 문제 + 기본 풀이 탭(id `solution`), 추가 탭('AI 풀이'·'참고' 등) = 참고 자료, 안내
+  `ASK_SCOPE_NOTE_SOLUTION`은 참고 탭에 내용이 있을 때만. **문제 질문**: 지적 대상 = 문제뿐, **풀이까지 모든 탭이 참고 자료**,
+  안내 `ASK_SCOPE_NOTE_PROBLEM`은 탭 내용이 **하나라도 있으면 항상**(풀이 질문의 게이트를 쓰면 문제+풀이 탭만 있는 흔한
+  문항에서 안내가 빠져 풀이를 지적한다), 라벨 `'참고 자료'`. **탭 전송을 끈 문제 질문(P1)**: 문제 탭만 —
+  `currentTabContent`·`currentTabLabel`을 비우면 서버가 풀이 절 자체를 안 넣는다(`route.ts:402`), `tabSlots`도 `[]`.
+  ⚠ 탭 전송 판단은 **`effectiveWithTabs` 하나** — 풀이 질문은 저장값과 무관하게 항상 탭을 보낸다(끄면 풀이 없이 풀이를 검증한다).
+  서버 `buildUserPrompt`는 탭 내용을 전부 "## 현재 풀이" 한 제목 아래 붙이므로 표시 없이 보내면 참고 탭까지 검증 대상으로
+  읽힌다 → 클라가 절마다 `— 검증 대상` / `— 참고 자료 (검증 대상 아님)`를 단다(서버 0). ⚠ **풀이 탭을 맨 앞에** 둘 것 —
   15,000자 자르기가 뒤에서 자르므로 넘치면 참고 자료가 먼저 잘린다(그림 슬롯도 같은 순서라 번호가 안 밀린다).
-  ⚠ 범위 안내는 **질문 문안이 아니라 컨텍스트**에 둔다 — 세 질문에 똑같이 붙는 통제 조건이다.
-  ⚠ **라벨로 거르지 말 것**(사용자가 짓는 값이다 — id만 고정). 타이핑 대화는 그대로 전체 탭·표시 없음(Phase 47).
+  ⚠ 범위 안내는 **질문 문안이 아니라 컨텍스트**에 둔다 — 같은 종류의 질문에 똑같이 붙는 통제 조건이다.
+  ⚠ **라벨로 거르지 말 것**(사용자가 짓는 값이다 — id만 고정). ⚠ **`ask`가 없으면(타이핑 대화) 전체 탭·표시 없음** —
+  66b에서 옛/새 조립 함수를 뽑아 실행해 타이핑·풀이 질문 전 조합 바이트 동일을 확인했다. 이 동일성을 깨지 말 것
+- **질문 팝오버의 기억은 한 키에 병합해서 쓴다 (Phase 66b Z1)**: `mathory.ask.v1` = `{ modelIds, category }`, 읽기
+  `loadPrefs` · 쓰기 **`savePrefs(patch)`**. 66a의 `setItem(KEY, { modelIds })`는 키 전체를 덮어써서, 같은 키에 카테고리를 두자
+  **질문을 보낼 때마다 탭 기억이 지워졌다**. 한 필드만 담아 `setItem`하지 말 것. 카테고리 = 질문의 `target`이고 탭 순서는
+  문제 · 풀이(모달 이름도 '풀이' — '해설' 폐기). 편집에서 대상을 바꿔 저장하면 그 탭으로 넘어간다(지금 탭에서 사라져 삭제로 오해한다).
+  "풀이·참고 탭 함께 보내기" 체크박스는 대상이 문제일 때만 보인다
 - **⚠ `handleSendMessage`의 첫 분기는 답글이다 (Phase 66a D17)**: `if (replyingTo)`가 답글로 저장하고
   **`return`**해 AI가 한 번도 호출되지 않는다. 컴포저를 거치지 않고 그 함수를 직접 부르는 경로는
   전송 직전에 `setReplyingTo(null)`을 해야 한다. ⚠ 같은 이유로 **전송 전체를 try/catch**할 것 —
@@ -432,7 +451,27 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 66a — 문답 검증 1단계: agent 탭 질문 리스트** — 구현 완료(2026-09-15) · 후속 2 · **실험·검수 진행 중** · 66b 계획 v1 검증 중
+## 현재 Phase: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · **덕수 준비물 · 실물 검수 대기**
+
+문서: `docs/phasedocs/Phase66b 문답 검증 질문 카테고리·문제 검증 질문 v3 착수판.md`
+(계보: 질문 목록 v2 초안 web → 66b v1 CLI → v2 web → **v3 CLI 착수판**. §11이 구현 기록)
+
+질문 리스트를 **[문제]·[풀이] 탭**으로 나누고 문제 검증 질문 **P1 성립 · P2 표기·표현 · P3 과조건·군더더기 · P4 개선 재작성**을
+더했다. 기존 사용자에게는 **열 때 P1~P4만 보충**한다(`askSeedKeys` 기록 — 지운 질문은 되살아나지 않는다).
+**서버 0 · 규칙 0 · 검증 프롬프트 0 · 61b/61d/61h 0 · 렌더 5사이트 0 · 폰 0.** 수정 5 · 커밋 S1~S5 ·
+`ask_questions` 필드 `withTabs` 1 · 사용자 문서 필드 `askSeedKeys` 1 · 로직 검증 446 → **448건**.
+**규약은 「핵심 패턴」의 66a 절들이 소유한다**(「질문은 Firestore가 소유」 · 「문답 전송의 범위는 질문의 target이 정한다」 ·
+「질문 팝오버의 기억은 한 키에 병합」 — 66b에서 개정·신설).
+
+- **초안대로 넣으면 조용히 틀어지던 넷**: 새 씨앗이 기존 목록에 안 들어감 · 문제 질문이 풀이까지 지적 · P1 "풀이는 보지 말고"는
+  지켜질 수 없음(→ 실제로 안 보낸다) · `$…$`가 말풍선에서 깨짐(→ 꼬리 줄 삭제)
+- **결정을 그대로 구현하면 깨지던 셋(v3 Z1~Z3)**: 보낼 때마다 탭 기억이 지워짐 · 풀이 질문에서 탭 전송을 끄면 풀이 없이 검증 ·
+  대상을 바꾸면 질문이 사라진 것처럼 보임
+- **이름 확정(Q8)**: 폴더뷰 순차 실행 → **66c** · 검증 칩 정리 → **66d**
+- ⚠ 남은 일: 덕수 준비물(기존 G1~G3 "수식은 …" 부분 앱에서 삭제 · 문항 선정 — `maxTokens` 16000은 완료) · 실물 검수 10항 ·
+  실험(P는 각각 쓸 만한가, G는 판본 비교 · 시간 초과 기록) · `npm run build`는 로컬 미실행(dev 가동 중) — push 후 Vercel 빌드 로그 확인
+
+### 이전: **Phase 66a — 문답 검증 1단계: agent 탭 질문 리스트** — 구현 완료(2026-09-15) · 후속 2 · 실험 진행 중
 
 문서: `docs/phasedocs/Phase66a 문답 검증 1단계 agent 탭 질문 리스트 v6 착수판.md`
 (계보: 66 v1 구상 → 브레인스토밍 → 66a v1 web → v2 CLI → v3 web → v4 CLI → v5 web → **v6 CLI = 착수판**.
@@ -456,9 +495,8 @@ ICONS 60 → **61종** · 로직 검증 439 → **446건** · 규칙 블록 65 �
 - **첫 실험의 발견 셋(§13-3)**: 콘솔 `maxTokens` string → 조용히 1024 · Opus 5 사고가 한도를 먹으면 본문 0자 ·
   `$…$` 말풍선 표시(백틱도 실패) — 규약은 위 「콘솔로 만든 `ai_models` 문서」·「사람 메시지의 `$…$`」 두 절
 - **이탈 R1**: `dirtyRef`·`handleSaveRef` 선언을 `switchTab` 뒤로 올렸다(자동 저장 블록에 있으면 `handleRunVerify` deps가 TDZ로 터진다)
-- ⚠ 남은 일: 실험 §10 재개 · 실물 검수 11항 · **66b 계획 v1 검증 턴**(`docs/phaseSketch/phase66b-problem-questions-plan-v1.md` —
-  질문 카테고리 [문제]·[풀이] · 문제 검증 질문 P1~P4 · 옛 예약 66b 폴더뷰·66c 칩 정리는 Q8에 따라 66c·66d로 밀릴 수 있다) ·
-  ⚠ `npm run build`는 로컬 미실행(dev 서버 가동 중) — push 후 Vercel 빌드 로그 `[icons:check] OK — 61종` 확인
+- ⚠ 남은 일: 실험 §10 재개 · 실물 검수 11항 · 후속 **66b 구현 완료**(위 현재 Phase 절) — 옛 예약 "66b 폴더뷰·66c 칩 정리"는
+  **66c·66d**로 밀렸다 · 빌드 로그 `[icons:check] OK — 61종` 확인 완료(2026-09-15)
 
 ### 이전: **개선묶음 M7 — 기능 개선·버그 수정(편집창 9항 + 추가 2항)** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · 후속 4건 반영 · **push 대기**
 
