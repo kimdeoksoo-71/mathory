@@ -2,6 +2,7 @@
  * Phase 61e — Drive 그림 읽기 프록시
  *
  * GET /api/sheet-import/figure?name=<파일명>
+ * GET /api/sheet-import/figure?url=<Mathpix CDN 주소>   (좌우 배치 figure 환경 — 2026-09-15)
  * headers: Authorization: Bearer <Firebase ID token>
  * 응답:    이미지 바이트 (Content-Type = 원본, X-Fig-Duplicates = 동명 파일 수)
  *
@@ -29,7 +30,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { JWT } from 'google-auth-library';
 import { ApiError, verifyUid } from '../../../../lib/apiAuth';
-import { FIG_NAME_RE } from '../../../../lib/sheetImport';
+import { FIG_NAME_RE, isMathpixFigUrl } from '../../../../lib/sheetImport';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -124,6 +125,42 @@ export async function GET(req: NextRequest) {
   try {
     const env = readEnv();
     await verifyUid(req.headers.get('authorization'), env.apiKey, env.allowedUids);
+
+    // ── Mathpix CDN 갈래 ──
+    //    원본에서 좌우로 나란히 놓인 그림은 GAS가 Drive로 옮기지 않아 파일명이 없다(`MATHPIX_FIG_URL_RE` 주석).
+    //    ⚠ SSRF 방어는 셋이다 — 주소 화이트리스트(호스트·경로·쿼리 문자) · `redirect: 'error'`
+    //      (허용 호스트가 딴 데로 튕기는 경로 차단) · 이미지 content-type 확인. 인증은 아래와 같이 먼저 거쳤다.
+    const mathpixUrl = (req.nextUrl.searchParams.get('url') ?? '').trim();
+    if (mathpixUrl) {
+      if (!isMathpixFigUrl(mathpixUrl)) {
+        return fail(400, '허용되지 않는 그림 주소입니다 — Mathpix 그림만 가져올 수 있습니다');
+      }
+      let res: Response;
+      try {
+        res = await fetch(mathpixUrl, { redirect: 'error', cache: 'no-store' });
+      } catch {
+        throw new ApiError(502, 'Mathpix 그림을 내려받지 못했습니다');
+      }
+      if (!res.ok) {
+        return fail(res.status === 404 || res.status === 403 ? 404 : 502,
+          `Mathpix 그림을 내려받지 못했습니다 (HTTP ${res.status}) — 주소가 만료됐을 수 있습니다`);
+      }
+      const type = res.headers.get('content-type') ?? '';
+      if (!/^image\/(jpeg|png)$/.test(type.split(';')[0].trim())) {
+        throw new ApiError(502, 'Mathpix 응답이 그림이 아닙니다');
+      }
+      const buf = await res.arrayBuffer();
+      if (buf.byteLength > 10 * 1024 * 1024) throw new ApiError(502, 'Mathpix 그림이 너무 큽니다');
+      return new NextResponse(buf, {
+        status: 200,
+        headers: {
+          'Content-Type': type,
+          'Content-Length': String(buf.byteLength),
+          'Cache-Control': 'private, no-store',
+          'X-Fig-Duplicates': '1',
+        },
+      });
+    }
 
     const raw = (req.nextUrl.searchParams.get('name') ?? '').trim();
     if (!raw) return fail(400, 'name 파라미터가 필요합니다');

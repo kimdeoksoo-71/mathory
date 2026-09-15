@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import {
   SHEET_COL, SHEET_COL_COUNT, EXPECTED_HEADERS,
   parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash, stripChoiceLabel,
-  splitFigures, scanFigureNames, FIG_NAME_RE,
+  splitFigures, scanFigureNames, FIG_NAME_RE, isMathpixFigUrl,
 } from '../.test-build/lib/sheetImport.js';
 
 /** 16칸 셀 배열을 만든다. `{ id: 'x', problem_stem: 'y' }` 형태로 지정. */
@@ -467,6 +467,46 @@ test('F19 파일명에 대괄호가 있어도 분할된다 — `![[2027]…_fig1
   assert.deepEqual(scanFigureNames(`\\includegraphics{${name}} ![${name}](${DRIVE})`), [name, name]);
   // 균형이 안 맞는 대괄호는 여전히 경계가 아니다
   assert.deepEqual(splitFigures(`![a]b]_fig1.jpg](${DRIVE})`).figNames, []);
+});
+
+/* F20~F23 — 좌우 배치 그림: Mathpix figure 환경 (2026-09-15 Stack 4784·5096 실데이터) */
+const MPX1 = 'https://cdn.mathpix.com/cropped/b334b91a-55b3-4488-b338-b05065867d63-2.jpg?height=291&width=425&top_left_y=1012&top_left_x=138';
+const MPX2 = 'https://cdn.mathpix.com/cropped/b334b91a-55b3-4488-b338-b05065867d63-2.jpg?height=306&width=434&top_left_y=998&top_left_x=616';
+const figEnv = (url, cap) =>
+  `\\begin{figure}\n\\includegraphics[alt={},max width=\\textwidth]{${url}}\n\\captionsetup{labelformat=empty}\n\\caption{${cap}}\n\\end{figure}`;
+
+test('F20 좌우 figure 둘 → [그림·캡션·그림·캡션] 위아래, 잔재 없음', () => {
+  const text = `개형은 그림과 같다.\n\n${figEnv(MPX1, '$[a<0$ 인 경우 $]$')}\n\n${figEnv(MPX2, '$[a>0$ 인 경우 $]$')} $a$의 값의 부호에 따라`;
+  const r = splitFigures(text);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text', 'image', 'text', 'text']);
+  assert.deepEqual(r.figNames, [MPX1, MPX2]);
+  assert.equal(r.blocks[2].raw_text, '[$a<0$ 인 경우]');
+  assert.equal(r.blocks[4].raw_text, '[$a>0$ 인 경우]');
+  assert.equal(r.blocks[5].raw_text, '$a$의 값의 부호에 따라');
+  assert.ok(!r.blocks.some((b) => /begin\{figure\}|caption|includegraphics/.test(b.raw_text)));
+  assert.deepEqual(r.warnings, []);
+});
+
+test('F21 캡션 정규화 — \\left[ … \\right. 변형 · 중첩 중괄호', () => {
+  const r = splitFigures(figEnv(MPX1, '$\\left[t=-\\frac{1}{2}\\right.$ 인 경우 $]$'));
+  assert.equal(r.blocks[1].raw_text, '[$t=-\\frac{1}{2}$ 인 경우]');
+});
+
+test('F22 isMathpixFigUrl — CDN cropped만 통과 (프록시 SSRF 게이트)', () => {
+  assert.equal(isMathpixFigUrl(MPX1), true);
+  assert.equal(isMathpixFigUrl('https://cdn.mathpix.com.evil.com/cropped/a.jpg'), false);
+  assert.equal(isMathpixFigUrl('https://cdn.mathpix.com/other/a.jpg'), false);
+  assert.equal(isMathpixFigUrl('http://cdn.mathpix.com/cropped/a.jpg'), false);
+  assert.equal(isMathpixFigUrl('https://cdn.mathpix.com/cropped/a.jpg?x=1#@evil'), false);
+  assert.equal(isMathpixFigUrl('강대_해설_1공통21_fig1.jpg'), false);
+});
+
+test('F23 그림 없는 figure 환경은 본문에 두고 경고', () => {
+  const t = '\\begin{figure}\n\\caption{x}\n\\end{figure}';
+  const r = splitFigures(t);
+  assert.deepEqual(r.figNames, []);
+  assert.equal(r.blocks[0].raw_text, t);
+  assert.ok(r.warnings.some((w) => /figure 환경/.test(w)));
 });
 
 test('G11 B열이 새 형식이어도 D13 복구가 된다', () => {

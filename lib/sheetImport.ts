@@ -213,6 +213,61 @@ export const FIG_NAME_RE =
 const FIG_SCAN_RE =
   /\\includegraphics[ \t]*(?:\[[^\]\n]*\])?\{([^}\n]+)\}|!\[((?:[^\[\]\n]|\[[^\[\]\n]*\])*)\]\([ \t]*(https:\/\/drive\.google\.com\/[^)\s]+)[ \t]*\)/;
 
+/**
+ * Mathpix CDN의 잘라낸 그림 주소. **클라 게이트와 서버 게이트가 이 하나를 공유한다.**
+ *
+ * 원본에서 그림 둘이 **좌우로 나란히** 놓이면 Mathpix가 각각을
+ * `\begin{figure}\includegraphics[…]{https://cdn.mathpix.com/cropped/…}\caption{…}\end{figure}`로 내고,
+ * GAS는 이것을 Drive `IMAGE_FIG`로 옮기지 않는다(2026-09-15 실측: Stack 4행 · 8장 — Drive에 짝 파일 0).
+ * 파일명이 없으니 **주소 자체를 키로** 프록시가 CDN에서 받는다.
+ *
+ * ⚠ 호스트·경로·쿼리 문자 집합을 좁게 잡은 것은 프록시의 SSRF 방어다 — 넓히지 말 것.
+ */
+export const MATHPIX_FIG_URL_RE =
+  /^https:\/\/cdn\.mathpix\.com\/cropped\/[A-Za-z0-9-]{1,100}\.(?:jpe?g|png)(?:\?[A-Za-z0-9_=&.-]{0,300})?$/;
+
+export function isMathpixFigUrl(s: string): boolean {
+  return MATHPIX_FIG_URL_RE.test(String(s ?? '').trim());
+}
+
+/** `\begin{figure}…\end{figure}` 한 덩어리. 안의 그림 인자·캡션은 `readFigureEnv`가 뽑는다.
+ *  ⚠ 여러 줄에 걸치므로 `[\s\S]*?`가 맞다(행 단위 전처리가 아니다). 비탐욕이라 이웃 환경을 삼키지 않는다. */
+const FIGURE_ENV_SRC = /\\begin\{figure\}(?:\[[^\]\n]*\])?[\s\S]*?\\end\{figure\}/.source;
+
+/**
+ * Mathpix 캡션 `$[a<0$ 인 경우 $]$` → `[$a<0$ 인 경우]`.
+ * 대괄호를 수식 구분자 안에 넣어 버리는 Mathpix 버릇을 되돌린다(`\left[ … \right.` 변형 포함).
+ * `$` 개수가 홀수가 되면 원문을 그대로 돌려준다 — 고치다가 수식을 깨느니 안 고친다.
+ */
+export function normalizeMathpixCaption(raw: string): string {
+  const src = String(raw ?? '').trim();
+  let s = src
+    .replace(/^\$[ \t]*(?:\\left)?\[[ \t]*/, '[$')
+    .replace(/[ \t]*\\right\.[ \t]*\$/, '$')
+    .replace(/[ \t]*\$[ \t]*(?:\\right)?\][ \t]*\$$/, ']');
+  s = s.replace(/\[\$[ \t]*\$/, '[');           // `[$$` 같은 빈 수식이 생기면 걷는다
+  return ((s.match(/(?<!\\)\$/g) ?? []).length % 2 === 0) ? s : src;
+}
+
+/** figure 환경 안에서 그림 인자와 캡션을 뽑는다. 그림이 없으면 null(경계로 삼지 않는다).
+ *  ⚠ 캡션은 중괄호가 중첩된다(`\frac{1}{2}`) — 정규식이 아니라 균형 스캔으로 읽는다(M1 W2). */
+function readFigureEnv(env: string): { name: string; caption: string } | null {
+  const g = /\\includegraphics[ \t]*(?:\[[^\]\n]*\])?\{([^}\n]+)\}/.exec(env);
+  if (!g) return null;
+  let caption = '';
+  const c = /\\caption[ \t]*\{/.exec(env);
+  if (c) {
+    let depth = 1; let i = c.index + c[0].length; const start = i;
+    for (; i < env.length && depth > 0; i++) {
+      if (env[i] === '\\') { i++; continue; }
+      if (env[i] === '{') depth++;
+      else if (env[i] === '}') depth--;
+    }
+    if (depth === 0) caption = normalizeMathpixCaption(env.slice(start, i - 1));
+  }
+  return { name: g[1].trim(), caption };
+}
+
 /** Drive가 **아닌** 이미지 링크. 패치 3이 안 돈 Mathpix 잔재다 — 경계로 삼지 않고 경고만 낸다(61e D21).
  *  ⚠ Drive 링크를 lookahead로 빼지 않으면 정상적인 신형식마다 이 경고가 덧난다. */
 const FOREIGN_IMG_RE =
@@ -221,8 +276,11 @@ const FOREIGN_IMG_RE =
 interface FigMatch {
   index: number;
   length: number;
-  /** 시트 원문 그대로의 파일명. **정규형을 바꾸지 않는다** — 정규형 시도는 프록시 몫이다(D29). */
+  /** 시트 원문 그대로의 파일명. **정규형을 바꾸지 않는다** — 정규형 시도는 프록시 몫이다(D29).
+   *  Mathpix figure 환경이면 CDN 주소가 온다(`isMathpixFigUrl`). */
   name: string;
+  /** figure 환경의 캡션(정규화 후). 그림 **바로 아래** text 블록이 된다. */
+  caption?: string;
 }
 
 /**
@@ -234,21 +292,34 @@ interface FigMatch {
  *     분할 자체가 안 된다(NFD 한글은 U+1100 계열 자모라 `[가-힣]`에 안 걸린다).
  */
 function scanFigMatches(text: string): { figs: FigMatch[]; warnings: string[] } {
-  const re = new RegExp(FIG_SCAN_RE.source, 'g');
+  // figure 환경을 **맨 앞 갈래**로 둔다 — 안의 `\includegraphics`를 구형 갈래가 먼저 먹으면
+  // `\begin{figure}`·`\caption{…}` 잔재가 본문에 남는다(2026-09-15 좌우 배치 그림 증상).
+  const re = new RegExp(`(${FIGURE_ENV_SRC})|${FIG_SCAN_RE.source}`, 'g');
   const figs: FigMatch[] = [];
   const warnings: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(String(text ?? ''))) !== null) {
+    // 갈래: m[1] figure 환경 / m[2] 구형 이름 / m[3] 신형 alt · m[4] Drive 링크
+    const at = { index: m.index, length: m[0].length };
     if (m[1] !== undefined) {
-      figs.push({ index: m.index, length: m[0].length, name: m[1].trim() });
+      const env = readFigureEnv(m[1]);
+      if (!env) {
+        warnings.push('그림이 없는 figure 환경이 있습니다 — 본문에 그대로 둡니다');
+        continue;
+      }
+      figs.push({ ...at, name: env.name, ...(env.caption ? { caption: env.caption } : {}) });
       continue;
     }
-    const alt = (m[2] ?? '').trim();
+    if (m[2] !== undefined) {
+      figs.push({ ...at, name: m[2].trim() });
+      continue;
+    }
+    const alt = (m[3] ?? '').trim();
     if (!FIG_NAME_RE.test(alt.normalize('NFC'))) {
       warnings.push(`그림 링크의 파일명이 규격과 다릅니다(${alt || '이름 없음'}) — 본문에 그대로 둡니다`);
       continue;
     }
-    figs.push({ index: m.index, length: m[0].length, name: alt });
+    figs.push({ ...at, name: alt });
   }
   return { figs, warnings };
 }
@@ -275,6 +346,9 @@ export function splitFigures(text: string): {
     const before = text.slice(last, f.index).trim();
     if (before) blocks.push({ type: 'text', raw_text: before });
     blocks.push({ type: 'image', raw_text: '', figName: f.name });
+    // 캡션은 그림 **바로 아래** 별도 text 블록 — 좌우로 나란히 있던 figure 둘이 위아래로
+    // [그림 · 캡션 · 그림 · 캡션]이 된다.
+    if (f.caption) blocks.push({ type: 'text', raw_text: f.caption });
     figNames.push(f.name);
     last = f.index + f.length;
   }

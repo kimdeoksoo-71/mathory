@@ -31,7 +31,7 @@ import type { User } from 'firebase/auth';
 import type { Block, Folder, ImportSource } from '../../types/problem';
 import {
   rowToDraft, isDraftError,
-  type ImportRow, type ProblemDraft, type DraftBlock,
+  type ImportRow, type ProblemDraft, type DraftBlock, isMathpixFigUrl,
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
 import { tidyBlocks } from '../../lib/blockTidy';
@@ -127,7 +127,9 @@ async function fetchFigures(
       while (cursor < names.length) {
         const name = names[cursor++];
         try {
-          const res = await fetch(`/api/sheet-import/figure?name=${encodeURIComponent(name)}`, {
+          // 좌우 배치 figure 환경은 파일명 대신 Mathpix CDN 주소가 키다(lib/sheetImport `MATHPIX_FIG_URL_RE`)
+          const param = isMathpixFigUrl(name) ? 'url' : 'name';
+          const res = await fetch(`/api/sheet-import/figure?${param}=${encodeURIComponent(name)}`, {
             headers: { Authorization: `Bearer ${idToken}` },
           });
           if (!res.ok) {
@@ -167,6 +169,12 @@ async function fetchFigures(
  * ⚠ 신형식이어도 폴백은 **구형 리터럴**이다(61e-2차 D30) — `![이름](Drive링크)`를 되살리면
  *   저장본에 **깨진 이미지**가 남아, 이번에 고친 "주소만 붙는" 증상과 구별되지 않는다.
  */
+/** 저장 alt·업로드 파일명. Mathpix 주소를 그대로 넣으면 `&`·`?`가 HTML 속성과 파일명에 섞인다. */
+function figAlt(figName: string): string {
+  if (!isMathpixFigUrl(figName)) return figName;
+  return `mathpix_${figName.split('?')[0].split('/').pop() ?? 'figure.jpg'}`;
+}
+
 function materializeImage(
   block: PersistedBlockData, draftBlock: DraftBlock | undefined, urlByFig: Map<string, string>,
 ): PersistedBlockData {
@@ -174,7 +182,7 @@ function materializeImage(
   const figName = draftBlock?.figName ?? '';
   const url = urlByFig.get(figName);
   if (!url) return { ...block, type: 'text', raw_text: `\\includegraphics{${figName}}` };
-  return { ...block, raw_text: `<img src="${url}" alt="${figName}" width="400" />` };
+  return { ...block, raw_text: `<img src="${url}" alt="${figAlt(figName)}" width="400" />` };
 }
 
 /* ═══ 스타일 ═══ */
@@ -458,7 +466,7 @@ export default function SheetImportModal({
           const entry = figSnapshot.get(figName);
           if (entry?.kind !== 'ok') { figFailed++; continue; }
           // N-9: content-type을 실어야 uploadImage가 확장자를 옳게 고른다.
-          const file = new File([entry.blob], figName, { type: entry.type });
+          const file = new File([entry.blob], figAlt(figName), { type: entry.type });
           const url = await uploadImage(file, problemId);
           uploaded.push(url);
           urlByFig.set(figName, url);
