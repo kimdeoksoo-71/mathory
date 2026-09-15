@@ -182,11 +182,13 @@ export function normalizeText(raw: string): { text: string; warnings: string[] }
  * `app/api/sheet-import/figure/route.ts`가 이 상수를 import한다 —
  * ⚠️ "import 0" 규약은 **이 파일이 남을 import하지 않는다**는 뜻이라 저촉되지 않는다.
  *
+ * ⚠️ `[`·`]`는 **허용**한다 — 시트 stem에 `[2027]강대모의고사X(15회)_…`처럼 대괄호가 실제로 온다
+ *    (2026-09-15 실측: 빠져 있어 그림이 통째로 텍스트로 남았다). Drive `q`의 `'…'` 안에서는 무해하다.
  * ⚠️ `'`를 문자 집합에서 **배제**한다 → Drive 검색 `q`의 작은따옴표 이스케이프가 아예 불필요해진다.
  *    NFC 정규화로는 `'`가 새로 생기지 않으므로 그 방어는 정규화 뒤에도 유지된다.
  */
 export const FIG_NAME_RE =
-  /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ()._\-]{1,200}_fig\d+\.(jpe?g|png|gif|webp)$/;
+  /^[0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ()[\]._\-]{1,200}_fig\d+\.(jpe?g|png|gif|webp)$/;
 
 /**
  * 그림 경계 **두 형식**을 한 벌로 훑는다.
@@ -203,16 +205,18 @@ export const FIG_NAME_RE =
  *   `reLink`와 문자 그대로 같다. 모르는 형식은 **오늘 동작**(텍스트 유지 + 경고)으로 떨어진다.
  * ⚠ `[ \t]*`다 — `\s*`는 개행을 삼킨다(CLAUDE.md). `](` 뒤 공백을 허용하지 않으면
  *   `]( https://… )` 같은 링크가 **분할도 경고도 없이 침묵**한다.
+ * ⚠ alt는 **한 단계 균형 대괄호**를 받는다(`![[2027]…_fig1.jpg](…)` — CommonMark도 허용). `[^\]]*`로 두면
+ *   첫 `]`에서 끊겨 분할이 안 되고, 남은 텍스트를 자동 수정이 `\displaystyle` 조각으로 부순다.
  * ⚠ 중괄호를 정규식으로 자르는 것은 개선묶음 M1 W2의 예외가 아니라 **적용 대상이 아니다** —
  *   GAS가 만드는 이름은 `<stem>_figN.<ext>`뿐이라 중괄호가 들어갈 수 없다.
  */
 const FIG_SCAN_RE =
-  /\\includegraphics[ \t]*(?:\[[^\]\n]*\])?\{([^}\n]+)\}|!\[([^\]\n]*)\]\([ \t]*(https:\/\/drive\.google\.com\/[^)\s]+)[ \t]*\)/;
+  /\\includegraphics[ \t]*(?:\[[^\]\n]*\])?\{([^}\n]+)\}|!\[((?:[^\[\]\n]|\[[^\[\]\n]*\])*)\]\([ \t]*(https:\/\/drive\.google\.com\/[^)\s]+)[ \t]*\)/;
 
 /** Drive가 **아닌** 이미지 링크. 패치 3이 안 돈 Mathpix 잔재다 — 경계로 삼지 않고 경고만 낸다(61e D21).
  *  ⚠ Drive 링크를 lookahead로 빼지 않으면 정상적인 신형식마다 이 경고가 덧난다. */
 const FOREIGN_IMG_RE =
-  /!\[[^\]\n]*\]\(\s*(?!https:\/\/drive\.google\.com\/)https?:\/\/[^)\s]+\s*\)/;
+  /!\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\(\s*(?!https:\/\/drive\.google\.com\/)https?:\/\/[^)\s]+\s*\)/;
 
 interface FigMatch {
   index: number;

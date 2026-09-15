@@ -456,6 +456,19 @@ test('F18 scanFigureNames도 두 형식을 본다', () => {
   assert.deepEqual(scanFigureNames(`a ${FIG1} b ${LINK1} c`), [NAME1, NAME1]);
 });
 
+test('F19 파일명에 대괄호가 있어도 분할된다 — `![[2027]…_fig1.jpg](…)` (2026-09-15 실데이터)', () => {
+  const name = '[2027]강대모의고사X(15회)_260915해설1공통22_fig1.jpg';
+  assert.equal(FIG_NAME_RE.test(name), true);
+  const r = splitFigures(`점 B의 좌표는 이다.\n![${name}](${DRIVE})\n두 점 A에 대하여`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text']);
+  assert.deepEqual(r.figNames, [name]);
+  assert.deepEqual(r.warnings, []);
+  // 구형 태그와 B열 스캔도 같은 이름을 준다
+  assert.deepEqual(scanFigureNames(`\\includegraphics{${name}} ![${name}](${DRIVE})`), [name, name]);
+  // 균형이 안 맞는 대괄호는 여전히 경계가 아니다
+  assert.deepEqual(splitFigures(`![a]b]_fig1.jpg](${DRIVE})`).figNames, []);
+});
+
 test('G11 B열이 새 형식이어도 D13 복구가 된다', () => {
   const d = draft({
     id: 'X', problem: `원문 ${LINK1}`, problem_stem: '정규화된 본문', given_solution: 's',

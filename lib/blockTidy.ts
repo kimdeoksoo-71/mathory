@@ -35,7 +35,7 @@ const SPLITTABLE = new Set(['text', 'heading', 'list', 'callout', 'coach_importa
 const NO_FIX = new Set(['image', 'svg', 'ggb']);
 
 /** 시트 가져오기의 CHOICE_FIG_RE — 그림 표기가 든 선택지는 정형화하지 않는다(61e 가드, 여기로 이전) */
-const CHOICE_FIG_RE = /\\includegraphics|!\[[^\]\n]*\]\([ \t]*https:\/\/drive\.google\.com\//;
+const CHOICE_FIG_RE = /\\includegraphics|!\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\([ \t]*https:\/\/drive\.google\.com\//;
 
 const ROMAN = '(?:i|ii|iii|iv|v|vi|vii|viii|ix|x)';
 const CASE_RE = new RegExp(`^\\(${ROMAN}\\)[ \\t]*(.+?인 경우)[ \\t]*[:,.]?[ \\t]*$`);
