@@ -273,3 +273,10 @@ test('⇒: 조사 공백 규칙과 비간섭 — `⇒ $x$이므로`가 그대로
   assert.equal(F('$\\Rightarrow x$ 이므로'), '⇒ $x$이므로');
   assert.equal(F('⇒ $x$이므로'), '⇒ $x$이므로');
 });
+
+test('자동 수정은 alt에 대괄호가 든 이미지 링크를 건드리지 않는다 (2026-09-16 그림 깨짐)', () => {
+  const img = '![[강대모의고사X] 시즌4_18회 (260914)_해설_1공통13_fig1.jpg](https://drive.google.com/file/d/abc/view)';
+  const { fixed } = P.autoFixDeterministicIssues(`${img}\n점 P`);
+  assert.ok(fixed.startsWith(img + '\n'), fixed);
+  assert.ok(fixed.includes('$\\mathrm{P}$'));
+});

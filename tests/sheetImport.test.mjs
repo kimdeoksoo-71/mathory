@@ -538,3 +538,13 @@ test('G14 O열 새 형식도 경고를 낸다 (분할하지 않는다)', () => {
   assert.ok(d.warnings.some((w) => /O열\(AI 정답\)에 그림/.test(w)), d.warnings.join('|'));
   assert.deepEqual(d.blocksByTab.extra_0.map((b) => b.type), ['text']);
 });
+
+test('F20 파일명에 반각 공백이 있어도 분할된다 — `[강대모의고사X] 시즌4_18회 (260914)_…` (2026-09-16 실데이터)', () => {
+  const name = '[강대모의고사X] 시즌4_18회 (260914)_해설_1공통13_fig1.jpg';
+  assert.ok(FIG_NAME_RE.test(name));
+  assert.ok(!FIG_NAME_RE.test('a\tb_fig1.jpg'), '탭은 여전히 배제');
+  const r = splitFigures(`앞\n![${name}](https://drive.google.com/file/d/abc/view?usp=drivesdk)\n뒤`);
+  assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text']);
+  assert.deepEqual(r.figNames, [name]);
+  assert.deepEqual(r.warnings, []);
+});

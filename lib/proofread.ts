@@ -268,7 +268,7 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   };
   addAll(/<[^>\n]+>/g);                          // HTML 태그
   addAll(/https?:\/\/\S+/g);                     // URL
-  addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);          // 마크다운 링크/이미지
+  addAll(/!?\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\([^)\n]*\)/g);   // 링크/이미지 — alt의 한 단계 균형 대괄호 허용(sheetImport FIG_SCAN_RE와 같은 모양)
   addAll(/`[^`\n]*`/g);                          // 인라인 코드
   addAll(/\\(?:tag|ref)\{[^}]*\}/g);             // \tag, \ref (안의 숫자 보호)
   // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 위 tag/ref 줄을 포함하지만
@@ -333,7 +333,7 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
   };
   addAll(/<[^>\n]+>/g);
   addAll(/https?:\/\/\S+/g);
-  addAll(/!?\[[^\]\n]*\]\([^)\n]*\)/g);
+  addAll(/!?\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\([^)\n]*\)/g);   // 링크/이미지 — alt의 한 단계 균형 대괄호 허용(sheetImport FIG_SCAN_RE와 같은 모양)
   addAll(/`[^`\n]*`/g);
   addAll(/\\(?:tag|ref)\{[^}]*\}/g);
   // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 이 줄이 없으면
