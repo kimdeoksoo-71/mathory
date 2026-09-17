@@ -889,11 +889,13 @@ export default function Sidebar({
             </button>
           </div>
 
-          {/* ═══ Section 1: New + Search ═══ */}
+          {/* ═══ Section 1: New + Search ═══
+              Phase 67b — 네이티브 title 제거(aria-label은 SidebarItem이 접힘에서 단다). 레일 전체가 peek 트리거라 80ms 뒤
+              펼친 패널이 라벨을 보여 주고, ~1초 뒤 뜨는 툴팁은 그 패널을 가린다. */}
           <div style={{ padding: renderCollapsed ? '8px 8px' : '8px 12px' }}>
-            <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={renderCollapsed} onClick={selNewProblem} />
-            <SidebarItem icon={<IconSearch />} label="검색" collapsed={renderCollapsed} onClick={selSearch} />
-            <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={renderCollapsed} onClick={selSheetImport} />
+            <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={renderCollapsed} title={false} onClick={selNewProblem} />
+            <SidebarItem icon={<IconSearch />} label="검색" collapsed={renderCollapsed} title={false} onClick={selSearch} />
+            <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={renderCollapsed} title={false} onClick={selSheetImport} />
           </div>
 
           {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
