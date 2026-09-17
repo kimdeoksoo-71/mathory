@@ -454,7 +454,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 67 — 좌측 사이드바 hover peek(자동 펼침·접힘)** — 구현 완료(2026-09-17) · **덕수 실물 검수 대기**
+## 현재 Phase: **Phase 67 — 좌측 사이드바 hover peek(자동 펼침·접힘)** — 구현 완료(2026-09-17) · push 완료 · **덕수 실물 검수 종결(2026-09-17, "모두 정상")**
 
 문서: `docs/phasedocs/Phase67 사이드바 hover peek v4 착수판.md`
 (계보: 덕수 구상 → v1 web → v1 CLI 교차검토 → v2 CLI + 독립 검증 에이전트 → v3 web(둥근 모서리·그림자 덕수 요청 D17) → **v4 CLI 착수판**. §13이 구현 기록)
@@ -471,7 +471,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   드롭 뒤 pointerover를 다시 보낸다. 앞은 검사를 보강했고(메뉴 연 채 빈 본문으로), 뒤는 다른 엔진 대비 안전망으로 남겼다
 - **계획 개정 R1~R6**(§13-1): `peekView` 순수 함수 추가 · 공유 레일 래퍼 S3→S4 · S4/S5 경계 · setInside는 위치만 · 재판정은 open에서만 · `usePeekHold` 헬퍼
 - **검증**: CDP 실제 마우스·터치·키보드 입력 — S4 36 · S5 14 · 화면 불변 단계(S2·S3) 스크린샷 바이트 대조
-- ⚠ 남은 일: 덕수 실물 검수 8항(§13-5 — 곡선 체감 · 닫힘 꼬리 N6 · D17 인상 · 실데이터 계정 · 편집창 위 z · **Safari** · iPad · 공개 뷰어) · push 후 Vercel 빌드 로그
+- **덕수 실물 검수 종결(2026-09-17, "모두 정상")** — §13-5 8항 전항 통과: 곡선 체감(200/160ms) · 닫힘 꼬리 150ms(**N6 수용 확정** — `SidebarItem` transition을 좁히지 않는다) · D17 모양 · 실데이터 계정 · 편집창 위 z · **Safari**(드롭 뒤 재판정 안전망 포함) · iPad · 공개 뷰어
 
 ### 이전: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · 덕수 실사용 전송 확인 · **실물 검수·실험 진행 중**
 
