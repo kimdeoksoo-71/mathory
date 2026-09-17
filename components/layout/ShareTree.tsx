@@ -4,6 +4,7 @@ import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
 import { IconChevron, IconShare, IconBazaar } from '../ui/Icons';
 import SidebarSectionHeader from './SidebarSectionHeader';
+import SectionSlide from './SectionSlide';
 
 export interface ShareGroup {
   uid: string;
@@ -34,6 +35,8 @@ interface ShareTreeProps {
     onPointerLeave?: React.PointerEventHandler<HTMLDivElement>;
     chevronTitle?: string | null;
   };
+  /** Phase 67b — 열림·닫힘 상하 슬라이드(Sidebar가 peek 중에만 참) */
+  slide?: boolean;
 }
 
 /**
@@ -46,7 +49,7 @@ interface ShareTreeProps {
  */
 export default function ShareTree({
   receivedTotal, receivedGroups, sentGroups, profiles, activeScopeKey, onSelectScope,
-  open, onToggleOpen, subOpen, onToggleSub, headerProps,
+  open, onToggleOpen, subOpen, onToggleSub, headerProps, slide = false,
 }: ShareTreeProps) {
   const bazaarOpen = subOpen.bazaar;
   const receivedOpen = subOpen.received;
@@ -71,7 +74,7 @@ export default function ShareTree({
         chevronTitle={headerProps?.chevronTitle}
       />
 
-      {open && (
+      <SectionSlide open={open} animate={slide}>
         <div>
           {/* ── Bazaar (Phase 52: 문항 공개 승격, 최상단) ── */}
           <ParentRow
@@ -154,7 +157,7 @@ export default function ShareTree({
             </>
           )}
         </div>
-      )}
+      </SectionSlide>
     </div>
   );
 }

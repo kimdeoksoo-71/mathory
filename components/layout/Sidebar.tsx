@@ -7,6 +7,7 @@ import { Problem, Folder, UserProfile } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
 import ShareTree, { ShareGroup, ShareSubKey, ShareSubOpen, SHARE_SUB_OPEN_DEFAULT } from './ShareTree';
 import SidebarSectionHeader from './SidebarSectionHeader';
+import SectionSlide from './SectionSlide';
 import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
 import { useSidebarPeek } from '../../hooks/useSidebarPeek';
@@ -790,6 +791,8 @@ export default function Sidebar({
   const myOpen = view.peeking ? peek.section === 'my' : foldersOpen;
   const shareOpenNow = view.peeking ? peek.section === 'share' : shareOpen;
   const recentOpenNow = view.peeking ? peek.section === 'recent' : recentOpen;
+  /* 보이는 폴더 트리(접힌 하위 제외) — 트리 렌더와 "미지정" 위 마진(SectionSlide ③)이 함께 쓴다 */
+  const visibleFolders = renderCollapsed ? [] : flattenVisible(buildFolderTree(folders), collapsedFolders);
   /* W6·Y5 — 선택 콜백 9종은 peek에 "골랐다"를 알린다. 리듀서가 터치로 연 peek일 때만 닫는다(마우스는 포인터가 안이라 머문다) */
   const picked = <A extends unknown[]>(fn: (...a: A) => unknown) => (...a: A) => { peekCtl.itemSelected(); fn(...a); };
   const selNewProblem = picked(onNewProblem);
@@ -943,8 +946,11 @@ export default function Sidebar({
                 </div>
               )}
 
-              {!renderCollapsed && myOpen && (() => {
-                const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
+              {/* Phase 67b — My 내용(트리·미지정·휴지통)은 SectionSlide 하나로 감싸 peek 중 상하 슬라이드 */}
+              {!renderCollapsed && (
+              <SectionSlide open={myOpen} animate={view.peeking}>
+              {(() => {
+                const visible = visibleFolders;
                 return (
                   <SortableContext items={visible.map((n) => n.folder.id)} strategy={verticalListSortingStrategy}>
                     {visible.map((n) => (
@@ -971,7 +977,7 @@ export default function Sidebar({
 
               {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위)
                   Phase 63 D25 — 드롭 타깃(folder_id: null). 하이라이트는 링+틴트 한 문법(D27). */}
-              {!renderCollapsed && myOpen && (
+              {(
                 <Droppable id={dndId.unassigned} data={{ type: 'unassigned' }}>
                   {({ setNodeRef, isOver }) => (
                 <button
@@ -990,7 +996,9 @@ export default function Sidebar({
                     color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
                     fontSize: 13.5,
                     fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 700 : 500,
-                    fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
+                    /* Phase 67b(SectionSlide ③) — 폴더가 없으면 이 행이 슬라이드 칸의 첫 자식이라 marginTop이 헤더 marginBottom 4와
+                       겹치지 않고 더해진다 → 0. 폴더가 있으면 마지막 폴더 행과의 간격 4(옛 배치 그대로). */
+                    fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: visibleFolders.length ? 4 : 0,
                   }}
                   onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)'; }}
                   onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent'; }}
@@ -1014,7 +1022,7 @@ export default function Sidebar({
               {/* 휴지통 (항상 맨 아래, 드래그 소스는 아님)
                   Phase 63 D25(Q9) — 드롭 타깃 = trash 액션(moveToTrash — 이 경로만 updated_at을
                   찍어 "버린 시각"이 된다, Q14). */}
-              {!renderCollapsed && myOpen && (
+              {(
                 <Droppable id={dndId.trash} data={{ type: 'trash' }}>
                   {({ setNodeRef, isOver }) => (
                 <button
@@ -1071,6 +1079,8 @@ export default function Sidebar({
                   )}
                 </Droppable>
               )}
+              </SectionSlide>
+              )}
             </div>
 
             {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
@@ -1097,6 +1107,7 @@ export default function Sidebar({
                   subOpen={shareSub}
                   onToggleSub={toggleShareSub}
                   headerProps={{ ...peekCtl.headerProps('share'), chevronTitle: view.peeking ? null : undefined }}
+                  slide={view.peeking}
                 />
               </div>
             )}
@@ -1116,15 +1127,19 @@ export default function Sidebar({
               ) : (
                 <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={renderCollapsed} {...peekCtl.railProps('recent')} />
               )}
-              {!renderCollapsed && recentOpenNow && recentProblems.map((p) => (
-                <DraggableProblemItem
-                  key={p.id}
-                  problem={p}
-                  onEdit={selEdit}
-                  onView={selView}
-                  onAction={onProblemAction}
-                />
-              ))}
+              {!renderCollapsed && (
+                <SectionSlide open={recentOpenNow} animate={view.peeking}>
+                  {recentProblems.map((p) => (
+                    <DraggableProblemItem
+                      key={p.id}
+                      problem={p}
+                      onEdit={selEdit}
+                      onView={selView}
+                      onAction={onProblemAction}
+                    />
+                  ))}
+                </SectionSlide>
+              )}
             </div>
 
           {/* ═══ Footer: Auth ═══ */}
