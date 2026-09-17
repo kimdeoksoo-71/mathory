@@ -248,6 +248,12 @@
   /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.2s ease;
+  /* Phase 67 D3 — 사이드바 hover peek 펼침·접힘(덕수 확정 2026-09-16). 표준 ease-in-out(.42,0,.58,1)은 출발이 굼떠
+     hover 반응이 늦게 느껴져 출발 가속을 앞당겼다. 접힘을 짧게 두는 이유: 사용자가 이미 떠난 뒤라 기다림이 체감된다.
+     값은 `<duration> <curve>`이고 속성명은 선언 쪽(`transition: width var(--transition-peek-open)`)에 둔다.
+     고정 펼침 토글은 --transition-normal 그대로다. ⚠ reduced-motion 규칙은 두지 않는다(N1 — @media 규약). */
+  --transition-peek-open: 200ms cubic-bezier(0.33, 0, 0.2, 1);
+  --transition-peek-close: 160ms cubic-bezier(0.33, 0, 0.2, 1);
 }
 
 /* ═══ Base Reset ═══ */

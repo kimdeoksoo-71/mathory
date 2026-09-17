@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { UserProfile } from '../../types/problem';
 import { ShareScope } from '../../lib/share-scope';
 import { IconChevron, IconShare, IconBazaar } from '../ui/Icons';
@@ -11,6 +10,12 @@ export interface ShareGroup {
   count: number;
 }
 
+/** Phase 67 D7 — 공유 하위(Bazaar·받은·보낸)의 펼침 키 */
+export type ShareSubKey = 'bazaar' | 'received' | 'sent';
+export type ShareSubOpen = Record<ShareSubKey, boolean>;
+/** 기본값 = 옛 내부 useState 초깃값(Phase 63 D32 이전부터의 "하위는 펼침") */
+export const SHARE_SUB_OPEN_DEFAULT: ShareSubOpen = { bazaar: true, received: true, sent: true };
+
 interface ShareTreeProps {
   receivedTotal: number;
   receivedGroups: ShareGroup[];
@@ -18,21 +23,34 @@ interface ShareTreeProps {
   profiles: Record<string, UserProfile>;
   activeScopeKey: string | null;
   onSelectScope: (scope: ShareScope) => void;
+  /** Phase 67 D7 — 제어형. 상태는 Sidebar가 소유한다(접힘으로 이 트리가 언마운트돼도 산다) */
+  open: boolean;
+  onToggleOpen: () => void;
+  subOpen: ShareSubOpen;
+  onToggleSub: (key: ShareSubKey) => void;
+  /** Phase 67 — 공유 헤더의 peek hover·chevron title(SidebarSectionHeader 규격 그대로 전달) */
+  headerProps?: {
+    onPointerEnter?: React.PointerEventHandler<HTMLDivElement>;
+    onPointerLeave?: React.PointerEventHandler<HTMLDivElement>;
+    chevronTitle?: string | null;
+  };
 }
 
 /**
  * Phase 49: 좌측 `공유` 트리 — 받은(출처별)·보낸(대상별) 그룹.
  * Phase 52(2단계): 최상단 `Bazaar`(전체/내 게시물) 승격. 기존 `문항 공개`(sent-web) 제거.
  * 카테고리 [+]/DnD는 보류(카드 '공유' 버튼이 정식 경로).
+ * Phase 67 D7 — **제어 컴포넌트**. 옛 내부 useState 4개(open·bazaar·received·sent)는 접힘마다 이 트리가
+ *   언마운트되어 리셋됐다 → hover peek의 "직전 상태 그대로"(R8)가 불가능. 상태는 Sidebar가 들고 내려준다.
+ *   기본값은 그대로(open false — Phase 63 D32 세션 내·영속 없음 / 하위 true×3).
  */
 export default function ShareTree({
   receivedTotal, receivedGroups, sentGroups, profiles, activeScopeKey, onSelectScope,
+  open, onToggleOpen, subOpen, onToggleSub, headerProps,
 }: ShareTreeProps) {
-  // Phase 63 D32 — 기본 접힘(세션 내 상태, 영속 없음). 하위 Bazaar·받은·보낸의 펼침은 현행 유지.
-  const [open, setOpen] = useState(false);
-  const [bazaarOpen, setBazaarOpen] = useState(true);
-  const [receivedOpen, setReceivedOpen] = useState(true);
-  const [sentOpen, setSentOpen] = useState(true);
+  const bazaarOpen = subOpen.bazaar;
+  const receivedOpen = subOpen.received;
+  const sentOpen = subOpen.sent;
 
   const sentTotal = sentGroups.reduce((s, g) => s + g.count, 0);
   const labelFor = (uid: string) => {
@@ -47,7 +65,10 @@ export default function ShareTree({
         icon={<IconShare size={16} />}
         label="공유"
         open={open}
-        onToggle={() => setOpen((v) => !v)}
+        onToggle={onToggleOpen}
+        onPointerEnter={headerProps?.onPointerEnter}
+        onPointerLeave={headerProps?.onPointerLeave}
+        chevronTitle={headerProps?.chevronTitle}
       />
 
       {open && (
@@ -60,7 +81,7 @@ export default function ShareTree({
             active={false}
             expandable
             expanded={bazaarOpen}
-            onToggleExpand={() => setBazaarOpen((v) => !v)}
+            onToggleExpand={() => onToggleSub('bazaar')}
             onClick={() => onSelectScope({ kind: 'bazaar', filter: 'all' })}
           />
           {bazaarOpen && (
@@ -87,7 +108,7 @@ export default function ShareTree({
             active={activeScopeKey === 'received-all'}
             expandable={receivedGroups.length > 0}
             expanded={receivedOpen}
-            onToggleExpand={() => setReceivedOpen((v) => !v)}
+            onToggleExpand={() => onToggleSub('received')}
             onClick={() => onSelectScope({ kind: 'received-all' })}
           />
           {receivedOpen && receivedGroups.map((g) => (
@@ -109,8 +130,8 @@ export default function ShareTree({
             active={false}
             expandable
             expanded={sentOpen}
-            onToggleExpand={() => setSentOpen((v) => !v)}
-            onClick={() => setSentOpen((v) => !v)}
+            onToggleExpand={() => onToggleSub('sent')}
+            onClick={() => onToggleSub('sent')}
           />
           {sentOpen && (
             <>

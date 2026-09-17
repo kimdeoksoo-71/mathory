@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { User } from 'firebase/auth';
 import { Problem, Folder, UserProfile } from '../../types/problem';
 import ContextMenu from '../ui/ContextMenu';
-import ShareTree, { ShareGroup } from './ShareTree';
+import ShareTree, { ShareGroup, ShareSubKey, ShareSubOpen, SHARE_SUB_OPEN_DEFAULT } from './ShareTree';
 import SidebarSectionHeader from './SidebarSectionHeader';
 import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
@@ -35,14 +35,26 @@ function SidebarItem({
   onClick,
   badge,
   trailing,
+  title,
+  onPointerEnter,
+  onPointerLeave,
+  onPointerDown,
 }: {
   icon: React.ReactNode;
   label: string;
   collapsed: boolean;
   active?: boolean;
-  onClick: () => void;
+  onClick: React.MouseEventHandler<HTMLButtonElement>;
   badge?: string | number;
   trailing?: React.ReactNode;
+  /** Phase 67 D5 — undefined = 현행(접힘이면 label) · false = 네이티브 title 미부착(peek 레일 3버튼: 펼침이 곧 라벨이고
+   *  네이티브 툴팁이 펼친 패널 위에 떠 가린다) · 문자열 = 그 값 */
+  title?: string | false;
+  /** Phase 67 D5 — peek hover(레일 My·공유·최근). 필터(pointerType)는 호출부 훅 */
+  onPointerEnter?: React.PointerEventHandler<HTMLButtonElement>;
+  onPointerLeave?: React.PointerEventHandler<HTMLButtonElement>;
+  /** Phase 67 D15 — click 직전 pointerType 기록(터치 peek 판별) */
+  onPointerDown?: React.PointerEventHandler<HTMLButtonElement>;
 }) {
   const [hovered, setHovered] = useState(false);
   return (
@@ -50,7 +62,12 @@ function SidebarItem({
       onClick={onClick}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      title={collapsed ? label : undefined}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+      onPointerDown={onPointerDown}
+      title={title === false ? undefined : (title ?? (collapsed ? label : undefined))}
+      /* Phase 67 Y6 — 접힘에서는 라벨 텍스트가 없고 peek 레일 3버튼은 title까지 빠지므로 이름을 aria-label로 */
+      aria-label={collapsed ? label : undefined}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -723,6 +740,12 @@ export default function Sidebar({
   const [foldersOpen, setFoldersOpen] = useState(true);
   const [myHeaderHovered, setMyHeaderHovered] = useState(false);
   const [recentOpen, setRecentOpen] = useState(true);
+  /* Phase 67 D7 — 공유 열림·하위 펼침을 ShareTree 밖으로 끌어올렸다. ShareTree는 접힘마다 언마운트되어
+     내부 상태가 리셋됐다(접었다 펴면 공유가 닫히고 하위가 전부 펼쳐졌다) — peek의 "직전 상태 그대로"(R8)가 불가능.
+     Sidebar는 접혀도 마운트가 유지되므로 세션 내내 산다. 영속 없음(Phase 63 D32). 기본값은 옛 초깃값 그대로. */
+  const [shareOpen, setShareOpen] = useState(false);
+  const [shareSub, setShareSub] = useState<ShareSubOpen>(SHARE_SUB_OPEN_DEFAULT);
+  const toggleShareSub = (key: ShareSubKey) => setShareSub((prev) => ({ ...prev, [key]: !prev[key] }));
 
   // Phase 40: 폴더 트리 펼침/접힘 (collapsed 집합, localStorage 영속)
   const COLLAPSE_KEY = 'mathory:folder:collapsed';
@@ -967,6 +990,10 @@ export default function Sidebar({
               profiles={shareProfiles}
               activeScopeKey={activeShareScopeKey}
               onSelectScope={onSelectShareScope}
+              open={shareOpen}
+              onToggleOpen={() => setShareOpen((v) => !v)}
+              subOpen={shareSub}
+              onToggleSub={toggleShareSub}
             />
           </div>
         )}

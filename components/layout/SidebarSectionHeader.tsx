@@ -11,10 +11,17 @@
  * 아이콘은 접힘(collapsed) 모드 SidebarItem과 같은 regular 도안(IconUserCircle·IconShare·IconRecent) — 펼침·접힘 1:1.
  * 래퍼 여백('8px 12px')은 호출부(Sidebar)가 세 섹션에 똑같이 준다 — 헤더 사이 간격이
  * 달라 보이던 실제 원인이 그 여백 차이였다(v1 §1 G).
+ *
+ * Phase 67(hover peek) — 스타일은 불변이고 props만 늘었다:
+ * · onPointerEnter/Leave — peek 중 섹션 전환 hover intent(루트 div). 필터(pointerType)는 호출부 훅이 한다.
+ * · chevronTitle — undefined면 현행('접기'/'펼치기'), null이면 title 미부착(peek 중 '접기'가 오해 — D14).
+ * ⚠ peek 중 onToggle은 토글이 아니라 **섹션 전환**이다 — 그 분기는 호출부(Sidebar) 책임.
  */
 import { IconChevron } from '../ui/Icons';
 
-export default function SidebarSectionHeader({ icon, label, open, onToggle, trailing, style }: {
+export default function SidebarSectionHeader({
+  icon, label, open, onToggle, trailing, style, onPointerEnter, onPointerLeave, chevronTitle,
+}: {
   icon: React.ReactNode;
   label: string;
   open: boolean;
@@ -22,9 +29,18 @@ export default function SidebarSectionHeader({ icon, label, open, onToggle, trai
   /** 라벨과 chevron 사이(My의 '+ 새 폴더' 버튼) */
   trailing?: React.ReactNode;
   style?: React.CSSProperties;
+  onPointerEnter?: React.PointerEventHandler<HTMLDivElement>;
+  onPointerLeave?: React.PointerEventHandler<HTMLDivElement>;
+  /** undefined = 현행 '접기'/'펼치기' · null = title 없음 */
+  chevronTitle?: string | null;
 }) {
+  const chevTitle = chevronTitle === undefined ? (open ? '접기' : '펼치기') : chevronTitle ?? undefined;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, ...style }}>
+    <div
+      style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4, ...style }}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={onPointerLeave}
+    >
       <span style={{ display: 'flex', flexShrink: 0, color: 'var(--text-primary)' }}>{icon}</span>
       <button
         onClick={onToggle}
@@ -49,7 +65,7 @@ export default function SidebarSectionHeader({ icon, label, open, onToggle, trai
           transform: open ? 'rotate(90deg)' : 'rotate(0)',
           transition: 'transform var(--transition-fast, .15s)',
         }}
-        title={open ? '접기' : '펼치기'}
+        title={chevTitle}
       >
         <IconChevron size={14} />
       </button>
