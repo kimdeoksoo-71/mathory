@@ -859,17 +859,21 @@ export default function Sidebar({
             animation: view.playPeekIn ? 'peekIn 90ms' : 'none',
           }}
         >
-          {/* ═══ Header ═══ */}
+          {/* ═══ Header ═══
+              Phase 67b — peek 중(open·closing)에는 사이드바 버튼을 **레일과 같은 왼쪽 자리**(중심 x 28 = 패딩 14 + 버튼 28의 절반)에
+              두고 워드마크를 그 오른쪽에. 레일 전체가 트리거라 "열기" 버튼 위에서 80ms면 peek이 열리는데, 고정 펼침 배치(버튼 오른쪽
+              x≈238)를 그대로 쓰면 클릭이 워드마크에 떨어져 아무 일도 안 일어난다. 고정한 순간(pinning·고정 펼침)은 원래 배치. */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: renderCollapsed ? 'center' : 'space-between',
-              padding: renderCollapsed ? '14px 0' : '14px 16px',
+              justifyContent: renderCollapsed ? 'center' : view.peeking ? 'flex-start' : 'space-between',
+              gap: view.peeking ? 10 : 0,
+              padding: renderCollapsed ? '14px 0' : view.peeking ? '14px 16px 14px 14px' : '14px 16px',
               minHeight: 52,
             }}
           >
-            {!renderCollapsed && (
+            {!renderCollapsed && !view.peeking && (
               <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
             )}
             <button
@@ -887,6 +891,9 @@ export default function Sidebar({
             >
               <IconSidebar />
             </button>
+            {view.peeking && (
+              <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
+            )}
           </div>
 
           {/* ═══ Section 1: New + Search ═══

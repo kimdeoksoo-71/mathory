@@ -14,6 +14,10 @@
       패널·바깥 aside가 **서로 다른 이벤트**를 보낸다(V8). transitioncancel은 듣지 않는다(Y9 — 폴백 타이머가 받는다).
    ⑤ hold는 안정 식별자다(Y2) — 소비처 effect가 렌더마다 release→hold를 돌면 holds가 0을 스쳐 리렌더 루프가 된다.
    ⑥ 레일 click의 e.detail === 0(키보드 합성)은 무시한다(X6) — 키보드 peek은 범위 밖이고 via가 낡은 값이 된다.
+   ⑨ Phase 67b — 트리거는 **레일 전체**(패널 진입 = railEnter(null)). 섹션 아이콘에서 벗어나는 것은 "레일 이탈"이 아니라
+      "섹션 없음으로 이동"(railEnter(null))이고, 레일 이탈(railLeave)은 **패널을 벗어날 때만**이다. React는 leave를 안쪽→바깥
+      순으로 보내 아이콘 leave(null) 다음 패널 leave(railLeave)가 와 idle로 끝난다. 진입은 바깥→안쪽이라 패널(null) 다음
+      아이콘(section)이 와 그 섹션으로 pending이 된다. 고정 펼침에서도 패널 진입은 오지만 리듀서가 collapsed로 거른다.
    ⑦ DnD 중 hold(D8-2): peek 안 문항·폴더를 끌다 패널이 닫히면 draggable이 언마운트되어 드래그가 끊긴다.
    ⑧ 드롭·hold 해제 뒤 inside **재판정**(V12·Y3): DragOverlay(fixed, pointer-events 없음)가 드래그 시작 순간 포인터
       밑에 들어와 패널 pointerleave가 나고 inside=false가 굳는다. 드롭 뒤 정지 포인터에 boundary 이벤트가 다시 오지 않는
@@ -168,7 +172,8 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
     },
     onPointerLeave: (e: React.PointerEvent) => {
       if (!isHoverPointerType(e.pointerType)) return;
-      dispatch({ type: 'railLeave' });
+      // ⑨ 아이콘을 벗어나도 레일 안이면 "섹션 없음". 패널까지 벗어나면 패널 leave가 이어서 railLeave를 보낸다
+      dispatch({ type: 'railEnter', section: null, dragKind: dragKindRef.current, collapsed: collapsedRef.current });
     },
     onPointerDown: (e: React.PointerEvent) => { railPointerType.current = e.pointerType; },
     onClick: (e: React.MouseEvent) => {
@@ -195,8 +200,18 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
 
   const panelProps = useMemo(() => ({
     ref: panelRef,
-    onPointerEnter: (e: React.PointerEvent) => { if (isHoverPointerType(e.pointerType)) dispatch({ type: 'panelEnter' }); },
-    onPointerLeave: (e: React.PointerEvent) => { if (isHoverPointerType(e.pointerType)) dispatch({ type: 'panelLeave' }); },
+    onPointerEnter: (e: React.PointerEvent) => {
+      if (!isHoverPointerType(e.pointerType)) return;
+      dispatch({ type: 'panelEnter' });
+      // ⑨ 레일 전체 트리거 — 빈 곳·새 문제·검색·시트·열기 버튼·푸터. 리듀서가 idle·pending·collapsed일 때만 받는다
+      lastPointer.current = { x: e.clientX, y: e.clientY };
+      dispatch({ type: 'railEnter', section: null, dragKind: dragKindRef.current, collapsed: collapsedRef.current });
+    },
+    onPointerLeave: (e: React.PointerEvent) => {
+      if (!isHoverPointerType(e.pointerType)) return;
+      dispatch({ type: 'panelLeave' });
+      dispatch({ type: 'railLeave' });   // pending이면 idle, 그 밖은 같은 객체
+    },
     onTransitionEnd: (e: React.TransitionEvent) => {
       if (e.target === e.currentTarget && e.propertyName === 'width') dispatch({ type: 'panelTransitionEnd' });
     },
