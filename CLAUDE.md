@@ -35,7 +35,7 @@ components/print/
   PdfDownloadButton.tsx    — 레거시 PDF 버튼
 components/layout/
   AppShell.tsx             — 메인 앱 레이아웃
-  Sidebar.tsx              — 사이드바
+  Sidebar.tsx              — 사이드바 (Phase 67: 자리·패널·콘텐츠 래퍼 세 겹 · 레일 hover peek)
 components/import/
   SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a)
 lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수)
@@ -68,6 +68,8 @@ lib/chromeAutoHide.ts     — 폰 가로 보기 크롬 자동 숨김 판정(4중
 lib/mathRegions.ts        — 편집창 수식 영역 스캐너 단일 원천(R-$$: 빈 `$$` = 빈 인라인 쌍) (M7, import 0 · test:mathregions)
 lib/blockTidy.ts          — 블록 정돈: 분할·머리 정리·결정적 정형화·trim (M7, import mathRegions·proofread · test:tidy)
 lib/blockClipboard.ts     — 블록 클립보드 메모리 싱글턴 (M7, import 0)
+lib/sidebarPeek.ts        — 사이드바 hover peek 상태기계 + 렌더 파생값 peekView (Phase 67, import 0 · test:peek)
+hooks/useSidebarPeek.ts   — peek 타이머·포인터 배선(seq deps · capture 리스너 · hold · 드롭 뒤 재판정) (Phase 67)
 hooks/useIsPhone.ts       — 폰 셸 단일 판별자(forceDesktop → initialPhone → matchMedia 보정) (Phase 64)
 components/layout/
   ResponsiveShell.tsx      — 공개 라우트·'/'의 폰/데스크톱 셸 스위치 (Phase 64)
@@ -146,6 +148,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
+- **사이드바 hover peek는 `collapsed`와 별개 층이다 (Phase 67)**: 접힘 레일의 My·공유·최근 아이콘에 마우스를 올리면 **패널만** 본문 위로 펼친다(자리 56 고정 · 본문 리플로 0). `collapsed`를 **읽기만** 하므로 M2 F(자동접힘·강제 펼침 금지) 위반이 아니다. 판단은 `lib/sidebarPeek.ts`(import 0 · `test:peek` — 리듀서 + 렌더 파생값 `peekView`), 배선은 `hooks/useSidebarPeek.ts`. ⚠ **aside는 세 겹**(자리 `<aside>` · 패널 absolute · 콘텐츠 래퍼)이고 **래퍼가 옛 aside의 flex column을 이어받는다** — 빠지면 푸터 바닥 고정·최근 `flex:1`·My 섹션 스크롤이 함께 깨지는데 **폴더가 적은 계정에서는 우연히 맞아 보인다**. ⚠ 패널 애니메이션은 **width** — transform·clip-path 금지(폴더 ⋯ 메뉴·아이콘 피커·이동 픽커·최근 ⋮ 메뉴가 비포털 fixed라 좌표 기준이 바뀌고 잘린다). ⚠ aside z 80은 **idle 외에만** — 상시면 고정 모드에서 ShareButton 바깥클릭 배경(40) 위로 올라간다. pin 직후 자리가 자라는 200ms는 `pinning` 단계가 80을 지킨다. ⚠ 타이머 effect deps는 **phase가 아니라 seq**(`pendingSeq`·`leaveSeq`) — 레일 빠른 이동의 leave·enter가 React 18 배칭으로 한 렌더에 합쳐지면 phase가 pending→pending이라 phase deps로는 재시작되지 않는다(변이로 67ms 조기 열림 실증; 손으로 천천히 옮기면 안 보인다). ⚠ document 리스너는 **capture**(onPointerDown stopPropagation 30곳) · 핸들러에서 preventDefault·stopPropagation 금지. ⚠ `transitionend`는 `target===currentTarget` · `width`, 패널과 aside가 **다른 이벤트**(합치면 pinning이 조기 종료). transitioncancel은 듣지 않는다(폴백 타이머). ⚠ 리듀서 ctx `dragKind`는 **DnD**(useDragKind)이지 Sidebar `dragging`(리사이즈 — 접힘에선 늘 false)이 아니다. ctx는 이벤트 페이로드로. ⚠ **no-op 이벤트는 같은 state 객체**, `hold`는 안정 식별자, 소비처는 `usePeekHold(열림 불리언)` — 어기면 hold effect ↔ 재판정 리렌더 루프. ⚠ **메뉴 hold의 필요는 "메뉴를 연 채 패널·메뉴 둘 다의 바깥으로"에서만 드러난다** — 메뉴는 패널 DOM 자손이라 메뉴 위에서는 pointerleave가 안 난다(검사를 메뉴 위만 재면 hold를 빼도 통과한다). ⚠ **드롭 뒤 inside 재판정은 Chromium에선 없어도 통과한다**(오버레이 제거 뒤 pointerover 재발송) — Safari·Firefox 대비 안전망이니 Chrome 테스트 통과를 근거로 지우지 말 것. 터치는 `railClick`이 inside를 세우고 **항목 선택 9종·바깥 탭**으로만 닫힌다 · 키보드 click(`detail 0`)은 무시 · reduced-motion 규칙 없음(@media 규약) · 모양(D17)은 드로어 카드 규격(`DRAWER_RADIUS`·`--drawer-shadow`)을 open·closing에만, transition 없이 · 공유 열림·하위 펼침은 **Sidebar가 소유**(ShareTree 제어형 — 접힘으로 언마운트돼도 산다, 영속 없음) · 공유 레일 래퍼는 My와 같은 두 겹(한 겹이면 슬롯 54 → 최근 레일 y 329가 325로)
 - **문답 검증의 질문은 코드가 아니라 Firestore가 소유한다 (Phase 66a → 66b 개정)**: `lib/ask/seed.ts`의
   `SEED_QUESTIONS`(문제 P1~P4 · 풀이 G1~G3)는 **1회 복사본**이고 이후 진실은 `users/{uid}/ask_questions`다 —
   씨앗을 고쳐도 이미 만들어진 문서는 안 바뀐다(의도). 꼬리(출력 형식 지시)도 **본문의 일부**라 코드가 붙이지 않는다.
@@ -451,7 +454,26 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · 덕수 실사용 전송 확인 · **실물 검수·실험 진행 중**
+## 현재 Phase: **Phase 67 — 좌측 사이드바 hover peek(자동 펼침·접힘)** — 구현 완료(2026-09-17) · **덕수 실물 검수 대기**
+
+문서: `docs/phasedocs/Phase67 사이드바 hover peek v4 착수판.md`
+(계보: 덕수 구상 → v1 web → v1 CLI 교차검토 → v2 CLI + 독립 검증 에이전트 → v3 web(둥근 모서리·그림자 덕수 요청 D17) → **v4 CLI 착수판**. §13이 구현 기록)
+
+접힘 사이드바 레일을 [열기·새 문제·검색·시트 가져오기·My·**공유**·최근 문항]으로 정리하고(최근 문항 점 4개 삭제), 뒤 세 아이콘에
+**hover peek**을 붙였다 — 포인터를 올리면 패널이 본문 위로 떠 있는 카드(우측 radius 10 + 드로어 그림자)로 펼쳐지고 그 섹션 하나만 열리며,
+벗어나면 180ms 유예 뒤 접힌다. My 트리 펼침(localStorage)·공유 하위 펼침(Sidebar 세션 상태)은 직전 그대로.
+**AppShell 0 · 서버 0 · 규칙 0 · 스키마 0 · Firestore 0 · 아이콘 추가 0 · 폰 0.** 신규 3 · 수정 5 · 커밋 S1~S6 ·
+로직 검증 448 → **492건**(`test:peek` 44). **규약은 「핵심 패턴」 맨 앞의 hover peek 절이 소유한다.**
+
+- **가장 값비싼 발견 셋**: ① 두 겹화의 콘텐츠 래퍼가 flex column을 안 이어받으면 푸터·최근 잘림·My 스크롤이 깨지는데 비로그인(폴더 0)
+  화면으로는 안 보인다 → 가짜 폴더 40개 임시 라우트로 검증 ② 레일 빠른 이동에서 타이머가 재시작되지 않는 W1은 실재한다(변이 67ms)
+  ③ 메뉴 hold·드롭 뒤 재판정은 **처음 검사로는 변이를 못 잡았다** — 메뉴는 DOM 자손이라 메뉴 위에선 leave가 없고, Chromium은
+  드롭 뒤 pointerover를 다시 보낸다. 앞은 검사를 보강했고(메뉴 연 채 빈 본문으로), 뒤는 다른 엔진 대비 안전망으로 남겼다
+- **계획 개정 R1~R6**(§13-1): `peekView` 순수 함수 추가 · 공유 레일 래퍼 S3→S4 · S4/S5 경계 · setInside는 위치만 · 재판정은 open에서만 · `usePeekHold` 헬퍼
+- **검증**: CDP 실제 마우스·터치·키보드 입력 — S4 36 · S5 14 · 화면 불변 단계(S2·S3) 스크린샷 바이트 대조
+- ⚠ 남은 일: 덕수 실물 검수 8항(§13-5 — 곡선 체감 · 닫힘 꼬리 N6 · D17 인상 · 실데이터 계정 · 편집창 위 z · **Safari** · iPad · 공개 뷰어) · push 후 Vercel 빌드 로그
+
+### 이전: **Phase 66b — 문답 검증 질문 카테고리(문제·풀이) · 문제 검증 질문 4종** — 구현 완료(2026-09-15) · 덕수 실사용 전송 확인 · **실물 검수·실험 진행 중**
 
 문서: `docs/phasedocs/Phase66b 문답 검증 질문 카테고리·문제 검증 질문 v3 착수판.md`
 (계보: 질문 목록 v2 초안 web → 66b v1 CLI → v2 web → **v3 CLI 착수판**. §11이 구현 기록)
