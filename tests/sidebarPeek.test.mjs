@@ -10,7 +10,7 @@ import {
 const S0 = INITIAL_PEEK_STATE;
 /** 이벤트 열을 순서대로 먹인다 — React 18이 한 렌더로 합친 배치도 리듀서 수준에서는 이 순차 적용과 같다 */
 const run = (events, s = S0) => events.reduce(reducePeek, s);
-const enter = (section = 'my', dragKind = null) => ({ type: 'railEnter', section, dragKind });
+const enter = (section = 'my', dragKind = null, collapsed = true) => ({ type: 'railEnter', section, dragKind, collapsed });
 const E = (type, extra = {}) => ({ type, ...extra });
 
 /** hover로 열린 상태(포인터는 패널 안) */
@@ -80,12 +80,36 @@ test('railClick(mouse) in pending — 80ms 전 클릭도 즉시 open · via=hove
 });
 
 // ─── W1 — seq ───
-test('W1: pending 중 다른 섹션 railEnter → section 교체 · pendingSeq 증가', () => {
+test('67b: pending 중 레일 안 이동 → 섹션만 바뀌고 pendingSeq 불변(타이머 재시작 없음)', () => {
   const a = run([enter('my')]);
   const b = reducePeek(a, enter('share'));
   assert.equal(b.phase, 'pending');
   assert.equal(b.section, 'share');
-  assert.ok(b.pendingSeq > a.pendingSeq);
+  assert.equal(b.pendingSeq, a.pendingSeq);
+  const c = reducePeek(b, enter(null));
+  assert.equal(c.section, null, '버튼에서 빈 곳으로 — 열릴 섹션 없음');
+  assert.equal(c.pendingSeq, a.pendingSeq);
+});
+
+test('67b: pending 중 같은 섹션 railEnter는 같은 객체', () => {
+  const a = run([enter('recent')]);
+  assert.strictEqual(reducePeek(a, enter('recent')), a);
+});
+
+test('67b: 빈 곳·일반 버튼으로 진입 → 섹션 없이 열림(세 헤더 모두 접힘) → 헤더로 전환 가능', () => {
+  let s = run([enter(null), E('openTimer')]);
+  assert.equal(s.phase, 'open');
+  assert.equal(s.section, null);
+  const v = peekView(s, true);
+  assert.equal(v.peeking, true);
+  assert.equal(v.peekCard, true);
+  s = reducePeek(s, { type: 'switchSection', section: 'share' });
+  assert.equal(s.section, 'share');
+});
+
+test('67b: 고정 펼침(collapsed=false)의 railEnter는 같은 객체', () => {
+  assert.strictEqual(reducePeek(S0, enter(null, null, false)), S0);
+  assert.strictEqual(reducePeek(S0, enter('my', null, false)), S0);
 });
 
 test('W1: railLeave→railEnter 배치 뒤 phase는 pending 그대로지만 pendingSeq는 달라진다', () => {

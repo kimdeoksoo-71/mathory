@@ -42,6 +42,8 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
   stateRef.current = state;
   const dragKindRef = useRef(dragKind);
   dragKindRef.current = dragKind;
+  const collapsedRef = useRef(collapsed);
+  collapsedRef.current = collapsed;
   /** 마지막 포인터 좌표 — railEnter가 먼저 채우고, pending부터 document pointermove가 갱신(W2) */
   const lastPointer = useRef<Pt | null>(null);
   /** 전환 가드 기준점 — open 진입·섹션 전환 직후 세우고, 포인터가 PEEK_MOVE_ARM_PX 이상 움직이면 해제(null) */
@@ -162,7 +164,7 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
     onPointerEnter: (e: React.PointerEvent) => {
       if (!isHoverPointerType(e.pointerType)) return;
       lastPointer.current = { x: e.clientX, y: e.clientY };
-      dispatch({ type: 'railEnter', section, dragKind: dragKindRef.current });
+      dispatch({ type: 'railEnter', section, dragKind: dragKindRef.current, collapsed: collapsedRef.current });
     },
     onPointerLeave: (e: React.PointerEvent) => {
       if (!isHoverPointerType(e.pointerType)) return;

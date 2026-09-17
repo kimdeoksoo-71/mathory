@@ -16,6 +16,10 @@
    ④ transitionend 출처는 둘(패널/바깥 aside)이고 **서로 다른 이벤트**다(V8). 합치면 pinning 중 패널 폭
       종료가 pinning을 조기에 끝내 main이 패널 우측을 덮는다. transitioncancel은 듣지 않는다(Y9 — 폴백이 받는다).
    ⑤ `dragKind`는 DnD(useDragKind)다 — Sidebar의 `dragging` prop(리사이즈)이 아니다(V10).
+   ⑥ Phase 67b — 트리거는 **레일 전체**다(빈 곳·새 문제·검색·시트·열기 버튼·푸터 포함). 기준은 "레일에 PEEK_OPEN_DELAY
+      머물렀는가"이고, 열릴 때의 섹션은 그 순간 포인터가 올라간 섹션 아이콘(없으면 null = 세 헤더 모두 접힘).
+      그래서 pending 중 섹션이 바뀌어도 pendingSeq를 올리지 않는다(레일 안 이동이 타이머를 다시 시작하지 않는다).
+      트리거가 패널 수준이라 고정 펼침에서도 진입 이벤트가 오므로 railEnter는 collapsed를 페이로드로 싣는다.
    ═══════════════════════════════════════════════════════════════ */
 
 export type PeekSection = 'my' | 'share' | 'recent';
@@ -25,7 +29,7 @@ export type PeekDragKind = null | 'problem' | 'problems' | 'folder';
 
 export interface PeekState {
   phase: PeekPhase;
-  /** 펼친 섹션. idle·pending에서는 의미 없음(pending은 열 예정인 섹션) */
+  /** 펼친 섹션. null = 세 헤더 모두 접힘(섹션 아이콘이 아닌 곳으로 연 peek — 67b). pending은 열 예정인 섹션 */
   section: PeekSection | null;
   /** 닫힘 보류 카운터(메뉴·피커·DnD) — phase와 독립으로 산다(G5) */
   holds: number;
@@ -33,7 +37,7 @@ export interface PeekState {
   inside: boolean;
   /** open이 idle·pending에서 왔는가 — peekIn 1회 재생용(V13). closing→open 되감기는 false, idle 진입 시 false(W3) */
   fresh: boolean;
-  /** railEnter마다 +1 — open 타이머 effect deps(W1) */
+  /** idle→pending마다 +1 — open 타이머 effect deps(W1). 레일 안 섹션 이동(pending→pending)은 올리지 않는다(67b) */
   pendingSeq: number;
   /** inside 참→거짓 · holds→0 마다 +1 — close 타이머 effect deps(W1 · Y2) */
   leaveSeq: number;
@@ -42,7 +46,8 @@ export interface PeekState {
 }
 
 export type PeekEvent =
-  | { type: 'railEnter'; section: PeekSection; dragKind: PeekDragKind }
+  /** 레일 진입·레일 안 이동 — section은 포인터 밑 섹션 아이콘(없으면 null) */
+  | { type: 'railEnter'; section: PeekSection | null; dragKind: PeekDragKind; collapsed: boolean }
   | { type: 'railLeave' }
   | { type: 'openTimer' }
   | { type: 'railClick'; section: PeekSection; pointerType: string }
@@ -103,10 +108,16 @@ function withInside(s: PeekState, inside: boolean): PeekState {
 export function reducePeek(s: PeekState, e: PeekEvent): PeekState {
   switch (e.type) {
     case 'railEnter': {
-      // 레일은 collapsed일 때만 렌더되므로 collapsed는 페이로드에 없다. DnD 중에는 열지 않는다(D9).
-      if (e.dragKind !== null) return s;
-      if (s.phase !== 'idle' && s.phase !== 'pending') return s;
-      return { ...s, phase: 'pending', section: e.section, inside: true, pendingSeq: s.pendingSeq + 1 };
+      // 고정 펼침에서는 레일이 없다(패널 수준 트리거라 이벤트는 온다 — 67b). DnD 중에는 열지 않는다(D9).
+      if (!e.collapsed || e.dragKind !== null) return s;
+      if (s.phase === 'idle') {
+        return { ...s, phase: 'pending', section: e.section, inside: true, pendingSeq: s.pendingSeq + 1 };
+      }
+      if (s.phase === 'pending') {
+        // 레일 안 이동 — 열릴 섹션만 바꾸고 타이머는 그대로(⑥)
+        return s.section === e.section && s.inside ? s : { ...s, section: e.section, inside: true };
+      }
+      return s;
     }
     case 'railLeave':
       return s.phase === 'pending' ? toIdle(s) : s;
