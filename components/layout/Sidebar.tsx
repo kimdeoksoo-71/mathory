@@ -9,6 +9,8 @@ import ShareTree, { ShareGroup, ShareSubKey, ShareSubOpen, SHARE_SUB_OPEN_DEFAUL
 import SidebarSectionHeader from './SidebarSectionHeader';
 import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
+import { INITIAL_PEEK_STATE, peekView } from '../../lib/sidebarPeek';
+import { DRAWER_RADIUS } from '../ui/dialogStyles';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle,
   IconDots, IconChevron, IconGoogle, IconGrip, IconTrash, IconInbox, IconShare, IconDownload,
@@ -765,348 +767,398 @@ export default function Sidebar({
     });
   };
 
+  /* ═══ Phase 67 S3 — 사이드바 두 겹화(D1·D2) ═══
+     바깥 <aside> = 흐름 안 **자리**(폭 56 | width), 안쪽 패널 = 보이는 사이드바(absolute), 콘텐츠 래퍼 = 옛 aside의
+     flex column. hover peek(S4)은 자리를 56으로 둔 채 패널만 본문 위로 넓힌다 — 본문 리플로 0.
+     지금(S3)은 peek 상태가 늘 idle이라 renderCollapsed === collapsed이고 화면·토글 애니메이션은 옛 aside와 같다.
+     ⚠ 패널 애니메이션은 width다 — transform·clip-path 금지: 폴더 ⋯ 메뉴·아이콘 피커·이동 픽커·최근 문항 메뉴가
+       전부 비포털 position:fixed라 조상 transform이 좌표 기준을 바꾸고, clip-path는 패널 밖 픽커를 자른다.
+     ⚠ 조건부 스타일은 키를 늘 두고 값만 바꾼다(Phase 45a longhand 구멍). */
+  const peek = INITIAL_PEEK_STATE;   // S4: useSidebarPeek
+  const view = peekView(peek, collapsed);
+  const renderCollapsed = view.renderCollapsed;
+  /* Y7 — idle에서 자리와 패널은 **같은 transition 식**이어야 고정 토글에서 본문 밀림(자리)과 사이드바 모양(패널)이
+     같은 곡선으로 움직인다. 하나라도 다르면 둘 사이에 본문 배경이 비친다. 리사이즈 드래그 중에는 둘 다 none. */
+  const idleTransition = dragging ? 'none' : 'width var(--transition-normal)';
+  const panelTransition = dragging ? 'none'
+    : peek.phase === 'open' ? 'width var(--transition-peek-open)'
+    : peek.phase === 'closing' ? 'width var(--transition-peek-close)'
+    : idleTransition;
+
   return (
     <aside
       style={{
         width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : width,
         flexShrink: 0,
-        /* 개선묶음 M2(덕수 보완 4) — 중앙보다 **미세하게 어둡게** + 가는 세로 구분선.
-           ProblemView의 클레이 프레임이 사라져 좌·중 경계가 안 보이던 것을 되살린다.
-           ⚠ 밝기 서열(사이드바 < 중앙 < 드로어)이 3단 구분의 전부다. 뒤집지 말 것. */
-        background: 'var(--bg-sidebar)',
-        borderRight: 'var(--rail-hairline)',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: dragging ? 'none' : 'width var(--transition-normal)',
-        overflow: 'hidden',
+        /* 자리 표시자 — 패널(absolute)의 기준 상자. 루트 flex의 stretch로 높이 100dvh.
+           z 80은 idle 외 전부(S4) — 상시 80이면 고정 모드에서 스태킹 컨텍스트가 되어 ShareButton 바깥클릭 배경(40)
+           위로 올라간다. pinning이 pin 직후 200ms의 80을 지킨다(E1). */
+        position: 'relative',
+        zIndex: view.raised ? 80 : 'auto',
+        transition: idleTransition,
       }}
     >
-      {/* ═══ Header ═══ */}
       <div
         style={{
+          position: 'absolute', top: 0, bottom: 0, left: 0,
+          width: view.panelWide ? width : SIDEBAR_COLLAPSED_WIDTH,
+          /* 개선묶음 M2(덕수 보완 4) — 중앙보다 **미세하게 어둡게** + 가는 세로 구분선.
+             ProblemView의 클레이 프레임이 사라져 좌·중 경계가 안 보이던 것을 되살린다.
+             ⚠ 밝기 서열(사이드바 < 중앙 < 드로어)이 3단 구분의 전부다. 뒤집지 말 것. */
+          background: 'var(--bg-sidebar)',
+          borderRight: 'var(--rail-hairline)',
+          /* D17 — peek 중(open·closing)만 떠 있는 카드: 우측 위·아래 radius + 드로어 그림자. transition에 넣지 않는다 */
+          borderRadius: view.peekCard ? `0 ${DRAWER_RADIUS}px ${DRAWER_RADIUS}px 0` : 0,
+          boxShadow: view.peekCard ? 'var(--drawer-shadow)' : 'none',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'space-between',
-          padding: collapsed ? '14px 0' : '14px 16px',
-          minHeight: 52,
+          transition: panelTransition,
+          overflow: 'hidden',
         }}
       >
-        {!collapsed && (
-          <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
-        )}
-        <button
-          onClick={onToggle}
-          style={{
-            border: 'none', background: 'none', cursor: 'pointer',
-            color: 'var(--text-muted)', display: 'flex', padding: 4,
-            borderRadius: 6, transition: 'color var(--transition-fast)',
-          }}
-          title={collapsed ? '사이드바 열기' : '사이드바 닫기'}
-        >
-          <IconSidebar />
-        </button>
-      </div>
-
-      {/* ═══ Section 1: New + Search ═══ */}
-      <div style={{ padding: collapsed ? '8px 8px' : '8px 12px' }}>
-        <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={collapsed} onClick={onNewProblem} />
-        <SidebarItem icon={<IconSearch />} label="검색" collapsed={collapsed} onClick={onSearch} />
-        <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={collapsed} onClick={onSheetImport} />
-      </div>
-
-      {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
-        {/* ═══ Section 2: Folders ═══ */}
         <div
-          style={{ padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}
-          onMouseEnter={() => setMyHeaderHovered(true)}
-          onMouseLeave={() => setMyHeaderHovered(false)}
+          style={{
+            /* Y1 — 옛 aside의 flex column을 **그대로 이어받는다**. 최근 섹션 flex:1이 남는 높이를 먹고 푸터가 바닥에
+               붙으며 My 섹션 overflow:auto가 줄어드는 것이 전부 이 flex 부모에 기댄다. block이면 셋이 함께 깨지는데
+               폴더가 적은 계정에서는 우연히 맞아 보인다.
+               폭: peek 중(open·closing·pinning)에만 사이드바 폭으로 고정해 패널이 넓어지는 동안 줄바꿈이 안 흔들리게 한다.
+               idle은 100% — 고정 토글에서 아이콘이 줄어드는 폭을 따라 미끄러지는 현행 동작 보존(V16·W7). */
+            width: view.lockContentWidth ? width : '100%',
+            flexShrink: 0,
+            height: '100%',
+            minHeight: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            animation: view.playPeekIn ? 'peekIn 90ms' : 'none',
+          }}
         >
-          {/* M6 D22 — 세 섹션 헤더(My·공유·최근 문항)는 SidebarSectionHeader 한 벌 */}
-          {!collapsed ? (
-            <SidebarSectionHeader
-              icon={<IconUserCircle size={16} />}
-              label="My"
-              open={foldersOpen}
-              onToggle={() => setFoldersOpen(!foldersOpen)}
-              trailing={
-                /* + 버튼: My 헤더 hover 시에만 노출 */
-                <button
-                  onClick={onNewFolder}
-                  style={{
-                    border: 'none', background: 'none',
-                    cursor: 'pointer',
-                    color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
-                    visibility: myHeaderHovered ? 'visible' : 'hidden',
-                  }}
-                  title="새 폴더"
-                >
-                  <IconPlus size={16} />
-                </button>
-              }
-            />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-              <SidebarItem icon={<IconUserCircle />} label="My" collapsed={collapsed} onClick={() => {}} />
-            </div>
-          )}
-
-          {!collapsed && foldersOpen && (() => {
-            const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
-            return (
-              <SortableContext items={visible.map((n) => n.folder.id)} strategy={verticalListSortingStrategy}>
-                {visible.map((n) => (
-                  <SortableFolderItem
-                    key={n.folder.id}
-                    folder={n.folder}
-                    count={folderCounts[n.folder.id] ?? 0}
-                    active={activeFolderId === n.folder.id}
-                    depth={n.depth}
-                    hasChildren={n.children.length > 0}
-                    expanded={!collapsedFolders.has(n.folder.id)}
-                    onToggleExpand={() => toggleFolderExpand(n.folder.id)}
-                    allFolders={folders}
-                    onSelect={() => onSelectFolder(n.folder)}
-                    onAction={onFolderAction}
-                    onSetIcon={onSetFolderIcon}
-                    onNewSubfolder={onNewSubfolder}
-                    onMoveFolder={onMoveFolder}
-                  />
-                ))}
-              </SortableContext>
-            );
-          })()}
-
-          {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위)
-              Phase 63 D25 — 드롭 타깃(folder_id: null). 하이라이트는 링+틴트 한 문법(D27). */}
-          {!collapsed && foldersOpen && (
-            <Droppable id={dndId.unassigned} data={{ type: 'unassigned' }}>
-              {({ setNodeRef, isOver }) => (
-            <button
-              ref={setNodeRef}
-              onClick={onSelectUnassigned}
-              style={{
-                /* Phase 63 D38(Q17=B) — 좌측 붙임: 아이콘 x0. chevron 슬롯이 없어 일반
-                   폴더(아이콘 x20)보다 왼쪽 = 의도된 구별(슬롯을 채워 맞추지 말 것) */
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: 'calc(100% + 8px)', marginLeft: -8,
-                padding: '8px 12px', paddingLeft: 8,
-                border: 'none', borderRadius: 8, cursor: 'pointer',
-                boxShadow: isOver ? DROP_RING : 'none',
-                background: isOver ? DROP_TINT
-                  : activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
-                color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontSize: 13.5,
-                fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 700 : 500,
-                fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
-              }}
-              onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)'; }}
-              onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent'; }}
-            >
-              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === UNASSIGNED_FOLDER_ID ? 1 : 0.75 }}>
-                <IconInbox size={16} />
-              </span>
-              <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                미지정
-              </span>
-              {unassignedCount > 0 && (
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)', borderRadius: 10, padding: '1px 7px' }}>
-                  {unassignedCount}
-                </span>
-              )}
-            </button>
-              )}
-            </Droppable>
-          )}
-
-          {/* 휴지통 (항상 맨 아래, 드래그 소스는 아님)
-              Phase 63 D25(Q9) — 드롭 타깃 = trash 액션(moveToTrash — 이 경로만 updated_at을
-              찍어 "버린 시각"이 된다, Q14). */}
-          {!collapsed && foldersOpen && (
-            <Droppable id={dndId.trash} data={{ type: 'trash' }}>
-              {({ setNodeRef, isOver }) => (
-            <button
-              ref={setNodeRef}
-              onClick={onSelectTrash}
-              style={{
-                /* Phase 63 D38 — 미지정과 아이콘 위치 통일(옛 paddingLeft 34는 일관성 없는
-                   여백이라 삭제 — 덕수 지시) */
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                width: 'calc(100% + 8px)',
-                marginLeft: -8,
-                padding: '8px 12px',
-                paddingLeft: 8,
-                border: 'none',
-                borderRadius: 8,
-                cursor: 'pointer',
-                boxShadow: isOver ? DROP_RING : 'none',
-                background: isOver ? DROP_TINT
-                  : activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
-                color: activeFolderId === TRASH_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
-                fontSize: 13.5,
-                fontWeight: activeFolderId === TRASH_FOLDER_ID ? 700 : 500,
-                fontFamily: 'var(--font-ui)',
-                transition: 'all 0.15s',
-                marginTop: 4,
-              }}
-              onMouseEnter={(e) => {
-                if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)';
-              }}
-              onMouseLeave={(e) => {
-                if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent';
-              }}
-            >
-              <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === TRASH_FOLDER_ID ? 1 : 0.75 }}>
-                <IconTrash size={16} />
-              </span>
-              <span style={{
-                flex: 1, textAlign: 'left', overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                휴지통
-              </span>
-              {trashCount > 0 && (
-                <span style={{
-                  fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)',
-                  borderRadius: 10, padding: '1px 7px',
-                }}>
-                  {trashCount}
-                </span>
-              )}
-            </button>
-              )}
-            </Droppable>
-          )}
-        </div>
-
-        {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
-        {!collapsed && (
-          <div style={{ padding: '8px 12px' }}>   {/* M6 D22 — 세 섹션 래퍼 여백 통일('8px 12px') */}
-            <ShareTree
-              receivedTotal={sharedCount}
-              receivedGroups={receivedGroups}
-              sentGroups={sentGroups}
-              profiles={shareProfiles}
-              activeScopeKey={activeShareScopeKey}
-              onSelectScope={onSelectShareScope}
-              open={shareOpen}
-              onToggleOpen={() => setShareOpen((v) => !v)}
-              subOpen={shareSub}
-              onToggleSub={toggleShareSub}
-            />
-          </div>
-        )}
-
-        {/* ═══ Section 3: Recent Problems ═══ */}
-        <div style={{ flex: 1, padding: collapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
-          {!collapsed ? (
-            <SidebarSectionHeader
-              icon={<IconRecent size={16} />}
-              label="최근 문항"
-              open={recentOpen}
-              onToggle={() => setRecentOpen(!recentOpen)}
-            />
-          ) : (
-            <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={collapsed} onClick={() => {}} />
-          )}
-          {(collapsed ? recentProblems.slice(0, 4) : recentOpen ? recentProblems : []).map((p) => (
-            <DraggableProblemItem
-              key={p.id}
-              problem={p}
-              collapsed={collapsed}
-              onEdit={onEditProblem}
-              onView={onViewProblem}
-              onAction={onProblemAction}
-            />
-          ))}
-        </div>
-
-      {/* ═══ Footer: Auth ═══ */}
-      <div style={{
-        borderTop: '1px solid var(--border-primary)',
-        padding: collapsed ? '10px 4px' : '10px 12px',
-        display: 'flex', alignItems: 'center',
-        justifyContent: collapsed ? 'center' : 'flex-start',
-        gap: 8,
-      }}>
-        {user ? (() => {
-          const idOnly = (user.email || '').split('@')[0] || user.displayName || '';
-          const photo = user.photoURL;
-          const avatar = photo ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={photo} alt={idOnly} referrerPolicy="no-referrer"
-              style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-          ) : (
-            <div style={{
-              width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-              background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #666)',
-            }}>{(idOnly || '?').charAt(0).toUpperCase()}</div>
-          );
-          const openSettings = () => router.push('/settings');
-          return collapsed ? (
-            <button onClick={openSettings} title={`${idOnly || ''} — 개인 설정`}
-              style={{
-                border: 'none', background: 'transparent', cursor: 'pointer',
-                padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                borderRadius: '50%',
-              }}>
-              {avatar}
-            </button>
-          ) : (
-            <>
-              <button onClick={openSettings} title="개인 설정"
-                style={{
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  borderRadius: '50%',
-                }}>
-                {avatar}
-              </button>
-              <button onClick={openSettings} title="개인 설정"
-                style={{
-                  flex: 1, minWidth: 0,
-                  fontSize: 12, color: 'var(--text-secondary)',
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  fontFamily: 'var(--font-ui)',
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  textAlign: 'left', padding: 0,
-                }}
-              >
-                {idOnly || '로그인됨'}
-              </button>
-              <button onClick={onLogout}
-                style={{
-                  flexShrink: 0,
-                  border: 'none', background: 'transparent', cursor: 'pointer',
-                  fontSize: 11, color: 'var(--text-muted)', padding: '2px 0',
-                  fontFamily: 'var(--font-ui)',
-                }}
-                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
-              >
-                로그아웃
-              </button>
-            </>
-          );
-        })() : (
-          <button onClick={onLogin}
-            title={collapsed ? 'Google 로그인' : undefined}
+          {/* ═══ Header ═══ */}
+          <div
             style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: collapsed ? 8 : '8px 14px', border: '1px solid var(--border-light)',
-              borderRadius: 8, background: 'transparent', cursor: 'pointer',
-              fontSize: 13, color: 'var(--text-primary)',
-              fontFamily: 'var(--font-ui)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: renderCollapsed ? 'center' : 'space-between',
+              padding: renderCollapsed ? '14px 0' : '14px 16px',
+              minHeight: 52,
             }}
-            onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
-            onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
           >
-            <IconGoogle size={14} />
-            {!collapsed && <span>Google 로그인</span>}
-          </button>
-        )}
+            {!renderCollapsed && (
+              <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
+            )}
+            <button
+              onClick={onToggle}
+              style={{
+                border: 'none', background: 'none', cursor: 'pointer',
+                color: 'var(--text-muted)', display: 'flex', padding: 4,
+                borderRadius: 6, transition: 'color var(--transition-fast)',
+              }}
+              title={collapsed ? '사이드바 열기' : '사이드바 닫기'}
+            >
+              <IconSidebar />
+            </button>
+          </div>
+
+          {/* ═══ Section 1: New + Search ═══ */}
+          <div style={{ padding: renderCollapsed ? '8px 8px' : '8px 12px' }}>
+            <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={renderCollapsed} onClick={onNewProblem} />
+            <SidebarItem icon={<IconSearch />} label="검색" collapsed={renderCollapsed} onClick={onSearch} />
+            <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={renderCollapsed} onClick={onSheetImport} />
+          </div>
+
+          {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
+            {/* ═══ Section 2: Folders ═══ */}
+            <div
+              style={{ padding: renderCollapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}
+              onMouseEnter={() => setMyHeaderHovered(true)}
+              onMouseLeave={() => setMyHeaderHovered(false)}
+            >
+              {/* M6 D22 — 세 섹션 헤더(My·공유·최근 문항)는 SidebarSectionHeader 한 벌 */}
+              {!renderCollapsed ? (
+                <SidebarSectionHeader
+                  icon={<IconUserCircle size={16} />}
+                  label="My"
+                  open={foldersOpen}
+                  onToggle={() => setFoldersOpen(!foldersOpen)}
+                  trailing={
+                    /* + 버튼: My 헤더 hover 시에만 노출 */
+                    <button
+                      onClick={onNewFolder}
+                      style={{
+                        border: 'none', background: 'none',
+                        cursor: 'pointer',
+                        color: 'var(--text-muted)', display: 'flex', padding: 2, borderRadius: 4,
+                        visibility: myHeaderHovered ? 'visible' : 'hidden',
+                      }}
+                      title="새 폴더"
+                    >
+                      <IconPlus size={16} />
+                    </button>
+                  }
+                />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                  <SidebarItem icon={<IconUserCircle />} label="My" collapsed={renderCollapsed} onClick={() => {}} />
+                </div>
+              )}
+
+              {!renderCollapsed && foldersOpen && (() => {
+                const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
+                return (
+                  <SortableContext items={visible.map((n) => n.folder.id)} strategy={verticalListSortingStrategy}>
+                    {visible.map((n) => (
+                      <SortableFolderItem
+                        key={n.folder.id}
+                        folder={n.folder}
+                        count={folderCounts[n.folder.id] ?? 0}
+                        active={activeFolderId === n.folder.id}
+                        depth={n.depth}
+                        hasChildren={n.children.length > 0}
+                        expanded={!collapsedFolders.has(n.folder.id)}
+                        onToggleExpand={() => toggleFolderExpand(n.folder.id)}
+                        allFolders={folders}
+                        onSelect={() => onSelectFolder(n.folder)}
+                        onAction={onFolderAction}
+                        onSetIcon={onSetFolderIcon}
+                        onNewSubfolder={onNewSubfolder}
+                        onMoveFolder={onMoveFolder}
+                      />
+                    ))}
+                  </SortableContext>
+                );
+              })()}
+
+              {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위)
+                  Phase 63 D25 — 드롭 타깃(folder_id: null). 하이라이트는 링+틴트 한 문법(D27). */}
+              {!renderCollapsed && foldersOpen && (
+                <Droppable id={dndId.unassigned} data={{ type: 'unassigned' }}>
+                  {({ setNodeRef, isOver }) => (
+                <button
+                  ref={setNodeRef}
+                  onClick={onSelectUnassigned}
+                  style={{
+                    /* Phase 63 D38(Q17=B) — 좌측 붙임: 아이콘 x0. chevron 슬롯이 없어 일반
+                       폴더(아이콘 x20)보다 왼쪽 = 의도된 구별(슬롯을 채워 맞추지 말 것) */
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    width: 'calc(100% + 8px)', marginLeft: -8,
+                    padding: '8px 12px', paddingLeft: 8,
+                    border: 'none', borderRadius: 8, cursor: 'pointer',
+                    boxShadow: isOver ? DROP_RING : 'none',
+                    background: isOver ? DROP_TINT
+                      : activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                    color: activeFolderId === UNASSIGNED_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    fontSize: 13.5,
+                    fontWeight: activeFolderId === UNASSIGNED_FOLDER_ID ? 700 : 500,
+                    fontFamily: 'var(--font-ui)', transition: 'all 0.15s', marginTop: 4,
+                  }}
+                  onMouseEnter={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)'; }}
+                  onMouseLeave={(e) => { if (activeFolderId !== UNASSIGNED_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent'; }}
+                >
+                  <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === UNASSIGNED_FOLDER_ID ? 1 : 0.75 }}>
+                    <IconInbox size={16} />
+                  </span>
+                  <span style={{ flex: 1, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    미지정
+                  </span>
+                  {unassignedCount > 0 && (
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)', borderRadius: 10, padding: '1px 7px' }}>
+                      {unassignedCount}
+                    </span>
+                  )}
+                </button>
+                  )}
+                </Droppable>
+              )}
+
+              {/* 휴지통 (항상 맨 아래, 드래그 소스는 아님)
+                  Phase 63 D25(Q9) — 드롭 타깃 = trash 액션(moveToTrash — 이 경로만 updated_at을
+                  찍어 "버린 시각"이 된다, Q14). */}
+              {!renderCollapsed && foldersOpen && (
+                <Droppable id={dndId.trash} data={{ type: 'trash' }}>
+                  {({ setNodeRef, isOver }) => (
+                <button
+                  ref={setNodeRef}
+                  onClick={onSelectTrash}
+                  style={{
+                    /* Phase 63 D38 — 미지정과 아이콘 위치 통일(옛 paddingLeft 34는 일관성 없는
+                       여백이라 삭제 — 덕수 지시) */
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    width: 'calc(100% + 8px)',
+                    marginLeft: -8,
+                    padding: '8px 12px',
+                    paddingLeft: 8,
+                    border: 'none',
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    boxShadow: isOver ? DROP_RING : 'none',
+                    background: isOver ? DROP_TINT
+                      : activeFolderId === TRASH_FOLDER_ID ? 'var(--bg-active)' : 'transparent',
+                    color: activeFolderId === TRASH_FOLDER_ID ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    fontSize: 13.5,
+                    fontWeight: activeFolderId === TRASH_FOLDER_ID ? 700 : 500,
+                    fontFamily: 'var(--font-ui)',
+                    transition: 'all 0.15s',
+                    marginTop: 4,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'var(--bg-hover)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (activeFolderId !== TRASH_FOLDER_ID && !isOver) e.currentTarget.style.background = 'transparent';
+                  }}
+                >
+                  <span style={{ flexShrink: 0, display: 'flex', opacity: activeFolderId === TRASH_FOLDER_ID ? 1 : 0.75 }}>
+                    <IconTrash size={16} />
+                  </span>
+                  <span style={{
+                    flex: 1, textAlign: 'left', overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    휴지통
+                  </span>
+                  {trashCount > 0 && (
+                    <span style={{
+                      fontSize: 11, color: 'var(--text-muted)', background: 'var(--badge-bg)',
+                      borderRadius: 10, padding: '1px 7px',
+                    }}>
+                      {trashCount}
+                    </span>
+                  )}
+                </button>
+                  )}
+                </Droppable>
+              )}
+            </div>
+
+            {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
+            {!renderCollapsed && (
+              <div style={{ padding: '8px 12px' }}>   {/* M6 D22 — 세 섹션 래퍼 여백 통일('8px 12px') */}
+                <ShareTree
+                  receivedTotal={sharedCount}
+                  receivedGroups={receivedGroups}
+                  sentGroups={sentGroups}
+                  profiles={shareProfiles}
+                  activeScopeKey={activeShareScopeKey}
+                  onSelectScope={onSelectShareScope}
+                  open={shareOpen}
+                  onToggleOpen={() => setShareOpen((v) => !v)}
+                  subOpen={shareSub}
+                  onToggleSub={toggleShareSub}
+                />
+              </div>
+            )}
+
+            {/* ═══ Section 3: Recent Problems ═══ */}
+            <div style={{ flex: 1, padding: renderCollapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
+              {!renderCollapsed ? (
+                <SidebarSectionHeader
+                  icon={<IconRecent size={16} />}
+                  label="최근 문항"
+                  open={recentOpen}
+                  onToggle={() => setRecentOpen(!recentOpen)}
+                />
+              ) : (
+                <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={renderCollapsed} onClick={() => {}} />
+              )}
+              {(renderCollapsed ? recentProblems.slice(0, 4) : recentOpen ? recentProblems : []).map((p) => (
+                <DraggableProblemItem
+                  key={p.id}
+                  problem={p}
+                  collapsed={renderCollapsed}
+                  onEdit={onEditProblem}
+                  onView={onViewProblem}
+                  onAction={onProblemAction}
+                />
+              ))}
+            </div>
+
+          {/* ═══ Footer: Auth ═══ */}
+          <div style={{
+            borderTop: '1px solid var(--border-primary)',
+            padding: renderCollapsed ? '10px 4px' : '10px 12px',
+            display: 'flex', alignItems: 'center',
+            justifyContent: renderCollapsed ? 'center' : 'flex-start',
+            gap: 8,
+          }}>
+            {user ? (() => {
+              const idOnly = (user.email || '').split('@')[0] || user.displayName || '';
+              const photo = user.photoURL;
+              const avatar = photo ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={photo} alt={idOnly} referrerPolicy="no-referrer"
+                  style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+              ) : (
+                <div style={{
+                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
+                  background: 'var(--bg-active, #ddd)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 11, fontWeight: 600, color: 'var(--text-secondary, #666)',
+                }}>{(idOnly || '?').charAt(0).toUpperCase()}</div>
+              );
+              const openSettings = () => router.push('/settings');
+              return renderCollapsed ? (
+                <button onClick={openSettings} title={`${idOnly || ''} — 개인 설정`}
+                  style={{
+                    border: 'none', background: 'transparent', cursor: 'pointer',
+                    padding: 4, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    borderRadius: '50%',
+                  }}>
+                  {avatar}
+                </button>
+              ) : (
+                <>
+                  <button onClick={openSettings} title="개인 설정"
+                    style={{
+                      border: 'none', background: 'transparent', cursor: 'pointer',
+                      padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      borderRadius: '50%',
+                    }}>
+                    {avatar}
+                  </button>
+                  <button onClick={openSettings} title="개인 설정"
+                    style={{
+                      flex: 1, minWidth: 0,
+                      fontSize: 12, color: 'var(--text-secondary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      fontFamily: 'var(--font-ui)',
+                      border: 'none', background: 'transparent', cursor: 'pointer',
+                      textAlign: 'left', padding: 0,
+                    }}
+                  >
+                    {idOnly || '로그인됨'}
+                  </button>
+                  <button onClick={onLogout}
+                    style={{
+                      flexShrink: 0,
+                      border: 'none', background: 'transparent', cursor: 'pointer',
+                      fontSize: 11, color: 'var(--text-muted)', padding: '2px 0',
+                      fontFamily: 'var(--font-ui)',
+                    }}
+                    onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.color = 'var(--text-muted)'; }}
+                  >
+                    로그아웃
+                  </button>
+                </>
+              );
+            })() : (
+              <button onClick={onLogin}
+                title={renderCollapsed ? 'Google 로그인' : undefined}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  padding: renderCollapsed ? 8 : '8px 14px', border: '1px solid var(--border-light)',
+                  borderRadius: 8, background: 'transparent', cursor: 'pointer',
+                  fontSize: 13, color: 'var(--text-primary)',
+                  fontFamily: 'var(--font-ui)',
+                }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+              >
+                <IconGoogle size={14} />
+                {!renderCollapsed && <span>Google 로그인</span>}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </aside>
   );
