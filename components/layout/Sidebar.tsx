@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from 'firebase/auth';
 import { Problem, Folder, UserProfile } from '../../types/problem';
@@ -106,6 +106,18 @@ function SidebarItem({
       {!collapsed && trailing}
     </button>
   );
+}
+
+/* Phase 67 D8 — peek 닫힘 보류. 메뉴·피커가 열린 동안 hold하고 effect cleanup이 해제한다(수동 쌍 금지 — 누수 차단).
+   기본값은 Provider 밖 방어(G9): 아무것도 안 하고 no-op 해제를 돌려준다.
+   ⚠ 소비처 effect deps는 **열림 불리언**이지 좌표 객체나 hold가 아니다(Y2) — 좌표가 바뀔 때마다 release→hold가 돌면
+     holds가 0을 스쳐 재판정·유예가 흔들린다. */
+const SidebarPeekContext = createContext<{ hold: () => () => void }>({ hold: () => () => {} });
+
+/** 열려 있는 동안 peek을 붙잡는다 */
+function usePeekHold(open: boolean) {
+  const { hold } = useContext(SidebarPeekContext);
+  useEffect(() => (open ? hold() : undefined), [open, hold]);
 }
 
 type FolderMenuAction = 'rename' | 'delete' | 'icon' | 'clearIcon' | 'newSub' | 'move';
@@ -252,6 +264,8 @@ function SortableFolderItem({
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
   const [iconPickerPos, setIconPickerPos] = useState<{ x: number; y: number } | null>(null);
   const [movePos, setMovePos] = useState<{ x: number; y: number } | null>(null);
+  /* Phase 67 D8-1 — ⋯ 메뉴·아이콘 피커·이동 픽커가 열린 동안 peek 닫힘 보류(메뉴는 패널 밖으로 삐져나온다) */
+  usePeekHold(!!(menuPos || iconPickerPos || movePos));
 
   const {
     attributes, listeners, setNodeRef,
@@ -565,6 +579,7 @@ function DraggableProblemItem({
 }) {
   const [hovered, setHovered] = useState(false);
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+  usePeekHold(!!menuPos);   // Phase 67 D8-1 — ⋮ 컨텍스트 메뉴
 
   const {
     attributes, listeners, setNodeRef, transform, isDragging,
@@ -786,6 +801,7 @@ export default function Sidebar({
   const selShareScope = picked(onSelectShareScope);
   const selView = picked(onViewProblem);
   const selEdit = picked(onEditProblem);
+  const peekHoldValue = useMemo(() => ({ hold: peekCtl.hold }), [peekCtl.hold]);
   /* Y7 — idle에서 자리와 패널은 **같은 transition 식**이어야 고정 토글에서 본문 밀림(자리)과 사이드바 모양(패널)이
      같은 곡선으로 움직인다. 하나라도 다르면 둘 사이에 본문 배경이 비친다. 리사이즈 드래그 중에는 둘 다 none. */
   const idleTransition = dragging ? 'none' : 'width var(--transition-normal)';
@@ -795,6 +811,7 @@ export default function Sidebar({
     : idleTransition;
 
   return (
+    <SidebarPeekContext.Provider value={peekHoldValue}>
     <aside
       style={{
         width: collapsed ? SIDEBAR_COLLAPSED_WIDTH : width,
@@ -1190,5 +1207,6 @@ export default function Sidebar({
         </div>
       </div>
     </aside>
+    </SidebarPeekContext.Provider>
   );
 }

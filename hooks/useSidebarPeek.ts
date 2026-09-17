@@ -14,6 +14,14 @@
       패널·바깥 aside가 **서로 다른 이벤트**를 보낸다(V8). transitioncancel은 듣지 않는다(Y9 — 폴백 타이머가 받는다).
    ⑤ hold는 안정 식별자다(Y2) — 소비처 effect가 렌더마다 release→hold를 돌면 holds가 0을 스쳐 리렌더 루프가 된다.
    ⑥ 레일 click의 e.detail === 0(키보드 합성)은 무시한다(X6) — 키보드 peek은 범위 밖이고 via가 낡은 값이 된다.
+   ⑦ DnD 중 hold(D8-2): peek 안 문항·폴더를 끌다 패널이 닫히면 draggable이 언마운트되어 드래그가 끊긴다.
+   ⑧ 드롭·hold 해제 뒤 inside **재판정**(V12·Y3): DragOverlay(fixed, pointer-events 없음)가 드래그 시작 순간 포인터
+      밑에 들어와 패널 pointerleave가 나고 inside=false가 굳는다. 드롭 뒤 정지 포인터에 boundary 이벤트가 다시 오지 않는
+      엔진에서는 패널 안 폴더에 **성공적으로** 떨어뜨렸는데 180ms 뒤 닫힌다. ⚠ S5 실측: Chromium은 오버레이 제거 뒤
+      pointerover를 다시 보내 재판정 없이도 복구된다(이 줄을 지운 변이가 headless Chrome에서 통과했다) — 그래서 이것은
+      다른 엔진(Safari·Firefox) 대비 **안전망**이고, Chrome 테스트 통과를 근거로 지우지 말 것. 재판정은 holds 0 ∧
+      드래그 없음이 **되는 순간** 한 번(release 호출마다가 아니다) · open일 때만 · 좌표가 있을 때만.
+      오버레이 제거와 dragKind=null이 같은 커밋이라(onDragEnd 배칭) effect 시점 elementFromPoint는 가로막히지 않는다.
    ═══════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import {
@@ -125,6 +133,29 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
 
   useEffect(() => clearSwitch, [clearSwitch]);
 
+  // ── DnD hold(⑦) — 드래그 시작: pending이면 취소 + hold / 끝: release ──
+  const dragging = dragKind !== null;
+  useEffect(() => {
+    if (!dragging) return;
+    dispatch({ type: 'dragStart' });
+    dispatch({ type: 'hold' });
+    return () => dispatch({ type: 'release' });
+  }, [dragging]);
+
+  // ── inside 재판정(⑧) — 가장자리에서만 ──
+  const settled = state.holds === 0 && !dragging;
+  const wasSettled = useRef(settled);
+  useEffect(() => {
+    const was = wasSettled.current;
+    wasSettled.current = settled;
+    if (!settled || was) return;
+    if (stateRef.current.phase !== 'open') return;
+    const p = lastPointer.current, panel = panelRef.current;
+    if (!p || !panel) return;
+    const el = document.elementFromPoint(p.x, p.y);
+    dispatch({ type: 'setInside', inside: !!el && panel.contains(el) });
+  }, [settled]);
+
   // ── 소비처 props ──
   const railProps = useCallback((section: PeekSection) => ({
     title: false as const,
@@ -186,7 +217,7 @@ export function useSidebarPeek({ collapsed, dragKind }: { collapsed: boolean; dr
   const pin = useCallback(() => dispatch({ type: 'pin' }), []);
   /** 선택 콜백 9종이 부른다 — 리듀서가 터치 peek일 때만 닫는다(W6·Y5) */
   const itemSelected = useCallback(() => dispatch({ type: 'itemSelected' }), []);
-  /** 닫힘 보류 — 반환한 함수로 해제. 소비처는 useEffect cleanup으로만 쓴다(Y2 · S5 배선) */
+  /** 닫힘 보류 — 반환한 함수로 해제. 소비처는 useEffect cleanup으로만 쓴다(Y2). deps 없음 = 안정 식별자 */
   const hold = useCallback(() => {
     dispatch({ type: 'hold' });
     return () => dispatch({ type: 'release' });
