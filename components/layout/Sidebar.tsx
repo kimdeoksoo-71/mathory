@@ -9,7 +9,7 @@ import ShareTree, { ShareGroup, ShareSubKey, ShareSubOpen, SHARE_SUB_OPEN_DEFAUL
 import SidebarSectionHeader from './SidebarSectionHeader';
 import Wordmark from '../ui/Wordmark';
 import { ShareScope } from '../../lib/share-scope';
-import { INITIAL_PEEK_STATE, peekView } from '../../lib/sidebarPeek';
+import { useSidebarPeek } from '../../hooks/useSidebarPeek';
 import { DRAWER_RADIUS } from '../ui/dialogStyles';
 import {
   IconSidebar, IconPlus, IconSearch, IconFolder, IconRecent, IconUserCircle,
@@ -554,13 +554,11 @@ function FolderIconPicker({
 // ─── Draggable Problem Item (can be dragged to folder) ───
 function DraggableProblemItem({
   problem,
-  collapsed,
   onEdit,
   onView,
   onAction,
 }: {
   problem: Problem;
-  collapsed: boolean;
   onEdit: (p: Problem) => void;
   onView: (p: Problem) => void;
   onAction: (action: string, problem: Problem) => void;
@@ -599,45 +597,38 @@ function DraggableProblemItem({
           style={{
             display: 'flex',
             alignItems: 'center',
-            padding: collapsed ? '8px 0' : '7px 12px',
-            justifyContent: collapsed ? 'center' : 'space-between',
+            padding: '7px 12px',
+            justifyContent: 'space-between',
             borderRadius: 8,
             cursor: isDragging ? 'grabbing' : 'pointer',
             transition: 'background var(--transition-fast)',
             background: hovered && !isDragging ? 'var(--bg-hover)' : 'transparent',
           }}
         >
-          {collapsed ? (
-            <span style={{
-              width: 8, height: 8, borderRadius: '50%', background: 'var(--text-faint)',
-            }} />
-          ) : (
-            <>
-              <span style={{
-                fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
-                fontFamily: 'var(--font-ui)',
-              }}>
-                {problem.title}
-              </span>
-              {/* ⋮ 버튼 — 항상 자리 확보, hover 시만 보임 → 레이아웃 흔들림 방지 */}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMenuPos({ x: e.clientX, y: e.clientY });
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                style={{
-                  border: 'none', background: 'none', cursor: 'pointer',
-                  padding: '2px 4px', borderRadius: 4, color: 'var(--text-muted)',
-                  display: 'flex', flexShrink: 0,
-                  visibility: hovered && !isDragging ? 'visible' : 'hidden',
-                }}
-              >
-                <IconDots />
-              </button>
-            </>
-          )}
+          {/* Phase 67 D13 — 접힘 레일의 점 4개(slice(0,4))는 삭제했다. 최근 문항은 레일 아이콘 hover peek으로 본다 */}
+          <span style={{
+            fontSize: 13, color: 'var(--text-primary)', overflow: 'hidden',
+            textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+            fontFamily: 'var(--font-ui)',
+          }}>
+            {problem.title}
+          </span>
+          {/* ⋮ 버튼 — 항상 자리 확보, hover 시만 보임 → 레이아웃 흔들림 방지 */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuPos({ x: e.clientX, y: e.clientY });
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            style={{
+              border: 'none', background: 'none', cursor: 'pointer',
+              padding: '2px 4px', borderRadius: 4, color: 'var(--text-muted)',
+              display: 'flex', flexShrink: 0,
+              visibility: hovered && !isDragging ? 'visible' : 'hidden',
+            }}
+          >
+            <IconDots />
+          </button>
         </div>
       </div>
       {menuPos && (
@@ -770,13 +761,31 @@ export default function Sidebar({
   /* ═══ Phase 67 S3 — 사이드바 두 겹화(D1·D2) ═══
      바깥 <aside> = 흐름 안 **자리**(폭 56 | width), 안쪽 패널 = 보이는 사이드바(absolute), 콘텐츠 래퍼 = 옛 aside의
      flex column. hover peek(S4)은 자리를 56으로 둔 채 패널만 본문 위로 넓힌다 — 본문 리플로 0.
-     지금(S3)은 peek 상태가 늘 idle이라 renderCollapsed === collapsed이고 화면·토글 애니메이션은 옛 aside와 같다.
+     S3는 상태를 idle로 고정해 화면 불변을 확인했고, S4부터 useSidebarPeek(hooks/)가 상태를 공급한다.
      ⚠ 패널 애니메이션은 width다 — transform·clip-path 금지: 폴더 ⋯ 메뉴·아이콘 피커·이동 픽커·최근 문항 메뉴가
        전부 비포털 position:fixed라 조상 transform이 좌표 기준을 바꾸고, clip-path는 패널 밖 픽커를 자른다.
      ⚠ 조건부 스타일은 키를 늘 두고 값만 바꾼다(Phase 45a longhand 구멍). */
-  const peek = INITIAL_PEEK_STATE;   // S4: useSidebarPeek
-  const view = peekView(peek, collapsed);
+  const dragKind = useDragKind();
+  const peekCtl = useSidebarPeek({ collapsed, dragKind });
+  const peek = peekCtl.state;
+  const view = peekCtl.view;
   const renderCollapsed = view.renderCollapsed;
+  /* D6 — peek 중(open·closing)에는 포인터가 올라간 섹션 **하나만** 연다. 고정 상태값은 읽지도 쓰지도 않는다
+     (pinning은 collapsed=false라 고정값으로 돌아간다 — D10 의도). 트리·미지정·휴지통 게이트가 myOpen을 본다. */
+  const myOpen = view.peeking ? peek.section === 'my' : foldersOpen;
+  const shareOpenNow = view.peeking ? peek.section === 'share' : shareOpen;
+  const recentOpenNow = view.peeking ? peek.section === 'recent' : recentOpen;
+  /* W6·Y5 — 선택 콜백 9종은 peek에 "골랐다"를 알린다. 리듀서가 터치로 연 peek일 때만 닫는다(마우스는 포인터가 안이라 머문다) */
+  const picked = <A extends unknown[]>(fn: (...a: A) => unknown) => (...a: A) => { peekCtl.itemSelected(); fn(...a); };
+  const selNewProblem = picked(onNewProblem);
+  const selSearch = picked(onSearch);
+  const selSheetImport = picked(onSheetImport);
+  const selFolder = picked(onSelectFolder);
+  const selUnassigned = picked(onSelectUnassigned);
+  const selTrash = picked(onSelectTrash);
+  const selShareScope = picked(onSelectShareScope);
+  const selView = picked(onViewProblem);
+  const selEdit = picked(onEditProblem);
   /* Y7 — idle에서 자리와 패널은 **같은 transition 식**이어야 고정 토글에서 본문 밀림(자리)과 사이드바 모양(패널)이
      같은 곡선으로 움직인다. 하나라도 다르면 둘 사이에 본문 배경이 비친다. 리사이즈 드래그 중에는 둘 다 none. */
   const idleTransition = dragging ? 'none' : 'width var(--transition-normal)';
@@ -797,8 +806,10 @@ export default function Sidebar({
         zIndex: view.raised ? 80 : 'auto',
         transition: idleTransition,
       }}
+      {...peekCtl.asideProps}
     >
       <div
+        {...peekCtl.panelProps}
         style={{
           position: 'absolute', top: 0, bottom: 0, left: 0,
           width: view.panelWide ? width : SIDEBAR_COLLAPSED_WIDTH,
@@ -845,13 +856,17 @@ export default function Sidebar({
               <Wordmark size={19} color="var(--wordmark-small, #944728)" shadow />
             )}
             <button
-              onClick={onToggle}
+              onClick={() => {
+                /* D10 — peek 중이면 pin(→ pinning: 바깥 자리가 폭까지 자라는 200ms 동안 z 80 유지, E1) 후 고정 펼침 */
+                if (peek.phase === 'open' || peek.phase === 'closing') peekCtl.pin();
+                onToggle();
+              }}
               style={{
                 border: 'none', background: 'none', cursor: 'pointer',
                 color: 'var(--text-muted)', display: 'flex', padding: 4,
                 borderRadius: 6, transition: 'color var(--transition-fast)',
               }}
-              title={collapsed ? '사이드바 열기' : '사이드바 닫기'}
+              title={collapsed ? (view.peeking ? '사이드바 고정' : '사이드바 열기') : '사이드바 닫기'}
             >
               <IconSidebar />
             </button>
@@ -859,9 +874,9 @@ export default function Sidebar({
 
           {/* ═══ Section 1: New + Search ═══ */}
           <div style={{ padding: renderCollapsed ? '8px 8px' : '8px 12px' }}>
-            <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={renderCollapsed} onClick={onNewProblem} />
-            <SidebarItem icon={<IconSearch />} label="검색" collapsed={renderCollapsed} onClick={onSearch} />
-            <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={renderCollapsed} onClick={onSheetImport} />
+            <SidebarItem icon={<IconPlus />} label="새 문제" collapsed={renderCollapsed} onClick={selNewProblem} />
+            <SidebarItem icon={<IconSearch />} label="검색" collapsed={renderCollapsed} onClick={selSearch} />
+            <SidebarItem icon={<IconDownload size={18} />} label="시트 가져오기" collapsed={renderCollapsed} onClick={selSheetImport} />
           </div>
 
           {/* Phase 63 S0 — 이 아래 폴더·공유·최근 섹션의 DnD는 AppShell의 전역 DndContext가 받는다 */}
@@ -876,8 +891,10 @@ export default function Sidebar({
                 <SidebarSectionHeader
                   icon={<IconUserCircle size={16} />}
                   label="My"
-                  open={foldersOpen}
-                  onToggle={() => setFoldersOpen(!foldersOpen)}
+                  open={myOpen}
+                  onToggle={() => (view.peeking ? peekCtl.switchTo('my') : setFoldersOpen(!foldersOpen))}
+                  {...peekCtl.headerProps('my')}
+                  chevronTitle={view.peeking ? null : undefined}
                   trailing={
                     /* + 버튼: My 헤더 hover 시에만 노출 */
                     <button
@@ -896,11 +913,11 @@ export default function Sidebar({
                 />
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
-                  <SidebarItem icon={<IconUserCircle />} label="My" collapsed={renderCollapsed} onClick={() => {}} />
+                  <SidebarItem icon={<IconUserCircle />} label="My" collapsed={renderCollapsed} {...peekCtl.railProps('my')} />
                 </div>
               )}
 
-              {!renderCollapsed && foldersOpen && (() => {
+              {!renderCollapsed && myOpen && (() => {
                 const visible = flattenVisible(buildFolderTree(folders), collapsedFolders);
                 return (
                   <SortableContext items={visible.map((n) => n.folder.id)} strategy={verticalListSortingStrategy}>
@@ -915,7 +932,7 @@ export default function Sidebar({
                         expanded={!collapsedFolders.has(n.folder.id)}
                         onToggleExpand={() => toggleFolderExpand(n.folder.id)}
                         allFolders={folders}
-                        onSelect={() => onSelectFolder(n.folder)}
+                        onSelect={() => selFolder(n.folder)}
                         onAction={onFolderAction}
                         onSetIcon={onSetFolderIcon}
                         onNewSubfolder={onNewSubfolder}
@@ -928,12 +945,12 @@ export default function Sidebar({
 
               {/* 미지정 폴더 (폴더 목록 하단, 휴지통 위)
                   Phase 63 D25 — 드롭 타깃(folder_id: null). 하이라이트는 링+틴트 한 문법(D27). */}
-              {!renderCollapsed && foldersOpen && (
+              {!renderCollapsed && myOpen && (
                 <Droppable id={dndId.unassigned} data={{ type: 'unassigned' }}>
                   {({ setNodeRef, isOver }) => (
                 <button
                   ref={setNodeRef}
-                  onClick={onSelectUnassigned}
+                  onClick={selUnassigned}
                   style={{
                     /* Phase 63 D38(Q17=B) — 좌측 붙임: 아이콘 x0. chevron 슬롯이 없어 일반
                        폴더(아이콘 x20)보다 왼쪽 = 의도된 구별(슬롯을 채워 맞추지 말 것) */
@@ -971,12 +988,12 @@ export default function Sidebar({
               {/* 휴지통 (항상 맨 아래, 드래그 소스는 아님)
                   Phase 63 D25(Q9) — 드롭 타깃 = trash 액션(moveToTrash — 이 경로만 updated_at을
                   찍어 "버린 시각"이 된다, Q14). */}
-              {!renderCollapsed && foldersOpen && (
+              {!renderCollapsed && myOpen && (
                 <Droppable id={dndId.trash} data={{ type: 'trash' }}>
                   {({ setNodeRef, isOver }) => (
                 <button
                   ref={setNodeRef}
-                  onClick={onSelectTrash}
+                  onClick={selTrash}
                   style={{
                     /* Phase 63 D38 — 미지정과 아이콘 위치 통일(옛 paddingLeft 34는 일관성 없는
                        여백이라 삭제 — 덕수 지시) */
@@ -1031,7 +1048,16 @@ export default function Sidebar({
             </div>
 
             {/* ═══ Section 2.5: 공유 (My와 동렬 최상위 카테고리, Phase 49) ═══ */}
-            {!renderCollapsed && (
+            {renderCollapsed ? (
+              /* Phase 67 D13·X3 — 접힘 레일의 공유. 래퍼는 My 레일과 **같은 두 겹**(섹션 8px 8px + 안쪽 marginBottom 4) —
+                 한 겹이면 슬롯이 54px이 되어 최근 레일 중심이 329 → 325로 올라가 착지 좌표(§1-1)가 틀어진다.
+                 IconShare 기본은 14라 레일 이웃(18)에 맞춘다(E4). */
+              <div style={{ padding: '8px 8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 4 }}>
+                  <SidebarItem icon={<IconShare size={18} />} label="공유" collapsed={renderCollapsed} {...peekCtl.railProps('share')} />
+                </div>
+              </div>
+            ) : (
               <div style={{ padding: '8px 12px' }}>   {/* M6 D22 — 세 섹션 래퍼 여백 통일('8px 12px') */}
                 <ShareTree
                   receivedTotal={sharedCount}
@@ -1039,34 +1065,37 @@ export default function Sidebar({
                   sentGroups={sentGroups}
                   profiles={shareProfiles}
                   activeScopeKey={activeShareScopeKey}
-                  onSelectScope={onSelectShareScope}
-                  open={shareOpen}
-                  onToggleOpen={() => setShareOpen((v) => !v)}
+                  onSelectScope={selShareScope}
+                  open={shareOpenNow}
+                  onToggleOpen={() => (view.peeking ? peekCtl.switchTo('share') : setShareOpen((v) => !v))}
                   subOpen={shareSub}
                   onToggleSub={toggleShareSub}
+                  headerProps={{ ...peekCtl.headerProps('share'), chevronTitle: view.peeking ? null : undefined }}
                 />
               </div>
             )}
 
             {/* ═══ Section 3: Recent Problems ═══ */}
-            <div style={{ flex: 1, padding: renderCollapsed ? '8px 8px' : '8px 12px', overflow: 'auto' }}>
+            {/* D11 — peek 중에는 overflow hidden: 넘친 최근 문항은 푸터 경계선 밑으로 잘린다(스크롤 없음, R9). 고정 펼침은 현행 스크롤 */}
+            <div style={{ flex: 1, padding: renderCollapsed ? '8px 8px' : '8px 12px', overflow: view.peeking ? 'hidden' : 'auto' }}>
               {!renderCollapsed ? (
                 <SidebarSectionHeader
                   icon={<IconRecent size={16} />}
                   label="최근 문항"
-                  open={recentOpen}
-                  onToggle={() => setRecentOpen(!recentOpen)}
+                  open={recentOpenNow}
+                  onToggle={() => (view.peeking ? peekCtl.switchTo('recent') : setRecentOpen(!recentOpen))}
+                  {...peekCtl.headerProps('recent')}
+                  chevronTitle={view.peeking ? null : undefined}
                 />
               ) : (
-                <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={renderCollapsed} onClick={() => {}} />
+                <SidebarItem icon={<IconRecent />} label="최근 문항" collapsed={renderCollapsed} {...peekCtl.railProps('recent')} />
               )}
-              {(renderCollapsed ? recentProblems.slice(0, 4) : recentOpen ? recentProblems : []).map((p) => (
+              {!renderCollapsed && recentOpenNow && recentProblems.map((p) => (
                 <DraggableProblemItem
                   key={p.id}
                   problem={p}
-                  collapsed={renderCollapsed}
-                  onEdit={onEditProblem}
-                  onView={onViewProblem}
+                  onEdit={selEdit}
+                  onView={selView}
                   onAction={onProblemAction}
                 />
               ))}
