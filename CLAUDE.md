@@ -479,7 +479,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **가장 값비싼 발견(v3~v5 교차검토)**: 초성 "전 위치" 매핑은 NFD 한글을 파괴 · 문항 생성+블록 한 배치는 규칙이 거부 · Gemini 사고 토큰이 비용에서 0건 · 휴리스틱이 실제 결함 3/5를 지움 · 운영 1차 Gemini 비용 $0
 - **M4 프로브(구현 중)**: Mathpix는 `⋯⋯ ㉠`를 인식하고도 기본 text에서 버린다 → `include_equation_tags` 채택(실행판 §9-3 · R3)
 - **덕수 실물 검수 종결(2026-09-19)** — G-1 · B-1·B-2 · A-1·A-4 · H-2 · R3(aligned) · C-1 · C-2 · D-1(실기기) 전항 OK. H-2의 마지막 1%(Mathpix가 리더 잔재를 태그 **안**에 넣은 `\tag{$\cdots … \cdot($ ㄱ}`)는 검수 후속 `db72f4b`(`normalizeTagLabels`, 실행판 R8)로 해결
-- ⚠ 남은 일: push 뒤 Vercel 빌드 로그 확인 · `claude-reporter` ai_models 단가 15/75 → 5/25(꺼져 있음) · Vercel 미사용 env `ANTHROPIC_MODEL` 정리(선택)
+- ⚠ 남은 일: push 뒤 Vercel 빌드 로그 확인 · ~~`claude-reporter` 단가 15/75 → 5/25~~(덕수 수정 2026-09-19, REST 확인) · Vercel 미사용 env `ANTHROPIC_MODEL` 정리(선택)
 
 ### 이전: **Phase 67 — 좌측 사이드바 hover peek(자동 펼침·접힘)** — 구현 완료(2026-09-17) · push 완료 · **덕수 실물 검수 종결(2026-09-17, "모두 정상")** · 67b 후속(실사용 개선) 구현 완료 · **덕수 실물 검수 종결(2026-09-17, "대만족 · 잘 작동")**
 
