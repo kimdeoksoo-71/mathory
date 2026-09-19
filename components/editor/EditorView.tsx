@@ -1698,7 +1698,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* ─── 수식행 분할 ($$..$$ 를 \\ 단위로 분리) ─── */
   /**
-   * 개선묶음 M1 — 결과는 **들여쓰기(callout) 블록 1개**이고 행마다 `$…$` 한 줄, 행 사이는 빈 줄이다.
+   * 개선묶음 M1 — 결과는 **들여쓰기(callout) 블록 1개**이고 행마다 `$…$` 한 줄이다(소스에 빈 줄 없음 — 아래).
    *
    * ⚠ 소스에는 빈 줄을 넣지 않는다. 대신 `insertMarkerLineBreaks`가 **연속된 수식 전용 행** 사이에
    *   렌더 시 빈 줄을 넣는다 — 그것이 없으면 `remark-breaks` 부재로 세 행이 한 문단으로 합쳐진다.
