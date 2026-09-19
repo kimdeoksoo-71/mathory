@@ -297,6 +297,13 @@ export default function FolderView({
      드래그 소스 조건(dragUid — 내 소유·비공유 뷰)과 같은 게이트다. */
   const selectable = !!dragUid;
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  /* M9 D1′·Q1 — 선택 표시는 뷰 무관(클릭 = 선택). 선택 바는 selectable + (2건 이상 또는 체크박스로 만든 선택)일 때만 —
+     단건 클릭마다 바가 우측 컨트롤(보기 전환·일괄 검증·휴지통 비우기)을 대체하면 카드 보기로 가려고 먼저 해제해야 한다. */
+  const [selectionOrigin, setSelectionOrigin] = useState<'click' | 'checkbox'>('click');
+  const changeSelection = useCallback((next: Set<string>, origin: 'click' | 'checkbox') => {
+    setSelectedIds(next); setSelectionOrigin(origin);
+  }, []);
+  const lastCardPointerRef = useRef<string>('mouse');
   const [batchMoveOpen, setBatchMoveOpen] = useState(false);
   useEffect(() => { setSelectedIds(new Set()); setBatchMoveOpen(false); }, [folder.id]);
   // 목록 갱신 시 사라진 문항을 선택에서 정리 — 이동·삭제 완료 해제가 여기서 성립한다
@@ -321,7 +328,34 @@ export default function FolderView({
   // T6 검수 반영(덕수) — 헤더 전체선택: 전부 선택이면 해제, 아니면 현재 목록 전부
   const allSelected = folderProblems.length > 0 && folderProblems.every((p) => selectedIds.has(p.id));
   const toggleSelectAll = () => {
-    setSelectedIds(allSelected ? new Set() : new Set(folderProblems.map((p) => p.id)));
+    changeSelection(allSelected ? new Set() : new Set(folderProblems.map((p) => p.id)), 'checkbox');
+  };
+  /* M9 D6′ — Enter = 단독 선택 1건 진입. ⚠ 포커스된 버튼(확인 대화상자·선택 바·⋮)의 네이티브 click과 겹치지 않게
+     activeElement가 body거나 행·카드일 때만. IME 조합·키 반복 무시 */
+  useEffect(() => {
+    if (selectedIds.size !== 1) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' || e.isComposing || e.repeat) return;
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && ae !== document.body && !ae.closest('.folder-row, .problem-card')) return;
+      const id = [...selectedIds][0];
+      const p = folderProblems.find((x) => x.id === id);
+      if (p) { e.preventDefault(); onView(p); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [selectedIds, folderProblems, onView]);
+  /** M9 D1′·Q4 — 카드 = 단일 선택(다중 선택은 소비처가 없다 — 카드 드래그는 단건, 선택 바는 리스트 전용) */
+  const handleCardClick = (e: React.MouseEvent, problem: Problem) => {
+    if (lastCardPointerRef.current === 'touch' && selectedIds.size === 1 && selectedIds.has(problem.id)) { onView(problem); return; }
+    if (e.detail > 1) return;
+    changeSelection(selectedIds.size === 1 && selectedIds.has(problem.id) ? new Set() : new Set([problem.id]), 'click');
+  };
+  /** M9 Q2 — 빈 곳 클릭 = 선택 해제(행·카드·버튼·입력 위 클릭은 제외) */
+  const handleEmptyClick = (e: React.MouseEvent) => {
+    if (selectedIds.size === 0) return;
+    if ((e.target as HTMLElement).closest('.folder-row, .problem-card, .list-folder-row, button, input, select, label, a')) return;
+    clearSelection();
   };
   const runBatchMove = async (folderId: string | null) => {
     const ids = [...selectedIds];
@@ -598,7 +632,8 @@ export default function FolderView({
           {/* Phase 63 D17·D44 — 선택 ≥1이면 행 1 우측 컨트롤 자리를 선택 바가 대체한다.
               행 2 칼럼 헤더는 그대로라 선택 중 정렬 변경이 가능하고 선택도 유지된다(D20).
               높이 변화 0 — 행 1은 minHeight 57 고정. */}
-          {viewMode === 'list' && selectedIds.size > 0 ? (
+          {/* M9 D2′·Q1 — selectable 필수(없으면 공유 뷰에서 남의 문항에 이동·휴지통 바가 뜬다) · 단건 클릭 선택은 바 없음 */}
+          {selectable && viewMode === 'list' && (selectedIds.size >= 2 || (selectedIds.size > 0 && selectionOrigin === 'checkbox')) ? (
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
               <span style={{ fontSize: 12.5, fontWeight: 600, color: 'var(--text-primary)', fontFamily: 'var(--font-ui)' }}>
                 {selectedIds.size}개 선택
@@ -717,7 +752,7 @@ export default function FolderView({
           아이보리 = "문항 밖". 이제 클레이는 카드·리스트 행이 담당한다.
           ⚠ U자 프레임은 EditorView·ProblemView 2곳이 공유한다 — FolderView에 되살리지 말 것.
           overflow/position/fontSize는 유지한다(스크롤·sticky·DnD의 기준). */}
-      <div ref={scrollRef} style={{
+      <div ref={scrollRef} onClick={handleEmptyClick} style={{
         flex: 1, minHeight: 0, width: '100%',
         fontSize: contentFontSize,
         overflow: 'auto', position: 'relative',
@@ -754,8 +789,9 @@ export default function FolderView({
             folderRows={folderRowsData}
             onSelectFolder={onSelectFolder}
             dragUid={dragUid}
-            selectedIds={selectable ? selectedIds : undefined}
-            onSelectionChange={selectable ? setSelectedIds : undefined}
+            selectedIds={selectedIds}
+            onSelectionChange={changeSelection}
+            selectable={selectable}
             recipientUid={listContext?.recipientUid}
             profiles={listContext?.profiles}
             onView={onView}
@@ -782,18 +818,22 @@ export default function FolderView({
               return (
                 <Draggable key={problem.id} id={dndId.card(problem.id)} data={{ type: 'problem', problem }} disabled={!dragUid || problem.authorUid !== dragUid}>
                   {({ setNodeRef, attributes, listeners, isDragging }) => {
-                  const canDrag = !!dragUid && problem.authorUid === dragUid;
                   /* D30 — 전역 KeyboardSensor의 onKeyDown 활성자는 스프레드에서 제외한다:
                      카드는 attributes로 tabIndex를 받으므로, 빼지 않으면 포커스된 카드에서
                      Space/Enter가 드래그를 시작한다(포인터 전용 소스). */
-                  const { onKeyDown: _kbdActivator, ...pointerListeners } = (listeners ?? {}) as Record<string, unknown>;
+                  const { onKeyDown: _kbdActivator, onPointerDown: dndPointerDown, ...pointerListeners } =
+                    (listeners ?? {}) as Record<string, unknown> & { onPointerDown?: (e: React.PointerEvent) => void };
                   return (
                 <div
                   ref={setNodeRef}
                   {...attributes}
                   {...pointerListeners}
-                  onClick={() => onView(problem)}
-                  className="problem-card"
+                  onPointerDown={(e) => { lastCardPointerRef.current = e.pointerType; dndPointerDown?.(e); }}
+                  // M9 D1′ — 클릭 = 선택(포인터가 나가도 표시 유지) · 더블클릭 = 진입 · 더블클릭의 글자 선택 방지
+                  onClick={(e) => handleCardClick(e, problem)}
+                  onDoubleClick={() => onView(problem)}
+                  onMouseDown={(e) => { if (e.detail > 1) e.preventDefault(); }}
+                  className={`problem-card${selectedIds.has(problem.id) ? ' is-selected' : ''}`}
                   style={{
                     // Phase 62 D2 — 클레이 카드. 인라인이 --card-surface를 참조하므로
                     // globals.css의 :hover가 변수만 갈아끼우면 배경·페이드가 함께 따라온다.
@@ -804,7 +844,7 @@ export default function FolderView({
                     padding: '18px 22px',
                     height: 320,
                     overflow: 'hidden',
-                    cursor: canDrag ? 'grab' : 'pointer',
+                    cursor: 'default',   // M9 D7 — 클릭은 이제 선택이다(옛 grab/pointer 구분 폐기 — 드래그 가능 여부는 Draggable disabled가 판정)
                     opacity: isDragging ? 0.4 : 1,
                     position: 'relative',
                     transition: 'box-shadow 0.15s, transform 0.15s, background 0.15s',
@@ -857,6 +897,7 @@ export default function FolderView({
                     <BlockchainBadge problem={problem} size={13} />
                     <button
                       onPointerDown={(e) => e.stopPropagation()}
+                      onDoubleClick={(e) => e.stopPropagation()}   // M9 — ⋮ 두 번 누름이 진입이 되지 않게
                       onClick={(e) => openCardMenu(e, problem)}
                       title="더보기"
                       style={{

@@ -950,6 +950,11 @@ p:has(.marker-circled) {
   .problem-card:hover { --card-surface: var(--block-bg-active); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08); }
   .folder-row:hover   { --card-surface: var(--block-bg-active); box-shadow: 0 2px 8px  rgba(0, 0, 0, 0.06); }
 }
+/* M9 D4 — 선택(클릭 1회) = hover와 같은 면·음영을 **고정** + 선택 링(--drop-ring은 box-shadow 전체 값).
+   hover와 완전히 같으면 이웃 hover와 구별이 안 된다. 입력 장치와 무관하므로 @media 밖, 순서는 alt → hover → selected.
+   ⚠ 배경은 #E8DFCE(--block-bg-active)보다 어둡게 내리지 말 것(위 명암비 규약). */
+.problem-card.is-selected { --card-surface: var(--block-bg-active); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08), var(--drop-ring); }
+.folder-row.is-selected   { --card-surface: var(--block-bg-active); box-shadow: 0 2px 8px  rgba(0, 0, 0, 0.06), var(--drop-ring); }
 
 /* Phase 63 D13 — 리스트 하위 폴더 행: 배경 채움 없이 이름 밑줄만(브레드크럼 문법).
    행 배경 hover를 주지 않는 이유 — --bg-hover(0.8349)는 클레이(0.8674)보다 어두워

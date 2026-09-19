@@ -107,9 +107,11 @@ interface ListViewProps {
   /** Phase 63 D24 — 이 uid 소유 문항만 드래그 가능. null이면 드래그 전부 비활성(공유 뷰) */
   dragUid?: string | null;
   /** Phase 63 D16(S5) — 다중 선택. 상태는 FolderView 소유(선택 바가 행 1에 살기 때문).
-   *  onSelectionChange가 없으면 체크박스 열 자체가 없다(공유 뷰) */
+   *  M9 D1′ — 선택 **표시**는 뷰 무관(공유 뷰에서도 클릭 = 선택). origin은 선택 바 노출 판정(Q1)용. */
   selectedIds?: Set<string>;
-  onSelectionChange?: (next: Set<string>) => void;
+  onSelectionChange?: (next: Set<string>, origin: 'click' | 'checkbox') => void;
+  /** M9 D2′ — 체크박스 열·그리드 트랙·Shift/⌘ 다중 선택의 게이트(종전 selectable = 내 소유·비공유 뷰) */
+  selectable?: boolean;
   /** sent 모드: 이 뷰가 묶인 수신자 uid (권한 변경·공유 중단 대상) */
   recipientUid?: string;
   /** received 모드: 소유자 프로필 (uid → profile) */
@@ -159,16 +161,16 @@ function UpdatedCell({ d }: { d?: Date }) {
 
 export default function ListView({
   problems, scopeKey, mode, prefs, bodyGridRef, folderRows = [], onSelectFolder, dragUid = null,
-  selectedIds, onSelectionChange,
+  selectedIds, onSelectionChange, selectable = false,
   recipientUid, profiles, onView, onProblemAction, onChanged,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
-  // Shift-클릭 범위 앵커(D16 — 범위는 체크박스 위에서만)
+  // Shift 범위 앵커 — M9 D1′: 체크박스·행 일반 클릭·⌘ 클릭 모두 앵커를 세운다(안 그러면 클릭 뒤 Shift가 옛 앵커를 쓴다)
   const lastCheckRef = useRef<string | null>(null);
-
-  const selectable = !!onSelectionChange;
+  // M9 Q3 — 마지막 포인터 종류(iPad Safari의 click은 MouseEvent라 pointerType이 없어 pointerdown에서 기록한다)
+  const lastPointerTypeRef = useRef<string>('mouse');
   const sort = prefs.sort;
   const visible = visibleColumns(prefs, mode);
   const template = buildGridTemplate(visible, prefs.widths, selectable);
@@ -235,7 +237,38 @@ export default function ListView({
     } else if (next.has(id)) next.delete(id);
     else next.add(id);
     lastCheckRef.current = id;
-    onSelectionChange(next);
+    onSelectionChange(next, 'checkbox');
+  };
+
+  /** M9 D1′ — 행 클릭 = 선택(진입은 더블클릭). 재클릭 해제는 `e.detail`(브라우저 더블클릭 창)이 판정 — 타이머 금지.
+   *  Shift = 앵커~대상 범위 **추가**(Finder 방식 — handleCheck의 "대상이 선택돼 있으면 범위 해제"를 쓰지 않는다) · ⌘/Ctrl = 토글.
+   *  둘 다 selectable(내 소유·비공유 뷰)에서만. 터치는 이미 단독 선택된 행을 다시 탭하면 진입(Q3 — 더블탭은 확대와 겹친다). */
+  const handleRowClick = (e: React.MouseEvent, p: Problem) => {
+    if (!onSelectionChange) return;
+    const prev = selectedIds ?? new Set<string>();
+    if (lastPointerTypeRef.current === 'touch' && prev.size === 1 && prev.has(p.id)) { onView(p); return; }
+    if (e.detail > 1) return;   // 두 번째 클릭은 dblclick 몫
+    if (e.shiftKey && selectable) {
+      const anchor = lastCheckRef.current;
+      const ids = sorted.map((x) => x.id);
+      const a = anchor ? ids.indexOf(anchor) : -1;
+      const b = ids.indexOf(p.id);
+      const next = new Set(prev);
+      if (a === -1 || b === -1) next.add(p.id);
+      else for (let k = Math.min(a, b); k <= Math.max(a, b); k++) next.add(ids[k]);
+      if (a === -1) lastCheckRef.current = p.id;
+      onSelectionChange(next, 'click');
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && selectable) {
+      const next = new Set(prev);
+      if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
+      lastCheckRef.current = p.id;
+      onSelectionChange(next, 'click');
+      return;
+    }
+    lastCheckRef.current = p.id;
+    onSelectionChange(prev.size === 1 && prev.has(p.id) ? new Set() : new Set([p.id]), 'click');
   };
 
   const menuItemsFor = (p: Problem): ContextMenuAction[] => {
@@ -326,7 +359,7 @@ export default function ListView({
       case 'perm': {
         const role = recipientUid ? p.members?.[recipientUid] : undefined;
         return (
-          <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
+          <div onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()}>
             {role ? (
               <select
                 value={role}
@@ -448,15 +481,21 @@ export default function ListView({
           >
             {({ setNodeRef, attributes, listeners, isDragging }) => {
             // D30 — 전역 KeyboardSensor의 onKeyDown 활성자는 제외(카드와 같은 규약)
-            const { onKeyDown: _kbdActivator, ...pointerListeners } = (listeners ?? {}) as Record<string, unknown>;
+            // M9 — dnd-kit의 onPointerDown은 덮어쓰지 말고 합성한다(포인터 종류 기록, Q3)
+            const { onKeyDown: _kbdActivator, onPointerDown: dndPointerDown, ...pointerListeners } =
+              (listeners ?? {}) as Record<string, unknown> & { onPointerDown?: (e: React.PointerEvent) => void };
             return (
           <div
             ref={setNodeRef}
             {...attributes}
             {...pointerListeners}
-            className={`folder-row${i % 2 === 1 ? ' is-alt' : ''}`}
+            onPointerDown={(e) => { lastPointerTypeRef.current = e.pointerType; dndPointerDown?.(e); }}
+            className={`folder-row${i % 2 === 1 ? ' is-alt' : ''}${selectedIds?.has(p.id) ? ' is-selected' : ''}`}
             data-snap-row=""
-            onClick={() => onView(p)}
+            // M9 D1′ — 클릭 = 선택 · 더블클릭 = 진입 · 더블클릭·Shift의 글자 선택 방지(dnd-kit은 pointerdown이라 무영향)
+            onClick={(e) => handleRowClick(e, p)}
+            onDoubleClick={() => onView(p)}
+            onMouseDown={(e) => { if (e.detail > 1 || e.shiftKey) e.preventDefault(); }}
             style={{
               gridColumn: '1 / -1', display: 'grid', gridTemplateColumns: 'subgrid', columnGap: 12,
               alignItems: 'center',
@@ -464,7 +503,7 @@ export default function ListView({
               background: 'var(--card-surface, var(--bg-content))',
               border: '0.5px solid var(--border-content)',
               borderRadius: 8, marginBottom: 4,
-              cursor: 'pointer',
+              cursor: 'default',   // M9 D7 — 클릭은 이제 선택이다(pointer = "클릭하면 간다")
               opacity: isDragging ? 0.4 : busyId === p.id ? 0.5 : 1,
               transition: 'background .15s, box-shadow .15s',
             }}
@@ -475,6 +514,7 @@ export default function ListView({
                 style={{ gridColumn: 2, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}   // M9 — 빠른 두 번 체크가 진입이 되지 않게(Phase 45a)
               >
                 <input
                   type="checkbox"
@@ -501,6 +541,7 @@ export default function ListView({
             {/* 액션 — ⋮ 트랙 */}
             <button
               onPointerDown={(e) => e.stopPropagation()}
+              onDoubleClick={(e) => e.stopPropagation()}   // M9 — ⋮ 두 번 누름이 진입이 되지 않게
               onClick={(e) => {
                 e.stopPropagation();
                 const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
