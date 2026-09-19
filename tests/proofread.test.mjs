@@ -280,3 +280,46 @@ test('자동 수정은 alt에 대괄호가 든 이미지 링크를 건드리지 
   assert.ok(fixed.startsWith(img + '\n'), fixed);
   assert.ok(fixed.includes('$\\mathrm{P}$'));
 });
+
+/* ═══ M9 I — 번분수 · \section · STEP/GUIDE ═══ */
+{
+  const { nestFracToDfrac, unwrapSectionCommands, autoFixDeterministicIssues: fix } =
+    await import('../.test-build/lib/proofread.js');
+
+  test('M9 D27: 번분수 묶음은 바깥·안 모두 \\dfrac', () => {
+    assert.equal(nestFracToDfrac('$\\frac{\\frac{1}{2}}{3}$').fixed, '$\\dfrac{\\dfrac{1}{2}}{3}$');
+    assert.equal(nestFracToDfrac('$\\dfrac{1}{1+\\frac{1}{x}}$').fixed, '$\\dfrac{1}{1+\\dfrac{1}{x}}$');
+    assert.equal(nestFracToDfrac('$$\n\\frac{\\sqrt{\\frac{1}{2}}}{3}\n$$').fixed, '$$\n\\dfrac{\\sqrt{\\dfrac{1}{2}}}{3}\n$$');
+  });
+
+  test('M9 D27: 단순 분수·지수 안 분수·\\tfrac·수식 밖·중괄호 없는 인자는 무변경', () => {
+    for (const s of ['$\\frac{1}{2}$', '$e^{\\frac{1}{2}}$', '$\\frac{e^{\\frac{1}{2}}}{2}$',
+                     '$\\tfrac{\\frac{1}{2}}{3}$', '\\frac{\\frac{1}{2}}{3}', '$\\frac12 + \\frac{1}{2}$']) {
+      assert.equal(nestFracToDfrac(s).fixed, s, s);
+    }
+    // 묶음과 떨어진 단순 분수는 그대로
+    assert.equal(nestFracToDfrac('$\\frac{1}{2} + \\frac{\\frac{1}{2}}{3}$').fixed, '$\\frac{1}{2} + \\dfrac{\\dfrac{1}{2}}{3}$');
+  });
+
+  test('M9 D29: \\section 계열 벗기기(별표·선택 인자·중첩 중괄호) · 수식·코드 안 무접촉 · 멱등', () => {
+    assert.equal(unwrapSectionCommands('\\section*{GUIDE}\n본문').fixed, 'GUIDE\n본문');
+    assert.equal(unwrapSectionCommands('\\subsection*{STEP1 $f(x)$의 값}').fixed, 'STEP1 $f(x)$의 값');
+    assert.equal(unwrapSectionCommands('\\subsubsection[짧게]{제목 {중첩}}').fixed, '제목 {중첩}');
+    assert.equal(unwrapSectionCommands('`\\section*{x}`').fixed, '`\\section*{x}`');
+    assert.equal(unwrapSectionCommands('\\section*{깨짐').fixed, '\\section*{깨짐');
+    const once = unwrapSectionCommands('\\section*{A}').fixed;
+    assert.equal(unwrapSectionCommands(once).fixed, once);
+  });
+
+  test('M9 D28: STEP n·GUIDE는 수식화되지 않는다(행머리·본문 어디서나) · 주변 낱말은 종전대로', () => {
+    assert.equal(fix('STEP 2 극값 구하기').fixed, 'STEP 2 극값 구하기');
+    assert.equal(fix('STEP1. 조건 정리').fixed, 'STEP1. 조건 정리');
+    assert.equal(fix('GUIDE 함수를 본다').fixed, 'GUIDE 함수를 본다');
+    assert.equal(fix('STEP 2에서 구한 A').fixed, 'STEP 2에서 구한 $\\mathrm{A}$');
+    assert.equal(fix('\\section*{GUIDE}').fixed, 'GUIDE');   // Step 00 → 보호
+  });
+
+  test('M9 D27: autoFix 경유로도 번분수가 바뀐다(OCR 경로)', () => {
+    assert.equal(fix('$\\frac{\\frac{1}{2}}{3}$').fixed, '$\\dfrac{\\dfrac{1}{2}}{3}$');
+  });
+}

@@ -7,14 +7,17 @@
  * 이 모듈과 `lib/ocr.ts`(편집창·댓글 OCR 후처리). M7 때 "이 모듈 하나"라 적었던 것은 틀렸다(M9 §1-H7).
  *
  * 규칙 순서(순서가 규칙이다 — 분할 뒤에 정형화해야 새 블록도 받는다):
+ *   R0 (M9 D29) `\section*{…}` 계열 벗기기 — 분할 **앞**이라 `\section*{STEP1}`이 곧바로 제목 블록이 된다. autoFix 옵션 무관
  *   R1 분할  (text 계열만 · choices·image·svg·ggb 무접촉)
  *       ① `$$…$$` 독립 display 안에 `\begin{aligned|cases|array|matrix…}`이 있는 다행 덩어리 → 자기 블록(text)
  *          (한 줄짜리·`\begin` 없는 다행은 떼지 않는다 — P12)
  *       ② `(i) … 인 경우` 행 → `case` 블록(괄호 로마숫자 삭제, `…인 경우` 문장만)
  *       ③ `(i-1)`·`(i)-1` 꼴 → `subcase`
  *       ④ `[참고]` 행 → `heading`(`## [참고] …` — 표지 보존, P13)   ⑤ `STEP n` 행 → `heading`(`## STEP3 …`)
+ *       ⑥ (M9 D30) `GUIDE` 행 → `heading`(`## GUIDE …` — STEP과 같은 형식)
  *       분할된 조각 중 특수 타입이 아닌 첫 조각은 **원 블록 타입 유지**(case 제목행 보존), 이후는 `text`.
- *   R2 머리 정리 (question이 아닌 탭 — solution + extra 전부, P14)
+ *   R2 머리 정리 — (M9 D26) question 탭: 첫 블록 첫 행 문제번호 `15. `만 제거(정답 행 규칙 없음)
+ *       · question이 아닌 탭(solution + extra 전부, P14):
  *       탭 첫 블록 첫 행 앞머리 `15.` 제거 · 2행 이하에서 행 전체가 `정답 ③`·`정답: 56` 이면 그 행 삭제(콜론 허용, N4)
  *   R3 결정적 정형화 = `autoFixDeterministicIssues` 전부(⓪~③ + ⇒ 규칙). choices는 skipJamoRefs, 그림 있는 choices는 제외
  *   R4 trim = 저장 정규화(`toPersistedBlock`)와 같은 앞뒤 빈 줄 제거 — 정돈 직후 화면에서 보이게
@@ -24,7 +27,7 @@
  */
 
 import { scanMathRegions } from './mathRegions';
-import { autoFixDeterministicIssues } from './proofread';
+import { autoFixDeterministicIssues, unwrapSectionCommands } from './proofread';
 import { stripInvisibles, isInvisibleTarget } from './invisibles';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
@@ -44,9 +47,12 @@ const CASE_RE = new RegExp(`^\\(${ROMAN}\\)[ \\t]*(.+?인 경우)[ \\t]*[:,.]?[ 
 const SUBCASE_RE = new RegExp(`^\\(${ROMAN}(?:-\\d+\\)|\\)-\\d+)[ \\t]*(.+?인 경우)[ \\t]*[:,.]?[ \\t]*$`);
 const REF_RE = /^\[참고\]/;
 const STEP_RE = /^STEP[ \t]?\d+/;
+const GUIDE_RE = /^GUIDE(?![A-Za-z])/;   // M9 D30
 const MULTILINE_ENV_RE = /\\begin\{(?:aligned|cases|dcases|rcases|array|gathered|split|matrix|pmatrix|bmatrix|vmatrix|Vmatrix|Bmatrix|smallmatrix)\}/;
 
 const NUMBER_HEAD_RE = /^\d{1,2}\.[ \t]*\n?/;
+/** M9 D26 — 문제 탭 문제번호: 2자리 이하 자연수 + 마침표 + 공백(1개 이상, Q23) 또는 번호 단독 행. 소수 `1.5`는 공백 조건으로 비껴간다 */
+const QUESTION_NUMBER_HEAD_RE = /^\d{1,2}\.(?:[ \t]+|[ \t]*(?:\n|$))/;
 const ANSWER_LINE_RE = /^정답[ \t]*[:：]?[ \t]*(?:[①-⑮]|\d{1,3})[ \t]*$/;
 
 type Piece = { type: string | null; text: string };   // type null = 원 블록 타입을 잇는 "나머지" 조각
@@ -96,7 +102,7 @@ function splitBlock(text: string): Piece[] | null {
     let m: RegExpMatchArray | null;
     if ((m = line.match(SUBCASE_RE))) { flush(); pieces.push({ type: 'subcase', text: m[1] }); split = true; continue; }
     if ((m = line.match(CASE_RE))) { flush(); pieces.push({ type: 'case', text: m[1] }); split = true; continue; }
-    if (REF_RE.test(line) || STEP_RE.test(line)) { flush(); pieces.push({ type: 'heading', text: '## ' + line.trim() }); split = true; continue; }
+    if (REF_RE.test(line) || STEP_RE.test(line) || GUIDE_RE.test(line)) { flush(); pieces.push({ type: 'heading', text: '## ' + line.trim() }); split = true; continue; }
     buf.push(line);
   }
   flush();
@@ -111,6 +117,15 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
 
   // M9 D24-1′ — 비가시·단독 초성 정규화를 가장 먼저(분할·머리 정리 정규식이 깨끗한 글자를 보도록)
   blocks = blocks.map((b) => (isInvisibleTarget(b.type) ? { ...b, raw_text: stripInvisibles(b.raw_text) } : b));
+
+  // R0 (M9 D29) — `\section*{…}` 벗기기. 분할 앞이어야 `\section*{STEP1}`이 제목 블록으로 나뉜다
+  blocks = blocks.map((b) => {
+    if (!SPLITTABLE.has(b.type)) return b;
+    const r = unwrapSectionCommands(b.raw_text);
+    if (!r.count) return b;
+    stats.fixed += r.count;
+    return { ...b, raw_text: r.fixed };
+  });
 
   // R1
   blocks.forEach((b, origin) => {
@@ -132,6 +147,15 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
     stats.split += kept.length - 1;
     out.push(...kept);
   });
+
+  // R2-Q (M9 D26) — 문제 탭: 첫 블록 첫 행의 문제번호만
+  if (opts.tab === 'question') {
+    const first = out[0];
+    if (first && SPLITTABLE.has(first.type)) {
+      const m = first.raw_text.match(QUESTION_NUMBER_HEAD_RE);
+      if (m) { first.raw_text = first.raw_text.slice(m[0].length); stats.removed++; }
+    }
+  }
 
   // R2 (question이 아닌 탭)
   if (opts.tab !== 'question') {

@@ -275,6 +275,7 @@ export function autoWrapBareNumbers(text: string): { fixed: string; count: numbe
   // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 위 tag/ref 줄을 포함하지만
   // 명시성을 위해 둘 다 남긴다(중복 보호는 무해하다).
   protectedRanges.push(...collectControlSeqRanges(text));
+  protectedRanges.push(...collectHeadWordRanges(text));   // M9 D28 — STEP n · GUIDE
   addAll(/\(\d+\)/g);                             // 참조 번호 (1), (2), (3) … 은 수식화 제외
   // 배점 `[4점]`. 시험 문항의 관용 표기이고 **어떤 경우에도 수식이 아니다**(덕수 2026-08-30).
   // 없으면 `[$4$점]`이 되는데, 배점은 거의 모든 문항에 있어 시트 일괄 가져오기에서 전 문항에 박힌다.
@@ -340,6 +341,7 @@ export function autoWrapBareLetters(text: string): { fixed: string; count: numbe
   // Phase 61e D15 — 텍스트 영역에 남은 `\cmd{...}` 전체. 이 줄이 없으면
   // `\includegraphics{…}`가 `\$includegraphics${…}`로 파괴된다.
   protectedRanges.push(...collectControlSeqRanges(text));
+  protectedRanges.push(...collectHeadWordRanges(text));   // M9 D28 — STEP n · GUIDE
   // ol 라벨 예외:
   //   - 단일 영문 글자 in parens: (a), (b), ..., (z), (A), ...
   //   - 로마 숫자 in parens: (i), (ii), (iii), (iv), (v), (vi)... 대소문자 모두
@@ -503,6 +505,128 @@ function collectControlSeqRanges(text: string): Array<[number, number]> {
     out.push([m.index, end]);
   }
   return out;
+}
+
+/* ─── M9 D28: `STEP n`·`GUIDE` 수식화 제외 ─── */
+/**
+ * 풀이 소제목의 약속된 표기다 — `STEP1.`·`STEP 2`(번호·마침표 포함)·`GUIDE`. 수식이 아니다.
+ * 없으면 `STEP 2`가 `$\mathrm{STEP}$ $2$`로, `GUIDE`가 `$\mathrm{GUIDE}$`로 깨진다(M9 §1-I3·I5 실측).
+ * ⚠ `autoWrapBareNumbers`·`autoWrapBareLetters` **둘 다** 이 함수를 부른다 — 한쪽만 넣으면 반쪽만 깨진다.
+ * ⚠ 행머리뿐 아니라 본문 어디서나(`STEP 2에서 구한 값` 같은 참조도 같은 낱말 — Q22).
+ */
+function collectHeadWordRanges(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const re of [/(?<![A-Za-z])STEP[ \t]?\d+\.?/g, /(?<![A-Za-z])GUIDE(?![A-Za-z])/g]) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
+
+/** 코드펜스·인라인 코드 범위(아래 M9 규칙의 무접촉 영역) */
+function collectCodeRanges(text: string): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (const re of [/```[\s\S]*?```/g, /~~~[\s\S]*?~~~/g, /`[^`\n]*`/g]) {
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) out.push([m.index, m.index + m[0].length]);
+  }
+  return out;
+}
+
+/* ─── M9 D29: `\section*{…}` 벗기기 ─── */
+/**
+ * Mathpix가 제목 행을 `\section*{GUIDE}`·`\subsection*{STEP1}`로 내는 경우 명령을 벗기고 **내용만** 남긴다.
+ * `\section`·`\subsection`·`\subsubsection`(별표 유무 모두, Q21) · 선택 인자 `[…]`도 흡수.
+ * 인자는 균형 스캔(`readGroup` — M1 W2, 정규식 금지). 짝이 없으면 무변환. 수식·코드 안은 무접촉. 멱등.
+ * ⚠ 호출처는 둘이다 — `autoFixDeterministicIssues` 맨 앞(OCR 경로)과 `blockTidy` R0(분할 **앞** —
+ *   그래야 `\section*{STEP1}` → `STEP1` → 제목 블록 분할이 한 번의 정돈으로 끝난다).
+ */
+export function unwrapSectionCommands(text: string): { fixed: string; count: number } {
+  const skip = [...collectMathRanges(text), ...collectCodeRanges(text)];
+  const inSkip = (pos: number) => skip.some(([s, e]) => pos >= s && pos < e);
+  const re = /(?<!\\)\\(?:sub){0,2}section\*?(?![A-Za-z])/g;
+  const edits: Array<{ from: number; to: number; insert: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (inSkip(m.index)) continue;
+    let j = m.index + m[0].length;
+    while (text[j] === ' ' || text[j] === '\t') j++;
+    if (text[j] === '[') {
+      const close = text.indexOf(']', j + 1);
+      if (close === -1 || text.slice(j, close).includes('\n')) continue;
+      j = close + 1;
+    }
+    if (text[j] !== '{') continue;
+    const close = readGroup(text, j);
+    if (close === -1) continue;
+    edits.push({ from: m.index, to: close + 1, insert: text.slice(j + 1, close).trim() });
+    re.lastIndex = close + 1;
+  }
+  let fixed = text;
+  for (let k = edits.length - 1; k >= 0; k--) {
+    const e = edits[k];
+    fixed = fixed.slice(0, e.from) + e.insert + fixed.slice(e.to);
+  }
+  return { fixed, count: edits.length };
+}
+
+/* ─── M9 D27: 번분수 → `\dfrac` ─── */
+/**
+ * 분수의 인자 안에 분수가 있는 **묶음**은 바깥·안 모두 `\dfrac`으로(Q20). 인라인은 `\displaystyle` 주입으로 바깥
+ * 분수가 display 크기인데, KaTeX는 분수 인자 안의 `\frac`을 한 단계 작은 style로 그려 "안의 분수만 작다".
+ * - 지수·첨자(`^{…}`·`_{…}`) 안의 분수는 **제외** — `e^{\frac{1}{2}}`를 키우지 않는다
+ * - `\tfrac`·`\cfrac` 무접촉(작성자 의도) · 묶음이 아닌 단순 분수는 무변경
+ * - 인자가 중괄호가 아니거나(`\frac12`) 균형 스캔이 실패하면 그 분수는 **무변환**
+ * `\frac`·`\dfrac` 둘 다 팬텀 매크로(`katexMacros.ts`)라 변환 뒤에도 M3 세로 여백 규약이 유지된다.
+ */
+export function nestFracToDfrac(text: string): { fixed: string; count: number } {
+  type Frac = { tok: number; kind: string; argFrom: number; argTo: number };
+  const edits: number[] = [];   // 바꿀 `\frac`의 `\` 위치
+  for (const r of scanMathRegions(text)) {
+    if (!r.closed || r.empty) continue;
+    const from = r.innerFrom, to = r.innerTo;
+    // 스크립트 그룹 `^{…}`·`_{…}`의 범위
+    const scripts: Array<[number, number]> = [];
+    for (let k = from; k < to; k++) {
+      const c = text[k];
+      if (c === '\\') { k++; continue; }
+      if (c !== '^' && c !== '_') continue;
+      let j = k + 1;
+      while (text[j] === ' ') j++;
+      if (text[j] !== '{') continue;
+      const close = readGroup(text, j);
+      if (close !== -1 && close < to) scripts.push([j, close]);
+    }
+    const inScript = (pos: number) => scripts.some(([s, e]) => pos > s && pos < e);
+    const fracs: Frac[] = [];
+    const re = /(?<!\\)\\(d?frac)(?![A-Za-z])/g;
+    re.lastIndex = from;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null && m.index < to) {
+      let j = m.index + m[0].length;
+      while (text[j] === ' ') j++;
+      if (text[j] !== '{') continue;
+      const c1 = readGroup(text, j);
+      if (c1 === -1 || c1 >= to) continue;
+      let k = c1 + 1;
+      while (text[k] === ' ') k++;
+      if (text[k] !== '{') continue;
+      const c2 = readGroup(text, k);
+      if (c2 === -1 || c2 >= to) continue;
+      if (inScript(m.index)) continue;
+      fracs.push({ tok: m.index, kind: m[1], argFrom: j, argTo: c2 });
+    }
+    // 묶음: 분수 a의 인자 범위 안에 분수 b가 있으면 둘 다 표시(사슬이면 전부)
+    const mark = new Set<number>();
+    for (const a of fracs) for (const b of fracs) {
+      if (a !== b && b.tok > a.argFrom && b.tok < a.argTo) { mark.add(a.tok); mark.add(b.tok); }
+    }
+    for (const f of fracs) if (mark.has(f.tok) && f.kind === 'frac') edits.push(f.tok);
+  }
+  edits.sort((x, y) => y - x);
+  let fixed = text;
+  for (const pos of edits) fixed = fixed.slice(0, pos) + '\\dfrac' + fixed.slice(pos + '\\frac'.length);
+  return { fixed, count: edits.length };
 }
 
 /**
@@ -683,6 +807,12 @@ export function autoFixDeterministicIssues(
 ): { fixed: string; count: number } {
   let count = 0;
 
+  // Step 00 (M9 D29): `\section*{…}` 계열 벗기기 — 맨 앞(OCR 경로에서도 제목 표지가 남지 않도록). 멱등
+  {
+    const r = unwrapSectionCommands(text);
+    text = r.fixed;
+    count += r.count;
+  }
   // Step 0: display 수식 구분자 통일 (\[..\] → $$..$$)
   // 이후 단계의 수식 영역 인식($ 기반)이 새 $$ 블록에도 동일하게 작용하도록 가장 먼저 처리.
   {
@@ -722,6 +852,12 @@ export function autoFixDeterministicIssues(
     count += r.count;
   }
 
+  // Step 0c (M9 D27): 번분수 묶음 → `\dfrac`(지수·첨자 안 제외). 수식화(0a·0b) 뒤라 새 영역도 받는다
+  {
+    const r = nestFracToDfrac(text);
+    text = r.fixed;
+    count += r.count;
+  }
   // Step 1: 수식 내 위치 기반 편집 수집 (브레이스 + 쉼표).
   // 모든 편집을 (pos, replaceLen, insert) 형태로 모아 뒤에서 앞으로 적용.
   type Edit = { pos: number; replaceLen: number; insert: string };

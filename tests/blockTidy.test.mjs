@@ -58,10 +58,34 @@ test('R1: 분할 없으면 블록 그대로 · 빈 블록도 1개 유지', () =>
 });
 
 /* ═══ R2 머리 정리 ═══ */
-test('R2: 풀이 탭 첫 블록 첫 행의 `15.` 제거 · question 탭은 무접촉', () => {
+test('R2: 풀이 탭 첫 블록 첫 행의 `15.` 제거', () => {
   assert.deepEqual(shape(T('15. 풀이 시작\n둘째')), ['text:"풀이 시작\\n둘째"']);
   assert.deepEqual(shape(T('15.\n풀이')), ['text:"풀이"']);
-  assert.deepEqual(shape(T('15. 풀이', 'question')), ['text:"15. 풀이"']);
+});
+
+/* ═══ M9 I — 블록 정돈 조정(D26~D30) ═══ */
+
+test('M9 D26: 문제 탭 첫 블록 첫 행의 문제번호 제거(공백 1개 이상·번호 단독 행) · 소수·둘째 블록 무접촉', () => {
+  assert.deepEqual(shape(T('15. 함수 $f(x)$에 대하여', 'question')), ['text:"함수 $f(x)$에 대하여"']);
+  assert.deepEqual(shape(T('7.  다음 중', 'question')), ['text:"다음 중"']);
+  assert.deepEqual(shape(T('15.\n본문', 'question')), ['text:"본문"']);
+  assert.deepEqual(shape(T('1.5배가 된다', 'question')), ['text:"1.5배가 된다"']);
+  assert.deepEqual(shape(T('정답 ③\n본문', 'question')), ['text:"정답 ③\\n본문"']);   // 정답 행 규칙은 문제 탭에 없다
+  const r = tidyBlocks([{ type: 'text', raw_text: '본문' }, { type: 'text', raw_text: '3. 둘째' }], { tab: 'question', autoFix: false });
+  assert.deepEqual(shape(r), ['text:"본문"', 'text:"3. 둘째"']);
+});
+
+test('M9 D29·D30: \\section*{…} 벗기기가 분할 앞이라 STEP·GUIDE 제목 블록이 한 번에 생긴다', () => {
+  assert.deepEqual(shape(T('\\section*{STEP1}\n본문')), ['heading:"## STEP1"', 'text:"본문"']);
+  assert.deepEqual(shape(T('\\section*{GUIDE}\n풀이 방향')), ['heading:"## GUIDE"', 'text:"풀이 방향"']);
+  assert.deepEqual(shape(T('\\subsection{개념}\n본문')), ['text:"개념\\n본문"']);
+});
+
+test('M9 D28·D30: GUIDE 행은 제목 블록 · STEP·GUIDE는 수식화되지 않는다(autoFix 켬)', () => {
+  assert.deepEqual(shape(T('GUIDE 함수의 증가 감소를 조사한다.\n본문', 'solution', 'text', true)),
+    ['heading:"## GUIDE 함수의 증가 감소를 조사한다."', 'text:"본문"']);
+  assert.deepEqual(shape(T('STEP 2 극값 구하기', 'solution', 'text', true)), ['heading:"## STEP 2 극값 구하기"']);
+  assert.deepEqual(shape(T('GUIDES와 GUIDE는 다르다', 'solution', 'text', false)), ['text:"GUIDES와 GUIDE는 다르다"']);
 });
 
 test('R2: 2행 이하의 `정답 ③`·`정답: 56` 행 삭제 · 첫 행은 남긴다 · 문장 속 정답은 무접촉', () => {
