@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getAIProvider } from '../../../lib/ai-provider';
+import { getAIProvider, resolveAIProviderModel } from '../../../lib/ai-provider';
+import { priceFor, calcCostUsd } from '../../../lib/aiPricing';
 
 interface AICompleteRequest {
   questionContext: string;
@@ -81,7 +82,14 @@ ${body.currentText}`;
     }
     completion = completion.trim();
 
-    return NextResponse.json({ completion });
+    // M9 D16′ — 비용 집계(저장 없음). 모델명은 getAIProvider와 같은 해석(resolveAIProviderModel)
+    const { model } = resolveAIProviderModel();
+    const usage = {
+      inputTokens: result.inputTokens,
+      outputTokens: result.outputTokens,
+      costUsd: calcCostUsd(result.inputTokens, result.outputTokens, priceFor(model)),
+    };
+    return NextResponse.json({ completion, usage });
   } catch (error: any) {
     console.error('[ai-complete] Error:', error);
 

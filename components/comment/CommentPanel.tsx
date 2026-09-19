@@ -374,10 +374,38 @@ export default function CommentPanel({
   // 댓글 모드는 AI 비활성. agent 모드에서 선택된 세션이 aiEnabled일 때만.
   const isAISession = !isCommentsMode && !!activeSession && activeSession.aiEnabled;
 
-  /** 현재 세션의 누적 비용 (USD) */
-  const sessionCostUsd = useMemo(() => {
-    return visibleComments.reduce((sum, c) => sum + (c.aiUsage?.costUsd || 0), 0);
+  /** 현재 세션의 누적 비용 (USD) · 토큰 · 모델별 합계 — M9 D14′: 비용 표시는 헤더 배지 하나(카드 아래 비용은 삭제).
+   *  일괄 검증 세션과 단건 정밀 검증·토론 세션이 같은 코드 경로다(§1-C8). 출력 토큰은 사고 포함(D15′). */
+  const sessionCost = useMemo(() => {
+    let usd = 0, inTok = 0, outTok = 0, aiCount = 0;
+    const byModel = new Map<string, { usd: number; inTok: number; outTok: number; n: number }>();
+    for (const c of visibleComments) {
+      if (c.authorType !== 'ai') continue;
+      aiCount++;
+      const u = c.aiUsage;
+      if (!u) continue;
+      usd += u.costUsd || 0; inTok += u.inputTokens || 0; outTok += u.outputTokens || 0;
+      const key = c.modelId || '?';
+      const m = byModel.get(key) ?? { usd: 0, inTok: 0, outTok: 0, n: 0 };
+      m.usd += u.costUsd || 0; m.inTok += u.inputTokens || 0; m.outTok += u.outputTokens || 0; m.n++;
+      byModel.set(key, m);
+    }
+    return { usd, inTok, outTok, aiCount, byModel };
   }, [visibleComments]);
+  const sessionCostTitle = useMemo(() => {
+    const lines = [
+      '이 세션의 AI 응답 누적 비용',
+      `입력 ${sessionCost.inTok.toLocaleString()} · 출력 ${sessionCost.outTok.toLocaleString()} 토큰(출력은 사고 포함)`,
+    ];
+    if (sessionCost.byModel.size) {
+      lines.push('— 모델별 —');
+      for (const [id, m] of sessionCost.byModel) {
+        const name = id === 'verify' ? '정밀 검증' : id;
+        lines.push(`${name}: $${m.usd.toFixed(4)} · ${m.n}건 · 입력 ${m.inTok.toLocaleString()} · 출력 ${m.outTok.toLocaleString()}`);
+      }
+    }
+    return lines.join('\n');
+  }, [sessionCost]);
 
   /** 현재 세션에서 진행 중/실패한 AI 알림만 표시 */
   const visiblePendingAI = useMemo(
@@ -1050,9 +1078,10 @@ export default function CommentPanel({
           {isCommentsMode ? '댓글' : 'Agent'}
         </div>
         <div style={{ flex: 1 }} />
-        {isAISession && sessionCostUsd > 0 && (
+        {/* M9 D14 — AI 메시지가 1건이라도 있으면 $0.0000도 표시(1차 전용 종료에서 배지가 사라지지 않게) */}
+        {isAISession && sessionCost.aiCount > 0 && (
           <span
-            title="이 세션의 AI 응답 누적 비용"
+            title={sessionCostTitle}
             style={{
               fontSize: 11, color: 'var(--text-muted)',
               fontFamily: 'var(--font-ui)',
@@ -1062,7 +1091,7 @@ export default function CommentPanel({
               cursor: 'help',
             }}
           >
-            이 세션: ${sessionCostUsd.toFixed(4)}
+            이 세션: ${sessionCost.usd.toFixed(4)}
           </span>
         )}
         {chrome === 'drawer' && (
@@ -2023,18 +2052,7 @@ function CommentItem({
           {info.isAI && isOwner && (
             <button onClick={onDelete} style={{ ...miniLinkStyle, color: 'var(--accent-danger)' }}>삭제</button>
           )}
-          {info.isAI && comment.aiUsage && (
-            <span
-              style={{
-                fontSize: 10, color: 'var(--text-faint)',
-                cursor: 'help',
-                borderBottom: '1px dotted var(--text-faint)',
-              }}
-              title={`입력 ${comment.aiUsage.inputTokens.toLocaleString()} 토큰 · 출력 ${comment.aiUsage.outputTokens.toLocaleString()} 토큰`}
-            >
-              ${comment.aiUsage.costUsd.toFixed(5)}
-            </span>
-          )}
+          {/* M9 D14 — 카드별 비용은 삭제. 비용은 헤더 1행 우측 배지 하나(세션 합계 · tooltip에 토큰·모델별) */}
         </div>
       )}
     </div>

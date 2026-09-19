@@ -139,10 +139,15 @@ class GeminiProvider implements AIProvider {
     if (finishReason === 'MAX_TOKENS') {
       content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
     }
+    // M9 D15′ ① — 사고 토큰(thoughtsTokenCount)은 candidatesTokenCount에 없지만 **출력 단가로 청구**된다.
+    //   SDK 0.24 타입에 필드가 없을 뿐 응답 원본엔 온다. 입력은 total − 출력(도구 프롬프트 토큰까지)과 prompt 중 큰 값.
+    const um = usage as (typeof usage & { thoughtsTokenCount?: number; totalTokenCount?: number }) | undefined;
+    const outTok = (um?.candidatesTokenCount ?? 0) + (um?.thoughtsTokenCount ?? 0);
+    const inTok = Math.max(um?.promptTokenCount ?? 0, (um?.totalTokenCount ?? 0) - outTok);
     return {
       content,
-      inputTokens: usage?.promptTokenCount ?? 0,
-      outputTokens: usage?.candidatesTokenCount ?? 0,
+      inputTokens: inTok,
+      outputTokens: outTok,
       hasCodeExecution: codeBlocks.length > 0,
     };
   }
@@ -189,10 +194,14 @@ class OpenAICompatProvider implements AIProvider {
     if (choice?.finish_reason === 'length') {
       content += '\n\n_…응답이 토큰 한도(maxTokens)로 잘렸습니다._';
     }
+    // M9 D15′ ① — reasoning이 completion 밖에 있는 공급자(xAI)는 total이 그만큼 크다 → 차분을 출력에 더한다.
+    //   OpenAI·DeepSeek는 completion에 reasoning이 포함돼 차분이 0이다. total이 없으면 max(0, …)가 막는다.
+    const u = (res as { usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } }).usage;
+    const pTok = u?.prompt_tokens ?? 0, cTok = u?.completion_tokens ?? 0;
     return {
       content,
-      inputTokens: (res as { usage?: { prompt_tokens?: number } }).usage?.prompt_tokens ?? 0,
-      outputTokens: (res as { usage?: { completion_tokens?: number } }).usage?.completion_tokens ?? 0,
+      inputTokens: pTok,
+      outputTokens: cTok + Math.max(0, (u?.total_tokens ?? 0) - pTok - cTok),
     };
   }
 }
@@ -310,7 +319,9 @@ class OpenAIResponsesProvider implements AIProvider {
     return {
       content,
       inputTokens: res.usage?.input_tokens ?? 0,
-      outputTokens: res.usage?.output_tokens ?? 0,
+      // M9 D15′ ① — Responses의 output_tokens는 reasoning 포함. 같은 원칙으로 total 차분도 더한다(0이면 무변화)
+      outputTokens: (res.usage?.output_tokens ?? 0)
+        + Math.max(0, (res.usage?.total_tokens ?? 0) - (res.usage?.input_tokens ?? 0) - (res.usage?.output_tokens ?? 0)),
       hasCodeExecution: codeBlocks.length > 0,
     };
   }
@@ -595,21 +606,26 @@ export function getVerifyProviders(models: { gemini: string; claude: string }): 
 
 // ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
 
+/** M9 D16′ — `getAIProvider`가 쓰는 모델명(단가 조회용). 해석 규칙은 getAIProvider와 같다 */
+export function resolveAIProviderModel(): { provider: string; model: string } {
+  const provider = process.env.AI_PROVIDER || 'gemini';
+  const model = process.env.AI_MODEL || (provider === 'claude' ? 'claude-opus-5' : 'gemini-2.5-flash');
+  return { provider, model };
+}
+
 /** 레거시 호환: AI 풀이 자동완성 등에서 사용. 단일 provider 환경변수 기반 */
 export function getAIProvider(): AIProvider {
-  const provider = process.env.AI_PROVIDER || 'gemini';
+  const { provider, model } = resolveAIProviderModel();
 
   if (provider === 'gemini') {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다');
-    const model = process.env.AI_MODEL || 'gemini-2.5-flash';
     return new GeminiProvider(apiKey, model);
   }
 
   if (provider === 'claude') {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다');
-    const model = process.env.AI_MODEL || 'claude-opus-5';
     return new ClaudeProvider(apiKey, model);
   }
 

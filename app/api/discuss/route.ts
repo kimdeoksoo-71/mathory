@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getModelConfig } from '../../../lib/ai-models';
+import { calcCostUsd } from '../../../lib/aiPricing';
 import { getProviderForModel, type AIProvider } from '../../../lib/ai-provider';
 import { numberFigures, buildImageNote, allMissingFigures, countPlaceholders, type FigMeta } from '../../../lib/verify/figures';
 import { fetchFigures } from '../../../lib/figureFetch';
@@ -426,10 +427,8 @@ function calcCost(
   inputPerMillion: number,
   outputPerMillion: number,
 ): number {
-  return (
-    (inputTokens / 1_000_000) * inputPerMillion +
-    (outputTokens / 1_000_000) * outputPerMillion
-  );
+  // M9 D15′ — 산식 단일 원천(lib/aiPricing). 단가 자체는 ai_models 문서(누락·오류면 ai-models.ts가 표로 대체)
+  return calcCostUsd(inputTokens, outputTokens, { in: inputPerMillion, out: outputPerMillion });
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {

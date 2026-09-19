@@ -587,6 +587,7 @@ function printResult(label, r, sheetRef) {
   const judged = out.filter((o) => o.result.judged).length;
   console.log(`\n토큰 합계: in ${totalIn.toLocaleString()} / out ${totalOut.toLocaleString()}`
             + `  (2차까지 간 건 ${judged}/${out.length})`);
+  // ⚠ 5/25는 lib/aiPricing.ts의 claude-opus-5 단가 사본이다(raw fetch 프로브라 TS 모듈을 못 읽는다) — 표를 바꾸면 함께(M9 D15′ ⑤)
   console.log(`대략 비용: 최대 $${((totalIn / 1e6) * 5 + (totalOut / 1e6) * 25).toFixed(3)}`
             + ` — 전량을 Opus 단가로 계산한 상한이다(1차 Gemini분은 더 싸다)`);
 

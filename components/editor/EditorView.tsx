@@ -1468,7 +1468,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      const { completion } = await res.json();
+      const { completion, usage } = await res.json();
+      // M9 D16′ — 비용은 요청 1회에 status 한 줄(저장 없음)
+      if (usage && typeof usage.costUsd === 'number') {
+        setStatus(`AI 완성 $${usage.costUsd.toFixed(4)} · 입력 ${usage.inputTokens} · 출력 ${usage.outputTokens} 토큰`);
+        setTimeout(() => setStatus(''), 4000);
+      }
       if (completion) {
         const editor = editorRefs.current[targetId];
         if (editor) {
@@ -1511,7 +1516,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
       }
-      const json = await res.json() as { results: Record<string, { status: 'ok'; issues: ProofreadIssue[] }> };
+      const json = await res.json() as {
+        results: Record<string, { status: 'ok'; issues: ProofreadIssue[] }>;
+        usage?: { inputTokens: number; outputTokens: number; costUsd: number };
+      };
+      // M9 D16′ — 교정 비용은 요청 1회에 status 한 줄. ProofreadResultBox는 블록마다 하나라 거기 달면 N번 중복된다
+      if (json.usage) {
+        setStatus(`교정 $${json.usage.costUsd.toFixed(4)} · 입력 ${json.usage.inputTokens} · 출력 ${json.usage.outputTokens} 토큰`);
+        setTimeout(() => setStatus(''), 4000);
+      }
       for (const t of targets) {
         const apiResult = json.results?.[t.id];
         out[t.id] = { status: 'ok', issues: apiResult?.issues || [], timestamp: now };

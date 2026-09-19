@@ -10,6 +10,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { priceFor, calcCostUsd } from '../../../lib/aiPricing';
 
 interface ReqBlock { id: string; masked: string; }
 interface ProofreadRequest { blocks: ReqBlock[]; }
@@ -153,7 +154,12 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    return NextResponse.json({ results });
+    // M9 D16′ — 비용 집계(저장 없음 — 교정은 댓글이 없다). 표시는 편집창 status 한 줄
+    const inTok = apiResult.usage?.input_tokens ?? 0;
+    const outTok = apiResult.usage?.output_tokens ?? 0;
+    const usage = { inputTokens: inTok, outputTokens: outTok, costUsd: calcCostUsd(inTok, outTok, priceFor(MODEL)) };
+
+    return NextResponse.json({ results, usage });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : '교정 중 오류가 발생했습니다';
     console.error('[proofread] Error:', error);

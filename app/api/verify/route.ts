@@ -28,6 +28,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ApiError, verifyUid } from '../../../lib/apiAuth';
 import { getVerifyProviders, type AIProvider } from '../../../lib/ai-provider';
+import { priceFor, calcCostUsd, envPrice } from '../../../lib/aiPricing';
 import {
   PROMPT_PROBLEM_FIRST, SOLUTION_FIRST_PASSES, PROMPT_JUDGE, PROMPT_GARBAGE_JUDGE, MERGE_CANDIDATE_CAP,
   fillTemplate, labelBlocks, formatCandidatesForJudge, totalChars, deriveAnswerFormat,
@@ -158,11 +159,12 @@ function readEnv() {
     // F1: 2차 판정의 code_execution은 시트 STEP3에 전례가 없는 신규 요소다(그쪽 payload에는
     //     tools가 아예 없다). 기본 off로 두고 실측 후 켠다.
     judgeCodeExec: process.env.VERIFY_JUDGE_CODE_EXEC === '1',
-    // 단가는 모델이 env 고정이라 ai_models 문서를 못 쓴다 → 라우트 상수.
-    // Claude Opus 5: $5 / $25 per 1M (2026-06 기준 Anthropic 공시가 — Opus 4.8과 같은 단가).
-    claudeCostIn: 5, claudeCostOut: 25,
-    geminiCostIn: Number(process.env.VERIFY_GEMINI_COST_IN || 0),
-    geminiCostOut: Number(process.env.VERIFY_GEMINI_COST_OUT || 0),
+    // M9 D15′ — 단가: env override(VERIFY_*_COST_IN/OUT) → lib/aiPricing 표 → warn + 0.
+    //   옛 코드는 Claude 5/25 리터럴(모델을 바꿔도 남았다)과 Gemini env 기본 0이라 **운영의 1차 Gemini 비용이 $0**이었다(§1-C12).
+    ...verifyPrices(
+      process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',
+      process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
+    ),
   };
 }
 
@@ -635,7 +637,21 @@ function pickSuggestion(judgments: unknown[], c: RawFinding): string {
 }
 
 function cost(inTok: number, outTok: number, inPerM: number, outPerM: number): number {
-  return (inTok / 1_000_000) * inPerM + (outTok / 1_000_000) * outPerM;
+  return calcCostUsd(inTok, outTok, { in: inPerM, out: outPerM });
+}
+
+/** M9 D15′ — env override가 있으면 그것, 없으면 표. 둘 다 없으면 warn + 0(모른다는 것이 틀린 값보다 낫다) */
+function verifyPrices(claudeModel: string, geminiModel: string) {
+  const pick = (model: string, prefix: 'CLAUDE' | 'GEMINI') => {
+    const inEnv = envPrice(process.env[`VERIFY_${prefix}_COST_IN`]);
+    const outEnv = envPrice(process.env[`VERIFY_${prefix}_COST_OUT`]);
+    const table = priceFor(model);
+    if (inEnv === null && outEnv === null && !table) console.warn('[aiPricing] 단가 없음 — 비용 0으로 기록', model);
+    return { in: inEnv ?? table?.in ?? 0, out: outEnv ?? table?.out ?? 0 };
+  };
+  const c = pick(claudeModel, 'CLAUDE');
+  const g = pick(geminiModel, 'GEMINI');
+  return { claudeCostIn: c.in, claudeCostOut: c.out, geminiCostIn: g.in, geminiCostOut: g.out };
 }
 
 const round4 = (n: number) => Math.round(n * 10_000) / 10_000;

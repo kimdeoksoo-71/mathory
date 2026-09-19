@@ -273,7 +273,7 @@ export default function BatchVerifyDialog({
           <div style={{ flex: 1 }} />
           {phase === 'running' ? (
             <span style={{ fontSize: 12, color: 'var(--text-muted, #888)' }}>
-              {finishedCount} / {runKeys.length} 완료 · 누적 비용(2차 Claude 기준) ${usdTotal.toFixed(2)} · {fmtElapsed(elapsed)}
+              {finishedCount} / {runKeys.length} 완료 · 누적 비용 ${usdTotal.toFixed(2)} · {fmtElapsed(elapsed)}
             </span>
           ) : (
             <button
@@ -302,7 +302,7 @@ export default function BatchVerifyDialog({
                 {summary.remaining > 0 ? ` · 미실행 ${summary.remaining}` : ''}
               </div>
               <div style={{ color: 'var(--text-muted, #888)' }}>
-                소요 {fmtElapsed(elapsed)} · 비용(2차 Claude 기준) ${result.usage.costUsd.toFixed(2)}
+                소요 {fmtElapsed(elapsed)} · 비용 ${result.usage.costUsd.toFixed(2)}
               </div>
             </div>
           )}
