@@ -409,6 +409,109 @@ export async function deleteBlock(
   await deleteDoc(doc(db, 'problems', problemId, subcollection, blockId));
 }
 
+/* ═══ M9 D23-1′ — 문항 단위 원자 저장 ═══
+   옛 저장은 탭마다 `deleteBlock`(오류 삼킴) → `saveTabBlock`을 직렬로 돌렸다. 삭제 뒤 쓰기가 실패하면 그 탭이
+   **블록 0개**가 되고(빈 탭의 진짜 경로 1), 탭 k에서 실패하면 앞 탭은 새 id로 커밋됐는데 `origBlockIds`는 옛 id라
+   다음 저장에서 **앞 탭 블록이 두 벌**이 됐다(§1-F13 잠복). 이제 메타 update + 삭제된 탭 정리 + 탭별 delete·set을
+   **writeBatch 한 번**으로 커밋한다 — 실패하면 아무것도 바뀌지 않는다(0개도 중복도 없다).
+   ⚠ 500 ops(또는 커밋 페이로드 10 MiB) 초과면 탭 단위 배치로 내리고, **탭 커밋 직후마다** `onTabCommitted`로
+     새 id를 알린다(교차 탭 원자성만 잃고 중복은 없다).
+   ⚠ 문항 doc **생성**과 블록을 한 배치로 쓰지 말 것 — 규칙 `parentOwner()`의 `get()`은 배치 이전 상태를 읽어
+     부모가 없으면 거부한다(test:rules 67). 이 함수는 기존 문항 전용이다(66이 통과를 고정). */
+const BATCH_LIMIT = 500;
+
+export interface TabSavePlan {
+  tabId: string;
+  oldIds: string[];
+  blocks: Record<string, unknown>[];   // toPersistedBlock 결과(undefined 없음)
+}
+
+export async function commitProblemSave(args: {
+  problemId: string;
+  meta: Record<string, unknown>;          // updateProblem과 같은 필드(id·created_at 제외) — updated_at은 여기서
+  tabs: TabSavePlan[];
+  removedTabIds: string[];
+  onTabCommitted?: (tabId: string, newIds: string[]) => void;
+}): Promise<Record<string, string[]>> {
+  const { problemId, meta, tabs, removedTabIds, onTabCommitted } = args;
+  const problemRef = doc(db, 'problems', problemId);
+  // 삭제된 탭의 블록 id는 서버에서 읽는다(로컬 origIds는 없을 수 있다)
+  const removed: { tabId: string; ids: string[] }[] = [];
+  for (const tabId of removedTabIds) {
+    const snap = await getDocs(collection(db, 'problems', problemId, tabSubcollection(tabId)));
+    removed.push({ tabId, ids: snap.docs.map((d) => d.id) });
+  }
+  // 새 블록 id를 미리 발급 — 같은 id를 지웠다 다시 쓰는 일은 없다
+  const planned = tabs.map((t) => {
+    const col = collection(db, 'problems', problemId, tabSubcollection(t.tabId));
+    return { ...t, col, refs: t.blocks.map(() => doc(col)) };
+  });
+  const result: Record<string, string[]> = {};
+  for (const p of planned) result[p.tabId] = p.refs.map((r) => r.id);
+
+  const ops = 1 + removed.reduce((n, r) => n + r.ids.length, 0)
+    + planned.reduce((n, p) => n + p.oldIds.length + p.blocks.length, 0);
+
+  const commitAll = async () => {
+    const batch = writeBatch(db);
+    batch.update(problemRef, { ...meta, updated_at: serverTimestamp() });
+    for (const r of removed) for (const id of r.ids) batch.delete(doc(db, 'problems', problemId, tabSubcollection(r.tabId), id));
+    for (const p of planned) {
+      for (const id of p.oldIds) batch.delete(doc(p.col, id));
+      p.blocks.forEach((b, i) => batch.set(p.refs[i], b));
+    }
+    await batch.commit();
+    for (const p of planned) onTabCommitted?.(p.tabId, result[p.tabId]);
+  };
+
+  const commitPerTab = async () => {
+    await updateDoc(problemRef, { ...meta, updated_at: serverTimestamp() });
+    for (const r of removed) {
+      for (let i = 0; i < r.ids.length; i += BATCH_LIMIT) {
+        const b = writeBatch(db);
+        for (const id of r.ids.slice(i, i + BATCH_LIMIT)) b.delete(doc(db, 'problems', problemId, tabSubcollection(r.tabId), id));
+        await b.commit();
+      }
+    }
+    for (const p of planned) {
+      if (p.oldIds.length + p.blocks.length > BATCH_LIMIT) {
+        throw new Error(`탭 '${p.tabId}'의 블록이 너무 많아 한 번에 저장할 수 없습니다(${p.oldIds.length + p.blocks.length} > ${BATCH_LIMIT})`);
+      }
+      const b = writeBatch(db);
+      for (const id of p.oldIds) b.delete(doc(p.col, id));
+      p.blocks.forEach((blk, i) => b.set(p.refs[i], blk));
+      await b.commit();
+      onTabCommitted?.(p.tabId, result[p.tabId]);   // 탭 커밋 직후 — 다음 탭이 실패해도 이 탭의 id는 진실이다
+    }
+  };
+
+  if (ops <= BATCH_LIMIT) {
+    try {
+      await commitAll();
+    } catch (e: any) {
+      // 부록 C-7 — 커밋 페이로드(10 MiB) 초과는 invalid-argument로 온다. 원자적 실패라 아무것도 안 바뀌었으니 탭 단위로 1회 재시도
+      if (e?.code !== 'invalid-argument') throw e;
+      console.warn('[commitProblemSave] 단일 배치 거부(페이로드) → 탭 단위로 재시도', e?.message);
+      await commitPerTab();
+    }
+  } else {
+    await commitPerTab();
+  }
+  return result;
+}
+
+/** M9 D23-4′ — 새 문항의 첫 블록들을 한 배치로(문항 doc은 이미 있어야 한다 — 위 주석). */
+export async function saveInitialBlocks(
+  problemId: string,
+  byTab: { tabId: string; block: Record<string, unknown> }[],
+): Promise<void> {
+  const batch = writeBatch(db);
+  for (const { tabId, block } of byTab) {
+    batch.set(doc(collection(db, 'problems', problemId, tabSubcollection(tabId))), block);
+  }
+  await batch.commit();
+}
+
 /** 탭의 모든 블록 삭제 */
 export async function deleteAllTabBlocks(problemId: string, tabId: string): Promise<void> {
   const subcol = tabSubcollection(tabId);
@@ -531,6 +634,10 @@ function stripUndefined<T extends Record<string, any>>(obj: T): Partial<T> {
 export async function duplicateProblem(problemId: string, authorUid?: string): Promise<string> {
   const original = await getProblemWithBlocks(problemId);
   if (!original) throw new Error('원본 문제를 찾을 수 없습니다.');
+  // M9 D23-4′ — 읽기에 실패한 탭은 `[]`로 온다. 그대로 복사하면 사본의 그 탭이 빈 탭이 된다(collectCurrentContent와 같은 규약)
+  if (Object.keys(original.tabLoadErrors ?? {}).length) {
+    throw new Error('원본 탭 일부를 읽지 못해 사본을 만들지 않습니다. 잠시 뒤 다시 시도하세요.');
+  }
 
   const tabs = original.tabs || DEFAULT_TABS;
 

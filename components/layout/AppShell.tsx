@@ -10,7 +10,7 @@ import {
   listProblems, listRecentProblems, listFolders,
   createFolder, updateFolder, deleteFolder, updateFolderOrders,
   moveProblemToFolder, moveProblemsToFolder,
-  getFolderProblemCount, createProblem, saveQuestionBlock, saveSolutionBlock,
+  getFolderProblemCount, createProblem, saveInitialBlocks, deleteProblem,
   getProblemWithBlocks,
   duplicateProblem, moveToTrash, emptyTrash,
   TRASH_FOLDER_ID, UNASSIGNED_FOLDER_ID, SHARED_WITH_ME_FOLDER_ID,
@@ -336,8 +336,9 @@ export default function AppShell() {
         targetFolderId = fid;
       }
     }
+    let newProblemId: string | null = null;
     try {
-      const newProblemId = await createProblem({
+      newProblemId = await createProblem({
         title: '새 문제',
         year: new Date().getFullYear(),
         exam_type: '',
@@ -349,8 +350,17 @@ export default function AppShell() {
         visibility: 'private',
         ...(targetFolderId ? { folder_id: targetFolderId } : {}),
       });
-      await saveQuestionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
-      await saveSolutionBlock(newProblemId, { order: 0, type: 'text', raw_text: '' });
+      /* M9 D23-4′ — 첫 블록 2개는 한 배치로. ⚠ 문항 doc 생성과 같은 배치에 넣지 말 것 — 규칙 parentOwner()의
+         get()이 배치 이전 상태를 읽어 거부한다(test:rules 67). 블록 저장이 실패하면 빈 문항을 남기지 않게 지운다. */
+      try {
+        await saveInitialBlocks(newProblemId, [
+          { tabId: 'question', block: { order: 0, type: 'text', raw_text: '' } },
+          { tabId: 'solution', block: { order: 0, type: 'text', raw_text: '' } },
+        ]);
+      } catch (e) {
+        await deleteProblem(newProblemId).catch(() => { /* best-effort 보상 */ });
+        throw e;
+      }
       await loadData();
       setView({ type: 'editor', problemId: newProblemId });
     } catch (error) {

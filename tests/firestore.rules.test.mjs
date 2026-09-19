@@ -40,6 +40,8 @@
  *   61) github_export 단독 update 허용  62) name 동반 update 허용  63) content_hash 동반 update 거부
  *   [Phase 66a: 문답 검증 질문 users/{uid}/ask_questions]
  *   64) 본인 read/write 허용  65) 타인 read/write 거부
+ *   [M9 D23-1′·D23-4′: 문항 단위 원자 저장]
+ *   66) 문항 update + 블록 delete/set 한 배치 허용(M5)  67) 문항 doc 생성 + 하위 블록 한 배치 거부(get()이 배치 이전 상태)
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -50,7 +52,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, setDoc, getDoc, deleteDoc, updateDoc,
-  collection, getDocs, query, where, orderBy, limit, runTransaction,
+  collection, getDocs, query, where, orderBy, limit, runTransaction, writeBatch, serverTimestamp,
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'mathory-rules-test';
@@ -512,4 +514,34 @@ test('65. 타인 uid의 ask_questions read/write 거부', async () => {
   await assertFails(setDoc(doc(as(STRANGER), `users/${OWNER}/ask_questions/q3`), askQ));
   await assertFails(deleteDoc(doc(as(STRANGER), `users/${OWNER}/ask_questions/q2`)));
   await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), `users/${OWNER}/ask_questions/q2`)));
+});
+
+// ── M9 D23-1′·D23-4′: 문항 단위 원자 저장 (writeBatch) ──
+test('66. 오너: 문항 메타 update + 블록 delete·set을 한 배치로 커밋 허용 (M5)', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'problems/savep'), { authorUid: OWNER, title: 'old' });
+    await setDoc(doc(db, 'problems/savep/question_blocks/o1'), { order: 0, type: 'text', raw_text: 'a' });
+    await setDoc(doc(db, 'problems/savep/solution_blocks/o2'), { order: 0, type: 'text', raw_text: 'b' });
+  });
+  const db = as(OWNER);
+  const b = writeBatch(db);
+  b.update(doc(db, 'problems/savep'), { title: 'new', updated_at: serverTimestamp() });
+  b.delete(doc(db, 'problems/savep/question_blocks/o1'));
+  b.delete(doc(db, 'problems/savep/solution_blocks/o2'));
+  b.set(doc(collection(db, 'problems/savep/question_blocks')), { order: 0, type: 'text', raw_text: 'A' });
+  b.set(doc(collection(db, 'problems/savep/solution_blocks')), { order: 0, type: 'text', raw_text: 'B' });
+  await assertSucceeds(b.commit());
+  // 비오너는 같은 배치가 거부된다
+  const sdb = as(STRANGER);
+  const sb = writeBatch(sdb);
+  sb.update(doc(sdb, 'problems/savep'), { title: 'x' });
+  await assertFails(sb.commit());
+});
+test('67. 문항 doc 생성 + 하위 블록을 한 배치로 쓰면 거부 (parentOwner()의 get()은 배치 이전 상태) — D23-4′', async () => {
+  const db = as(OWNER);
+  const b = writeBatch(db);
+  b.set(doc(db, 'problems/newp'), { authorUid: OWNER, title: 't' });
+  b.set(doc(collection(db, 'problems/newp/question_blocks')), { order: 0, type: 'text', raw_text: '' });
+  await assertFails(b.commit());
 });

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection, VerifyKind, VerifyReport } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem, setVerification,
-  saveTabBlock, deleteBlock, deleteAllTabBlocks,
+  commitProblemSave,
 } from '../../lib/firestore';
 import { watchAllComments, countComments, countAgentSessions, addComment } from '../../lib/comments';
 import { listSessions } from '../../lib/discussion-sessions';
@@ -91,6 +91,13 @@ interface LocalBlock extends Block {
   isNew?: boolean;
   imageWidth?: number;
 }
+
+/** M9 D23-2′ — 빈 탭 시드 블록. 로드·`applyVersionContent`(undo·redo·복원·드래프트)에서 빈 탭을 채운다.
+ *  ⚠ id에 탭 id + nanoid — 루프 안에서 `new-${Date.now()}`를 쓰면 여러 탭이 같은 id를 받는다.
+ *  ⚠ 저장 직전에 시드하지 말 것 — 로컬은 0개인 채 서버만 1개가 되어 다음 저장이 그것을 지운다(M7 D11). */
+const seedLocalBlock = (tabId: string): LocalBlock => ({
+  id: `new-${tabId}-${nanoid()}`, block_key: nanoid(), order: 0, type: 'text', raw_text: '', title: '', collapsed: false,
+} as LocalBlock);
 
 /** 개선묶음 M1 B — `.mathory-range`의 진행 구간 비율.
  *  ⚠ `::-moz-range-progress`는 Firefox에만 있어, 두 엔진을 한 규칙으로 덮으려면
@@ -1355,6 +1362,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         for (const tab of loadedTabs) {
           const blocks = data.tabBlocks[tab.id] || [];
           blocksMap[tab.id] = toLocal(blocks);
+          // M9 D23-2′ — 빈 탭은 1블록 시드(빈 탭의 진짜 경로 2: 로드가 0개를 그대로 받아 다음 저장이 영속화했다).
+          //   ⚠ 읽기 실패 탭은 제외 — 서버엔 데이터가 있는데 못 읽은 것이라 덮어쓰면 안 된다. setAllBlocks와 같은 배치라 dirty 아님
+          if (!blocks.length && !data.tabLoadErrors?.[tab.id]) blocksMap[tab.id] = [seedLocalBlock(tab.id)];
           origIds[tab.id] = blocks.map((b) => b.id);
         }
         setAllBlocks(blocksMap);
@@ -2965,37 +2975,21 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         folder_id: editFolderId || null,
         tabs,
       };
-      await updateProblem(problem.id, updateData);
-
-      // 삭제된 탭의 블록 정리
-      for (const origTab of origTabs) {
-        if (!tabs.find((t) => t.id === origTab.id)) {
-          await deleteAllTabBlocks(problem.id, origTab.id);
-        }
-      }
-
-      // 각 탭의 블록 저장 (delete all → re-add)
-      for (const tab of tabs) {
-        const subcol = tabSubcollection(tab.id);
-        const origIds = origBlockIds[tab.id] || [];
-        const blocks = allBlocks[tab.id] || [];
-
-        // 기존 블록 전부 삭제
-        for (const oldId of origIds) {
-          try {
-            await deleteBlock(problem.id, subcol, oldId);
-          } catch (e) {
-            // 이미 삭제된 블록은 무시
-          }
-        }
-
-        // 저장 형태 정형화 — 스냅샷 해시와 단일 소스 (lib/blocks/normalize.ts, Phase55 F4).
-        // block_key 포함 외 기존 저장 결과와 필드 단위 동일.
-        for (let i = 0; i < blocks.length; i++) {
-          const saveData = toPersistedBlock(blocks[i], i);
-          await saveTabBlock(problem.id, tab.id, saveData as any);
-        }
-      }
+      /* M9 D23-1′ — 메타 update · 삭제된 탭 정리 · 탭별 delete→set을 **writeBatch 한 번**으로(lib/firestore.ts).
+         실패하면 아무것도 바뀌지 않는다(빈 탭·중복 없음). 저장 형태 정형화는 여전히 toPersistedBlock 단일 소스(Phase55 F4).
+         `origBlockIds`의 진실은 **반환 id**다 — 탭 단위 폴백(500 ops 초과)에서는 탭 커밋 직후마다 갱신해,
+         중간 탭이 실패해도 앞 탭의 새 id를 잃지 않는다(§1-F13 교차 탭 중복 차단). */
+      const saved = await commitProblemSave({
+        problemId: problem.id,
+        meta: updateData,
+        removedTabIds: origTabs.filter((o) => !tabs.find((t) => t.id === o.id)).map((o) => o.id),
+        tabs: tabs.map((tab) => ({
+          tabId: tab.id,
+          oldIds: origBlockIds[tab.id] || [],
+          blocks: (allBlocks[tab.id] || []).map((b, i) => toPersistedBlock(b, i) as unknown as Record<string, unknown>),
+        })),
+        onTabCommitted: (tabId, ids) => setOrigBlockIds((prev) => ({ ...prev, [tabId]: ids })),
+      });
 
       // 저장 후 리프레시
       const refreshed = await getProblemWithBlocks(problem.id);
@@ -3029,11 +3023,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
            포커스·커서·CM undo가 사라지고 저장 중 친 글자가 서버본에 덮여 사라졌다. 이제 로컬 id는 세션
            내내 유지되고 서버 id는 `origBlockIds`(다음 저장의 delete-all 대상)만 안다.
            ⚠ `setAllBlocks(refreshed…)`를 되살리지 말 것. undo·redo·복원의 세대 id 재생성은 별개(의도). */
-        const newOrigIds: Record<string, string[]> = {};
-        for (const tab of loadedTabs) {
-          newOrigIds[tab.id] = (refreshed.tabBlocks[tab.id] || []).map((b) => b.id);
-        }
-        setOrigBlockIds(newOrigIds);
+        // M9 D23-1′ — 서버 재조회가 아니라 커밋이 돌려준 id가 진실이다(읽기 실패 탭이 `[]`로 와 다음 저장이 중복을 만들던 경로 차단)
+        setOrigBlockIds(saved);
         // 교정 결과는 저장 시점 텍스트 기준이라 초기화(안전, 종전과 같다)
         setProofreadResults({});
 
@@ -3361,6 +3352,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       map[t.id] = (blocksByTab[t.id] || []).map((b) => ({
         ...b, id: `v${gen}-${b.block_key}`, collapsed: false, title: b.title || '',
       })) as LocalBlock[];
+      if (!map[t.id].length) map[t.id] = [seedLocalBlock(t.id)];   // M9 D23-2′ — undo·복원·드래프트도 빈 탭을 남기지 않는다
     }
     setTabs(vTabs);
     setAllBlocks(map);
@@ -3977,6 +3969,25 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 })}
               </SortableContext>
             </DndContext>
+            {/* M9 D23-3 — 빈 탭 자리표시자. `+`는 활성 블록의 하단 툴바에만 있어 블록이 0개면 새 블록을 만들 길이 없었다.
+                시드(로드·복원) 뒤에는 드물지만 남는 경로의 탈출구다. */}
+            {currentBlocks.length === 0 && (
+              <div style={{
+                margin: '16px', padding: '20px 16px', border: '1px dashed var(--border-content)', borderRadius: 8,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+                color: 'var(--text-muted, #888)', fontSize: 13,
+              }}>
+                <span>이 탭에 블록이 없습니다.</span>
+                <button
+                  type="button"
+                  onClick={() => handleAddBlock('text')}
+                  style={{
+                    padding: '6px 12px', border: '1px solid var(--border-content)', borderRadius: 6,
+                    background: 'var(--bg-primary, #fff)', color: 'var(--text-primary)', fontSize: 13, cursor: 'pointer',
+                  }}
+                >+ 블록 추가</button>
+              </div>
+            )}
             </div>
             {/* 문서 끝 여백 — 패널 자신에 paddingBottom:100vh 를 주면 border-box 규칙상
                 박스 최소높이가 100vh로 고정돼 overflow:hidden 부모(좌측 칼럼)에 복구 불가한
