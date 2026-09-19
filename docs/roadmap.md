@@ -2171,7 +2171,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## 개선묶음 M9: 각종 기능 개선·버그 수정 ✅ 구현 (2026-09-19) · push 대기 · **덕수 실물 검수 대기**
+## 개선묶음 M9: 각종 기능 개선·버그 수정 ✅ 구현 (2026-09-19) · push 대기 · **덕수 실물 검수 종결(2026-09-19, "마지막 1%까지 완벽")**
 
 계획서: `docs/phasedocs/개선묶음 M9 각종 기능 개선·버그 수정 v5 실행판.md` (§9 구현 기록 · 9커밋 S0~S8)
 (계보: 덕수 스케치 8항 + 추가 사항(블록정리 조정) → v1 web → v2 착수판 → v3 CLI 교차검토(정정 부록 B · D′ 21건 · Q1~Q19) → v4(Q 확정 · I항 · Firestore·Vercel 실측) → v5 web 재검증 → 구현)
@@ -2188,7 +2188,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 | **H** 인용 인덱스 | Mathpix `include_equation_tags`(프로브 실측 — 기본 요청은 `⋯⋯ ㉠`를 인식하고도 버린다) · 규칙 ⑤ `⋯⋯ ㉠`→`\tag{n}` · 태그 `인용번호미해결` · 일괄 검증만 필터 |
 | **I** 정돈 조정(추가) | 문제 탭 문제번호 제거 · 번분수 `\dfrac` · `STEP n`·`GUIDE` 수식화 제외 · `\section*` 벗기기 · GUIDE 제목 블록 |
 
-로직 테스트 21종 **539건** · `test:rules` 69 · 빌드 통과. 신설 모듈 3(`invisibles` · `aiPricing` · `panelStore`) + 프로브 1(`scripts/ocrProbe.mjs`).
+로직 테스트 21종 **543건** · `test:rules` 69 · 빌드 통과. 검수 후속 1건(OCR 태그 안 리더 잔재 → `normalizeTagLabels`, 실행판 R8). 신설 모듈 3(`invisibles` · `aiPricing` · `panelStore`) + 프로브 1(`scripts/ocrProbe.mjs`).
 
 ## Phase 67: 좌측 사이드바 hover peek(자동 펼침·접힘) ✅ 구현 (2026-09-17) · push 완료 · **덕수 실물 검수 종결(2026-09-17, "모두 정상")**
 
