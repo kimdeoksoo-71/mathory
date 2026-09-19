@@ -1591,7 +1591,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
     setCurrentBlocks(next);
     if (nextActive) setActiveBlockId(nextActive);
-    setStatus(`정돈: 분할 ${stats.split} · 정형화 ${stats.fixed} · 제거 ${stats.removed}`);
+    setStatus(`정돈: 분할 ${stats.split} · 정형화 ${stats.fixed} · 제거 ${stats.removed}`
+      + (stats.tagConflict ? ` · 식 번호 충돌로 ㉠→\\tag 변환 건너뜀 ${stats.tagConflict}블록` : ''));
     setTimeout(() => setStatus(''), 3000);
   }, [allBlocks, activeTab, activeBlockId, pushUndo, setCurrentBlocks]);
 

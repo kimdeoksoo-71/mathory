@@ -209,6 +209,8 @@ export const SOLUTION_TAGS = [
   // 61g — 시트 V2(`dda7bba`)의 유형 확장 이식. **개명이 아니라 추가**라 E-4 체계는 그대로다.
   // 저장된 옛 리포트의 태그는 문자열이라 그대로 남고, 카드는 매핑 표 없이 그대로 찍는다.
   '근거없는가정', '충분성미확인',
+  // M9 D25-3′ — 인용 번호의 정의부를 찾을 수 없다는 지적의 구조적 범주. 일괄 검증은 이 태그를 거른다(dropCitationFindings)
+  '인용번호미해결',
 ] as const;
 export const COMMON_TAGS = ['정답불일치'] as const;
 /** Phase 61h D1 — 군더더기 태그. **`SOLUTION_TAGS`(결함 어휘)와 섞지 않는다** — 별도 축이라
@@ -245,6 +247,8 @@ export function normalizeTag(raw: string, kind: VerifyKind): string {
   //    뒤 힌트(`비약`·`일관`·`경우`·`불일치`·`표기`)를 가로채기만 한다(61g E4).
   if (has('가정', 'assum', 'unwarrant')) return '근거없는가정';
   if (has('충분', 'suffic', 'uncheck')) return '충분성미확인';
+  // M9 D25-3′ — ⚠ problem 분기 **아래**(위에 두면 문제 검증으로 샌다)
+  if (has('인용', 'unresolved', 'refer')) return '인용번호미해결';
   if (has('비약', 'gap', 'logic_gap')) return '논리비약';
   if (has('일관', 'incons')) return '수식비일관';
   if (has('경우', 'case')) return '경우누락';
@@ -516,6 +520,27 @@ export function indexJudgments(arr: unknown): Record<string, Judgment> {
  * 종합 판정. 시트 STEP3 규칙 그대로: `fail≥1 → fail` / `check≥1 → check` / else `ok`.
  * (시트 어휘 valid→fail, uncertain→check로 이미 매핑된 findings를 받는다)
  */
+/* ─── M9 D25-4′ — 일괄 검증 전용 인용 번호 필터 ───
+   스케치: 완성 단계 원고의 일괄 검증에서 풀이 지적의 대부분이 "(1)·(2)가 무엇을 가리키는지 알 수 없다"였다 — OCR이
+   원문의 `⋯⋯ ㉠`(식 번호 정의부)를 놓친 탓. **단건 정밀 검증에서는 절대 거르지 않는다**(인용 번호 확인은 필수 검토).
+   탐지는 그대로 두고(프롬프트로 막지 않는다) 일괄 검증의 풀이 결과에서만 여기서 뺀다 — 유일한 필터 자리,
+   OCR이 좋아지면 라우트의 호출 한 줄을 지우면 된다.
+   ① 태그 `인용번호미해결` ② 보조 휴리스틱: reason에서 `$…$`를 지운 뒤 인용 토큰 뒤 24자 안에 "미해결" 서술.
+      v2의 AND 정규식은 실제 결함 5건 중 3건을 지웠다(`f'(1)=0만으로는 … 알 수 없다` 등 — `(\d)`가 함수값과 겹친다).
+   ③ `정답불일치`와 군더더기 격상분은 휴리스틱에서 제외(태그가 일치하면 거른다). */
+const CITE_UNRESOLVED_RE = /(?:\\(?:tag|ref)\{\d+\}|(?<![0-9A-Za-z가-힣_\\'])\(\d{1,2}\)|[㉠-㉭])[^.\n]{0,24}?(?:무엇을\s*)?(?:가리키|지칭|정의(?:부)?(?:가|이)?\s*(?:되지 않|없)|찾을 수 없|어디에도 없)/;
+
+export function isCitationFinding(f: { tag: string; reason: string }): boolean {
+  if (f.tag === '인용번호미해결') return true;
+  if (f.tag === '정답불일치' || f.reason.startsWith('[군더더기 검토에서 격상]')) return false;
+  return CITE_UNRESOLVED_RE.test(f.reason.replace(/\$[^$]*\$/g, ' '));
+}
+
+export function dropCitationFindings<T extends { tag: string; reason: string }>(findings: T[]): { kept: T[]; dropped: number } {
+  const kept = findings.filter((f) => !isCitationFinding(f));
+  return { kept, dropped: findings.length - kept.length };
+}
+
 export function synthesizeVerdict(findings: { verdict: 'fail' | 'check' }[]): 'ok' | 'check' | 'fail' {
   if (findings.some((f) => f.verdict === 'fail')) return 'fail';
   if (findings.some((f) => f.verdict === 'check')) return 'check';

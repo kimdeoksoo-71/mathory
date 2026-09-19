@@ -497,3 +497,57 @@ test('61h T8 — indexJudgments: suggestion·escalate·escalateTag (escalate는 
   // 기존 호출부 호환 — ruling·note는 그대로
   assert.equal(m.c1.ruling, 'valid');
 });
+
+/* ═══ M9 H — 인용 번호 태그 · 일괄 필터 ═══ */
+{
+  const Pm = await import('../.test-build/lib/verify/parse.js');
+  const Pr = await import('../.test-build/lib/verify/prompts.js');
+  const f = (tag, reason, extra = {}) => ({ tag, reason, verdict: 'check', quote: 'q', blockKey: 'k', quoteFound: true, ...extra });
+
+  test('M9 D25-3′: 태그 어휘·정규화 — 풀이만, 문제 검증으로 새지 않는다', () => {
+    assert.ok(Pm.SOLUTION_TAGS.includes('인용번호미해결'));
+    assert.ok(!Pm.PROBLEM_TAGS.includes('인용번호미해결'));
+    assert.equal(Pm.normalizeTag('인용 번호 미해결', 'solution'), '인용번호미해결');
+    assert.equal(Pm.normalizeTag('unresolved_reference', 'solution'), '인용번호미해결');
+    assert.equal(Pm.normalizeTag('인용', 'problem'), '조건결함');
+  });
+
+  test('M9 D25-4′: 태그 일치는 거른다 · 강화 휴리스틱 적중', () => {
+    const { kept, dropped } = Pm.dropCitationFindings([
+      f('인용번호미해결', '무엇이든'),
+      f('논리비약', '(2)가 무엇을 가리키는지 알 수 없다'),
+      f('표기오류', '㉠이 정의되지 않았다'),
+      f('계산오류', '계산이 틀렸다'),
+    ]);
+    assert.equal(dropped, 3);
+    assert.deepEqual(kept.map((x) => x.tag), ['계산오류']);
+  });
+
+  test('M9 D25-4′: v2 AND 정규식이 지우던 실제 결함은 남긴다(오살 0)', () => {
+    const real = [
+      f('논리오류', "$f'(1)=0$만으로는 극값인지 알 수 없다"),
+      f('충분성미확인', 'g(2)가 정의되는지 확인하지 않았다'),
+      f('논리비약', 'P(2)의 값이 왜 3인지 알 수 없다'),
+      f('정답불일치', '(1)이 가리키는 식이 없다'),
+      f('논리오류', '[군더더기 검토에서 격상] (1)이 가리키는 식을 찾을 수 없다'),
+    ];
+    const { kept, dropped } = Pm.dropCitationFindings(real);
+    assert.equal(dropped, 0);
+    assert.equal(kept.length, real.length);
+  });
+
+  test('M9 D25-4′: 전부 걸러지면 종합 판정은 ok', () => {
+    const { kept } = Pm.dropCitationFindings([f('인용번호미해결', 'x', { verdict: 'fail' })]);
+    assert.equal(Pm.synthesizeVerdict(kept), 'ok');
+  });
+
+  test('M9 P16·D25-3′: 관례 문장은 프롬프트 전부에 · 논리 패스는 여덟 태그 · 계산 패스·판정자에도 태그', () => {
+    const all = [Pr.PROMPT_PROBLEM_FIRST, ...Pr.SOLUTION_FIRST_PASSES, Pr.PROMPT_JUDGE];
+    for (const pr of all) assert.ok(pr.system.includes('재인용'), 'COMMON_RULES 관례 문장');
+    const sys = Pr.SOLUTION_FIRST_PASSES.map((p) => p.system + p.user).join('\n');
+    assert.ok(sys.includes('여덟 중 하나'));
+    assert.ok(!sys.includes('일곱 중 하나'));
+    assert.ok(Pr.SOLUTION_FIRST_PASSES[0].system.includes('인용번호미해결'), '계산 패스(Q15)');
+    assert.ok(Pr.PROMPT_JUDGE.system.includes('- 인용번호미해결:'), '판정자 [2′] 기준');
+  });
+}

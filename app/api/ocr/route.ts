@@ -44,6 +44,10 @@ export async function POST(req: NextRequest) {
         math_inline_delimiters: ['$', '$'],
         math_display_delimiters: ['$$', '$$'],
         rm_spaces: true,
+        // M9 D25-1·M4(프로브 실측) — 행 끝 `⋯⋯ ㉠`(식 번호)는 기본 요청에서 text에서 **제외**된다(line_data의
+        // equation_number · included:false). 이 옵션이 그것을 수식 안 `\tag{ㄱ}`로 싣는다. display가 equation*·align*로
+        // 감싸져 오는 부작용은 lib/ocr.ts normalizeMathpixEquationTags가 앱 정본으로 되돌린다.
+        include_equation_tags: true,
       }),
     });
 

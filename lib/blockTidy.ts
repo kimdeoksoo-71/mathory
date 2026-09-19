@@ -32,7 +32,7 @@ import { stripInvisibles, isInvisibleTarget } from './invisibles';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
-export interface TidyStats { split: number; fixed: number; removed: number }
+export interface TidyStats { split: number; fixed: number; removed: number; /** M9 Q16 — 식 번호 충돌로 ㉠→\tag 변환을 건너뛴 블록 수 */ tagConflict: number }
 export interface TidyOptions { tab: 'question' | 'solution' | 'extra'; autoFix?: boolean }
 
 /** EditorView.SPLITTABLE_TYPES와 같다(사본 — 그쪽은 컴포넌트 상수라 import 0 규약상 여기 다시 적는다) */
@@ -112,7 +112,7 @@ function splitBlock(text: string): Piece[] | null {
 const trimBlock = (t: string) => t.replace(/^\s*\n/, '').replace(/\n\s*$/, '');
 
 export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyOut[]; stats: TidyStats } {
-  const stats: TidyStats = { split: 0, fixed: 0, removed: 0 };
+  const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0 };
   const out: TidyOut[] = [];
 
   // M9 D24-1′ — 비가시·단독 초성 정규화를 가장 먼저(분할·머리 정리 정규식이 깨끗한 글자를 보도록)
@@ -177,10 +177,13 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
   }
 
   // R3 · R4
+  // M9 Q16 — 규칙 ⑤(㉠→\tag{n})의 번호 충돌 판정은 **탭 전체**의 기존 \tag 번호로(블록마다 부르므로 블록 안만 보면 놓친다)
+  const reservedTagNumbers = [...new Set(out.flatMap((o) => [...o.raw_text.matchAll(/\\tag\*?\{(\d+)\}/g)].map((x) => Number(x[1]))))];
   for (const o of out) {
     if (opts.autoFix !== false && !NO_FIX.has(o.type) && !(o.type === 'choices' && CHOICE_FIG_RE.test(o.raw_text))) {
-      const r = autoFixDeterministicIssues(o.raw_text, { skipJamoRefs: o.type === 'roman' || o.type === 'choices' });
+      const r = autoFixDeterministicIssues(o.raw_text, { skipJamoRefs: o.type === 'roman' || o.type === 'choices', reservedTagNumbers });
       o.raw_text = r.fixed; stats.fixed += r.count;
+      if (r.tagConflict) stats.tagConflict++;
     }
     if (SPLITTABLE.has(o.type)) o.raw_text = trimBlock(o.raw_text);
   }

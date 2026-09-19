@@ -629,6 +629,159 @@ export function nestFracToDfrac(text: string): { fixed: string; count: number } 
   return { fixed, count: edits.length };
 }
 
+/* ─── M9 D25-2′: 인용 인덱스 `⋯⋯ ㉠` → `\tag{n}` · 본문 `㉠` → `(n)` (규칙 ⑤) ─── */
+/**
+ * 해설 원문의 식 번호 표기(행 끝 리더 `⋯⋯` + 원문자 자음 `㉠`)를 앱 정본(`\tag{n}` · 재인용 `(n)`)으로 옮긴다.
+ * ㉠=1 … ㉭=14 **고정 매핑**(정의부는 문제 탭, 인용은 풀이 탭에 흩어지고 blockTidy가 블록마다 부르므로 오프셋 불가).
+ *
+ * 행 단위 판정:
+ *  - 라벨 = `[㉠-㉭]` · `\text{㉠}` · (Q13) 리더 뒤의 `(n)`(convertJamoRefs가 `(ㄱ)`을 바꾼 형태 — 정의부가 참조로 둔갑하던 것)
+ *  - 라벨 뒤가 행 끝(공백·닫는 `$`/`$$`만)이어야 정의부다. 그 앞의 리더(`\cdots`·`\ldots`·`\dots`·`⋯`·`…`·`···`·`...`)를
+ *    **수식 안팎 가리지 않고** 걷어낸다(Mathpix는 `\cdots`를 수식 안에 낸다).
+ *  - 인라인 수식 안·뒤 → `\tag`는 **수식 밖 행 끝**(KaTeX: 인라인 `\tag`는 오류) · display 안·뒤 → 닫는 `$$` 직전
+ *    (그 display에 라벨이 둘 이상이거나 이미 `\tag`가 있으면 **변환 안 함** — "Multiple \tag" 오류) · 텍스트 → 행 끝 ` \tag{n}`
+ *  - 리더 없는 행 끝 라벨은 **직전이 수식일 때만**(`$x$ ㉠`) — 산문 끝 `㉠`는 무변환
+ *  - 본문 중간(텍스트)의 `㉠` → `(n)`. ⚠ 앞이 한글 음절이면(`식㉠에서`) `REF_TAGNUM_RE` lookbehind로 ref-marker가 안 된다(알고 둘 한계)
+ *  - (Q16) 만들어질 번호가 이미 있는 `\tag{k}`(또는 호출부가 넘긴 reserved)와 겹치면 **이 텍스트 전체를 건너뛴다** — conflict
+ * 코드펜스·인라인 코드 안은 무접촉. 멱등(두 번째 적용 시 라벨이 없다).
+ */
+const CIRCLED_JAMO = '㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭';
+
+/** end에서 거꾸로 리더·공백을 걷는다. strong = 리더로 볼 만한가(텍스트: 토큰 1개 이상 또는 점 3개 이상 / 수식 안: 토큰 2개 이상) */
+function walkLeaderBack(s: string, from: number, end: number): { start: number; tokens: number; dots: number } {
+  let i = end, tokens = 0, dots = 0;
+  for (;;) {
+    const seg = s.slice(from, i);
+    let m: RegExpMatchArray | null;
+    if ((m = seg.match(/[ \t]+$/))) { i -= m[0].length; continue; }
+    if ((m = seg.match(/\\(?:cdots|ldots|dots)$/))) { i -= m[0].length; tokens++; continue; }
+    if ((m = seg.match(/\\cdot$/))) { i -= m[0].length; dots++; continue; }
+    if ((m = seg.match(/(?:\\qquad|\\quad|\\[,;: ]|~)$/))) { i -= m[0].length; continue; }
+    if ((m = seg.match(/[⋯…]+$/))) { i -= m[0].length; tokens += m[0].length; continue; }
+    if ((m = seg.match(/[·.]+$/))) { i -= m[0].length; dots += m[0].length; continue; }
+    break;
+  }
+  return { start: i, tokens, dots };
+}
+const backSpaces = (s: string, from: number, i: number) => { while (i > from && (s[i - 1] === ' ' || s[i - 1] === '\t')) i--; return i; };
+const lineEndAt = (s: string, i: number) => { const n = s.indexOf('\n', i); return n === -1 ? s.length : n; };
+const onlySpaces = (s: string) => /^[ \t]*$/.test(s);
+
+export function convertCircledLeaderTags(
+  text: string, reserved: number[] = [],
+): { fixed: string; count: number; conflict: boolean } {
+  if (!/[㉠-㉭]/.test(text) && !/\(\d{1,2}\)/.test(text)) return { fixed: text, count: 0, conflict: false };
+  const code = collectCodeRanges(text);
+  const inCode = (p: number) => code.some(([s, e]) => p >= s && p < e);
+  const regions = scanMathRegions(text).filter((r) => r.closed && !r.empty);
+  const regionAt = (p: number) => regions.find((r) => p >= r.innerFrom && p < r.innerTo);
+  const regionEndingAt = (p: number) => regions.find((r) => r.to === p);
+
+  type Edit = { from: number; to: number; insert: string };
+  const edits: Edit[] = [];
+  const planned: number[] = [];
+  const touchedDisplay = new Set<number>();
+
+  const LABEL_RE = /\\text\s*\{\s*([㉠-㉭])\s*\}|([㉠-㉭])|\((\d{1,2})\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = LABEL_RE.exec(text)) !== null) {
+    const labelFrom = m.index, labelTo = m.index + m[0].length;
+    if (inCode(labelFrom)) continue;
+    const isParen = m[3] !== undefined;
+    const ch = m[1] ?? m[2];
+    const n = isParen ? Number(m[3]) : CIRCLED_JAMO.indexOf(ch!) + 1;
+    const R = regionAt(labelFrom);
+
+    if (!R) {
+      /* ── 텍스트 속 라벨 ── */
+      const lineEnd = lineEndAt(text, labelTo);
+      const atLineEnd = onlySpaces(text.slice(labelTo, lineEnd));
+      if (!atLineEnd) {
+        // 본문 중간 재인용: ㉠ → (n). `\text{㉠}`·`(n)`은 텍스트 중간이면 무접촉
+        if (m[2] !== undefined) { edits.push({ from: labelFrom, to: labelTo, insert: `(${n})` }); }
+        continue;
+      }
+      const lineStart = text.lastIndexOf('\n', labelFrom - 1) + 1;
+      const w = walkLeaderBack(text, lineStart, labelFrom);
+      const textLeader = w.tokens >= 1 || w.dots >= 3;
+      let j = textLeader ? w.start : backSpaces(text, lineStart, labelFrom);
+      const prevMath = regionEndingAt(j);
+      if (prevMath) {
+        // 수식 뒤 라벨: 수식 안 끝의 리더도 걷는다(수식 안은 토큰 2개 이상일 때만 — `$a+\cdots$`의 정당한 \cdots 보호)
+        const wi = walkLeaderBack(text, prevMath.innerFrom, prevMath.innerTo);
+        const mathLeader = wi.tokens >= 2 || wi.dots >= 6;
+        if (!textLeader && !mathLeader && isParen) continue;   // `$x$ (1)`은 재인용 — 무접촉
+        if (prevMath.kind === 'display') {
+          if (touchedDisplay.has(prevMath.from) || /\\tag\b/.test(text.slice(prevMath.innerFrom, prevMath.innerTo))) continue;
+          touchedDisplay.add(prevMath.from);
+          const innerEnd = mathLeader ? backSpaces(text, prevMath.innerFrom, wi.start) : backSpaces(text, prevMath.innerFrom, prevMath.innerTo);
+          const tailWs = text.slice(innerEnd, prevMath.innerTo).includes('\n') ? '\n' : '';
+          edits.push({ from: innerEnd, to: prevMath.innerTo, insert: ` \\tag{${n}}${tailWs}` });
+          edits.push({ from: prevMath.to, to: lineEnd, insert: '' });
+        } else {
+          if (mathLeader) {
+            const cut = backSpaces(text, prevMath.innerFrom, wi.start);
+            if (onlySpaces(text.slice(prevMath.innerFrom, cut))) {
+              // 수식이 리더뿐이었다 → 수식째 지운다
+              const before = backSpaces(text, lineStart, prevMath.from);
+              edits.push({ from: before, to: lineEnd, insert: ` \\tag{${n}}` });
+              planned.push(n);
+              continue;
+            }
+            edits.push({ from: cut, to: prevMath.innerTo, insert: '' });
+          }
+          edits.push({ from: prevMath.to, to: lineEnd, insert: ` \\tag{${n}}` });
+        }
+        planned.push(n);
+        continue;
+      }
+      if (!textLeader) continue;   // 산문 끝 라벨(리더 없음) — 무변환
+      j = backSpaces(text, lineStart, j);
+      if (j === lineStart) continue;   // 행에 리더와 라벨뿐 — 붙일 식이 없다
+      edits.push({ from: j, to: lineEnd, insert: ` \\tag{${n}}` });
+      planned.push(n);
+      continue;
+    }
+
+    /* ── 수식 속 라벨 ── */
+    if (isParen) continue;   // 수식 안의 (1)은 수식의 일부
+    if (!onlySpaces(text.slice(labelTo, R.innerTo).replace(/\n/g, ''))) continue;   // 수식 중간의 라벨 — 무접촉
+    const lineEnd = lineEndAt(text, R.to);
+    if (R.kind === 'inline' && !onlySpaces(text.slice(R.to, lineEnd))) continue;
+    const w = walkLeaderBack(text, R.innerFrom, labelFrom);
+    const leader = w.tokens >= 1 || w.dots >= 3;
+    const cut = backSpaces(text, R.innerFrom, leader ? w.start : labelFrom);
+    if (R.kind === 'display') {
+      const inner = text.slice(R.innerFrom, R.innerTo);
+      const labels = inner.match(/[㉠-㉭]/g) ?? [];
+      if (labels.length > 1 || /\\tag\b/.test(inner) || touchedDisplay.has(R.from)) continue;
+      touchedDisplay.add(R.from);
+      const tailWs = text.slice(labelTo, R.innerTo).includes('\n') ? '\n' : '';
+      edits.push({ from: cut, to: R.innerTo, insert: ` \\tag{${n}}${tailWs}` });
+    } else {
+      if (onlySpaces(text.slice(R.innerFrom, cut))) {
+        const lineStart = text.lastIndexOf('\n', R.from - 1) + 1;
+        edits.push({ from: backSpaces(text, lineStart, R.from), to: lineEnd, insert: ` \\tag{${n}}` });
+      } else {
+        edits.push({ from: cut, to: R.innerTo, insert: '' });
+        edits.push({ from: R.to, to: lineEnd, insert: ` \\tag{${n}}` });
+      }
+    }
+    planned.push(n);
+  }
+
+  if (!edits.length) return { fixed: text, count: 0, conflict: false };
+  // Q16 — 번호 충돌: 이미 있는 \tag{k}·reserved와 겹치거나 정의부가 같은 번호를 두 번 쓰면 전체를 건너뛴다
+  const existing = new Set<number>([...reserved, ...[...text.matchAll(/\\tag\*?\{(\d+)\}/g)].map((x) => Number(x[1]))]);
+  if (planned.some((k) => existing.has(k)) || new Set(planned).size !== planned.length) {
+    return { fixed: text, count: 0, conflict: true };
+  }
+  edits.sort((a, b) => b.from - a.from || b.to - a.to);
+  let fixed = text;
+  for (const e of edits) fixed = fixed.slice(0, e.from) + e.insert + fixed.slice(e.to);
+  return { fixed, count: edits.filter((e) => e.insert).length, conflict: false };
+}
+
 /**
  * 수식 영역(구분자 포함) 범위 수집.
  *
@@ -803,9 +956,10 @@ export function convertTabularToMarkdown(text: string): { fixed: string; count: 
 
 export function autoFixDeterministicIssues(
   text: string,
-  opts?: { skipJamoRefs?: boolean },
-): { fixed: string; count: number } {
+  opts?: { skipJamoRefs?: boolean; reservedTagNumbers?: number[] },
+): { fixed: string; count: number; tagConflict?: boolean } {
   let count = 0;
+  let tagConflict = false;
 
   // Step 00 (M9 D29): `\section*{…}` 계열 벗기기 — 맨 앞(OCR 경로에서도 제목 표지가 남지 않도록). 멱등
   {
@@ -835,6 +989,14 @@ export function autoFixDeterministicIssues(
     const r = convertJamoRefs(text);
     text = r.fixed;
     count += r.count;
+  }
+  // Step 0-2b (M9 D25-2′): 인용 인덱스 `⋯⋯ ㉠` → `\tag{n}` · 본문 `㉠` → `(n)`. convertJamoRefs **뒤**(행 끝 `⋯ (ㄱ)`이
+  //   `(1)`이 된 뒤 정의부로 되돌린다 — Q13) · 같은 게이트(choices·roman의 ㉠가 `① (1)`이 되지 않게)
+  if (!opts?.skipJamoRefs) {
+    const r = convertCircledLeaderTags(text, opts?.reservedTagNumbers);
+    text = r.fixed;
+    count += r.count;
+    if (r.conflict) tagConflict = true;
   }
 
   // Step 0a: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
@@ -932,7 +1094,7 @@ export function autoFixDeterministicIssues(
     }
   }
 
-  return { fixed, count };
+  return tagConflict ? { fixed, count, tagConflict } : { fixed, count };
 }
 
 /* ─── 블록 raw_text 정제: choices의 ① 라벨 등 제거 (필요 시) ─── */

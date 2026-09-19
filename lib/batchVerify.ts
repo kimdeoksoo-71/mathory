@@ -230,6 +230,7 @@ export async function runBatchVerify(args: {
           answer: fresh.answer || '',
           tabLoadErrors: fresh.tabLoadErrors,
           buildMarkdown,
+          batch: true,   // M9 D25-4′ — 풀이 인용 번호 지적은 서버가 거른다(설정처는 여기 하나)
         });
         addUsage(u);
         setOutcome(it.problemId, kind, { state: 'done', verdict: report.verdict });

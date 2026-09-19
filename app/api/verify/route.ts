@@ -38,6 +38,7 @@ import {
   parseAndRepair, sanitizeFindings, mergeCandidates, splitBySeverity, anchorByQuote, indexJudgments,
   normalizeTag, synthesizeVerdict, compareAnswer, repairLatexControlCharsInString,
   type RawFinding, type VerifyKind,
+  dropCitationFindings,
 } from '../../../lib/verify/parse';
 import { figureLabel, buildImageNote } from '../../../lib/verify/figures';
 import { fetchFigures, type FigureSet } from '../../../lib/figureFetch';
@@ -126,6 +127,8 @@ interface VerifyRequestBody {
    *  클라가 prompts를 import하면 프롬프트 전문이 클라이언트 번들에 실린다. */
   hasChoices?: boolean;
   hasGanaOrRoman?: boolean;
+  /** M9 D25-4′ — 일괄 검증에서만 true(단건 요청 바디에는 키 자체가 없다 — 바이트 불변). 풀이 인용 번호 지적을 거른다 */
+  batch?: boolean;
 }
 
 /* ═══ 환경변수 ═══ */
@@ -226,6 +229,7 @@ export async function POST(req: NextRequest) {
         answerCheck: body.answerCheck,
         carriedIn: 0, carriedOut: 0, carriedUsd: 0,
         startedAt,
+        batch: body.batch === true,
       });
     }
 
@@ -423,6 +427,8 @@ async function runJudge(a: {
   answerCheck?: 'match' | 'mismatch' | 'no_answer';
   carriedIn: number; carriedOut: number; carriedUsd: number;
   startedAt: number;
+  /** M9 D25-4′ — 일괄 검증 */
+  batch?: boolean;
 }) {
   const { kind, judge, env, problemBlocks, solutionBlocks, targetBlocks, candidates } = a;
   let inputTokens = a.carriedIn;
@@ -561,7 +567,15 @@ async function runJudge(a: {
       });
     }
 
+    /* M9 D25-4′·Q14 — 일괄 검증의 **풀이** 검증에서만 인용 번호 지적을 거른다(단건은 절대 거르지 않는다).
+       유일한 필터 자리 — OCR이 원문의 `⋯⋯ ㉠`를 살리게 되면 이 블록을 지운다. 군더더기 절(garbageOut)은 무접촉.
+       `findings`가 const라 새 배열(kept)을 verdict·리포트에 넘긴다 — verdict·개수·배지·정렬이 함께 맞는다. */
+    const { kept, dropped } = a.batch && kind === 'solution'
+      ? dropCitationFindings(findings)
+      : { kept: findings, dropped: 0 };
+
     const notes: string[] = [];
+    if (dropped) notes.push(`인용 번호 관련 지적 ${dropped}건은 일괄 검증에서 제외(M9)`);
     // Phase 61f — 누락 그림은 사람이 알아야 한다 (Y열 fig_info의 등가물)
     if (a.figs.missing.length) {
       notes.push(`첨부되지 않은 그림 ${a.figs.missing.length}장: ${a.figs.missing.map((m) => `[그림 ${m.k} — ${m.reason}]`).join(', ')}`);
@@ -569,7 +583,7 @@ async function runJudge(a: {
     if (garbageJudgeFailed) notes.push('군더더기 판정 실패 — 이번 리포트에 군더더기 절 없음');
 
     return NextResponse.json({
-      report: report(kind, synthesizeVerdict(findings), findings, {
+      report: report(kind, synthesizeVerdict(kept), kept, {
         models: { first: env.geminiModel, judge: env.claudeModel },
         derivedAnswer: a.derivedAnswer, answerCheck: a.answerCheck,
         garbage: garbageOut,

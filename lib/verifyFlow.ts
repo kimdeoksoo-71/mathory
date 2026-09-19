@@ -116,6 +116,8 @@ export async function runVerifyFlow(args: {
   tabLoadErrors?: Record<string, string>;
   /** 리포트 markdown 조립 (컴포넌트가 주입 — lib이 컴포넌트를 import하지 않도록) */
   buildMarkdown: (report: VerifyReport) => string;
+  /** M9 D25-4′ — 일괄 검증만 true(batchVerify.ts 한 곳). 단건 요청 바디에는 키가 없다 */
+  batch?: boolean;
 }): Promise<{ report: VerifyReport; usage: VerifyUsage; commentId: string }> {
   const question = args.blocksByTab['question'] || [];
   const solution = args.blocksByTab['solution'] || [];
@@ -147,6 +149,7 @@ export async function runVerifyFlow(args: {
     // 프롬프트 전문이 클라이언트 번들에 실린다. 재료만 넘긴다.
     hasChoices: question.some((b) => b.type === 'choices'),
     hasGanaOrRoman: question.some((b) => b.type === 'gana' || b.type === 'roman'),
+    ...(args.batch ? { batch: true } : {}),
     // Phase 61f D9 — `hasImages`(죽은 필드)와 `hasMedia`는 함께 삭제됐다. 그림은 이제
     // image 블록의 `imageUrl`로 실려 가 서버가 실물을 첨부한다.
   };

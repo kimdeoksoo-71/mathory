@@ -323,3 +323,50 @@ test('자동 수정은 alt에 대괄호가 든 이미지 링크를 건드리지 
     assert.equal(fix('$\\frac{\\frac{1}{2}}{3}$').fixed, '$\\dfrac{\\dfrac{1}{2}}{3}$');
   });
 }
+
+/* ═══ M9 D25-2′ — 규칙 ⑤ 인용 인덱스 ⋯⋯ ㉠ → \tag{n} ═══ */
+{
+  const { convertCircledLeaderTags: C, autoFixDeterministicIssues: fix } = await import('../.test-build/lib/proofread.js');
+  const eq = (src, out) => assert.equal(C(src).fixed, out, src);
+
+  test('M9 규칙⑤: 리더가 수식 밖·안·\\text{㉠} 어디에 있든 행 끝 \\tag{n}(인라인 \\tag 금지 — 수식 밖으로)', () => {
+    eq('$= \\frac{2}{(t+1)^2}$ ⋯⋯ ㉠', '$= \\frac{2}{(t+1)^2}$ \\tag{1}');
+    eq('$= \\frac{2}{(t+1)^2} \\cdots\\cdots$ ㉠', '$= \\frac{2}{(t+1)^2}$ \\tag{1}');
+    eq('$= \\frac{2}{(t+1)^2} \\cdots \\cdots ㉠$', '$= \\frac{2}{(t+1)^2}$ \\tag{1}');
+    eq('$= \\frac{2}{(t+1)^2} \\cdots \\cdots \\text { ㉠ }$', '$= \\frac{2}{(t+1)^2}$ \\tag{1}');
+    eq("⇒ $f'(t)=\\frac{1}{2}$ \\ldots\\ldots ㉡", "⇒ $f'(t)=\\frac{1}{2}$ \\tag{2}");
+    eq('$x=1$ ··· ㉠', '$x=1$ \\tag{1}');
+  });
+
+  test('M9 규칙⑤: display 끝은 닫는 $$ 직전 · 라벨 둘 이상인 display는 무변환(Multiple \\tag)', () => {
+    eq('$$\nx = 1 \\cdots\\cdots ㉠\n$$', '$$\nx = 1 \\tag{1}\n$$');
+    eq('$$x=1 ㉠ \\\\ y=2 ㉡$$', '$$x=1 ㉠ \\\\ y=2 ㉡$$');
+  });
+
+  test('M9 규칙⑤: 본문 중간 ㉠ → (n) · 여러 행 · Q13 행 끝 ⋯ (1)도 정의부', () => {
+    eq('㉠에서 $t=1$이다', '(1)에서 $t=1$이다');
+    eq('첫 줄 $a$ ⋯ ㉠\n㉠과 ㉡에 의하여\n$b$ ⋯⋯ ㉡', '첫 줄 $a$ \\tag{1}\n(1)과 (2)에 의하여\n$b$ \\tag{2}');
+    eq('$x=2$ \\cdots\\cdots (1)', '$x=2$ \\tag{1}');
+  });
+
+  test('M9 규칙⑤: 리더 없는 행 끝은 직전이 수식일 때만 · 산문 끝·재인용 (1)·코드는 무변환', () => {
+    eq('$x$ ㉠', '$x$ \\tag{1}');
+    eq('조건을 만족한다 ㉠', '조건을 만족한다 ㉠');
+    eq('$x=2$ (1)', '$x=2$ (1)');
+    eq('`㉠` 코드', '`㉠` 코드');
+  });
+
+  test('M9 규칙⑤ Q16: 기존 \\tag·reserved와 번호가 겹치면 전체 건너뜀(conflict) · 멱등', () => {
+    const r = C('$x = 1$ \\tag{1}\n$y$ ⋯ ㉠');
+    assert.equal(r.conflict, true); assert.equal(r.count, 0);
+    assert.equal(C('$y$ ⋯ ㉠', [1]).conflict, true);
+    const once = C('$a$ ⋯ ㉠\n㉠에서').fixed;
+    assert.equal(C(once).fixed, once);
+  });
+
+  test('M9 규칙⑤: autoFix 경유 — 보기 라벨 블록(skipJamoRefs)은 무접촉 · 충돌은 tagConflict로 보고', () => {
+    assert.equal(fix('$y=1$ ⋯⋯ ㉠').fixed, '$y=1$ \\tag{1}');
+    assert.equal(fix('① ㉠, ㉡', { skipJamoRefs: true }).fixed, '① ㉠, ㉡');
+    assert.equal(fix('$x$ \\tag{1}\n$y$ ⋯ ㉠').tagConflict, true);
+  });
+}
