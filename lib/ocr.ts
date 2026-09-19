@@ -7,6 +7,7 @@
  */
 
 import { autoFixDeterministicIssues } from './proofread';
+import { stripInvisibles } from './invisibles';
 
 export const OCR_MAX_BYTES = 5 * 1024 * 1024;
 export const OCR_MAX_DIM = 2000;
@@ -77,7 +78,8 @@ function fileToDataUrl(file: File): Promise<string> {
  * 3) `autoFixDeterministicIssues`로 ^/_ 한 글자 중괄호 래핑 + 인라인수식-조사 공백 제거
  */
 export function normalizeAndFix(raw: string): string {
-  let s = raw.trim();
+  // M9 D24-1′ — 비가시·단독 초성(U+1100 등) 정규화를 맨 먼저(이후 정규식이 깨끗한 글자를 보도록)
+  let s = stripInvisibles(raw).trim();
 
   s = s.replace(/\\\[/g, '$$').replace(/\\\]/g, '$$');
   s = s.replace(/\\\(/g, '$').replace(/\\\)/g, '$');

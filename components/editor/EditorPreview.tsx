@@ -148,15 +148,15 @@ function preprocessLocale(text: string): string {
   //    ⚠ (a)/(i) 레거시 변환은 없다 — Phase 60 후속에서 삭제했다.
   //    (lib/locale.ts convertGanaLiteral/convertGiyeokLiteral과 동일 — 정규식은 공유 상수)
   t = t.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-gana">(${ch})</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-gana">(${ch})</span>`);
   t = t.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-giyeok">${ch}.</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-giyeok">${ch}.</span>`);
 
   // 4-1. ①②③ … 행 시작: marker span(내어쓰기용)
   //      마커 뒤 공백은 [ \t]*로만 — \s*는 개행까지 삼켜서 내용 없는 원문자 줄들이 뭉친다
   //      (lib/locale.ts convertCircledList와 동일)
   t = t.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-circled">${ch}</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-circled">${ch}</span>`);
 
   // 5. Fig.N → [그림N]
   t = t.replace(/\bFig\.(\d+)/g, '[그림$1]');

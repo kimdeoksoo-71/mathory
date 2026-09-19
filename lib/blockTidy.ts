@@ -1,9 +1,10 @@
 /**
- * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`뿐(`npm run test:tidy`가 단독 컴파일).
+ * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`뿐(`npm run test:tidy`가 단독 컴파일).
  *
  * 취지: 시트 가져오기·OCR로 들어온 "한 덩어리" 텍스트를 Mathory의 블록 체계에 맞게 **분할**하고,
  * 가능한 경우 **타입**(경우·하위 경우·제목)을 부여하며, 편집 스타일의 **결정적 정형화**를 한 번에 태운다.
- * 교정(proofread)은 이제 API 내용 검토만 한다(D19-4) — `autoFixDeterministicIssues`의 소비처는 이 모듈 하나다.
+ * 교정(proofread)은 이제 API 내용 검토만 한다(D19-4). ⚠ `autoFixDeterministicIssues`의 소비처는 **둘**이다 —
+ * 이 모듈과 `lib/ocr.ts`(편집창·댓글 OCR 후처리). M7 때 "이 모듈 하나"라 적었던 것은 틀렸다(M9 §1-H7).
  *
  * 규칙 순서(순서가 규칙이다 — 분할 뒤에 정형화해야 새 블록도 받는다):
  *   R1 분할  (text 계열만 · choices·image·svg·ggb 무접촉)
@@ -24,6 +25,7 @@
 
 import { scanMathRegions } from './mathRegions';
 import { autoFixDeterministicIssues } from './proofread';
+import { stripInvisibles, isInvisibleTarget } from './invisibles';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
@@ -106,6 +108,9 @@ const trimBlock = (t: string) => t.replace(/^\s*\n/, '').replace(/\n\s*$/, '');
 export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyOut[]; stats: TidyStats } {
   const stats: TidyStats = { split: 0, fixed: 0, removed: 0 };
   const out: TidyOut[] = [];
+
+  // M9 D24-1′ — 비가시·단독 초성 정규화를 가장 먼저(분할·머리 정리 정규식이 깨끗한 글자를 보도록)
+  blocks = blocks.map((b) => (isInvisibleTarget(b.type) ? { ...b, raw_text: stripInvisibles(b.raw_text) } : b));
 
   // R1
   blocks.forEach((b, origin) => {

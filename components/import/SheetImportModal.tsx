@@ -35,6 +35,7 @@ import {
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
 import { tidyBlocks } from '../../lib/blockTidy';
+import { stripInvisibles, isInvisibleTarget } from '../../lib/invisibles';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { uploadImage, deleteUploadedFile } from '../../lib/storage';
 import { createProblem, saveTabBlock, deleteProblem, createFolder, listProblems, TRASH_FOLDER_ID } from '../../lib/firestore';
@@ -377,6 +378,10 @@ export default function SheetImportModal({
         const figNames: string[] = [];
         let autoFixCount = 0;
         for (const tabId of Object.keys(d.blocksByTab)) {
+          // M9 D24-1′ — 비가시·단독 초성 정규화. stemHash(rowToDraft 안)가 확정된 **뒤**라 중복 키 불변 ·
+          //   정돈 앞이라 convertJamoRefs·R1이 호환 자모를 본다. lib/sheetImport.ts(import 0)는 무접촉.
+          d.blocksByTab[tabId] = d.blocksByTab[tabId].map((b) =>
+            isInvisibleTarget(b.type) ? { ...b, raw_text: stripInvisibles(b.raw_text) } : b);
           if (tidy) {
             const r = tidyDrafts(d.blocksByTab[tabId], tabId);
             d.blocksByTab[tabId] = r.blocks;

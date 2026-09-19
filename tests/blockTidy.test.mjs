@@ -95,3 +95,8 @@ test('origin: 여러 입력 블록의 조각이 각자 입력 인덱스를 가�
   const r = tidyBlocks([{ type: 'text', raw_text: 'a\n(i) b인 경우' }, { type: 'text', raw_text: 'c' }], { tab: 'question', autoFix: false });
   assert.deepEqual(r.blocks.map((b) => b.origin), [0, 0, 1]);
 });
+
+test('M9 D24-1′: 정돈은 단독 초성 U+1100을 호환 자모로 먼저 정규화한다(roman 첫 행)', () => {
+  const r = tidyBlocks([{ type: 'roman', raw_text: '\u1100. $t=1$이면\n\u1102. 둘째' }], { tab: 'question' });
+  assert.equal(r.blocks[0].raw_text, 'ㄱ. $t=1$이면\nㄴ. 둘째');
+});

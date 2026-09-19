@@ -53,15 +53,19 @@ export const MARKER_LINE_RE = new RegExp(
  *  ⚠ \s*는 개행까지 삼켜 다음 줄을 빨아들인다 (Phase 57).
  *  ⚠ 범위 10개 — 매핑 테이블이 없으므로 상한을 둘 이유가 없다. 상한을 남기면 (바)를
  *    쓴 사용자가 "그 줄만 내어쓰기가 빠지는" 조용한 결함을 겪는다 (D9). */
-export const GANA_LITERAL_RE = /^\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
+/* M9 D24-2′ — 마커 리터럴 3종(GANA·GIYEOK·CIRCLED)은 행머리의 **비ASCII 공백**(NBSP·전각·en/em·한글 채움)을
+ * 소비하고 **ASCII 들여쓰기는 캡처해 보존**한다(그룹 1). 첫 행에 NBSP가 붙은 `ㄱ.`이 span을 못 받고 재인용으로
+ * 오분류되던 것(§1-G5)을 막는다. ASCII 들여쓰기까지 먹으면 `- 항목↵  ㄱ. 내용`이 목록 밖 문단이 된다(실측).
+ * ⚠ 그룹이 (들여쓰기, 마커)로 둘이다 — 소비처는 `(_, ind, ch) => ind + span`. 사본: EditorPreview · tests/chatExtract. */
+export const GANA_LITERAL_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
 
 /** 행 시작 ㄱ.~ㅊ. 리터럴 → marker span */
-export const GIYEOK_LITERAL_RE = /^([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
+export const GIYEOK_LITERAL_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
 
 /** 행 시작 ①~⑮ → marker span.
  *  뒤 공백은 [ \t]*로만 먹는다 — \s*를 쓰면 개행까지 삼켜서, 내용이 아직 없는
  *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
-export const CIRCLED_NUM_LINE_RE = /^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
+export const CIRCLED_NUM_LINE_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
 
 /** 수식 하나만 있는 행 (뒤에 `\tag{n}` 꼬리표는 허용).
  *
@@ -179,13 +183,13 @@ export function convertSubcaseMarkers(text: string): string {
  *  `^\(`에 걸리지 않는다(멱등). */
 function convertGanaLiteral(text: string): string {
   return text.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-gana">(${ch})</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-gana">(${ch})</span>`);
 }
 
 /** ㄱ.~ㅊ. 리터럴 → 행 시작 marker span (Phase 60 P1) */
 function convertGiyeokLiteral(text: string): string {
   return text.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-giyeok">${ch}.</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-giyeok">${ch}.</span>`);
 }
 
 /** ①②③ … 행 시작 → marker span (수식 표시와 같은 들여쓰기)
@@ -193,7 +197,7 @@ function convertGiyeokLiteral(text: string): string {
  *  원문자 줄들(`① `↵`② `)이 한 문단으로 뭉친다('목록' 블록 프리셋, Phase 57). */
 function convertCircledList(text: string): string {
   return text.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'),
-    (_, ch) => `<span class="marker-circled">${ch}</span>`);
+    (_, ind, ch) => `${ind}<span class="marker-circled">${ch}</span>`);
 }
 
 /* ═══ 개선묶음 M2 C — 참조 인용(hover 말풍선)용 마크업 ═══

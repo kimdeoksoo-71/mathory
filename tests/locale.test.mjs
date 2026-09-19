@@ -284,3 +284,22 @@ test('M2-C10 \\ref{n}이 만든 (n)을 다시 감싸지 않는다 (멱등)', () 
   assert.equal(preprocessLocale(once, 'ko'), once);
   assert.equal(once.match(/ref-marker[^>]*><span class="ref-marker"/g), null);
 });
+
+/* ═══ M9 D24-2′ — 마커 행머리 비ASCII 공백 관용 · ASCII 들여쓰기 보존 ═══ */
+
+test('M9 D24-2′: NBSP·전각·한글 채움이 붙은 첫 행 ㄱ.도 marker span을 받고 재인용으로 오분류되지 않는다', () => {
+  for (const lead of ['\u00A0', '\u3000', '\u3164', '\u2003']) {
+    const out = P(`${lead}ㄱ. 첫째\nㄴ. 둘째`);
+    assert.ok(out.startsWith(giyeok('ㄱ')), JSON.stringify(out));
+    assert.ok(!out.includes('ref-marker'), JSON.stringify(out));
+  }
+  assert.ok(P('\u00A0(가) a').startsWith(gana('가')));
+  assert.ok(P('\u00A0① a').startsWith('<span class="marker-circled">①</span>'));
+});
+
+test('M9 D24-2′: ASCII 들여쓰기는 보존된다(목록 연속 문단이 목록 밖으로 나가지 않는다)', () => {
+  const out = P('- 항목\n  ㄱ. 내용');
+  assert.ok(out.includes(`  ${giyeok('ㄱ')}내용`), JSON.stringify(out));
+  // 들여쓰기 없는 기존 입력은 바이트 동일
+  assert.equal(P('ㄱ. 내용'), `${giyeok('ㄱ')}내용`);
+});

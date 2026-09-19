@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid';
 import type { Block, SvgInitialView, GgbInitialCoords } from '../../types/problem';
 import { normalizeDisplayMathSpacing } from '../preprocess';
+import { stripInvisibles, isInvisibleTarget } from '../invisibles';
 
 /**
  * Phase 55 — 블록의 "저장될 형태(persisted form)".
@@ -28,7 +29,9 @@ export interface PersistedBlockData {
 
 export function toPersistedBlock(b: Block, index: number): PersistedBlockData {
   // $$ ... $$ 독립수식 앞·뒤 빈 줄 정규화 → 위아래 빈 줄 제거 (handleSave와 동일)
-  const trimmed = normalizeDisplayMathSpacing(b.raw_text)
+  // M9 D24-1′ — 비가시·단독 초성 정규화(안전망 — 로드·붙여넣기·정돈·OCR이 먼저 거친다). 텍스트 계열만
+  const text = isInvisibleTarget(b.type) ? stripInvisibles(b.raw_text) : b.raw_text;
+  const trimmed = normalizeDisplayMathSpacing(text)
     .replace(/^\s*\n/, '')
     .replace(/\n\s*$/, '');
   const out: PersistedBlockData = {

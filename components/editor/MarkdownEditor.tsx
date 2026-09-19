@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
-import { keymap, tooltips } from '@codemirror/view';
+import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
+import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
 import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
@@ -884,6 +885,12 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           metaListener,
           tabHandler,
           basicSetup,
+          /* M9 D24-3′ — 정규화 대상 글자(폭 0·한글 채움·단독 초성·전각 마침표)를 점으로 보인다. basicSetup의
+             highlightSpecialChars와 설정이 합쳐지고 플러그인은 싱글턴이라 두 번 등록해도 무해(@codemirror/view 6.39).
+             ⚠ 초성은 **단독**만 — 범위 전체면 붙여넣은 NFD 한글의 초성이 전부 점이 된다. */
+          highlightSpecialChars({ addSpecialChars: INVISIBLE_SPECIAL_CHARS }),
+          /* M9 D24-1′·Q12 — 붙여넣은 텍스트만 정규화(IME 조합·타자에는 닿지 않는다) */
+          EditorView.clipboardInputFilter.of((text) => stripInvisibles(text)),
           /* 툴팁을 에디터 밖 전용 호스트로(M7 D25′) — 끔 모드에서 .cm-editor 에 transform 이 걸리므로
              (fixed 거터의 containing block) 에디터 안의 fixed 툴팁은 좌표를 잃는다. 컨테이너는
              view.themeClasses 를 그대로 받아 아래 .cm-tooltip 테마가 계속 적용된다.

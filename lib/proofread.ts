@@ -66,6 +66,7 @@ export function maskForProofread(text: string): { masked: string; placeholders: 
     const atLineStart = i === 0 || text[i - 1] === '\n';
     if (atLineStart) {
       // 마커: 한국 리터럴 (가)~(차)·ㄱ.~ㅊ. + 레거시 (a)~(z)·(i)~(v) (Phase 60 P3)
+      // M9 D24-2′ — 행머리 공백(비ASCII 포함)도 마스크에 함께 넣는다(렌더 정규식이 그것을 관용하게 된 것과 짝).
       // ⚠ 레거시는 이제 (가)/ㄱ.로 변환되지 않지만(Phase 60 후속) 마스킹은 **유지**한다.
       //   마스킹은 변환이 아니라 "AI가 건드리지 못하게 막는" 보호 장치라, 옛 문항에
       //   남아 있는 (a) 표기가 교정 대상이 되어 임의로 바뀌는 것을 막아야 한다.
@@ -74,7 +75,7 @@ export function maskForProofread(text: string): { masked: string; placeholders: 
       //   `⟦M0⟧⟦M1⟧⟦M2⟧` 한 줄로 전달된다. 항목이 몇 개인지 알 수 없는 형태라
       //   교정 품질이 떨어진다(복원은 정상이므로 원문 손상은 없다). 실측 확인.
       const markerMatch = text.slice(i).match(
-        /^(?:\(([a-z]+|[ivx]+)\)|\((?:가|나|다|라|마|바|사|아|자|차)\)|[ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ]\.)[ \t]*/
+        /^[^\S\n\r]*(?:\(([a-z]+|[ivx]+)\)|\((?:가|나|다|라|마|바|사|아|자|차)\)|[ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ]\.)[ \t]*/
       );
       if (markerMatch) {
         out += push(markerMatch[0]);

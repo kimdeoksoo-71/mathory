@@ -30,6 +30,7 @@ import { maskForProofread, ProofreadIssue } from '../../lib/proofread';
 import { tidyBlocks } from '../../lib/blockTidy';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
+import { stripInvisibles, isInvisibleTarget } from '../../lib/invisibles';
 import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib/blockClipboard';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
@@ -1341,7 +1342,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         setOrigTabs(loadedTabs);
 
         const toLocal = (blocks: Block[]): LocalBlock[] =>
-          blocks.map((b) => ({ ...b, block_key: b.block_key || nanoid(), type: normalizeBlockType(b.type), collapsed: false, title: b.title || '' }));
+          blocks.map((b) => {
+            const type = normalizeBlockType(b.type);
+            // M9 D24-1′·Q12 — 로드 시 정규화. 저장은 로컬을 서버본으로 교체하지 않으므로(M7 D11) 저장 시점에만
+            //   정규화하면 같은 세션의 미리보기가 계속 깨져 보인다. 비dirty — 다음 편집 저장이 서버본을 고친다.
+            const raw_text = isInvisibleTarget(type) ? stripInvisibles(b.raw_text) : b.raw_text;
+            return { ...b, raw_text, block_key: b.block_key || nanoid(), type, collapsed: false, title: b.title || '' };
+          });
 
         const blocksMap: Record<string, LocalBlock[]> = {};
         const origIds: Record<string, string[]> = {};

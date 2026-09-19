@@ -35,9 +35,9 @@ import {
    ⚠️ 원본과 반드시 일치시킬 것. 갈라지면 이 테스트가 거짓 안심을 준다.
    ═══════════════════════════════════════════════════════ */
 const MARKER_LINE_RE = new RegExp('^(?:\\((?:[a-e]|[가-차]|i{1,3}|iv|v)\\)|[ㄱ-ㅊ]\\.)[ \\t]*');
-const GANA_LITERAL_RE = /^\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
-const GIYEOK_LITERAL_RE = /^([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
-const CIRCLED_NUM_LINE_RE = /^([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
+const GANA_LITERAL_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*\((가|나|다|라|마|바|사|아|자|차)\)[ \t]*/;
+const GIYEOK_LITERAL_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*([ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊ])\.[ \t]*/;
+const CIRCLED_NUM_LINE_RE = /^([ \t]*)[\u00A0\u3000\u2000-\u200A\u202F\u3164]*([①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮])[ \t]*/;
 
 function preventSetextHeadings(text) {
   const lines = text.split('\n');
@@ -91,9 +91,9 @@ function preprocessLocale(text) {
   }
   t = t.replace(/^(-\s+)\*\*(Case\s+\d+[a-z])\.\*\*/gm,
     (_, bullet, label) => `${bullet}<span class="marker-case-sub">**${label}.**</span>`);
-  t = t.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'), (_, ch) => `<span class="marker-gana">(${ch})</span>`);
-  t = t.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'), (_, ch) => `<span class="marker-giyeok">${ch}.</span>`);
-  t = t.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'), (_, ch) => `<span class="marker-circled">${ch}</span>`);
+  t = t.replace(new RegExp(GANA_LITERAL_RE.source, 'gm'), (_, ind, ch) => `${ind}<span class="marker-gana">(${ch})</span>`);
+  t = t.replace(new RegExp(GIYEOK_LITERAL_RE.source, 'gm'), (_, ind, ch) => `${ind}<span class="marker-giyeok">${ch}.</span>`);
+  t = t.replace(new RegExp(CIRCLED_NUM_LINE_RE.source, 'gm'), (_, ind, ch) => `${ind}<span class="marker-circled">${ch}</span>`);
   t = t.replace(/\bFig\.(\d+)/g, '[그림$1]');
   t = t.replace(/\bTable\s+(\d+)/g, '[표$1]');
   t = t.replace(/\\ref\{(\d+)\}/g, (_, num) => `(${num})`);
