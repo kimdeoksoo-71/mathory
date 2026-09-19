@@ -55,9 +55,9 @@ test('무시 창 안의 역방향(클램프 이벤트) — show 되지 않는다
   assert.equal(r.state.acc, 0);
 });
 
-test('무시 창이 지나면 위로 24px에 show(reveal-on-up)', () => {
-  const { s } = run([at(300), at(324, 1000)], from(300));              // hidden
-  const { s: s2, actions } = run([at(600, 1400, { clientHeight: 393 }), at(576, 1450, { clientHeight: 393 })], s);
+test('무시 창이 지나면 위로 24px에 show(reveal-on-up — 모드 명시, 기본은 M9부터 reveal-at-top)', () => {
+  const { s } = run([at(300), at(324, 1000)], from(300), 'reveal-on-up');              // hidden
+  const { s: s2, actions } = run([at(600, 1400, { clientHeight: 393 }), at(576, 1450, { clientHeight: 393 })], s, 'reveal-on-up');
   assert.deepEqual(actions, ['show']);
   assert.equal(s2.hidden, false);
 });
@@ -106,4 +106,19 @@ test('상수·리셋', () => {
   assert.equal(HYSTERESIS_PX, 24);
   assert.ok(IGNORE_MS > 200, '무시 창은 크롬 transition(200ms)보다 길어야 한다');
   assert.deepEqual(resetChromeState(), INITIAL_CHROME_STATE);
+});
+
+test('M9 D19′: 기본 모드는 reveal-at-top — 모드 인자 없이 위로 밀어도 show 되지 않는다', () => {
+  const { s } = run([at(300), at(324, 1000)], from(300));              // hidden
+  const { s: s2, actions } = run([at(600, 1400, { clientHeight: 393 }), at(500, 1450, { clientHeight: 393 })], s);
+  assert.deepEqual(actions, []);
+  assert.equal(s2.hidden, true);
+});
+
+test('M9 D20: hide 직후 무시 창 안이라도 맨 위(y=0)면 show', () => {
+  const { s } = run([at(300), at(324, 1000)], from(300));              // hidden, ignoreUntil = 1000 + 300
+  assert.equal(s.hidden, true);
+  const r = nextChromeState(s, at(0, 1100, { clientHeight: 393 }));   // 100ms 뒤 맨 위
+  assert.equal(r.action, 'show');
+  assert.equal(r.state.hidden, false);
 });

@@ -5,7 +5,7 @@ import type React from 'react';
 import Wordmark from '../ui/Wordmark';
 import { IconChevronLeft } from '../ui/Icons';
 import {
-  ChromeState, INITIAL_CHROME_STATE, nextChromeState, markProgrammaticScroll, resetChromeState,
+  ChromeState, INITIAL_CHROME_STATE, nextChromeState, markProgrammaticScroll, resetChromeState, type RevealMode,
 } from '../../lib/chromeAutoHide';
 
 /* ═══════════════════════════════════════════════════════════════
@@ -56,9 +56,11 @@ const PhoneShell = forwardRef<PhoneShellHandle, {
   overlay?: React.ReactNode;
   /** M8 D5 — 가로 보기에서 스크롤에 따라 상단 바·탭 행을 접는다(리더만 true) */
   chromeAutoHide?: boolean;
+  /** M9 D19′ — 크롬 복귀 조건. 기본값은 리더 기본(`reveal-at-top`)을 그대로 따른다 — 여기서 기본값을 두지 말 것(두 곳에 갈린다) */
+  chromeReveal?: RevealMode;
   children: React.ReactNode;
 }>(function PhoneShell({
-  title, left = 'wordmark', onBack, right, tabs, footer, overlay, chromeAutoHide = false, children,
+  title, left = 'wordmark', onBack, right, tabs, footer, overlay, chromeAutoHide = false, chromeReveal, children,
 }, ref) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const chromeRef = useRef<HTMLDivElement>(null);
@@ -113,7 +115,7 @@ const PhoneShell = forwardRef<PhoneShellHandle, {
     const r = nextChromeState(stateRef.current, {
       y: el.scrollTop, scrollHeight: el.scrollHeight, clientHeight: el.clientHeight,
       chromeH, now: Date.now(),
-    });
+    }, chromeReveal);
     stateRef.current = r.state;
     if (r.action) setHidden(r.action === 'hide');
   };

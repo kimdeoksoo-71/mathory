@@ -129,6 +129,7 @@ export default function PhoneReader({
     <PhoneShell
       ref={shellRef}
       chromeAutoHide   /* M8 D5 — 가로 보기에서 상단 바·탭 행 자동 숨김(리더만) */
+      chromeReveal="reveal-at-top"   /* M9 D19′ — 맨 위에 닿을 때만 복귀(M8 Q1 번복) */
       left={onBack ? 'back' : 'wordmark'}
       onBack={onBack}
       title={title}

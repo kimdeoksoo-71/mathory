@@ -23,7 +23,8 @@ export const IGNORE_MS = 300;
 /** 크롬을 접었을 때 남는 스크롤 여지가 이보다 작으면 접지 않는다 */
 export const MIN_EXTRA_PX = 40;
 
-/** 'reveal-on-up' = 위로 HYSTERESIS 이상 밀면 즉시 복귀(Q1 권장) / 'reveal-at-top' = 맨 위에서만 */
+/** 'reveal-at-top' = 맨 위에서만 복귀(**기본값** — M9 D19′, M8 Q1 번복 2026-09-19: 위로 밀자마자 뜨면 읽기가 끊긴다)
+ *  / 'reveal-on-up' = 위로 HYSTERESIS 이상 밀면 즉시 복귀(M8 Q1 (a) — 테스트·대안용으로 남긴다) */
 export type RevealMode = 'reveal-on-up' | 'reveal-at-top';
 
 export interface ChromeState {
@@ -51,21 +52,24 @@ export const INITIAL_CHROME_STATE: ChromeState = { hidden: false, lastY: 0, acc:
 export function nextChromeState(
   s: ChromeState,
   { y, scrollHeight, clientHeight, chromeH, now }: ScrollSample,
-  mode: RevealMode = 'reveal-on-up',
+  mode: RevealMode = 'reveal-at-top',
 ): { state: ChromeState; action: ChromeAction } {
   const max = scrollHeight - clientHeight;
 
   // ① 러버밴드 — 상태 무변경(lastY도 그대로: 복귀 샘플의 dy가 0에 가깝다)
   if (y < 0 || y > max) return { state: s, action: null };
 
-  // ② 무시 창 — 위치만 따라가고 누적은 버린다
-  if (now < s.ignoreUntil) return { state: { ...s, lastY: y, acc: 0 }, action: null };
-
-  // 맨 위 — 항상 표시
+  // 맨 위 — 항상 표시. ⚠ M9 D20: 무시 창(②)보다 **앞**이어야 한다. 뒤에 두면 hide 직후 300ms 안에 맨 위에 닿은
+  //   샘플이 삼켜지고, 그 뒤 scroll 이벤트가 더 없으면(안드로이드는 맨 위에서 당겨도 이벤트가 없다) 크롬이 다시
+  //   스크롤할 때까지 숨는다 — reveal-at-top에서는 맨 위가 유일한 복귀 경로다. 진동 없음: show는 hidden일 때만이고
+  //   hide는 y > chromeH에서만 일어나 y=0을 만들 수 없다.
   if (y <= 0) {
     if (s.hidden) return { state: { hidden: false, lastY: 0, acc: 0, ignoreUntil: now + IGNORE_MS }, action: 'show' };
     return { state: { ...s, lastY: 0, acc: 0 }, action: null };
   }
+
+  // ② 무시 창 — 위치만 따라가고 누적은 버린다
+  if (now < s.ignoreUntil) return { state: { ...s, lastY: y, acc: 0 }, action: null };
 
   const dy = y - s.lastY;
   // ③ 방향이 바뀌면 누적 리셋
