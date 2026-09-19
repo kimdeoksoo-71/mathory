@@ -370,3 +370,14 @@ test('자동 수정은 alt에 대괄호가 든 이미지 링크를 건드리지 
     assert.equal(fix('$x$ \\tag{1}\n$y$ ⋯ ㉠').tagConflict, true);
   });
 }
+
+/* ═══ M9 H 후속 — 정돈(autoFix)도 깨진 식 번호 라벨을 고친다 ═══ */
+{
+  const { autoFixDeterministicIssues: fix, normalizeTagLabels: T } = await import('../.test-build/lib/proofread.js');
+  test('M9 H 후속: 이미 문항에 들어간 \\tag{$\\cdots … ($ ㄱ}도 정돈 한 번으로 \\tag{1} · 멱등', () => {
+    const src = '$$\nx = 1 \\tag{$\\cdots \\cdots \\cdot($ ㄱ}\n$$';
+    assert.equal(fix(src).fixed, '$$\nx = 1 \\tag{1}\n$$');
+    assert.equal(T('\\tag{1}').count, 0);
+    assert.equal(T('`\\tag{ㄱ}`').count, 0);   // 코드 안 무접촉
+  });
+}

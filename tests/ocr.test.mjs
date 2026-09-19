@@ -23,3 +23,28 @@ test('M4: normalizeAndFix 전체 경로 — 프로브 원문(ocr-page) 모양', 
   assert.ok(!/equation\*|align\*|tag\{ㄱ\}|tag\{ㄴ\}/.test(out), out);
   assert.ok(out.includes('\\begin{aligned}'), out);
 });
+
+test('M9 H 후속: 리더 잔재가 태그 안에 섞인 형태도 \\tag{n}(덕수 실측 2026-09-19)', () => {
+  const src = '& \\Rightarrow \\frac{d t}{d s}=\\frac{2 s^{2}+4 s-2}{\\left(s^{2}+1\\right)^{2}}-\\frac{2 s}{s^{2}+1} \\tag{$\\cdots \\cdots \\cdots \\cdots \\cdots \\cdot($ ㄱ}';
+  assert.equal(N(src), '& \\Rightarrow \\frac{d t}{d s}=\\frac{2 s^{2}+4 s-2}{\\left(s^{2}+1\\right)^{2}}-\\frac{2 s}{s^{2}+1} \\tag{1}');
+  for (const [inp, out] of [
+    ['\\tag{\\cdots \\cdots (ㄴ)}', '\\tag{2}'],
+    ['\\tag{ ( ㄷ ) }', '\\tag{3}'],
+    ['\\tag{ㄱ)}', '\\tag{1}'],
+    ['\\tag{\\text{(ㄹ)}}', '\\tag{4}'],
+    ['\\tag{……… ㉡}', '\\tag{2}'],
+    ['\\tag{$\\cdots$ (3)}', '\\tag{3}'],
+    ['\\tag*{(ㄱ)}', '\\tag*{1}'],
+  ]) assert.equal(N(inp), out, inp);
+});
+
+test('M9 H 후속: 판단할 수 없는 태그는 무접촉(절 번호·문자·두 글자·숫자 정본)', () => {
+  for (const s of ['\\tag{1}', '\\tag{1.2}', '\\tag{A}', '\\tag{ㄱㄴ}', '\\tag{12}']) assert.equal(N(s), s, s);
+});
+
+test('M9 H 후속: normalizeAndFix 전체 경로에서도 — 태그 안 $가 수식 판정을 흔들지 않는다', () => {
+  const raw = '$$\\begin{align*}\n& f=1 \\\\\n& g=2 \\tag{$\\cdots \\cdots \\cdot($ ㄱ}\n\\end{align*}$$';
+  const out = normalizeAndFix(raw);
+  assert.ok(out.includes('g=2 \\tag{1}'), out);
+  assert.ok(!out.includes('cdots'), out);
+});

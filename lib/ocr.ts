@@ -6,7 +6,7 @@
  * - `autoFixDeterministicIssues`로 중괄호·조사 공백 자동 교정
  */
 
-import { autoFixDeterministicIssues } from './proofread';
+import { autoFixDeterministicIssues, normalizeTagLabels } from './proofread';
 import { stripInvisibles } from './invisibles';
 
 export const OCR_MAX_BYTES = 5 * 1024 * 1024;
@@ -83,14 +83,9 @@ function fileToDataUrl(file: File): Promise<string> {
    그 번호가 수식 안 `\tag{ㄱ}`로 실려 온다 — 대신 display가 `equation*`·`align*`로 감싸져 온다(idiomatic_eqn_arrays 동반).
    여기서 앱 정본으로 되돌린다: `\tag{ㄱ}`·`\tag{(ㄱ)}`·`\tag{㉠}` → `\tag{1}`(㉠=1 고정 매핑 — proofread 규칙 ⑤와 같다) ·
    `equation*` 한 겹 벗기기 · `align*`→`aligned`(정돈 분할·⌘⇧L이 아는 환경). KaTeX는 네 형태 모두 그린다(실측). */
-const TAG_JAMO = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ';
-const TAG_CIRCLED = '㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭';
 export function normalizeMathpixEquationTags(s: string): string {
-  return s
-    .replace(/\\tag\{\s*\(?\s*([ㄱ-ㅎ㉠-㉭])\s*\)?\s*\}/g, (m, ch: string) => {
-      const i = TAG_JAMO.indexOf(ch) + 1 || TAG_CIRCLED.indexOf(ch) + 1;
-      return i ? `\\tag{${i}}` : m;
-    })
+  // 태그 라벨은 proofread `normalizeTagLabels`가 소유한다(리더 잔재가 태그 안에 섞인 형태까지 — 덕수 실측 2026-09-19)
+  return normalizeTagLabels(s).fixed
     .replace(/\\begin\{equation\*?\}[ \t]*\n?([\s\S]*?)\n?[ \t]*\\end\{equation\*?\}/g, '$1')
     .replace(/\\begin\{align\*?\}/g, '\\begin{aligned}')
     .replace(/\\end\{align\*?\}/g, '\\end{aligned}');

@@ -533,6 +533,49 @@ function collectCodeRanges(text: string): Array<[number, number]> {
   return out;
 }
 
+/* ─── M9 H 후속: 식 번호 라벨 정규화 `\tag{…ㄱ}` → `\tag{1}` ─── */
+/**
+ * Mathpix(`include_equation_tags`)는 행 끝 `⋯⋯ ㉠`를 대개 `\tag{ㄱ}`로 주지만, 일부는 리더 잔재가 태그 **안**에 섞여 온다
+ * — 실측(덕수 2026-09-19): `\tag{$\cdots \cdots \cdots \cdots \cdots \cdot($ ㄱ}`. 내용에서 `$`·리더(`\cdots`·`\cdot`·
+ * `\ldots`·`\dots`·`⋯`·`…`·`·`·`.`)·괄호·`\text{}` 껍질·공백을 걷어낸 뒤 **남는 것이 자모 하나·원문자 하나**면 `\tag{n}`
+ * (㉠=ㄱ=1 고정 매핑 — 규칙 ⑤와 같다), **숫자**면 잔재만 걷은 `\tag{숫자}`. 그 밖(`\tag{1.2}`·`\tag{A}` 등)은 무접촉.
+ * 인자는 균형 스캔(`readGroup`). 코드 안은 무접촉. 멱등. 호출처: OCR 후처리(`lib/ocr.ts`) · 결정적 세트 맨 앞(정돈 —
+ * 이미 문항에 들어간 깨진 태그도 정돈 한 번으로 고쳐진다).
+ */
+const TAG_LABEL_JAMO = 'ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ';
+const TAG_LABEL_CIRCLED = '㉠㉡㉢㉣㉤㉥㉦㉧㉨㉩㉪㉫㉬㉭';
+export function normalizeTagLabels(text: string): { fixed: string; count: number } {
+  if (!text.includes('\\tag')) return { fixed: text, count: 0 };
+  const code = collectCodeRanges(text);
+  const re = /\\tag(\*?)\s*\{/g;
+  const edits: Array<{ from: number; to: number; insert: string }> = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (code.some(([s, e]) => m!.index >= s && m!.index < e)) continue;
+    const open = m.index + m[0].length - 1;
+    const close = readGroup(text, open);
+    if (close === -1) continue;
+    const content = text.slice(open + 1, close);
+    re.lastIndex = close + 1;
+    if (/\d\.\d/.test(content)) continue;   // 1.2 같은 절 번호는 무접촉
+    const core = content
+      .replace(/\\text\s*\{([^{}]*)\}/g, '$1')
+      .replace(/\\(?:cdots|ldots|dots|cdot|qquad|quad|[,;: ])/g, ' ')
+      .replace(/[$⋯…·.()（）[\]~\s]/g, '');
+    let label: string | null = null;
+    const j = TAG_LABEL_JAMO.indexOf(core);
+    const c = TAG_LABEL_CIRCLED.indexOf(core);
+    if (core.length === 1 && j !== -1) label = String(j + 1);
+    else if (core.length === 1 && c !== -1) label = String(c + 1);
+    else if (/^\d{1,3}$/.test(core)) label = core;
+    if (label === null || label === content) continue;
+    edits.push({ from: m.index, to: close + 1, insert: `\\tag${m[1]}{${label}}` });
+  }
+  let fixed = text;
+  for (let k = edits.length - 1; k >= 0; k--) fixed = fixed.slice(0, edits[k].from) + edits[k].insert + fixed.slice(edits[k].to);
+  return { fixed, count: edits.length };
+}
+
 /* ─── M9 D29: `\section*{…}` 벗기기 ─── */
 /**
  * Mathpix가 제목 행을 `\section*{GUIDE}`·`\subsection*{STEP1}`로 내는 경우 명령을 벗기고 **내용만** 남긴다.
@@ -961,6 +1004,13 @@ export function autoFixDeterministicIssues(
   let count = 0;
   let tagConflict = false;
 
+  // Step 000 (M9 H 후속): 식 번호 라벨 정규화 — `\tag{$\cdots … ($ ㄱ}` 같은 OCR 잔재 → `\tag{1}`. 맨 앞(뒤 단계의
+  //   수식 영역 판정이 태그 안의 `$`에 흔들리지 않게)
+  {
+    const r = normalizeTagLabels(text);
+    text = r.fixed;
+    count += r.count;
+  }
   // Step 00 (M9 D29): `\section*{…}` 계열 벗기기 — 맨 앞(OCR 경로에서도 제목 표지가 남지 않도록). 멱등
   {
     const r = unwrapSectionCommands(text);
