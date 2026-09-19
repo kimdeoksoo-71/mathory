@@ -13,7 +13,11 @@ import {
   buildThreads, isCommentStream,
 } from '../../lib/comments';
 import { getUserProfile } from '../../lib/users';
-import { getEnabledModels } from '../../lib/ai-models';
+import { getEnabledModels, peekEnabledModels } from '../../lib/ai-models';
+import {
+  usePanel, updatePanel, readPassive, writePassive, panelKey,
+  type PendingAI, type DiscussRequestContext,
+} from '../../lib/panelStore';
 import {
   listSessions, createNormalSession, renameSession, deleteSession, ensureCommentSession,
 } from '../../lib/discussion-sessions';
@@ -127,39 +131,7 @@ interface DisplayInfo {
   modelDisplayName?: string;
 }
 
-interface PendingAI {
-  modelId: string;
-  nickname: string;
-  emoji: string;
-  provider?: string;
-  /** 이 호출이 시작된 세션 ID — 다른 세션으로 전환해도 알림은 원래 세션에서만 보여야 함 */
-  sessionId: string;
-  error?: string;
-  /** 재시도 시 사용할 원본 호출 컨텍스트 */
-  retryContext?: DiscussRequestContext;
-  /** Phase 61b: 'verify'면 aiModels에 없는 합성 항목이다 — 재시도 경로가 다르다 */
-  kind?: 'discuss' | 'verify';
-  /** Phase 61b: 검증 재시도용 */
-  verifyKind?: VerifyKind;
-  /** Phase 61b: 여러 모델이 함께 도는 작업의 아이콘들(검증 = 1차 Gemini → 2차 Claude) */
-  providers?: string[];
-}
-
-interface DiscussRequestContext {
-  problemContent: string;
-  currentTabContent?: string;
-  currentTabLabel?: string;
-  discussionHistory: Array<{ role: 'human' | 'ai'; nickname: string; content: string }>;
-  participantNicknames: string[];
-  currentMessage: string;
-  /** Phase 61f — 필드별 자리표시자(⟦그림⟧)와 정렬된 그림 URL (서버 DiscussImages와 동일 계약) */
-  images?: {
-    problem: (string | null)[];
-    tab: (string | null)[];
-    history: (string | null)[][];
-    message: (string | null)[];
-  };
-}
+/* M9 D8′ — PendingAI·DiscussRequestContext는 lib/panelStore.ts로 이관(스토어가 소유) */
 
 export default function CommentPanel({
   problemId, ownerUid, tabs, activeTabId, currentUid, canComment,
@@ -176,8 +148,15 @@ export default function CommentPanel({
   const isOwner = currentUid === ownerUid;
   const isCommentsMode = mode === 'comments';
 
+  // ─── M9 D8′ — 패널 스토어(뷰 전환에도 산다). 키 = uid:problemId ───
+  const pKey = panelKey(currentUid, problemId);
+  const panel = usePanel(pKey);
+  const draftMode: 'comments' | 'agent' = isCommentsMode ? 'comments' : 'agent';
+  // 재마운트 첫 렌더의 캐시(stale-while-revalidate — 구독·재조회는 종전대로 돈다, D11′)
+  const [cached] = useState(() => readPassive(pKey).cache);
+
   // ─── 데이터 ───
-  const [comments, setComments] = useState<ProblemComment[]>([]);
+  const [comments, setComments] = useState<ProblemComment[]>(() => cached?.comments ?? []);
 
   /* Phase 61c: 댓글 id → **렌더에 쓰인 마크다운 소스**.
      검증 리포트는 `CommentItem`이 펜스를 뺀 `verify.body`를 EditorPreview에 넘기므로
@@ -188,20 +167,32 @@ export default function CommentPanel({
     const v = extractVerifyReport(c.content);
     return v ? v.body : c.content;
   }, [comments]);
-  const [loading, setLoading] = useState(true);
-  const [profiles, setProfiles] = useState<Record<string, UserProfile>>({});
-  const [sessions, setSessions] = useState<DiscussionSession[]>([]);
-  const [aiModels, setAiModels] = useState<AIModelConfig[]>([]);
-  const [myProfile, setMyProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(() => !cached);
+  const [profiles, setProfiles] = useState<Record<string, UserProfile>>(() => cached?.profiles ?? {});
+  const [sessions, setSessions] = useState<DiscussionSession[]>(() => cached?.sessions ?? []);
+  const [aiModels, setAiModels] = useState<AIModelConfig[]>(() => peekEnabledModels());   // M9 D11′ — 이름 '?' 깜빡임 방지
+  const [myProfile, setMyProfile] = useState<UserProfile | null>(() => cached?.myProfile ?? null);
+  // M9 D11′ — 캐시 갱신(알림 없음). 다음 재마운트의 초기값이 된다
+  useEffect(() => {
+    if (loading) return;
+    writePassive(pKey, { cache: { comments, sessions, profiles, myProfile } });
+  }, [pKey, loading, comments, sessions, profiles, myProfile]);
 
   // ─── UI 상태 ───
   // Phase 44: 메인 작성 입력창 세로 높이 드래그 리사이즈 (상단 경계선 = 핸들)
-  const [inputHeight, setInputHeight] = useState(120);
+  // M9 D8′ — 스토어 상태(함수형 갱신: 병렬 모델·언마운트 뒤 도착한 응답도 유실 없이 반영)
+  const inputHeight = panel.inputHeight;
+  const setInputHeight = useCallback((h: number) => updatePanel(pKey, () => ({ inputHeight: h })), [pKey]);
   const [inputResizeHover, setInputResizeHover] = useState(false);
   const [inputResizeDragging, setInputResizeDragging] = useState(false);
-  const [activeSessionId, setActiveSessionId] = useState<string>('');
-  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]); // AI 칩 토글
-  const [pendingAI, setPendingAI] = useState<PendingAI[]>([]); // 응답 대기 중
+  const activeSessionId = panel.sessionId;
+  const setActiveSessionId = useCallback((id: string) => updatePanel(pKey, () => ({ sessionId: id })), [pKey]);
+  const selectedModelIds = panel.modelIds;   // AI 칩 토글
+  const setSelectedModelIds = useCallback((u: string[] | ((prev: string[]) => string[])) =>
+    updatePanel(pKey, (s) => ({ modelIds: typeof u === 'function' ? u(s.modelIds) : u })), [pKey]);
+  const pendingAI = panel.pending;           // 응답 대기 중 — 언마운트 뒤에도 완료·실패가 기록된다
+  const setPendingAI = useCallback((u: PendingAI[] | ((prev: PendingAI[]) => PendingAI[])) =>
+    updatePanel(pKey, (s) => ({ pending: typeof u === 'function' ? u(s.pending) : u })), [pKey]);
   const [creatingSession, setCreatingSession] = useState(false);
   const [newSessionName, setNewSessionName] = useState('');
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
@@ -243,7 +234,8 @@ export default function CommentPanel({
   }, [problemId]);
 
   useEffect(() => {
-    setLoading(true);
+    // M9 D11′ — 캐시가 있으면 로딩 표시를 켜지 않는다(켜면 스크롤 effect가 다시 돌아 복원한 위치를 맨 아래로 덮는다)
+    if (!readPassive(pKey).cache) setLoading(true);
     Promise.all([
       refreshComments(),
       refreshSessions(),
@@ -349,9 +341,12 @@ export default function CommentPanel({
     if (initialSelectionDoneRef.current) return;
     if (loading) return;
     if (!isCommentsMode) {
-      setActiveSessionId(normalSessions.length > 0 ? normalSessions[0].id : '');
+      // M9 D8′ — 스토어에 남은 세션이 아직 있으면 그대로(뷰 전환 뒤 같은 대화를 잇는다)
+      const keep = activeSessionId && normalSessions.some((x) => x.id === activeSessionId);
+      if (!keep) setActiveSessionId(normalSessions.length > 0 ? normalSessions[0].id : '');
     }
     initialSelectionDoneRef.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, isCommentsMode, normalSessions]);
 
   // ─── 필터 (탭 필터 없음 — 문항 전체) ───
@@ -413,6 +408,9 @@ export default function CommentPanel({
     [pendingAI, activeSessionId],
   );
 
+  // M9 D11′ — 마지막 스크롤 위치(onScroll에서 알림 없이 기록 — unmount cleanup 시점엔 ref가 이미 풀려 있다)
+  const scrollRestoreRef = useRef<number | null>(readPassive(pKey).scrollTop[draftMode]);
+
   // ─── 마지막 메시지로 자동 스크롤 ───
   // 메시지 수가 늘어나거나 세션이 바뀌거나 AI 응답이 진행되면 하단으로 이동
   const messageCountSignal = useMemo(() => {
@@ -435,6 +433,13 @@ export default function CommentPanel({
     const el = messagesScrollRef.current;
     if (!el) return;
     // 레이아웃이 안정된 후 스크롤
+    // M9 D11′ — 재마운트(뷰 전환) 뒤 첫 1회는 기록해 둔 위치로 복원하고 맨 아래 고정을 건너뛴다
+    const restore = scrollRestoreRef.current;
+    if (restore !== null && !loading) {
+      scrollRestoreRef.current = null;
+      requestAnimationFrame(() => { el.scrollTop = restore; });
+      return;
+    }
     requestAnimationFrame(() => {
       el.scrollTop = el.scrollHeight;
     });
@@ -1152,7 +1157,15 @@ export default function CommentPanel({
       )}
 
       {/* ═══ 메시지 리스트 ═══ */}
-      <div ref={messagesScrollRef} className="no-scrollbar" style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+      <div
+        ref={messagesScrollRef}
+        className="no-scrollbar"
+        onScroll={(e) => {
+          const p = readPassive(pKey);
+          writePassive(pKey, { scrollTop: { ...p.scrollTop, [draftMode]: e.currentTarget.scrollTop } });
+        }}
+        style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}
+      >
         {loading ? (
           <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
             불러오는 중…
@@ -1261,6 +1274,13 @@ export default function CommentPanel({
           })()}
           <CommentEditor
             ref={mainEditorRef}
+            /* M9 D8′·Q7 — 초안은 모드별(댓글 스트림은 공개 대상 — agent 초안이 섞이면 안 된다). 모드가 바뀌면 그 모드의 초안으로 */
+            key={draftMode}
+            initialValue={readPassive(pKey).draft[draftMode]}
+            onDraftChange={(v) => {
+              const p = readPassive(pKey);
+              if (p.draft[draftMode] !== v) writePassive(pKey, { draft: { ...p.draft, [draftMode]: v } });
+            }}
             problemId={problemId}
             placeholder=""
             inputHeight={inputHeight}

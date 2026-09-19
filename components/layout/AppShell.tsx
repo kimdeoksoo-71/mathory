@@ -45,6 +45,7 @@ import FolderPickerDialog from '../ui/FolderPickerDialog';
 import { alertDialog, confirmDialog, promptDialog } from '../../lib/dialogs';
 import { parseDeepLink } from '../../lib/deepLink';
 import Wordmark from '../ui/Wordmark';
+import { clearPanelMode, panelKey } from '../../lib/panelStore';
 
 type ViewState =
   | { type: 'home' }
@@ -152,6 +153,18 @@ export default function AppShell() {
   }, [allProblems.length, sharedProblems.length]);
 
   const [view, setView] = useState<ViewState>({ type: 'home' });
+  /* M9 D9′·Q5 — 패널 열림 상태는 같은 문항의 문항 보기 ↔ 편집창 전환 사이에서만 잇는다.
+     그 밖(폴더·홈·다른 문항)으로 나가면 직전 문항의 열림·버전 드로어를 닫는다(세션·칩·초안·캐시는 남는다). */
+  const prevViewRef = useRef<ViewState>(view);
+  useEffect(() => {
+    const prev = prevViewRef.current;
+    prevViewRef.current = view;
+    const idOf = (v: ViewState) => (v.type === 'problem' || v.type === 'editor' ? v.problemId : null);
+    const prevId = idOf(prev);
+    if (!prevId || !user) return;
+    if (idOf(view) !== prevId) clearPanelMode(panelKey(user.uid, prevId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
   const [problemViewNonce, setProblemViewNonce] = useState(0);
 
   // ─── 단일 활성 세션 (다른 곳에서 로그인 시 자동 로그아웃) ───

@@ -68,6 +68,11 @@ export async function getEnabledModels(): Promise<AIModelConfig[]> {
   return all.filter((m) => m.enabled);
 }
 
+/** M9 D11′ — 이미 로드된 활성 모델을 동기로(없으면 []). 패널 재마운트의 첫 렌더가 AI 이름을 '?'로 그리지 않게 */
+export function peekEnabledModels(): AIModelConfig[] {
+  return cache ? cache.filter((m) => m.enabled) : [];
+}
+
 /** 모든 AI 모델 (캐시, enabled 무관) */
 export async function getAllModels(): Promise<AIModelConfig[]> {
   if (cache) return cache;

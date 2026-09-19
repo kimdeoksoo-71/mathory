@@ -15,6 +15,7 @@ import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
+import { panelKey, readPanel, updatePanel, getPanelWidth, setPanelWidth } from '../../lib/panelStore';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H, PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
 import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
@@ -213,10 +214,15 @@ export default function ProblemView({
   // 저자 프로필
   const [authorProfile, setAuthorProfile] = useState<UserProfile | null>(null);
   // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
-  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
+  // M9 D8′ — 열림 상태는 패널 스토어가 잇는다(편집창 ↔ 문항 보기 전환에도 agent가 열린 채). 문항 밖으로 나가면 AppShell이 닫는다(Q5)
+  const panelStoreKey = user ? panelKey(user.uid, problemId) : '';
+  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(() => (panelStoreKey ? readPanel(panelStoreKey).mode : null));
+  useEffect(() => { if (panelStoreKey) updatePanel(panelStoreKey, () => ({ mode: panelMode })); }, [panelStoreKey, panelMode]);
   // Phase 44 → Phase 62 D11: 댓글 패널 드래그 리사이즈 (우측). 기본 420px (75% of 560)
   const comment = useDrawerResize({
-    defaultWidth: PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
+    // M9 D12′·Q6 — 폭은 전역 1값(편집창과 이어진다)
+    defaultWidth: getPanelWidth() ?? PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
+    onCommit: setPanelWidth,
   });
   /* Phase 62 D13 — 우측 단도 같은 문법으로 조절한다.
      ⚠ 덕수 요청(2026-08-28)으로 **폭 수치까지** 다른 패널과 통일했다(구 220/150/360).

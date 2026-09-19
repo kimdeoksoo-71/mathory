@@ -63,6 +63,7 @@ import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
+import { panelKey, readPanel, updatePanel, getPanelWidth, setPanelWidth } from '../../lib/panelStore';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import {
   IconChevronLeft, IconGrip, IconPlus,
@@ -1064,11 +1065,16 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   const [saveError, setSaveError] = useState(false);
   const [recoverableDraft, setRecoverableDraft] = useState<VersionContent | null>(null);
-  const [versionDrawerOpen, setVersionDrawerOpen] = useState(false);  // Stage 4
+  // M9 D10 — 버전 드로어 열림은 스토어에 기록해 편집창 재진입에서 복원한다(ProblemView엔 드로어가 없다 — 추가하지 않는다)
+  const panelStoreKey = user ? panelKey(user.uid, problemId) : '';
+  const [versionDrawerOpen, setVersionDrawerOpen] = useState(() => (panelStoreKey ? readPanel(panelStoreKey).versionOpen : false));  // Stage 4
+  useEffect(() => { if (panelStoreKey) updatePanel(panelStoreKey, () => ({ versionOpen: versionDrawerOpen })); }, [panelStoreKey, versionDrawerOpen]);
   // Phase 44 Step D → Phase 62 D11: 토론 패널 드래그 리사이즈 (조기 return보다 위에 선언 — 훅 규칙)
   // 폭은 세션 내 상태로만 유지 (Firestore 저장 범위 밖). 기본 420px (75% of 560).
   const comment = useDrawerResize({
-    defaultWidth: PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
+    // M9 D12′·Q6 — 폭은 전역 1값(문항 보기와 이어진다)
+    defaultWidth: getPanelWidth() ?? PANEL_WIDTH_DEFAULT, min: PANEL_WIDTH_MIN, max: () => window.innerWidth * 0.9, anchor: 'right',
+    onCommit: setPanelWidth,
   });
   // Phase 62 D13 — 버전 드로어도 같은 문법으로 조절한다(폭 수치만 별도).
   const version = useDrawerResize({
@@ -1139,7 +1145,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 토론 패널 (편집 중에도 AI 토론·댓글 참조 가능)
   // 활성 탭과 동기 — 사용자가 편집 탭을 바꾸면 토론 탭도 따라감
   // Phase 47: 패널 모드 — 'comments'(댓글) | 'agent' | null(닫힘)
-  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(null);
+  // M9 D8′ — 열림 상태는 패널 스토어가 잇는다(문항 보기 ↔ 편집창). 문항 밖으로 나가면 AppShell이 닫는다(Q5)
+  const [panelMode, setPanelMode] = useState<'comments' | 'agent' | null>(() => (panelStoreKey ? readPanel(panelStoreKey).mode : null));
+  useEffect(() => { if (panelStoreKey) updatePanel(panelStoreKey, () => ({ mode: panelMode })); }, [panelStoreKey, panelMode]);
   const discussionOpen = panelMode !== null;
   /* 우측 패널이 차지하는 폭 — 댓글·agent와 버전 기록 드로어가 같은 규약을 쓴다.
      둘 다 덮지 않고 편집·미리보기를 왼쪽으로 밀어낸다(기타 개선 3-2).

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState, useImperativeHandle, forwardRef, type ReactNode } from 'react';
+import { useRef, useState, useEffect, useImperativeHandle, forwardRef, type ReactNode } from 'react';
 import EditorPreview from '../editor/EditorPreview';
 import MathSymbolPalette from '../editor/MathSymbolPalette';
 import LatexInputEditor, { LatexInputEditorHandle } from './LatexInputEditor';
@@ -37,6 +37,8 @@ interface CommentEditorProps {
   maxLength?: number;
   /** 입력창 세로 높이(px). 메인 작성 영역은 패널에서 드래그 리사이즈로 제어, 답글은 기본 120 */
   inputHeight?: number;
+  /** M9 D8′ — 입력 초안을 바깥(패널 스토어, 알림 없음)에 기록. 뷰 전환 뒤 재마운트에서 initialValue로 되돌아온다 */
+  onDraftChange?: (value: string) => void;
 }
 
 const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(function CommentEditor({
@@ -50,8 +52,13 @@ const CommentEditor = forwardRef<CommentEditorHandle, CommentEditorProps>(functi
   problemId,
   maxLength = 1000,
   inputHeight = 120,
+  onDraftChange,
 }, ref) {
   const [value, setValue] = useState(initialValue);
+  // M9 D8′ — 초안 기록(전송 성공 뒤 비워지는 것도 함께 기록된다)
+  const onDraftChangeRef = useRef(onDraftChange);
+  onDraftChangeRef.current = onDraftChange;
+  useEffect(() => { onDraftChangeRef.current?.(value); }, [value]);
   const [showPreview, setShowPreview] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);

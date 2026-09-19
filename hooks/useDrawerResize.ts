@@ -20,6 +20,8 @@ export interface DrawerResizeOptions {
   max: number | (() => number);
   /** 패널이 뷰포트의 어느 변에 고정되어 있는가 */
   anchor: 'left' | 'right';
+  /** M9 D12′ — 드래그가 끝났을 때 최종 폭(패널 스토어가 뷰 전환 사이에 폭을 잇는다 — localStorage 아님) */
+  onCommit?: (w: number) => void;
 }
 
 export interface DrawerResize {
@@ -34,7 +36,7 @@ export interface DrawerResize {
   };
 }
 
-export function useDrawerResize({ defaultWidth, min, max, anchor }: DrawerResizeOptions): DrawerResize {
+export function useDrawerResize({ defaultWidth, min, max, anchor, onCommit }: DrawerResizeOptions): DrawerResize {
   const [width, setWidth] = useState(defaultWidth);
   const [dragging, setDragging] = useState(false);
   const [hover, setHover] = useState(false);
@@ -43,6 +45,7 @@ export function useDrawerResize({ defaultWidth, min, max, anchor }: DrawerResize
   // clamp/onPointerDown이 재생성되지 않게 ref로 받는다.
   const widthRef = useRef(width);  widthRef.current = width;
   const maxRef = useRef(max);      maxRef.current = max;
+  const onCommitRef = useRef(onCommit); onCommitRef.current = onCommit;
 
   const clamp = useCallback((w: number) => {
     const m = maxRef.current;
@@ -65,11 +68,13 @@ export function useDrawerResize({ defaultWidth, min, max, anchor }: DrawerResize
     try { el.setPointerCapture(pid); } catch {}   // 오버레이·iframe 위에서도 이벤트를 붙잡는다
     setDragging(true);
 
+    let last = w0;
     const onMove = (ev: PointerEvent) => {
       const next = anchor === 'right'
         ? window.innerWidth - ev.clientX + delta
         : ev.clientX - delta;
-      setWidth(clamp(next));
+      last = clamp(next);
+      setWidth(last);
     };
     const onUp = (ev: PointerEvent) => {
       el.removeEventListener('pointermove', onMove);
@@ -79,6 +84,7 @@ export function useDrawerResize({ defaultWidth, min, max, anchor }: DrawerResize
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
       setDragging(false);
+      onCommitRef.current?.(last);
       // ⚠ capture 중에는 boundary 이벤트가 핸들로만 가므로 hover가 남을 수 있다.
       //   무조건 false로 끄면 커서가 아직 핸들 위인데 활성선이 꺼지는 역회귀가 생긴다
       //   → 릴리즈 지점을 rect로 판정해 확정한다.
@@ -92,6 +98,9 @@ export function useDrawerResize({ defaultWidth, min, max, anchor }: DrawerResize
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
   }, [anchor, clamp]);
+
+  // M9 D12′ — 마운트 시 1회 clamp(이어받은 폭이 지금 창보다 클 수 있다). ⚠ max()는 effect 안에서만(SSR)
+  useEffect(() => { setWidth((w) => clamp(w)); }, [clamp]);
 
   // 창이 줄면 상한이 내려간다 → 패널이 화면 밖으로 나가지 않게 재클램프
   useEffect(() => {
