@@ -66,7 +66,9 @@ lib/device.ts             — 폰 판별 순수 함수(뷰포트식·UA 태블�
 lib/deepLink.ts           — `?view=…&id=` 파싱 (Phase 64, import 0 · test:deeplink)
 lib/chromeAutoHide.ts     — 폰 가로 보기 크롬 자동 숨김 판정(4중 가드) (M8, import 0 · test:chrome)
 lib/mathRegions.ts        — 편집창 수식 영역 스캐너 단일 원천(R-$$: 빈 `$$` = 빈 인라인 쌍) (M7, import 0 · test:mathregions)
-lib/blockTidy.ts          — 블록 정돈: 분할·머리 정리·결정적 정형화·trim (M7, import mathRegions·proofread · test:tidy)
+lib/blockTidy.ts          — 블록 정돈: 분할·머리 정리·결정적 정형화·R5 행 환경 레이아웃·trim (M7·Phase 68, import mathRegions·proofread·mathInput · test:tidy)
+lib/mathInput.ts          — 편집창 수식 입력 **판정** 단일 원천: 행 환경 ROW_ENVS·자리 해석 parseSlots·Tab 자리 이동 nextSlot·약어·자동 분수·행 Enter·정돈 R5 (Phase 68, import mathRegions·latexScan · test:mathinput)
+lib/mathSlots.ts          — 수식 단축어 입력 자리 StateField(CM snippet() 대체 — 이스케이프 위치 버그 회피) (Phase 68, import @codemirror/state·mathInput · test:mathslots)
 lib/blockClipboard.ts     — 블록 클립보드 메모리 싱글턴 (M7, import 0)
 lib/invisibles.ts         — 비가시·단독 초성 자모 정규화 stripInvisibles (M9 G, import 0 · test:invisibles)
 lib/aiPricing.ts          — AI 단가 표·priceFor·calcCostUsd (M9 C, import 0)
@@ -153,6 +155,12 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
+- **편집창 Tab은 편집창 것이다 — 키 체계 (Phase 68)**: `MarkdownEditor`의 Tab·Shift+Tab은 포커스가 있으면 **항상 `return true`**(포커스 이탈 없음). 밖으로 나가는 길은 CM 내장 — **Escape 뒤 2초 안 Tab**(view dist 4503·4835) · `Ctrl-m`/mac `Shift-Alt-m`. 자동완성이 열려 있으면 Escape가 그쪽에 먼저 먹혀 두 번. Tab 순서(`mathTab`, 첫 성공에서 멈춤): ⓪ IME 조합 중 → 제자리 ① 자동완성 열림 → 수락 ② **수식 안** + 커서 앞 약어(`matchAbbrev` — 영숫자 런의 가장 긴 접미사, 앞이 영문자·`\`면 불일치, `2sq`는 됨) → 확장(활성 자리 안에서도 — 중첩, 새 자리 목록이 옛 것을 **대체**) ③ 활성 자리 → 다음 자리(수식 안팎 무관) ④ 수식 안 + 행 환경 본문 + 그룹 깊이 0 + `AMP_ENVS` → `&`(gathered류 제외) ⑤ 수식 안 → 자리 이동(`nextSlot`: 감싼 가장 안쪽 그룹이 있으면 닫는 괄호 뒤 3자 안의 `{`·`[`로 **형제 진입**(`(`는 아니다 — `\sqrt{2}(x)`), 아니면 **닫는 괄호 뒤로 탈출**; 그룹 밖이면 커서 뒤 다음 **빈** `{}`·`[]`·`()`. `()`·`[]`는 같은 종류끼리 짝이 맞을 때만 그룹 — `[0, 1)`) ⑥ 인라인 `$…$` 안 → 닫는 `$` 뒤(P22, display는 제자리) ⑦ 제자리. ⚠ ④가 ⑤보다 앞이라 환경 본문 깊이 0에서는 같은 행 뒤 빈 `{}`로 Tab으로는 못 간다 — **Alt+Tab**(모든 `{` 순회, 유지)이 간다. Command 더블탭·`tabStopsRef` 무장·`__tabStopsActive`는 **삭제**됐다(되살리지 말 것). **Enter**: 행 환경 본문 안이면 `rowEnterPlan` ⓐ `\begin` 행 끝 → 줄바꿈+2칸 ⓑ 빈 행 → 줄바꿈만 ⓒ 커서 뒤 `\end` → ` \\`+새 행+`\end` 자기 행 ⓓ 이미 `\\` → 줄바꿈만 ⓔ ` \\`+줄바꿈+같은 들여쓰기. ⚠ **Shift+Enter에 `shift`를 묶지 않는다** — basicSetup `standardKeymap`이 `shift: insertNewlineAndIndent`(commands dist 1731)로 이미 묶고 있어 "들여쓰기 유지 줄바꿈(`\\` 없음)"이 곧 탈출구다. 바인딩은 `Prec.high`(완성 Enter는 `Prec.highest`라 먼저 간다). 판정은 전부 `lib/mathInput.ts`(순수 · `test:mathinput`), 상태는 `lib/mathSlots.ts`(`test:mathslots`) — `MarkdownEditor`에는 dispatch만 둔다. 검증은 임시 라우트 + headless Chrome CDP(`Input.insertText`·`dispatchKeyEvent`)로 31건 실측(2026-10-07) — ⚠ **포커스 이탈 검사는 편집창 앞뒤에 포커스 가능한 요소를 둬야** 한다(하나뿐이면 Tab이 자기에게 되돌아와 "실패"로 보인다)
+- **⚠ CM `snippet()`·`snippetKeymap`을 쓰지 말 것 (Phase 68 N1)**: `@codemirror/autocomplete 6.20.0` `Snippet.parse`의 `\{`·`\}` 이스케이프 제거(dist 1495-1500)가 **치환 전 index**를 **이미 감소된 필드 위치**와 비교해, 이스케이프가 둘 이상 앞서면 자리가 1~2자 밀린다(프로브: `\int_{▢}^{▢}{▢ dx}` 자리 9·13·15, 정답 9·12·14). LaTeX는 `\{`·`\\{`가 흔해 템플릿 이스케이프 자체가 함정이고, 번호 필드 `${0}`은 번호 없는 필드보다 **앞**에 선다(탈출 자리로 못 쓴다). 그래서 자리는 `parseSlots`(이스케이프 0 — `▢`(U+25A2) 위치, 없으면 빈 `{}`·`[]`·`()` 안, 끝에 탈출 자리) + 자체 `slotsField`다. 갱신 규칙 넷: ① `setSlots` 효과는 **매핑 없이 즉시 반환**(효과 좌표 = 변경 뒤 좌표) ② undo·redo면 해제 ③ 변경은 `from: mapPos(-1)`·`to: mapPos(+1)`(빈 자리에 친 글자가 자리에 포함) ④ 선택이 활성 자리 밖이면 해제. 마지막 자리(탈출)로 가며 해제. 자리 장식은 없다(P21 (a)). ⚠ 테스트에서 `@codemirror/state`를 **ESM으로 import하면 다른 복사본**이 되어 `Field is not present`가 난다 — `createRequire`로 컴파일된 lib와 같은 CJS 인스턴스를 쓸 것(dual package hazard)
+- **삽입은 3분 규약이다 (Phase 61c → Phase 68 D23)**: `insertText`(툴바 템플릿·단축키 상용구 — `{}`가 있으면 커서를 첫 `{}` 안으로) / `insertPlainText`(채팅·**AI 완성·OCR** — 선택 대체 + 커서 끝 + 포커스. 결과의 `{}`로 커서가 튀면 안 되는 경로 전부) / `insertMathSnippet`(수식 단축어 — `lib/mathSlots.insertWithSlots`, 메뉴 클릭과 약어 Tab이 같은 엔진, 커서가 수식 밖이어도 그대로 넣는다 P16). 새 삽입 경로를 만들면 셋 중 하나를 골라 쓸 것
+- **후위 변환은 inputHandler 한 곳 · "친 글자 + 별도 트랜잭션"이다 (Phase 68 D19~D22)**: 수식 안 `^`·`_` → `^{}`·`_{}`(다음 글자 `{`·앞 글자 `\`·선택 있음이면 그냥) · `(A)/` → `\frac{A}{}`(`autoFracAt` — 짝 `(`를 균형 스캔으로 찾고 그 앞이 없음·공백·`+ - = < > , & { ( [`·줄바꿈 `\\`일 때만. `f(x)/`·`\left(x\right)/`·`\frac{1}{2}(x)/`·**`(a)(b)/`**는 무변환) · 선택 + `(`·`[`·`{` → `\left(…\right)`(양끝이 **같은** 수식 영역일 때만 — 밖은 현행 = 선택 대체). 1차는 inputHandler **5번째 인자 `insert()`**(CM 기본 타자와 같은 `input.type`·`scrollIntoView` — M7 D5 가로 중앙 추적 발화), 2차는 `isolateHistory.of('before')` → ⌘Z 1회면 변환만 풀린다. ⚠ inputHandler는 **IME 조합 중에도 불린다**(view dist 4257) — `view.composing` 가드 필수. 한글 음절 뒤의 `/`·`^`는 `compositionend`(dist 5148)로 조합이 끝난 뒤 도착해 변환된다
+- **행 환경 이름의 단일 원천은 `lib/mathInput.ROW_ENVS`다 (Phase 68 D15)**: blockTidy R1 ①(`ROW_ENV_RE`)·R5·편집창 Tab/Enter가 같은 목록(`aligned·alignedat·align·align*·alignat·alignat*·cases·dcases·rcases·drcases·array·darray·gathered·gather·gather*·split·*matrix·*matrix*`)을 본다. ⚠ `lib/mathSplit.ts BLOCKED_ENVS`는 "분할 차단" 의미라 **별개**(합치지 말 것). 정돈 **R5**(`layoutRowEnvs`, R3 뒤·R4 앞, autoFix 옵션 무관)는 **펜스형 `$$`만** — 여는 `$$` 뒤 행 나머지 공백·닫는 `$$` 앞 공백. 한 줄 `$$…$$`(렌더가 **인라인**인 레거시 — 줄을 나누면 display로 바뀌어 렌더가 달라진다)·인라인·(c) 형태·`\[…\]`(R3이 먼저 `$$`로)는 무접촉. 정규형: `\begin{env}{인수}`·`\end` 자기 줄, 중괄호 깊이 0·중첩 환경 밖의 `\\`로 행 분리, 들여쓰기 깊이×2칸, 중첩 환경이 든 행은 앞 텍스트/환경/뒤 텍스트가 각자 줄. `\\[4pt]`처럼 **크기로 읽히는 인수만** 행 구분자에 붙인다 — `\\[b,c]`는 KaTeX가 크기로 읽어 오류를 내는 그 함정이라 떼어 낸다. **멱등**(테스트가 고정). ⚠ 편집창 스캐너는 `$$\begin{…}`(여는 `$$`와 내용이 같은 행)을 **빈 인라인 쌍**으로 읽어 그 안을 수식 밖으로 판정한다 — Tab·Enter·후위 변환이 거기서는 안 된다(R10, 펜스형으로 쓰면 된다)
+- **스니펫은 두 종류이고 Firestore `kind`로 가른다 (Phase 68)**: `hotkey`(단축키 상용구, `⌃⌥1~9`, `insertText`) · `abbrev`(수식 단축어, Tab 트리거). 저장값 없는 옛 문서 = hotkey(이관 0 · 규칙 0). ⚠ `listSnippets`에 **`orderBy('shortcutIndex')`를 되살리지 말 것** — Firestore는 orderBy 필드가 없는 문서를 결과에서 **뺀다**(abbrev 문서가 조용히 사라진다). 클라 정렬. `createSnippet`은 **항상 `order`를 쓴다**(abbrev = `Date.now()`). `getNextAvailableIndex`·단축키 칩은 hotkey만 센다. 기본 8종(`DEFAULT_ABBREVS` — b1·b2·log·sq·root·lim·int·sum)은 코드 상수, 사용자가 같은 약어를 등록하면 **사용자 우선**(메뉴 기본 행 "대체됨"). 약어 `/^[A-Za-z][A-Za-z0-9]{0,9}$/`, 사용자끼리 중복 거부. 구조 템플릿 3종(Phase 54)은 삭제
 - **폴더뷰 클릭은 선택, 더블클릭이 진입이다 (M9 A)**: 재클릭 해제는 `e.detail`(브라우저 더블클릭 창)로 — **타이머 금지**. 선택 **표시**는 뷰 무관(공유 뷰도), 선택 바·체크박스 열·Shift/⌘ 다중·Finder 드래그는 `selectable`(내 소유·비공유 뷰). 선택 바는 **`selectable` + (2건 이상 또는 체크박스로 만든 선택)**일 때만(Q1 — 단건 클릭마다 바가 뜨면 보기 전환이 사라진다). 행 클릭 핸들러는 **ListView 소유**(범위가 `sorted` 순서) — 일반·⌘ 클릭도 `lastCheckRef` 앵커를 세우고, 행 Shift는 **범위 추가**(체크박스 `handleCheck`의 "선택돼 있으면 범위 해제"를 쓰지 않는다). 카드는 단일 선택. 터치(iPad)는 단독 선택된 항목 재탭 = 진입. ⚠ dnd-kit `onPointerDown`은 덮지 말고 **합성**(포인터 종류 기록). ⚠ 클릭 가능한 자식(⋮·체크박스·perm)은 **`onDoubleClick` 전파도** 막을 것(Phase 45a). ⚠ Enter 진입은 `activeElement`가 body·행·카드일 때만(확인 버튼 Enter와 겹친다). `.is-selected`는 hover 면·음영 + `--drop-ring`(box-shadow 전체 값), `@media` 밖, 순서 alt → hover → selected
 - **우측 패널 상태의 원천은 `lib/panelStore.ts`다 (M9 B)**: 패널은 두 뷰가 각자 마운트하고(**호이스팅 하지 않는다**) 잃던 상태만 모듈 스토어에 둔다. 키 **`uid:problemId`**. 갱신은 **함수형 `updatePanel(key, fn)`**(`fn`은 저장된 현재 값을 받는다 — 병렬 모델·언마운트 뒤 도착한 응답이 유실되지 않는다). 초안(모드별)·스크롤·캐시는 **passive**(`writePassive` — 알림 없음; 초안을 알림형에 두면 키 입력마다 패널 리렌더). ⚠ `replyingTo`·`editingId`·`freshAiCommentId`·세션 입력은 복원 금지. ⚠ 캐시가 있으면 `setLoading(true)`를 부르지 말 것(스크롤 복원이 덮인다). 폭은 전역 1값(`useDrawerResize` `onCommit`, localStorage 무사용). 열림(`mode`·`versionOpen`)은 **같은 문항의 문항 보기 ↔ 편집창 사이에서만** — 밖으로 나가면 AppShell이 `clearPanelMode`
 - **AI 비용의 출력 토큰은 사고(reasoning) 포함이다 (M9 C)**: Gemini `thoughtsTokenCount`는 `candidatesTokenCount`에 없는데 **출력 단가로 청구**된다(SDK 0.24 타입에 필드가 없을 뿐 응답엔 온다) — `ai-provider.ts`가 더한다. OpenAI-compat·Responses는 `total − prompt − completion` 차분을 더한다(xAI). 단가 우선순위: 토론 = `ai_models` 문서(숫자 문자열은 살리고 누락·0은 `lib/aiPricing.ts`로 대체 + warn) · 정밀 검증 = env `VERIFY_*_COST_IN/OUT` → 표 → warn + 0 · 교정·자동완성 = 표. ⚠ **라우트에 단가 리터럴을 다시 적지 말 것**(옛 verify 5/25). ⚠ 운영 Vercel에는 `VERIFY_*` env가 없다(2026-09-19 실측) — 표가 곧 운영 단가. 비용 표시는 패널 헤더 배지 하나(tooltip에 토큰·모델별) — 카드별 비용은 없다. 교정·자동완성 비용은 status 한 줄(블록마다 상자에 달면 N번 중복)
@@ -466,7 +474,20 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M9 — 각종 기능 개선·버그 수정** — 구현 완료(2026-09-19) · 9커밋(S0~S8) + 검수 후속 1 · push 대기 · **덕수 실물 검수 종결(2026-09-19, "마지막 1%까지 완벽")**
+## 현재 Phase: **Phase 68 — 스니펫·수식 자동 확장** — 구현 완료(2026-10-07) · 7커밋(S0~S7) · **덕수 실물 검수 대기** · push 대기
+
+문서: `docs/phasedocs/Phase68 스니펫·수식 자동 확장 v4 착수판.md`
+(계보: 덕수 스케치 `snippet_automation_sketch_261007.md` → v1 web → v2 CLI 교차검토(정정 8·보완 12·P14~P20) → v3 web 재검증(N1 CM snippet() 위치 버그 → 자체 자리 StateField · P21) → **v4 CLI 착수판**(정정 F1~F6 · P22) → 구현. §11이 구현 기록)
+
+상용구 → **스니펫**(단축키 상용구 + 수식 단축어 8종·사용자 등록) · **Tab = 수식 입력 도구**(약어 확장·자리 순회·행 환경 `&`·그룹 탈출·인라인 `$` 탈출, 포커스 이탈 없음) · 행 환경 **Enter = ` \\`+줄바꿈+들여쓰기** · 정돈 **R5 환경 레이아웃** · 후위 변환(`^`→`^{}` · `(A)/`→`\frac{A}{}`) · 선택 `\left…\right` 감싸기 · AI 완성·OCR `insertPlainText`.
+**서버 0 · Firestore 규칙 0 · 스키마 additive(`kind`·`abbrev`) · 이관 0 · 렌더 5사이트 0 · 폰 0.** 신설 2(`lib/mathInput.ts` · `lib/mathSlots.ts`) · 로직 테스트 21종 543 → **23종 566건**(`test:mathinput` 13 · `test:mathslots` 7 · `test:tidy` 18→21). **규약은 「핵심 패턴」 맨 앞의 Phase 68 절 6개가 소유한다.**
+
+- **가장 값비싼 발견(v3 N1, v4에서 재현)**: CM `snippet()`의 `\{` 이스케이프 처리에 필드 위치 버그 — v2 프로브가 **첫 자리만** 봐서 놓쳤다(둘째 자리부터 밀린다). 템플릿 엔진을 버리고 자리를 자체 StateField로
+- **v3를 뒤집은 것(v4 F1~F6)**: Shift+Enter는 standardKeymap이 이미 묶고 있다 · 형제 진입에서 `(` 제외 · 자리 스토어는 `lib/` · StateField 효과는 매핑 없이 반환 + undo 해제 · Escape 한 번은 자동완성 닫힌 상태에서
+- **실측**: headless Chrome CDP **31/31**(§9-2 ①~⑦·⑪·⑫·메뉴 경로) — Escape→Tab 포커스 이탈은 페이지에 포커스 가능한 요소가 편집창 하나뿐이면 **되돌아와 실패로 보인다**(하니스 함정) · S5(후위 변환)는 inputHandler 한 곳이라 S3에 함께
+- ⚠ 남은 일: 덕수 실물 검수(§9-2 ⑧ 메뉴 · ⑨ 긴 블록 하단 확장 스크롤·목록 안 `$$` 정돈 · ⑩ · ⑬ 한글 IME 직후 `^`·`/` · ⑭ 줄바꿈 끔 가로 추적 · ⑮ 시트 정돈) · push 뒤 Vercel 빌드 로그 · 임시 라우트 `app/dev68`은 삭제됨
+
+### 이전: **개선묶음 M9 — 각종 기능 개선·버그 수정** — 구현 완료(2026-09-19) · 9커밋(S0~S8) + 검수 후속 1 · push 대기 · **덕수 실물 검수 종결(2026-09-19, "마지막 1%까지 완벽")**
 
 문서: `docs/phasedocs/개선묶음 M9 각종 기능 개선·버그 수정 v5 실행판.md`
 (계보: 덕수 스케치 8항 + 추가 사항(블록정리 조정) → v1 web → v2 착수판(P1~P16) → v3 CLI 교차검토(정정 부록 B · D′ 21건 · Q1~Q19) → v4(Q 확정 · I항 · Firestore·Vercel 실측) → v5 web 재검증(부록 C) → **구현 — §9가 기록**)
@@ -1305,9 +1326,10 @@ agent 대화창에서 드래그 → 미니 팝업([편집창에 삽입] · [복�
 - **순서 스큐는 상수다** — 코드펜스(검산 python·`mathory-graph`)·인라인 코드가 있으면 무보정 인덱스는
   **100% 어긋난다**. ``` · `~~~` · 인라인 코드(**백틱 런 매칭**. `` `[^`\n]*` `` 근사는 다중 백틱에서 깨진다)를
   **길이·개행을 보존하며** 마스킹한 뒤 인덱싱한다
-- **⚠️ `insertText`를 채팅 삽입에 쓰지 말 것** — 텍스트에 `{}`가 있으면 커서를 첫 `{}` 안으로 점프시키고
-  2개 이상이면 **탭스톱을 무장**한다(툴바 템플릿 전용 규약). AI 대화문에는 `x^{}`가 실제로 섞인다 →
-  `insertPlainText`(선택 대체 + 커서 + 포커스, 한 dispatch = undo 1스텝)가 이 경로를 담당한다
+- **⚠️ `insertText`를 채팅 삽입에 쓰지 말 것** — 텍스트에 `{}`가 있으면 커서를 첫 `{}` 안으로 점프시킨다
+  (툴바 템플릿 전용 규약. ~~2개 이상이면 탭스톱을 무장~~ — 무장은 Phase 68 D14로 사라졌고 그 뒤 Tab은
+  `lib/mathInput.nextSlot`이 맡는다). AI 대화문에는 `x^{}`가 실제로 섞인다 → `insertPlainText`(선택 대체 +
+  커서 + 포커스, 한 dispatch = undo 1스텝)가 이 경로를 담당한다. 현행 규약은 위 「삽입은 3분 규약이다」 절
 - **⚠️ `FindingRow`는 행 전체가 클릭 영역이다** — 가드가 없으면 검증 카드 안 드래그가 곧 점프(탭 전환·
   블록 펼침·`ref.focus()`)여서 **인용을 뽑는 것 자체가 막힌다**. `onClick` 진입부에서 살아 있는 선택을 보고 물러난다
 - **`Range.containsNode`는 존재하지 않는다** — 그건 `Selection`의 메서드다. 표 전체 포함 판정은
