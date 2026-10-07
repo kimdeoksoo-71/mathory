@@ -9,7 +9,7 @@
  */
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { MathSnippet } from '../../types/snippet';
+import { MathSnippet, SnippetInput } from '../../types/snippet';
 import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
 import { IconLoader, PhIcon } from '../ui/Icons';
@@ -181,9 +181,13 @@ interface UnifiedToolbarProps {
   showToolbar: boolean;
   onInsert: (template: string, cursorOffset: number) => void;
   snippets: MathSnippet[];
+  /** Phase 68 — 수식 단축어 맵(기본 + 사용자) · 사용자가 등록한 약어 집합("대체됨" 표시·중복 검사) */
+  abbrevs: Record<string, string>;
+  userAbbrevs: Set<string>;
   onSnippetInsert: (content: string) => void;
-  onSnippetAdd: (data: { name: string; shortcutIndex: number; content: string }) => void;
-  onSnippetEdit: (snippetId: string, data: Partial<{ name: string; shortcutIndex: number; content: string }>) => void;
+  onInsertAbbrev: (content: string) => void;
+  onSnippetAdd: (data: SnippetInput) => void;
+  onSnippetEdit: (snippetId: string, data: Partial<SnippetInput>) => void;
   onSnippetDelete: (snippetId: string) => void;
   searchOpen: boolean;
   onToggleSearch: () => void;
@@ -591,7 +595,10 @@ export default function UnifiedToolbar({
   showToolbar,
   onInsert,
   snippets,
+  abbrevs,
+  userAbbrevs,
   onSnippetInsert,
+  onInsertAbbrev,
   onSnippetAdd,
   onSnippetEdit,
   onSnippetDelete,
@@ -649,7 +656,7 @@ export default function UnifiedToolbar({
     <div key={key} style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
   );
 
-  /* M7 후속(덕수 2026-09-12) — 게이트를 항목별로: **블록에 넣는 것**(강조·상용구·특수문자·표·AI 완성)만
+  /* M7 후속(덕수 2026-09-12) — 게이트를 항목별로: **블록에 넣는 것**(강조·스니펫·특수문자·표·AI 완성)만
      활성 텍스트 블록이 필요하고, **탭 단위 동작**(정돈·교정·찾기·전체 접기·블록 복사/붙여넣기·줄바꿈)은
      활성 블록이 그림이거나 없어도 눌려야 한다. 옛 루트 전체 게이트는 시트로 가져온 문항(첫 블록이 그림)에서
      정돈 버튼까지 흐리게 만들었다. 좌측 컨텍스트 영역($·$$·팔레트)은 여전히 블록 게이트다. */
@@ -682,7 +689,7 @@ export default function UnifiedToolbar({
       node: (
         <>
           <IconButton
-            title="상용구"
+            title="스니펫"
             onClick={() => setSnippetMenuOpen((v) => !v)}
             active={snippetMenuOpen}
             buttonRef={snippetBtnRef}
@@ -692,7 +699,10 @@ export default function UnifiedToolbar({
           {snippetMenuOpen && (
             <MathSnippetMenu
               snippets={snippets}
+              abbrevs={abbrevs}
+              userAbbrevs={userAbbrevs}
               onInsert={onSnippetInsert}
+              onInsertAbbrev={onInsertAbbrev}
               onAdd={onSnippetAdd}
               onEdit={onSnippetEdit}
               onDelete={onSnippetDelete}

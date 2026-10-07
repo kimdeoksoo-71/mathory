@@ -713,6 +713,7 @@ function SortableEditorBlock({
   onGgbHeightChange,
   problemId,
   onSnippetShortcut,
+  abbrevs,
   onCursorActivity,
   onSplitMathLines,
   blockTypes,
@@ -753,6 +754,8 @@ function SortableEditorBlock({
   onGgbHeightChange: (blockId: string, height: number) => void;
   problemId: string;
   onSnippetShortcut: (index: number) => void;
+  /** Phase 68 — 수식 단축어 맵(기본 + 사용자). MarkdownEditor Tab 핸들러로 passthrough */
+  abbrevs: Record<string, string>;
   onCursorActivity?: (info: CursorActivityInfo) => void;
   onSplitMathLines: () => void;
   blockTypes: { type: string; label: string }[];
@@ -1008,6 +1011,7 @@ function SortableEditorBlock({
               onChange={onChange}
               lineWrap={lineWrap}
               onSnippetShortcut={onSnippetShortcut}
+              abbrevs={abbrevs}
               onCursorActivity={onCursorActivity
                 ? (info) => onCursorActivity({ ...info, blockId: block.id })
                 : undefined}
@@ -1244,8 +1248,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     useSensor(KeyboardSensor)
   );
 
-  // ── 수식 상용구 ──
-  const { snippets, addSnippet, editSnippet, removeSnippet, getByShortcut } = useSnippets();
+  // ── 스니펫(Phase 68: 단축키 상용구 + 수식 단축어) ──
+  const { snippets, addSnippet, editSnippet, removeSnippet, getByShortcut, abbrevMap, userAbbrevs } = useSnippets();
 
   /* ─── 글꼴 크기 초기화 ─── */
   useEffect(() => {
@@ -1485,7 +1489,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       if (completion) {
         const editor = editorRefs.current[targetId];
         if (editor) {
-          editor.insertText(completion, completion.length);
+          // Phase 68 D23 — insertText가 아니라 insertPlainText: 완성문의 `{}`로 커서가 튀지 않게(3분 규약)
+          editor.insertPlainText(completion);
         }
       }
     } catch (e: any) {
@@ -2493,10 +2498,17 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return 'inserted';
   }, [activeBlockId]);
 
-  /* ─── 수식 상용구 ─── */
+  /* ─── 스니펫 (Phase 68 D8·D23 — 삽입 3분 규약) ─── */
+  /** 단축키 상용구: 현행 그대로 insertText(`{}`가 있으면 커서를 그 안으로) */
   const handleSnippetInsert = (content: string) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
       editorRefs.current[activeBlockId]?.insertText(content, content.length);
+    }
+  };
+  /** 수식 단축어(메뉴 클릭): 약어 Tab과 같은 엔진(lib/mathSlots) — 커서가 수식 밖이어도 그대로 넣는다(P16) */
+  const handleInsertAbbrev = (content: string) => {
+    if (activeBlockId && editorRefs.current[activeBlockId]) {
+      editorRefs.current[activeBlockId]?.insertMathSnippet(content);
     }
   };
 
@@ -2544,7 +2556,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const normalized = normalizeAndFix(data.text as string);
       // 커서 위치에 \n + 결과 + \n 삽입, 커서는 삽입 끝으로 이동
       const payload = `\n${normalized}\n`;
-      editorRefs.current[activeBlockId]?.insertText(payload, payload.length);
+      editorRefs.current[activeBlockId]?.insertPlainText(payload);   // Phase 68 D23 — OCR 결과의 `{}`로 커서가 튀지 않게
     } catch (e: any) {
       await alertDialog(`OCR 처리 중 오류: ${e?.message || e}`);
     } finally {
@@ -3733,7 +3745,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onInsert={handleInsert}
           onInsertInlineMath={handleInsertInlineMath}
           snippets={snippets}
+          abbrevs={abbrevMap}
+          userAbbrevs={userAbbrevs}
           onSnippetInsert={handleSnippetInsert}
+          onInsertAbbrev={handleInsertAbbrev}
           onSnippetAdd={addSnippet}
           onSnippetEdit={editSnippet}
           onSnippetDelete={removeSnippet}
@@ -3969,6 +3984,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onGgbHeightChange={handleGgbHeightChange}
                     problemId={problemId}
                     onSnippetShortcut={handleSnippetShortcut}
+                    abbrevs={abbrevMap}
                     onCursorActivity={handleCursorActivity}
                     onSplitMathLines={() => handleSplitMathLines(block.id)}
                     blockTypes={BLOCK_TYPES.map((t) => ({ type: t, label: BLOCK_TYPE_LABELS[t] }))}
