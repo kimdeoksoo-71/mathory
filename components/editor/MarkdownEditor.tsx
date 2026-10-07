@@ -6,7 +6,8 @@ import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
 import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
 import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
-import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
+import { autocompletion, CompletionContext, Completion, completionStatus, acceptCompletion } from '@codemirror/autocomplete';
+import { isolateHistory } from '@codemirror/commands';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 // search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
@@ -26,6 +27,11 @@ import {
 import { LATEX_COMPLETIONS, isInsideMath } from '../../lib/latex-completions';
 import { lintLaTeX } from '../../lib/latex-linter';
 import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/editorScroll';
+/* Phase 68 — 수식 입력 보조: 판정(lib/mathInput) · 자리 상태(lib/mathSlots) · 영역(lib/mathRegions).
+   ⚠ `@codemirror/autocomplete`의 snippet·snippetKeymap·clearSnippet을 import하지 말 것 — lib/mathSlots.ts 머리 주석(N1). */
+import { scanMathRegions, mathRegionAt } from '../../lib/mathRegions';
+import { nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, findEnclosingEnv, groupDepth, AMP_ENVS } from '../../lib/mathInput';
+import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from '../../lib/mathSlots';
 
 /* ═══ Phase 65 — 줄바꿈 켬/끔 (⌥Z) ═══════════════════════════════════
    CodeMirror의 "줄을 접는가"는 **클래스가 아니라 computed white-space**로 정해진다
@@ -153,6 +159,8 @@ interface MarkdownEditorProps {
   onCursorActivity?: (info: Omit<CursorActivityInfo, 'blockId'>) => void;
   /** Phase 65: 줄바꿈 켬(기본) / 끔이면 긴 줄이 접히지 않고 블록 안에서 좌우 스크롤된다. */
   lineWrap?: boolean;
+  /** Phase 68: 수식 단축어 맵(기본 8종 + 사용자, 사용자 우선). 수식 안에서 약어 뒤 Tab이 확장한다. ref로 보관해 keymap 클로저가 최신값을 읽는다 */
+  abbrevs?: Record<string, string>;
 }
 
 export interface MarkdownEditorHandle {
@@ -161,8 +169,10 @@ export interface MarkdownEditorHandle {
    *  커서는 닫는 `$` 뒤, 없으면 `$|$`. 삽입 지점 바로 앞/뒤 글자가 `$`이면 그쪽에 공백 1을 함께 넣는다
    *  (마크다운은 `$a$$b$`를 수식 하나 `a$$b`로 읽는다 — micromark 실측). 단일 dispatch = undo 1스텝. */
   insertInlineMath: () => void;
-  /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 탭스톱·커서 점프가 없다 */
+  /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 커서 점프가 없다(AI 완성·OCR도 이쪽 — Phase 68 D23) */
   insertPlainText: (text: string) => void;
+  /** Phase 68: 수식 단축어 삽입 — `▢` 자리(없으면 빈 괄호)를 Tab으로 순회한다. 메뉴 클릭·약어 Tab이 같은 엔진(lib/mathSlots) */
+  insertMathSnippet: (content: string) => void;
   getCursorPosition: () => number;
   getContent: () => string;
   setContent: (text: string) => void;
@@ -345,7 +355,7 @@ function findMathRegion(doc: string, cursor: number): { start: number; end: numb
   return null;
 }
 
-// 수식 영역 내 다음 { 안으로 커서 이동 (끝이면 처음으로 순회). Alt-Tab / Command 더블탭 공용.
+// 수식 영역 내 다음 { 안으로 커서 이동 (끝이면 처음으로 순회). Alt-Tab 전용(Command 더블탭은 Phase 68 D14로 제거).
 function jumpToNextBrace(view: EditorView): boolean {
   const doc = view.state.doc.toString();
   const cursor = view.state.selection.main.head;
@@ -391,9 +401,6 @@ function latexCompletionSource(context: CompletionContext) {
         view.dispatch({
           selection: { anchor: from + offset },
         });
-        if (item.braceCount >= 2) {
-          (view as any).__tabStopsActive = true;
-        }
       },
     }));
 
@@ -429,7 +436,7 @@ const latexLinter = linter((view) => {
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity, lineWrap = true }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity, lineWrap = true, abbrevs }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     /* Phase 65 — 줄바꿈 Compartment. 뷰마다 하나이고, 초기 state는 마운트 시점의
@@ -437,10 +444,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     const wrapCompartment = useRef(new Compartment());
     const lineWrapRef = useRef(lineWrap);
     lineWrapRef.current = lineWrap;
-    const tabStopsRef = useRef<boolean>(false);
     const chordPendingRef = useRef<boolean>(false);
     const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const lastMetaDownRef = useRef<number>(0); // Command 더블탭 감지용
+    /* Phase 68 — Tab 핸들러가 읽는 약어 맵(snippetCallbackRef 패턴). Command 더블탭(lastMetaDownRef)·탭스톱 무장(tabStopsRef)은 D14로 제거 */
+    const abbrevsRef = useRef<Record<string, string>>(abbrevs ?? {});
+    useEffect(() => { abbrevsRef.current = abbrevs ?? {}; }, [abbrevs]);
     /* 마우스 버튼이 눌려 있는 동안(=드래그 선택 진행 중)인가.
        CM은 드래그 중 mousemove마다 userEvent 'select.pointer' 트랜잭션을 만들므로,
        이것만으로 "클릭"을 판정하면 드래그 내내 정렬이 실시간 발화한다. (Phase 56 D17) */
@@ -464,9 +472,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
         const { from, to } = view.state.selection.main;
 
-        const braceCount = (text.match(/\{\}/g) || []).length;
-        tabStopsRef.current = braceCount >= 2;
-
         view.dispatch({
           changes: { from, to, insert: text },
         });
@@ -484,10 +489,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
         view.focus();
       },
-      /* ⚠️ Phase 61c: 위 `insertText`는 **툴바 템플릿 전용 규약**이다 —
-            텍스트에 `{}`가 있으면 커서를 그 안으로 점프시키고, 2개 이상이면 탭스톱을 무장해
-            이후 Tab 키 동작이 바뀐다. AI 대화문에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
-            채팅 삽입에는 쓰면 안 된다. 이쪽은 선택 대체 + 커서 이동 + 포커스만 한다. */
+      /* ⚠️ 삽입 3분 규약(Phase 61c → Phase 68 D23): 위 `insertText`는 **툴바 템플릿·단축키 상용구 전용**이다 —
+            텍스트에 `{}`가 있으면 커서를 그 안으로 점프시킨다(Phase 68 D14로 탭스톱 "무장"은 사라졌고, 그 뒤 Tab은
+            lib/mathInput.nextSlot이 맡는다). AI 대화문·AI 완성·OCR 결과에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
+            그쪽은 아래 `insertPlainText`(선택 대체 + 커서 이동 + 포커스만). 수식 단축어는 `insertMathSnippet`(자리 순회). */
       insertInlineMath() {
         const view = viewRef.current;
         if (!view) return;
@@ -502,6 +507,13 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           changes: { from, to, insert: text },
           selection: { anchor: from + text.length },
         });
+        view.focus();
+      },
+      insertMathSnippet(content: string) {
+        const view = viewRef.current;
+        if (!view) return;
+        const { from, to } = view.state.selection.main;
+        insertWithSlots(view, from, to, content);   // 한 트랜잭션 = undo 1스텝, 첫 자리에 커서
         view.focus();
       },
       getCursorPosition() {
@@ -688,48 +700,71 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     useEffect(() => {
       if (!editorRef.current) return;
 
-      // ── Tab stop 핸들러 ──
-      const tabHandler = keymap.of([
-        {
-          key: 'Tab',
-          run: (view) => {
-            if ((view as any).__tabStopsActive) {
-              tabStopsRef.current = true;
-              (view as any).__tabStopsActive = false;
-            }
-
-            if (!tabStopsRef.current) return false;
-
-            const doc = view.state.doc.toString();
-            const cursor = view.state.selection.main.head;
-
-            const closeBrace = doc.indexOf('}', cursor);
-            if (closeBrace === -1) {
-              tabStopsRef.current = false;
-              return false;
-            }
-
-            const afterClose = doc.indexOf('{', closeBrace + 1);
-            const nextClose = doc.indexOf('}', closeBrace + 1);
-
-            if (afterClose !== -1 && (nextClose === -1 || afterClose < nextClose)) {
-              const gap = doc.substring(closeBrace + 1, afterClose);
-              if (gap.length <= 3) {
-                view.dispatch({
-                  selection: { anchor: afterClose + 1 },
-                });
-                return true;
-              }
-            }
-
-            tabStopsRef.current = false;
+      /* ═══ Phase 68 — Tab · Shift+Tab · Enter (착수판 D9~D16) ═════════════════════════════════
+         Tab은 편집창에 포커스가 있으면 **항상** 편집창 것이다(return true — 포커스 이탈 없음). 밖으로 나가는 길은
+         CM 내장: Escape 뒤 2초 안 Tab(view dist 4503·4835-4836) · Ctrl-m / mac Shift-Alt-m(defaultKeymap).
+         순서(첫 성공에서 멈춤): ⓪ IME 조합 중 → 제자리 ① 자동완성 열림 → 수락 ② 수식 안 + 커서 앞 약어 → 확장(활성 자리
+         안에서도 — 중첩, 새 자리 목록이 옛 것을 대체) ③ 활성 자리 → 다음 자리(수식 안팎 무관 — 메뉴로 수식 밖에 넣은 것도)
+         ④ 수식 안 + 행 환경 본문 + 그룹 깊이 0 + AMP_ENVS → `&` ⑤ 수식 안 → 자리 이동(그룹 탈출 우선 → 커서 뒤 빈 괄호)
+         ⑥ 인라인 `$…$` 안 → 닫는 `$` 뒤로(P22 — display는 줄을 넘어가므로 제자리) ⑦ 제자리.
+         ⚠ ④가 ⑤보다 앞이라 환경 본문 깊이 0에서는 같은 행 뒤쪽 빈 `{}`로 Tab으로는 못 간다(Alt+Tab은 간다) — 예측 가능성과의 교환(P15).
+         Enter: 행 환경 본문 안이면 ` \\`+줄바꿈+들여쓰기(lib/mathInput.rowEnterPlan ⓐ~ⓔ). `shift`를 묶지 않는다 —
+         Shift+Enter는 standardKeymap의 insertNewlineAndIndent(들여쓰기 유지 줄바꿈, `\\` 없음)가 탈출구다. */
+      const mathTab = (view: EditorView): boolean => {
+        if (view.composing) return true;
+        if (completionStatus(view.state) === 'active') { acceptCompletion(view); return true; }
+        const doc = view.state.doc.toString();
+        const sel = view.state.selection.main;
+        const pos = sel.head;
+        const region = mathRegionAt(scanMathRegions(doc), pos);
+        if (region && sel.empty) {
+          const m = matchAbbrev(doc, pos, abbrevsRef.current, region);
+          if (m) { insertWithSlots(view, m.from, pos, m.content); return true; }
+        }
+        if (hasActiveSlots(view.state) && nextSlotCmd(view)) return true;
+        if (region) {
+          const env = findEnclosingEnv(doc, pos, region);
+          if (env && AMP_ENVS.has(env.name) && pos >= env.bodyFrom && pos <= env.bodyTo
+              && groupDepth(doc, env.bodyFrom, pos) === 0) {
             view.dispatch({
-              selection: { anchor: closeBrace + 1 },
+              changes: { from: sel.from, to: sel.to, insert: '&' },
+              selection: { anchor: sel.from + 1 }, scrollIntoView: true, userEvent: 'input.type',
             });
             return true;
-          },
-        },
-      ]);
+          }
+          const slot = nextSlot(doc, pos, region);
+          if (slot !== null) { view.dispatch({ selection: { anchor: slot }, scrollIntoView: true }); return true; }
+          if (region.kind === 'inline' && region.closed && !region.empty) {
+            view.dispatch({ selection: { anchor: region.to }, scrollIntoView: true });
+            return true;
+          }
+        }
+        return true;
+      };
+      const mathShiftTab = (view: EditorView): boolean => {
+        if (view.composing) return true;
+        if (hasActiveSlots(view.state)) prevSlotCmd(view);
+        return true;
+      };
+      const rowEnter = (view: EditorView): boolean => {
+        if (view.composing || completionStatus(view.state) === 'active') return false;
+        const sel = view.state.selection.main;
+        if (!sel.empty) return false;
+        const doc = view.state.doc.toString();
+        const region = mathRegionAt(scanMathRegions(doc), sel.head);
+        if (!region) return false;
+        const plan = rowEnterPlan(doc, sel.head, region);
+        if (!plan) return false;
+        view.dispatch({
+          changes: { from: plan.from, to: plan.to, insert: plan.insert },
+          selection: { anchor: plan.cursor }, scrollIntoView: true, userEvent: 'input.type',
+        });
+        return true;
+      };
+      const mathKeys = Prec.high(keymap.of([
+        { key: 'Tab', run: mathTab, shift: mathShiftTab },
+        { key: 'Enter', run: rowEnter },
+      ]));
 
       // ── Cmd+F / Ctrl+F 내장 검색 패널 차단 (커스텀 FindReplacePanel만 사용) ──
       const disableBuiltinSearch = Prec.highest(keymap.of([
@@ -798,7 +833,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             return false;
           },
         },
-        // ── Alt+Tab: 수식 내 중괄호 순회 (Command 더블탭과 동일 동작) ──
+        // ── Alt+Tab: 수식 내 중괄호 순회 — 채운 칸까지 돈다(빈 칸만 보는 Tab과 용도가 다르다, Phase 68 P3) ──
         {
           key: 'Alt-Tab',
           run: (view) => jumpToNextBrace(view),
@@ -845,28 +880,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         },
       });
 
-      // ── Command(Meta) 더블탭: 수식 내 다음 중괄호로 이동 ──
-      const metaListener = EditorView.domEventHandlers({
-        keydown(event, view) {
-          if (event.key === 'Meta') {
-            const now = Date.now();
-            if (now - lastMetaDownRef.current < 400) {
-              lastMetaDownRef.current = 0;
-              if (jumpToNextBrace(view)) {
-                event.preventDefault();
-                return true;
-              }
-              return false;
-            }
-            lastMetaDownRef.current = now;
-            return false;
-          }
-          // Meta 외 다른 키 → 더블탭 추적 리셋 (Cmd+C 등 오발 방지)
-          lastMetaDownRef.current = 0;
-          return false;
-        },
-      });
-
       // ── LaTeX 자동완성 설정 ──
       const latexAutocompletion = autocompletion({
         override: [latexCompletionSource],
@@ -882,8 +895,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           disableBuiltinSearch,
           mathShortcuts,
           chordListener,
-          metaListener,
-          tabHandler,
+          mathKeys,
+          slotsField,
           basicSetup,
           /* M9 D24-3′ — 정규화 대상 글자(폭 0·한글 채움·단독 초성·전각 마침표)를 점으로 보인다. basicSetup의
              highlightSpecialChars와 설정이 합쳐지고 플러그인은 싱글턴이라 두 번 등록해도 무해(@codemirror/view 6.39).
@@ -898,9 +911,56 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           tooltips({ parent: tooltipHost(), position: 'fixed' }),
           latexAutocompletion,
           // ── 괄호 자동닫기 제어 ──
-          Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {
+          Prec.highest(EditorView.inputHandler.of((view, from, to, text, insert) => {
             const doc = view.state.doc.toString();
             const inMath = isInsideMath(doc, from);
+
+            /* ═══ Phase 68 — 선택 감싸기·후위 변환 (D19~D22) ═══════════════════════════════
+               IME 조합 중에는 관여하지 않는다(inputHandler는 조합 중에도 불린다 — view dist 4257-4260).
+               변환은 "친 글자 그대로"(`insert()` — CM 기본 타자와 같은 userEvent·scrollIntoView라 M7 D5 가로 중앙 추적이 그대로
+               발화) 다음 **별도 트랜잭션**(isolateHistory 'before') → ⌘Z 1회면 변환만 풀리고 친 글자는 남는다. */
+            if (!view.composing) {
+              // D22 선택 감싸기 — 양끝이 **같은** 수식 영역 안일 때만. 밖은 현행(선택 대체)
+              if (from !== to && (text === '(' || text === '[' || text === '{')) {
+                const regions = scanMathRegions(doc);
+                const a = mathRegionAt(regions, from);
+                if (a && a === mathRegionAt(regions, to)) {
+                  const [open, close] = text === '(' ? ['\\left(', '\\right)']
+                    : text === '[' ? ['\\left[', '\\right]'] : ['\\left\\{', '\\right\\}'];
+                  const wrapped = open + doc.slice(from, to) + close;
+                  view.dispatch({
+                    changes: { from, to, insert: wrapped },
+                    selection: { anchor: from, head: from + wrapped.length }, userEvent: 'input.type',
+                  });
+                  return true;
+                }
+              }
+              if (inMath && from === to) {
+                // D20 `^`·`_` → `^{}`·`_{}` — 다음 글자가 `{`이거나 앞 글자가 `\`(`\^`)면 그냥 입력
+                if ((text === '^' || text === '_') && doc[from] !== '{' && doc[from - 1] !== '\\') {
+                  view.dispatch(insert());
+                  view.dispatch({
+                    changes: { from: from + 1, insert: '{}' }, selection: { anchor: from + 2 },
+                    annotations: isolateHistory.of('before'),
+                  });
+                  return true;
+                }
+                // D19 자동 분수 `(A)/` → `\frac{A}{}` — `(`가 항의 시작일 때만(f(x)/ · \left(x\right)/ 제외)
+                if (text === '/') {
+                  const region = mathRegionAt(scanMathRegions(doc), from);
+                  const f = region ? autoFracAt(doc, from, region) : null;
+                  if (f) {
+                    view.dispatch(insert());
+                    const repl = `\\frac{${f.numerator}}{}`;
+                    view.dispatch({
+                      changes: { from: f.from, to: from + 1, insert: repl }, selection: { anchor: f.from + repl.length - 1 },
+                      annotations: isolateHistory.of('before'),
+                    });
+                    return true;
+                  }
+                }
+              }
+            }
 
             // ── \left( / \bigl[ / \Bigl| 등: 좌측 구분자 입력 시 \right 쌍 자동 완성 ──
             const PAIR: Record<string, [string, string]> = {
