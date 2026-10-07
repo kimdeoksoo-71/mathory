@@ -9,6 +9,38 @@ const T = (raw, tab = 'solution', type = 'text', autoFix = false) =>
   tidyBlocks([{ type, raw_text: raw }], { tab, autoFix });
 const shape = (r) => r.blocks.map((b) => `${b.type}:${JSON.stringify(b.raw_text)}`);
 
+/* ═══ R5 행 환경 레이아웃 (Phase 68 D17) ═══ */
+test('R5: 펜스형 $$ 안 한 줄 aligned → \\begin·\\end 자기 줄 + 행 분리 + 2칸 들여쓰기 · stats.fixed · 멱등', () => {
+  const r = T('앞\n\n$$\n\\begin{aligned}a&=1\\\\b&=2\\end{aligned}\n$$\n\n뒤');
+  // R1 ①이 display를 먼저 자기 블록으로 떼고, 그 조각이 R5를 받는다
+  assert.deepEqual(shape(r), [ 'text:"앞"', 'text:"$$\\n\\\\begin{aligned}\\n  a&=1 \\\\\\\\\\n  b&=2\\n\\\\end{aligned}\\n$$"', 'text:"뒤"' ]);
+  assert.equal(r.stats.fixed, 1);
+  const again = tidyBlocks(r.blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab: 'solution', autoFix: false });
+  assert.deepEqual(shape(again), shape(r));
+  assert.equal(again.stats.fixed, 0);
+});
+
+test('R5: 한 줄 $$…$$·인라인·(c) 형태는 무접촉 · autoFix 켬에서도 돈다 · choices 무접촉', () => {
+  for (const raw of ['$$\\begin{aligned}a\\\\b\\end{aligned}$$', '본문 $\\begin{cases}a\\\\b\\end{cases}$', '$$\\begin{aligned}\na\\\\b\n\\end{aligned}$$']) {
+    const r = T(raw);
+    assert.deepEqual(shape(r), [`text:${JSON.stringify(raw)}`], raw);
+    assert.equal(r.stats.fixed, 0);
+  }
+  const on = T('$$\n\\begin{cases}a\\\\b\\end{cases}\n$$', 'solution', 'text', true);
+  assert.deepEqual(shape(on), ['text:"$$\\n\\\\begin{cases}\\n  a \\\\\\\\\\n  b\\n\\\\end{cases}\\n$$"']);
+  const ch = T('$$\n\\begin{cases}a\\\\b\\end{cases}\n$$', 'solution', 'choices');
+  assert.equal(ch.stats.fixed, 0);
+});
+
+test('R5: R1 ①로 떼어 낸 display 조각도 레이아웃을 받는다 · ROW_ENV_RE라 align*도 R1 ① 대상', () => {
+  const r = T('앞\n$$\n\\begin{align*}a&=1\\\\\nb&=2\\end{align*}\n$$\n뒤', 'question');
+  assert.deepEqual(shape(r), [
+    'text:"앞"',
+    'text:"$$\\n\\\\begin{align*}\\n  a&=1 \\\\\\\\\\n  b&=2\\n\\\\end{align*}\\n$$"',
+    'text:"뒤"',
+  ]);
+});
+
 /* ═══ R1 분할 ═══ */
 test('R1 ②③ 경우·하위 경우 문장만 떼고 본문은 text로', () => {
   const r = T('서론\n(i) $a>0$ 인 경우\n본문1\n(i-1) $b>0$인 경우:\n본문2\n(ii) $a<0$ 인 경우.\n본문3', 'question');
@@ -29,10 +61,10 @@ test('R1 ④⑤ [참고]·STEP 행은 제목 블록(표지 보존)', () => {
     ['text:"앞"', 'heading:"## [참고] 극한의 성질"', 'text:"뒤"', 'heading:"## STEP3 정수 $a$의 값 구하기"', 'text:"끝"']);
 });
 
-test('R1 ① \\begin 환경이 든 다행 display만 자기 블록으로 — 한 줄·환경 없는 다행은 유지', () => {
+test('R1 ① \\begin 환경이 든 다행 display만 자기 블록으로 — 한 줄·환경 없는 다행은 유지 (조각은 R5 레이아웃을 받는다)', () => {
   const r = T('앞\n$$\n\\begin{aligned}\na&=1\\\\\nb&=2\n\\end{aligned}\n$$\n중간\n$$\nx=1\n$$\n$$y=2$$\n끝', 'question');
   assert.deepEqual(shape(r), [
-    'text:"앞"', 'text:"$$\\n\\\\begin{aligned}\\na&=1\\\\\\\\\\nb&=2\\n\\\\end{aligned}\\n$$"',
+    'text:"앞"', 'text:"$$\\n\\\\begin{aligned}\\n  a&=1 \\\\\\\\\\n  b&=2\\n\\\\end{aligned}\\n$$"',
     'text:"중간\\n$$\\nx=1\\n$$\\n$$y=2$$\\n끝"',
   ]);
 });

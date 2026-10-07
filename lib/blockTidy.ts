@@ -1,5 +1,5 @@
 /**
- * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`뿐(`npm run test:tidy`가 단독 컴파일).
+ * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`·`./mathInput`뿐(`npm run test:tidy`가 단독 컴파일).
  *
  * 취지: 시트 가져오기·OCR로 들어온 "한 덩어리" 텍스트를 Mathory의 블록 체계에 맞게 **분할**하고,
  * 가능한 경우 **타입**(경우·하위 경우·제목)을 부여하며, 편집 스타일의 **결정적 정형화**를 한 번에 태운다.
@@ -20,7 +20,11 @@
  *       · question이 아닌 탭(solution + extra 전부, P14):
  *       탭 첫 블록 첫 행 앞머리 `15.` 제거 · 2행 이하에서 행 전체가 `정답 ③`·`정답: 56` 이면 그 행 삭제(콜론 허용, N4)
  *   R3 결정적 정형화 = `autoFixDeterministicIssues` 전부(⓪~③ + ⇒ 규칙). choices는 skipJamoRefs, 그림 있는 choices는 제외
+ *   R5 (Phase 68 D17) 행 환경 레이아웃 = `layoutRowEnvs` — **펜스형 `$$`** 안의 aligned·cases·matrix… 를 `\begin`·`\end` 자기 줄 ·
+ *       행마다 한 줄 · 들여쓰기 깊이×2칸으로. 렌더 동일(KaTeX는 공백·줄바꿈 무시) · 멱등 · autoFix 옵션 무관(내용 변화 0).
+ *       한 줄 `$$…$$`(렌더가 인라인인 레거시)·인라인·(c) 형태는 무접촉. R3 뒤라 `\[..\]`→`$$` 변환분도 받는다
  *   R4 trim = 저장 정규화(`toPersistedBlock`)와 같은 앞뒤 빈 줄 제거 — 정돈 직후 화면에서 보이게
+ *   ⚠ 행 환경 이름의 단일 원천은 `lib/mathInput.ROW_ENV_RE`(Phase 68 D15 — R1 ①·R5·편집창 Tab/Enter가 같은 목록을 본다)
  *
  * ⚠ 정규식은 행 시작 앵커 + `[ \t]*`(`\s*` 금지 — 개행을 빨아들인다, CLAUDE.md 규약).
  * ⚠ 새 조각의 `block_key`·id는 **호출부**가 부여한다(모듈은 nanoid를 모른다). `origin`이 입력 인덱스다.
@@ -29,6 +33,7 @@
 import { scanMathRegions } from './mathRegions';
 import { autoFixDeterministicIssues, unwrapSectionCommands } from './proofread';
 import { stripInvisibles, isInvisibleTarget } from './invisibles';
+import { ROW_ENV_RE, layoutRowEnvs } from './mathInput';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
@@ -48,7 +53,6 @@ const SUBCASE_RE = new RegExp(`^\\(${ROMAN}(?:-\\d+\\)|\\)-\\d+)[ \\t]*(.+?인 �
 const REF_RE = /^\[참고\]/;
 const STEP_RE = /^STEP[ \t]?\d+/;
 const GUIDE_RE = /^GUIDE(?![A-Za-z])/;   // M9 D30
-const MULTILINE_ENV_RE = /\\begin\{(?:aligned|cases|dcases|rcases|array|gathered|split|matrix|pmatrix|bmatrix|vmatrix|Vmatrix|Bmatrix|smallmatrix)\}/;
 
 const NUMBER_HEAD_RE = /^\d{1,2}\.[ \t]*\n?/;
 /** M9 D26 — 문제 탭 문제번호: 2자리 이하 자연수 + 마침표 + 공백(1개 이상, Q23) 또는 번호 단독 행. 소수 `1.5`는 공백 조건으로 비껴간다 */
@@ -78,7 +82,7 @@ function splitBlock(text: string): Piece[] | null {
   for (const r of scanMathRegions(text)) {
     if (r.kind !== 'display' || !r.closed || r.empty) continue;
     const inner = text.slice(r.innerFrom, r.innerTo);
-    if (!inner.includes('\n') || !MULTILINE_ENV_RE.test(inner)) continue;
+    if (!inner.includes('\n') || !ROW_ENV_RE.test(inner)) continue;
     const li = lines.findIndex((l) => l.start <= r.from && r.from <= l.end);
     const lj = lines.findIndex((l) => l.start <= r.to - 1 && r.to - 1 <= l.end);
     if (li >= 0 && lj >= 0) display.push({ from: li, to: lj });
@@ -176,7 +180,7 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
     });
   }
 
-  // R3 · R4
+  // R3 · R5 · R4
   // M9 Q16 — 규칙 ⑤(㉠→\tag{n})의 번호 충돌 판정은 **탭 전체**의 기존 \tag 번호로(블록마다 부르므로 블록 안만 보면 놓친다)
   const reservedTagNumbers = [...new Set(out.flatMap((o) => [...o.raw_text.matchAll(/\\tag\*?\{(\d+)\}/g)].map((x) => Number(x[1]))))];
   for (const o of out) {
@@ -185,7 +189,11 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
       o.raw_text = r.fixed; stats.fixed += r.count;
       if (r.tagConflict) stats.tagConflict++;
     }
-    if (SPLITTABLE.has(o.type)) o.raw_text = trimBlock(o.raw_text);
+    if (SPLITTABLE.has(o.type)) {
+      const r5 = layoutRowEnvs(o.raw_text);                       // R5 (Phase 68 D17)
+      if (r5.changed) { o.raw_text = r5.text; stats.fixed++; }
+      o.raw_text = trimBlock(o.raw_text);                           // R4
+    }
   }
   return { blocks: out, stats };
 }
