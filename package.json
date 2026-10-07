@@ -33,6 +33,8 @@
     "test:deeplink": "tsc lib/deepLink.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/deepLink.test.mjs",
     "test:chrome": "tsc lib/chromeAutoHide.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/chromeAutoHide.test.mjs",
     "test:ask": "tsc lib/ask/seed.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ask.test.mjs",
+    "test:mathinput": "tsc lib/mathInput.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathInput.test.mjs",
+    "test:mathslots": "tsc lib/mathSlots.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathSlots.test.mjs",
     "test:peek": "tsc lib/sidebarPeek.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sidebarPeek.test.mjs"
   },
   "dependencies": {
