@@ -474,7 +474,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 68 — 스니펫·수식 자동 확장** — 구현 완료(2026-10-07) · 7커밋(S0~S7) · **덕수 실물 검수 대기** · push 대기
+## 현재 Phase: **Phase 68 — 스니펫·수식 자동 확장** — 구현 완료(2026-10-07) · 7커밋(S0~S7) + docs 1 · **덕수 실물 검수 종결(2026-10-08, "다 잘 작동")** · push 대기
 
 문서: `docs/phasedocs/Phase68 스니펫·수식 자동 확장 v4 착수판.md`
 (계보: 덕수 스케치 `snippet_automation_sketch_261007.md` → v1 web → v2 CLI 교차검토(정정 8·보완 12·P14~P20) → v3 web 재검증(N1 CM snippet() 위치 버그 → 자체 자리 StateField · P21) → **v4 CLI 착수판**(정정 F1~F6 · P22) → 구현. §11이 구현 기록)
@@ -485,7 +485,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **가장 값비싼 발견(v3 N1, v4에서 재현)**: CM `snippet()`의 `\{` 이스케이프 처리에 필드 위치 버그 — v2 프로브가 **첫 자리만** 봐서 놓쳤다(둘째 자리부터 밀린다). 템플릿 엔진을 버리고 자리를 자체 StateField로
 - **v3를 뒤집은 것(v4 F1~F6)**: Shift+Enter는 standardKeymap이 이미 묶고 있다 · 형제 진입에서 `(` 제외 · 자리 스토어는 `lib/` · StateField 효과는 매핑 없이 반환 + undo 해제 · Escape 한 번은 자동완성 닫힌 상태에서
 - **실측**: headless Chrome CDP **31/31**(§9-2 ①~⑦·⑪·⑫·메뉴 경로) — Escape→Tab 포커스 이탈은 페이지에 포커스 가능한 요소가 편집창 하나뿐이면 **되돌아와 실패로 보인다**(하니스 함정) · S5(후위 변환)는 inputHandler 한 곳이라 S3에 함께
-- ⚠ 남은 일: 덕수 실물 검수(§9-2 ⑧ 메뉴 · ⑨ 긴 블록 하단 확장 스크롤·목록 안 `$$` 정돈 · ⑩ · ⑬ 한글 IME 직후 `^`·`/` · ⑭ 줄바꿈 끔 가로 추적 · ⑮ 시트 정돈) · push 뒤 Vercel 빌드 로그 · 임시 라우트 `app/dev68`은 삭제됨
+- **덕수 실물 검수 종결(2026-10-08)** — "테스트해봤는데, 다 잘 작동해". 반영 0건
+- ⚠ 남은 일: push 뒤 Vercel 빌드 로그 확인 · 임시 라우트 `app/dev68`은 삭제됨
 
 ### 이전: **개선묶음 M9 — 각종 기능 개선·버그 수정** — 구현 완료(2026-09-19) · 9커밋(S0~S8) + 검수 후속 1 · push 대기 · **덕수 실물 검수 종결(2026-09-19, "마지막 1%까지 완벽")**
 
