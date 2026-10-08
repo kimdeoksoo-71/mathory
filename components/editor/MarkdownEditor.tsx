@@ -30,7 +30,9 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 /* Phase 68 — 수식 입력 보조: 판정(lib/mathInput) · 자리 상태(lib/mathSlots) · 영역(lib/mathRegions).
    ⚠ `@codemirror/autocomplete`의 snippet·snippetKeymap·clearSnippet을 import하지 말 것 — lib/mathSlots.ts 머리 주석(N1). */
 import { scanMathRegions, mathRegionAt } from '../../lib/mathRegions';
-import { nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, findEnclosingEnv, groupDepth, AMP_ENVS } from '../../lib/mathInput';
+import { nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, findEnclosingEnv, groupDepth, AMP_ENVS, displayTabExit } from '../../lib/mathInput';
+/* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
+import { insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, dispatchExit } from '../../lib/math-editor-extensions';
 import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from '../../lib/mathSlots';
 /* Phase 68a — 수식 영역 자동 영문 입력. 판정·짝짓기·큐 관리는 lib/mathAscii(순수), 여기는 CM 배선뿐(아래 ═══ Phase 68a 절). */
 import {
@@ -204,10 +206,12 @@ interface MarkdownEditorProps {
 
 export interface MarkdownEditorHandle {
   insertText: (text: string, cursorOffset: number) => void;
-  /** M7 D1·D4 — 인라인 수식 스마트 삽입(`$` 버튼 · Ctrl+N,M 공용). 선택이 있으면 `$sel$`로 감싸고
+  /** M7 D1·D4 — 인라인 수식 스마트 삽입(`$` 버튼 · Ctrl+M 공용 — Phase 68b). 선택이 있으면 `$sel$`로 감싸고
    *  커서는 닫는 `$` 뒤, 없으면 `$|$`. 삽입 지점 바로 앞/뒤 글자가 `$`이면 그쪽에 공백 1을 함께 넣는다
    *  (마크다운은 `$a$$b$`를 수식 하나 `a$$b`로 읽는다 — micromark 실측). 단일 dispatch = undo 1스텝. */
   insertInlineMath: () => void;
+  /** Phase 68b Q1 — `$$` 버튼. Ctrl+Shift+M과 같은 `insertDisplayMathBlock`(상하 빈 줄 1개 · 선택은 블록 안 · undo 1스텝) */
+  insertBlockMath: () => void;
   /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 커서 점프가 없다(AI 완성·OCR도 이쪽 — Phase 68 D23) */
   insertPlainText: (text: string) => void;
   /** Phase 68: 수식 단축어 삽입 — `▢` 자리(없으면 빈 괄호)를 Tab으로 순회한다. 메뉴 클릭·약어 Tab이 같은 엔진(lib/mathSlots) */
@@ -246,170 +250,6 @@ export interface MarkdownEditorHandle {
 }
 
 export type KeyWrapResult = 'wrapped' | 'unwrapped' | 'rejected';
-
-/* M7 D1·D4 — 인라인 수식 스마트 삽입. 핸들(`$` 버튼)과 chord(Ctrl+N,M)가 같은 함수를 쓴다.
-   ⚠ `$ $`(안쪽 공백)로 바꾸지 말 것 — 소스에 공백이 영구히 남고 인접 `$` 문제는 그대로다(M7 P1 기각).
-   공백은 **인접 `$`일 때만**: `$x$` 바로 앞에서 누르면 `$|$ $x$`, 바로 뒤면 `$x$ $|$`. */
-function insertInlineMathIn(view: EditorView) {
-  const { from, to } = view.state.selection.main;
-  const doc = view.state.doc;
-  const pre = from > 0 && doc.sliceString(from - 1, from) === '$' ? ' ' : '';
-  const post = to < doc.length && doc.sliceString(to, to + 1) === '$' ? ' ' : '';
-  const sel = doc.sliceString(from, to);
-  const insert = `${pre}$${sel}$${post}`;
-  const anchor = sel ? from + pre.length + sel.length + 2 : from + pre.length + 1;
-  view.dispatch({ changes: { from, to, insert }, selection: { anchor }, userEvent: 'input' });
-  view.focus();
-}
-
-// ── 보편적 괄호/수식 탈출 헬퍼 (Shift+Esc용) ──────────────
-// 커서를 감싸는 가장 안쪽 괄호 또는 수식 기호의 닫는 위치+1 반환
-function findInnermostExit(doc: string, cursor: number): number {
-  const candidates: number[] = [];
-
-  // 1) 괄호 쌍 검사: (), {}, []
-  const pairs: [string, string][] = [['(', ')'], ['{', '}'], ['[', ']']];
-  for (const [open, close] of pairs) {
-    // 커서 왼쪽으로 스캔하며 매칭 안 된 여는 괄호 찾기
-    let depth = 0;
-    let foundOpen = -1;
-    for (let i = cursor - 1; i >= 0; i--) {
-      if (doc[i] === close) depth++;
-      else if (doc[i] === open) {
-        if (depth === 0) { foundOpen = i; break; }
-        depth--;
-      }
-    }
-    if (foundOpen === -1) continue;
-
-    // 커서 오른쪽으로 매칭되는 닫는 괄호 찾기
-    depth = 0;
-    for (let i = cursor; i < doc.length; i++) {
-      if (doc[i] === open) depth++;
-      else if (doc[i] === close) {
-        if (depth === 0) { candidates.push(i + 1); break; }
-        depth--;
-      }
-    }
-  }
-
-  // 2) $$ 블록 수식 검사
-  let searchStart = 0;
-  while (searchStart < doc.length) {
-    const openIdx = doc.indexOf('$$', searchStart);
-    if (openIdx === -1) break;
-    const innerStart = openIdx + 2;
-    const closeIdx = doc.indexOf('$$', innerStart);
-    if (closeIdx === -1) break;
-    if (cursor >= innerStart && cursor <= closeIdx) {
-      candidates.push(closeIdx + 2);
-    }
-    searchStart = closeIdx + 2;
-  }
-
-  // 3) $ 인라인 수식 검사
-  let i = 0;
-  while (i < doc.length) {
-    if (doc[i] === '$' && i + 1 < doc.length && doc[i + 1] === '$') {
-      const closeIdx = doc.indexOf('$$', i + 2);
-      if (closeIdx === -1) break;
-      i = closeIdx + 2;
-      continue;
-    }
-    if (doc[i] === '$') {
-      const innerStart = i + 1;
-      let closeIdx = -1;
-      for (let j = innerStart; j < doc.length; j++) {
-        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
-          closeIdx = j;
-          break;
-        }
-        if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
-      }
-      if (closeIdx !== -1 && cursor >= innerStart && cursor <= closeIdx) {
-        candidates.push(closeIdx + 1);
-      }
-      if (closeIdx !== -1) {
-        i = closeIdx + 1;
-      } else {
-        i++;
-      }
-      continue;
-    }
-    i++;
-  }
-
-  if (candidates.length === 0) return -1;
-  // 가장 안쪽(닫는 위치가 가장 가까운) 후보 반환
-  return Math.min(...candidates);
-}
-
-// ── 수식 영역 범위 반환 (Alt+Tab 중괄호 순회용) ──────────────
-function findMathRegion(doc: string, cursor: number): { start: number; end: number } | null {
-  // 1) $$ 블록 수식
-  let searchStart = 0;
-  while (searchStart < doc.length) {
-    const openIdx = doc.indexOf('$$', searchStart);
-    if (openIdx === -1) break;
-    const innerStart = openIdx + 2;
-    const closeIdx = doc.indexOf('$$', innerStart);
-    if (closeIdx === -1) break;
-    if (cursor >= innerStart && cursor <= closeIdx) {
-      return { start: innerStart, end: closeIdx };
-    }
-    searchStart = closeIdx + 2;
-  }
-
-  // 2) $ 인라인 수식
-  let i = 0;
-  while (i < doc.length) {
-    if (doc[i] === '$' && i + 1 < doc.length && doc[i + 1] === '$') {
-      const closeIdx = doc.indexOf('$$', i + 2);
-      if (closeIdx === -1) break;
-      i = closeIdx + 2;
-      continue;
-    }
-    if (doc[i] === '$') {
-      const innerStart = i + 1;
-      let closeIdx = -1;
-      for (let j = innerStart; j < doc.length; j++) {
-        if (doc[j] === '$' && doc[j - 1] !== '\\' && (j + 1 >= doc.length || doc[j + 1] !== '$')) {
-          closeIdx = j;
-          break;
-        }
-        if (doc[j] === '\n' && j + 1 < doc.length && doc[j + 1] === '\n') break;
-      }
-      if (closeIdx !== -1 && cursor >= innerStart && cursor <= closeIdx) {
-        return { start: innerStart, end: closeIdx };
-      }
-      if (closeIdx !== -1) {
-        i = closeIdx + 1;
-      } else {
-        i++;
-      }
-      continue;
-    }
-    i++;
-  }
-  return null;
-}
-
-// 수식 영역 내 다음 { 안으로 커서 이동 (끝이면 처음으로 순회). Alt-Tab 전용(Command 더블탭은 Phase 68 D14로 제거).
-function jumpToNextBrace(view: EditorView): boolean {
-  const doc = view.state.doc.toString();
-  const cursor = view.state.selection.main.head;
-  const region = findMathRegion(doc, cursor);
-  if (!region) return false;
-  const bracePositions: number[] = [];
-  for (let k = region.start; k < region.end; k++) {
-    if (doc[k] === '{') bracePositions.push(k + 1);
-  }
-  if (bracePositions.length === 0) return false;
-  let nextPos = bracePositions.find((p) => p > cursor);
-  if (nextPos === undefined) nextPos = bracePositions[0];
-  view.dispatch({ selection: { anchor: nextPos } });
-  return true;
-}
 
 // ── LaTeX 자동완성 소스 ──────────────────────────────────
 function latexCompletionSource(context: CompletionContext) {
@@ -483,8 +323,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     const wrapCompartment = useRef(new Compartment());
     const lineWrapRef = useRef(lineWrap);
     lineWrapRef.current = lineWrap;
-    const chordPendingRef = useRef<boolean>(false);
-    const chordTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     /* Phase 68 — Tab 핸들러가 읽는 약어 맵(snippetCallbackRef 패턴). Command 더블탭(lastMetaDownRef)·탭스톱 무장(tabStopsRef)은 D14로 제거 */
     const abbrevsRef = useRef<Record<string, string>>(abbrevs ?? {});
     useEffect(() => { abbrevsRef.current = abbrevs ?? {}; }, [abbrevs]);
@@ -545,6 +383,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const view = viewRef.current;
         if (!view) return;
         insertInlineMathIn(view);
+      },
+      insertBlockMath() {
+        const view = viewRef.current;
+        if (!view) return;
+        insertDisplayMathBlock(view);
       },
       insertPlainText(text: string) {
         const view = viewRef.current;
@@ -750,11 +593,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
 
       /* ═══ Phase 68 — Tab · Shift+Tab · Enter (착수판 D9~D16) ═════════════════════════════════
          Tab은 편집창에 포커스가 있으면 **항상** 편집창 것이다(return true — 포커스 이탈 없음). 밖으로 나가는 길은
-         CM 내장: Escape 뒤 2초 안 Tab(view dist 4503·4835-4836) · Ctrl-m / mac Shift-Alt-m(defaultKeymap).
+         CM 내장: Escape 뒤 2초 안 Tab(view dist 4503·4835-4836) · mac Shift-Alt-m(defaultKeymap — Ctrl-m은 Phase 68b 인라인 수식이 덮었다).
          순서(첫 성공에서 멈춤): ⓪ IME 조합 중 → 제자리 ① 자동완성 열림 → 수락 ② 수식 안 + 커서 앞 약어 → 확장(활성 자리
          안에서도 — 중첩, 새 자리 목록이 옛 것을 대체) ③ 활성 자리 → 다음 자리(수식 안팎 무관 — 메뉴로 수식 밖에 넣은 것도)
          ④ 수식 안 + 행 환경 본문 + 그룹 깊이 0 + AMP_ENVS → `&` ⑤ 수식 안 → 자리 이동(그룹 탈출 우선 → 커서 뒤 빈 괄호)
-         ⑥ 인라인 `$…$` 안 → 닫는 `$` 뒤로(P22 — display는 줄을 넘어가므로 제자리) ⑦ 제자리.
+         ⑥ 인라인 `$…$` 안 → 닫는 `$` 뒤로(P22) ⑥′ 닫힌 display 식 끝 → 밖(68b D7 — `$$`는 다음 행, `\[`는 `\]` 뒤) ⑦ 제자리.
          ⚠ ④가 ⑤보다 앞이라 환경 본문 깊이 0에서는 같은 행 뒤쪽 빈 `{}`로 Tab으로는 못 간다(Alt+Tab은 간다) — 예측 가능성과의 교환(P15).
          Enter: 행 환경 본문 안이면 ` \\`+줄바꿈+들여쓰기(lib/mathInput.rowEnterPlan ⓐ~ⓔ). `shift`를 묶지 않는다 —
          Shift+Enter는 standardKeymap의 insertNewlineAndIndent(들여쓰기 유지 줄바꿈, `\\` 없음)가 탈출구다. */
@@ -786,6 +629,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
             view.dispatch({ selection: { anchor: region.to }, scrollIntoView: true });
             return true;
           }
+          /* ⑥′ Phase 68b D7 — 닫힌 display(`$$`·`\[`) 식 끝(커서 뒤 공백뿐)에서 밖으로: `$$`는 닫는 행 다음 행, `\[`는 `\]` 뒤.
+             ④가 먼저라 aligned 본문 마지막 행 끝은 `&`이고 나가는 자리는 `\end{…}` 뒤. 빈 블록에서는 나가기만(지우기는 Ctrl+M) */
+          const dx = displayTabExit(doc, pos, region);
+          if (dx) return dispatchExit(view, dx);
         }
         return true;
       };
@@ -879,111 +726,24 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         { key: 'Mod-g', run: () => true, preventDefault: true },
       ]));
 
-      // $$ ... $$ 블록 삽입 시 상하에 정확히 빈 줄 1개씩 보장
-      // - 커서 좌·우의 공백(개행 포함)을 흡수해 그 자리에 정규화 삽입
-      // - 문서 시작/끝이면 그쪽 패딩은 생략
-      const insertDisplayMathBlock = (view: EditorView) => {
-        const doc = view.state.doc.toString();
-        const { from } = view.state.selection.main;
-        let left = from;
-        while (left > 0 && /\s/.test(doc[left - 1])) left--;
-        let right = from;
-        while (right < doc.length && /\s/.test(doc[right])) right++;
-        const atStart = left === 0;
-        const atEnd = right === doc.length;
-        const padBefore = atStart ? '' : '\n\n';
-        const padAfter = atEnd ? '' : '\n\n';
-        const insert = padBefore + '$$\n\n$$' + padAfter;
-        // cursor: 두 번째 '\n' 뒤(빈 줄 가운데) = padBefore + "$$\n" 다음
-        const cursor = left + padBefore.length + 3;
-        view.dispatch({
-          changes: { from: left, to: right, insert },
-          selection: { anchor: cursor },
-        });
-      };
-
-      // ── Chord 단축키 (Ctrl+N → M/N) + Shift+Esc + Ctrl+Alt+1~9 ──
-      const mathShortcuts = Prec.highest(keymap.of([
-        {
-          key: 'Ctrl-n',
-          run: (view) => {
-            if (chordPendingRef.current) {
-              chordPendingRef.current = false;
-              if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-              insertDisplayMathBlock(view);
-              return true;
-            }
-
-            chordPendingRef.current = true;
-            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-            chordTimerRef.current = setTimeout(() => {
-              chordPendingRef.current = false;
-            }, 1000);
-            return true;
-          },
-        },
-        {
-          key: 'Shift-Escape',
-          run: (view) => {
-            const doc = view.state.doc.toString();
-            const cursor = view.state.selection.main.head;
-            const exitPos = findInnermostExit(doc, cursor);
-
-            if (exitPos !== -1) {
-              view.dispatch({
-                selection: { anchor: exitPos },
-              });
-              return true;
-            }
-            return false;
-          },
-        },
-        // ── Alt+Tab: 수식 내 중괄호 순회 — 채운 칸까지 돈다(빈 칸만 보는 Tab과 용도가 다르다, Phase 68 P3) ──
-        {
-          key: 'Alt-Tab',
-          run: (view) => jumpToNextBrace(view),
-        },
-        // ── Ctrl+Alt+1 ~ Ctrl+Alt+9 (수식 상용구 단축키) ──
-        ...Array.from({ length: 9 }, (_, i) => ({
-          key: `Ctrl-Alt-${i + 1}`,
-          mac: `Ctrl-Alt-${i + 1}`,
-          run: () => {
-            if (snippetCallbackRef.current) {
-              snippetCallbackRef.current(i + 1);
-              return true;
-            }
-            return false;
-          },
-        })),
-      ]));
-
-      // ── Chord DOM 이벤트 핸들러 ──
-      const chordListener = EditorView.domEventHandlers({
-        keydown(event, view) {
-          if (!chordPendingRef.current) return false;
-
-          if (event.code === 'KeyM') {
-            event.preventDefault();
-            chordPendingRef.current = false;
-            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-
-            insertInlineMathIn(view);   // M7 D4 — `$` 버튼과 같은 스마트 삽입(선택 감싸기 · 인접 `$` 공백)
-            return true;
-          }
-
-          if (event.code === 'KeyN') {
-            event.preventDefault();
-            chordPendingRef.current = false;
-            if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-            insertDisplayMathBlock(view);
-            return true;
-          }
-
-          chordPendingRef.current = false;
-          if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
-          return false;
-        },
-      });
+      /* ── 수식 단축키 (Phase 68b) — Ctrl+M · Ctrl+Shift+M · Alt+= · Shift+Esc · Alt+Tab은 lib/math-editor-extensions가 소유(댓글 편집기와 한 벌).
+         Ctrl+Alt+1~9(스니펫 단축키 상용구)만 snippetCallbackRef를 닫으므로 여기 남는다. Ctrl+N 연타는 폐지(Windows 브라우저 예약 키) ── */
+      const mathShortcuts = [
+        createMathShortcuts().shortcuts,
+        Prec.highest(keymap.of(
+          Array.from({ length: 9 }, (_, i) => ({
+            key: `Ctrl-Alt-${i + 1}`,
+            mac: `Ctrl-Alt-${i + 1}`,
+            run: () => {
+              if (snippetCallbackRef.current) {
+                snippetCallbackRef.current(i + 1);
+                return true;
+              }
+              return false;
+            },
+          })),
+        )),
+      ];
 
       // ── LaTeX 자동완성 설정 ──
       const latexAutocompletion = autocompletion({
@@ -999,7 +759,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         extensions: [
           disableBuiltinSearch,
           mathShortcuts,
-          chordListener,
           mathKeys,
           slotsField,
           basicSetup,
@@ -1476,7 +1235,6 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (timerRef.current !== null) { clearTimeout(timerRef.current); timerRef.current = null; }   // destroy() 앞(H6)
         gutterRO?.disconnect();
         view.destroy();
-        if (chordTimerRef.current) clearTimeout(chordTimerRef.current);
       };
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
