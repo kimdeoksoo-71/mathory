@@ -25,6 +25,7 @@
 
 import { keymap, EditorView } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
+import { isolateHistory } from '@codemirror/commands';
 import {
   autocompletion,
   CompletionContext,
@@ -84,10 +85,13 @@ export function exitRegionOfSelection(view: EditorView): ExitRegion | null {
   return exitRegionAt(doc, sel.head) ?? (sel.empty ? null : exitRegionAt(doc, sel.anchor));
 }
 
-/** `mathExitPos`·`displayTabExit` 결과를 한 dispatch로(insert가 있으면 변경 + 선택 — undo 1스텝). 68 자리 StateField는 변경을 매핑하고 선택이 자리 밖이면 해제한다 */
+/** `mathExitPos`·`displayTabExit` 결과를 한 dispatch로(insert가 있으면 변경 + 선택 — undo 1스텝). 68 자리 StateField는 변경을 매핑하고 선택이 자리 밖이면 해제한다.
+ *  ⚠ 문서를 바꾸는 나오기(`\n` 삽입 · 빈 쌍·빈 블록 삭제)는 `isolateHistory.of('full')` — CM history가 500ms 안의 인접 변경을 한 그룹으로 합쳐
+ *  "Ctrl+Shift+M 두 번(삽입+삭제)"이 ⌘Z 한 번에 통째로 풀렸다(CDP ⑭ 실측). 커서 이동 키의 문서 변경은 항상 자기 undo 스텝이어야 한다 */
+const OWN_STEP = { annotations: isolateHistory.of('full') } as const;
 export function dispatchExit(view: EditorView, plan: ExitPlan): true {
   view.dispatch({
-    ...(plan.insert !== undefined ? { changes: { from: plan.at as number, insert: plan.insert } } : {}),
+    ...(plan.insert !== undefined ? { changes: { from: plan.at as number, insert: plan.insert }, ...OWN_STEP } : {}),
     selection: { anchor: plan.pos },
     scrollIntoView: true,
   });
@@ -97,13 +101,13 @@ export function dispatchExit(view: EditorView, plan: ExitPlan): true {
 /** D5 — ① 빈 쌍 → 삭제 ①′ 빈 블록 → 블록 삭제(`emptyDisplayDeleteRange`) ②③ 그 밖 → `mathExitPos`로 이동 */
 export function exitMath(view: EditorView, r: ExitRegion): true {
   if (r.kind === 'empty') {
-    view.dispatch({ changes: { from: r.from, to: r.to, insert: '' }, selection: { anchor: r.from }, scrollIntoView: true });
+    view.dispatch({ changes: { from: r.from, to: r.to, insert: '' }, selection: { anchor: r.from }, scrollIntoView: true, ...OWN_STEP });
     return true;
   }
   const doc = view.state.doc.toString();
   if (isEmptyDisplay(doc, r.region)) {
     const d = emptyDisplayDeleteRange(doc, r.region);
-    view.dispatch({ changes: { from: d.from, to: d.to, insert: d.insert }, selection: { anchor: d.cursor }, scrollIntoView: true });
+    view.dispatch({ changes: { from: d.from, to: d.to, insert: d.insert }, selection: { anchor: d.cursor }, scrollIntoView: true, ...OWN_STEP });
     return true;
   }
   return dispatchExit(view, mathExitPos(doc, r.region));
