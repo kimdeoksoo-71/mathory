@@ -547,11 +547,12 @@ v4의 인용(C22 자동완성 disabled 경로 · H5 `.compose.start` 예외 · F
 | K5 | 하니스의 `__ime.start()` 뒤 `commit()`이 reconcile **뒤**에 와 옛 텍스트 노드 오프셋에 `replaceData`를 해 `$`를 덮어썼다(`$x,,`) — 실제 Windows IME는 start→commit이 한 이벤트 안에서 동기 | `__ime.type()`(동기 조합) + commit 방어. **엔진 결함이 아니다** |
 | K6 | `$$`만 둔 문서에서 커서 1은 수식 **밖**이다 — R-$$ (a) 미닫힘 display 펜스(`innerFrom 2`) | 하니스 표본은 `본문 $$ 끝`(빈 인라인 쌍 (c)) · `$x$` |
 | K7 | `$x$`에서 `(`는 영문 IME도 `()`가 안 된다 — closeBrackets `before` 규칙(다음 글자가 `$`) | 표본 `$x $` |
+| K8 `[실물 검수 1차 · 2026-10-08]` | **`$` 버튼이 넣은 행 끝 `$\|$`에서 첫 글자만 한글로 남았다**(덕수: `함수 $ㅏ(x)$`). keydown의 영역 판정이 스캐너 R-$$ (a)에 걸려 `$$`+빈 행 나머지를 display 펜스로 읽어 커서를 "밖"으로 봤다 → 첫 키 미기록 → 글자가 들어간 뒤엔 `$ㅏ$`가 인라인이라 둘째 키부터 치환. 하니스 K6와 같은 함정을 **엔진 쪽**이 밟고 있었다 | keydown 판정을 **삽입 뒤의 문서**로(`probeInsertionRegion` — 글자 하나를 넣어 본 문서에서 `mathRegionAt(pos)`). updateListener가 삽입 시작 `fb`에서 판정하는 것과 기준이 같아진다. `test:mathascii` 32 · CDP ㉕(행 끝 `$\|$` · 아래 줄 있음 · 펜스 행 끝은 여전히 밖) |
 
 ### 11-2. 검증
 
-- `test:mathascii` **31건**(계획 30 + `consumeTypedKeys`) · 로직 테스트 **24종 597건**(23종 566 + 31) · `tsc --noEmit` 무오류 · `icons:check` 62종
-- headless Chrome CDP **26/26**: ① Mac식 `\frac{a}{b}`(₩ 직접 경로 = 신뢰 keydown preventDefault 포함) ② `^`→`^{}` 커서 안 ③ `(a+b)/`→`\frac{a+b}{}` ④ 수식 밖 보존 ⑤ `\text{}` 안 보존 ⑥⑲ 자동완성 열린 채 조합 → disabled → 재질의(닫히지 않음) ⑦ `composing=false` ⑧ 토글 off ⑨ ⌘Z 1회 ⑩ Safari 순서 ⑪ Windows `,` ⑫ 메아리 삭제/보존 ⑬ 음절 `마`→`ak`(키 보존) ⑭ Backspace 고아 키 ⑮ 끔 모드 scrollLeft · Windows `(`→`()` ⑯/㉒ 포커스 유지·밖이면 풀림 ⑰ onChange 3회 ⑱ 자리 안 재생 + Tab 탈출 ⑳ 보류 뒤 인접 `{`(안쪽 결합) ㉓ 동기 `(` 직후 한글 `(a)` ㉔ 조합 중 `{` 뒤 한글이 `{}` 안에
+- `test:mathascii` **32건**(계획 30 + `consumeTypedKeys` + `probeInsertionRegion`) · 로직 테스트 **24종 598건**(23종 566 + 32) · `tsc --noEmit` 무오류 · `icons:check` 62종
+- headless Chrome CDP **29/29**(검수 후속 ㉕ 3건 포함): ① Mac식 `\frac{a}{b}`(₩ 직접 경로 = 신뢰 keydown preventDefault 포함) ② `^`→`^{}` 커서 안 ③ `(a+b)/`→`\frac{a+b}{}` ④ 수식 밖 보존 ⑤ `\text{}` 안 보존 ⑥⑲ 자동완성 열린 채 조합 → disabled → 재질의(닫히지 않음) ⑦ `composing=false` ⑧ 토글 off ⑨ ⌘Z 1회 ⑩ Safari 순서 ⑪ Windows `,` ⑫ 메아리 삭제/보존 ⑬ 음절 `마`→`ak`(키 보존) ⑭ Backspace 고아 키 ⑮ 끔 모드 scrollLeft · Windows `(`→`()` ⑯/㉒ 포커스 유지·밖이면 풀림 ⑰ onChange 3회 ⑱ 자리 안 재생 + Tab 탈출 ⑳ 보류 뒤 인접 `{`(안쪽 결합) ㉓ 동기 `(` 직후 한글 `(a)` ㉔ 조합 중 `{` 뒤 한글이 `{}` 안에 ㉕ 행 끝 `$|$`의 첫 글자(K8) · 줄 끝 `$|$` · 펜스 행 끝은 보존
 - 임시 라우트 `app/dev68a` 삭제(dev 종료 뒤) · 프로브 3종은 `docs/phaseSketch/phase68a-ime-probe{,2,3}.html`
 
 ### 11-3. 알고 두는 것

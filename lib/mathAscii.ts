@@ -1,7 +1,7 @@
 /**
  * Phase 68a — 수식 영역 자동 영문 입력(한/영 전환 없는 수식 타이핑)의 **판정·짝짓기·큐 관리** 단일 원천.
  *
- * ⚠ import는 `./mathRegions`(타입)·`./latexScan`뿐 — `npm run test:mathascii`가 이 파일을 tsc로 단독 컴파일한다.
+ * ⚠ import는 `./mathRegions`·`./latexScan`뿐(둘 다 import 0) — `npm run test:mathascii`가 이 파일을 tsc로 단독 컴파일한다.
  *   CM 배선(keydown capture · reconcile · typeText · blur 끊기)은 `components/editor/MarkdownEditor.tsx`에 있다.
  *
  * ── 원리 (v5 D1) ─────────────────────────────────────────────────────────────
@@ -20,6 +20,7 @@
  * 키 폐기는 **순수 삭제·비자격 치환**에서만 — `ㅁ`→`마` 조합 갱신(CM은 `[5,6)→'마'` 치환으로 보고)은 키를 보존한다.
  */
 import type { MathRegion } from './mathRegions';
+import { scanMathRegions, mathRegionAt } from './mathRegions';
 import { readGroup } from './latexScan';
 
 /** 한글 — 첫가끝·호환 자모 · 음절 · 확장 자모 A/B · 반각 (D5′ · P17) */
@@ -245,6 +246,16 @@ export function advanceQueue(entries: readonly PendingIns[], changes: readonly C
   }
   const merged = survivors.concat(added).sort((a, b) => a.from - b.from);
   return { entries: merged, dropKeysBeforeT: dropT, added };
+}
+
+/* ── keydown 시점의 영역 판정은 "삽입 뒤의 문서"로 한다 (2026-10-08 덕수 실물 검수 K8) ──────────────
+   `$` 버튼이 넣는 `$|$`가 **행 끝**이면 스캐너(R-$$ (a))가 `$$`를 display 펜스로 읽어 커서를 "밖"으로 판정한다 →
+   첫 키가 기록되지 않아 한글로 남고, 글자가 들어간 뒤 `$ㅏ$`는 인라인이라 둘째 키부터 치환됐다(실측 `$ㅏ(x)$`).
+   글자 하나를 넣어 본 문서로 판정하면 updateListener(삽입 시작 `fb`에서 판정)와 기준이 같아진다. */
+export interface ProbeResult { region: MathRegion | null; probe: string }
+export function probeInsertionRegion(doc: string, pos: number): ProbeResult {
+  const probe = doc.slice(0, pos) + 'x' + doc.slice(pos);
+  return { region: mathRegionAt(scanMathRegions(probe), pos), probe };
 }
 
 /* ── `\text` 계열 인자 안 판정 (D13) ───────────────────────────────────────── */

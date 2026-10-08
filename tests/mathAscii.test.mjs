@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  US_KEYS, usCharFor, classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, advanceQueue, isInTextArg,
+  US_KEYS, usCharFor, classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, advanceQueue, isInTextArg, probeInsertionRegion,
   TEXT_CMDS, INS_WAIT_MS, ECHO_WINDOW_MS, KEY_TTL_MS, HANGUL_RE,
 } = await import('../.test-build/lib/mathAscii.js');
 const { scanMathRegions, mathRegionAt } = await import('../.test-build/lib/mathRegions.js');
@@ -196,4 +196,17 @@ test('isInTextArg: 10종 인자 안 ✔ · 밖 ✘ · 미닫힘 ✔ · \\mathrm 
   const no = ['$\\text{a}|$', '$\\mathrm{|}$', '$\\left\\{|$', '$|\\text{a}$', '$\\text{a}+|b$', '$\\operatorname{s|}$'];
   for (const s of yes) { const { doc, pos, region } = at(s); assert.ok(region, s); assert.ok(isInTextArg(doc, pos, region), s); }
   for (const s of no) { const { doc, pos, region } = at(s); assert.ok(region, s); assert.ok(!isInTextArg(doc, pos, region), s); }
+});
+
+/* ── keydown 영역 판정 = 삽입 뒤 문서 (K8) ── */
+test('probeInsertionRegion: 행 끝 `$|$`(R-$$ (a) 펜스 오판)도 안 · `$$|` 펜스 행·닫는 `$` 뒤는 밖', () => {
+  const at2 = (src) => { const pos = src.indexOf('|'); return probeInsertionRegion(src.slice(0, pos) + src.slice(pos + 1), pos); };
+  assert.ok(at2('함수 $|$').region, '행 끝 $|$');                          // 스캐너 단독으론 null
+  assert.ok(at2('함수 $|$\n다음 줄').region, '줄 끝 $|$');
+  assert.ok(at2('$|').region, '미닫힘 $');
+  assert.ok(at2('본문 $|$ 끝').region, '빈 인라인 쌍');
+  assert.equal(at2('$x$|').region, null, '닫는 $ 뒤');
+  assert.equal(at2('$$|\nx=1\n$$').region, null, 'display 펜스 여는 행');
+  assert.equal(at2('|함수').region, null);
+  const r = at2('$\\text{|}$'); assert.ok(r.region && isInTextArg(r.probe, 7, r.region), '\\text 안은 probe 문서로 판정');
 });

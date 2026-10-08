@@ -35,7 +35,7 @@ import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots }
 /* Phase 68a — 수식 영역 자동 영문 입력. 판정·짝짓기·큐 관리는 lib/mathAscii(순수), 여기는 CM 배선뿐(아래 ═══ Phase 68a 절). */
 import {
   classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, isInTextArg, advanceQueue,
-  INS_WAIT_MS, ANOMALY_WARN_AT,
+  probeInsertionRegion, INS_WAIT_MS, ANOMALY_WARN_AT,
 } from '../../lib/mathAscii';
 import type { RecordedKey, PendingIns, ChangeDesc } from '../../lib/mathAscii';
 
@@ -1446,10 +1446,11 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           caps: e.getModifierState('CapsLock'),
         });
         if (cls === 'pass' || cls === 'latin' || ch === null) return;
-        const doc = view.state.doc.toString();
         const head = view.state.selection.main.head;
-        const region = mathRegionAt(scanMathRegions(doc), head);
-        if (!region || isInTextArg(doc, head, region)) return;
+        /* 영역은 **삽입 뒤의 문서**로 판정한다 — `$|$`가 행 끝이면 스캐너가 display 펜스로 읽어 "밖"이지만 글자가 들어가면 `$x$`
+           인라인이다(실측: $ 버튼 뒤 첫 글자만 한글로 남았다). updateListener가 삽입 시작 `fb`에서 판정하는 것과 같은 기준 */
+        const { region, probe } = probeInsertionRegion(view.state.doc.toString(), head);
+        if (!region || isInTextArg(probe, head, region)) return;
         const now = performance.now();
         // 직접 경로(Mac 390 종성·₩) — 단 Safari처럼 삽입이 먼저 와 큐에 있으면 기록 경로로(D8)
         if (cls === 'direct' && !insRef.current.some((h) => now - h.t < INS_WAIT_MS)) {

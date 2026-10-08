@@ -2186,7 +2186,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 | **키 분류** | pass(수식 키·표 밖·길이>1 `Dead`·`HangulMode`) / latin(ASCII·비조합) / direct(비ASCII·keyCode 실값 — Mac 390 종성·`₩`: preventDefault + 즉시 삽입) / record(229·`Process`) |
 | **토글** | Row 2 `keyboard`(줄바꿈 왼쪽) · 기본 켬 · `mathory-editor-mathascii` · 단축키 없음 |
 
-신설 `lib/mathAscii.ts`(순수 · `test:mathascii` 31) · `MarkdownEditor` 배선 · 로직 테스트 23종 566 → **24종 597건** · headless Chrome CDP **26/26**(조합은 페이지 안 합성 — CDP IME 에뮬레이션이 브라우저 프로세스를 멎게 한다) · 서버 0 · 규칙 0 · 스키마 0 · 렌더 5사이트 0 · 폰 0 · 댓글 에디터 0 · ICONS 62종.
+신설 `lib/mathAscii.ts`(순수 · `test:mathascii` 32) · `MarkdownEditor` 배선 · 로직 테스트 23종 566 → **24종 598건** · headless Chrome CDP **29/29**(검수 1차 후속 K8 — 행 끝 `$|$`의 첫 글자: keydown 판정을 삽입 뒤 문서로)(조합은 페이지 안 합성 — CDP IME 에뮬레이션이 브라우저 프로세스를 멎게 한다) · 서버 0 · 규칙 0 · 스키마 0 · 렌더 5사이트 0 · 폰 0 · 댓글 에디터 0 · ICONS 62종.
 
 ## Phase 68: 스니펫·수식 자동 확장 ✅ 구현 (2026-10-07) · **덕수 실물 검수 종결(2026-10-08, "다 잘 작동")** · push 대기
 
