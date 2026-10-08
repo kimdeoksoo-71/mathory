@@ -63,3 +63,32 @@ test('mathRegionAt: 구분자 사이(양 끝 포함)만 안이다 · 빈 쌍은 
 test('인접 인라인 `$y$$x$`는 두 개로 읽는다(교정 마스킹 규약)', () => {
   assert.deepEqual(kinds('$y$$x$'), ['inline(y)', 'inline(x)']);
 });
+
+/* ── Phase 68b — probeInsertionRegion(68a K8, mathAscii에서 이관) · exitRegionAt(D5′) ── */
+const { probeInsertionRegion, exitRegionAt } = await import('../.test-build/lib/mathRegions.js');
+const exitAt = (src) => { const pos = src.indexOf('|'); return exitRegionAt(src.slice(0, pos) + src.slice(pos + 1), pos); };
+
+test('probeInsertionRegion: 행 끝 `$|$`는 probe로 안 · 본문은 밖', () => {
+  assert.equal(mathRegionAt(scanMathRegions('abc $$'), 5), null);                 // R-$$ (a) 오판
+  assert.equal(probeInsertionRegion('abc $$', 5).region?.kind, 'inline');
+  assert.equal(probeInsertionRegion('abc', 2).region, null);
+});
+
+test('exitRegionAt: 행 끝 `$|$` → empty(4-6) · 행 중간 `$|$x` → empty(probe 없이) · `$x|$` → region · 본문 → null', () => {
+  assert.deepEqual(exitAt('abc $|$'), { kind: 'empty', from: 4, to: 6 });
+  assert.deepEqual(exitAt('a $|$x'), { kind: 'empty', from: 2, to: 4 });
+  assert.deepEqual(exitAt('a $|$ b'), { kind: 'empty', from: 2, to: 4 });
+  const r = exitAt('$x|$');
+  assert.equal(r.kind, 'region'); assert.equal(r.region.kind, 'inline'); assert.equal(r.region.to, 3);
+  assert.equal(exitAt('ab|c'), null);
+  assert.equal(exitAt('|'), null);
+});
+
+test('exitRegionAt: 펜스 안 → region · 행 끝 `$$|`(여는 직후) → 미닫힘 region · `a $|b`는 미닫힘 region(빈 쌍 아님 — I2 가드)', () => {
+  const f = exitAt('x\n\n$$\na=|1\n$$\n');
+  assert.equal(f.kind, 'region'); assert.equal(f.region.kind, 'display'); assert.equal(f.region.closed, true);
+  const u = exitAt('abc $$|');
+  assert.equal(u.kind, 'region'); assert.equal(u.region.closed, false);
+  const o = exitAt('a $|b');
+  assert.equal(o.kind, 'region'); assert.equal(o.region.closed, false);
+});

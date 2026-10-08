@@ -223,3 +223,72 @@ test('layoutRowEnvs: 한 줄 $$…$$ · (c) 형태 · 인라인 · \\[…\\] · 
   const r = layoutRowEnvs(two);
   assert.equal(r.text, '$$\n\\begin{cases}\n  a \\\\\n  b\n\\end{cases}\n$$\n\n글  \n\n$$\nx=1\n$$\n\n$$\n\\begin{pmatrix}\n  1&2 \\\\\n  3&4\n\\end{pmatrix}\n$$');
 });
+
+/* ── Phase 68b — isFencedDisplay · isEmptyDisplay · mathExitPos · displayTabExit · emptyDisplayDeleteRange ── */
+const { isFencedDisplay, isEmptyDisplay, mathExitPos, displayTabExit, emptyDisplayDeleteRange } = await import('../.test-build/lib/mathInput.js');
+const regionOf = (doc, pos) => mathRegionAt(scanMathRegions(doc), pos);
+/** 나오기 결과를 "적용된 문서 + 커서"로 */
+const applyExit = (doc, plan) => {
+  const d = plan.insert ? doc.slice(0, plan.at) + plan.insert + doc.slice(plan.at) : doc;
+  return d.slice(0, plan.pos) + '|' + d.slice(plan.pos);
+};
+
+test('isFencedDisplay: 펜스 ✓ · 한 줄 $$…$$ ✗ · $$\\begin (c) ✗ · 닫는 $$ 앞 글자 ✗ · 인라인 ✗', () => {
+  const ok = (doc, pos) => isFencedDisplay(doc, regionOf(doc, pos));
+  assert.equal(ok('$$\nx\n$$', 3), true);
+  assert.equal(ok('$$x$$', 2), false);
+  assert.equal(ok('$$\\begin{aligned}a\\end{aligned}\n$$', 1), false);   // (c) 빈 쌍 안
+  assert.equal(ok('$$\nx=1 $$', 3), false);
+  assert.equal(ok('$x$', 1), false);
+});
+
+test('isEmptyDisplay: $$\\n\\n$$ ✓ · 공백 행 ✓ · 내용 ✗ · 한 줄 $$$$ ✓ · (c) 빈 쌍 ✗ · 미닫힘 ✗', () => {
+  const ok = (doc, pos) => isEmptyDisplay(doc, regionOf(doc, pos));
+  assert.equal(ok('$$\n\n$$', 3), true);
+  assert.equal(ok('$$\n  \n$$', 3), true);
+  assert.equal(ok('$$\nx\n$$', 3), false);
+  assert.equal(ok('$$$$', 2), true);
+  assert.equal(ok('a $$ b', 3), false);
+  assert.equal(ok('abc $$', 6), false);
+});
+
+test('mathExitPos: 인라인 → $ 뒤 · \\( → \\) 뒤 · \\[ → \\] 뒤 · 미닫힘 인라인 → 행 끝', () => {
+  const go = (src) => { const pos = src.indexOf('|'); const doc = src.slice(0, pos) + src.slice(pos + 1); return applyExit(doc, mathExitPos(doc, regionOf(doc, pos))); };
+  assert.equal(go('a $x|$ b'), 'a $x$| b');
+  assert.equal(go('a \\(x|\\) b'), 'a \\(x\\)| b');
+  assert.equal(go('a \\[x|\\] b'), 'a \\[x\\]| b');
+  assert.equal(go('a $x| b\nc'), 'a $x b|\nc');
+});
+
+test('mathExitPos: 닫힌 $$ — 펜스 → 다음 행 · 한 줄 $$x$$ → 다음 행 · 닫는 $$ 앞 글자 → 다음 행 · 뒤 글자 → region.to · 문서 끝/다음 행 비공백 → \\n 삽입', () => {
+  const go = (src) => { const pos = src.indexOf('|'); const doc = src.slice(0, pos) + src.slice(pos + 1); return applyExit(doc, mathExitPos(doc, regionOf(doc, pos))); };
+  assert.equal(go('a\n\n$$\nx|\n$$\n\nb'), 'a\n\n$$\nx\n$$\n|\nb');
+  assert.equal(go('a\n\n$$x|$$\n\nb'), 'a\n\n$$x$$\n|\nb');
+  assert.equal(go('a\n\n$$\nx|=1 $$\n\nb'), 'a\n\n$$\nx=1 $$\n|\nb');
+  assert.equal(go('foo $$x|$$ bar'), 'foo $$x$$| bar');
+  assert.equal(go('a\n\n$$\nx|\n$$'), 'a\n\n$$\nx\n$$\n|');
+  assert.equal(go('a\n\n$$\nx|\n$$\nb'), 'a\n\n$$\nx\n$$\n|\nb');
+  assert.equal(go('a\n\n$$\nx|\n$$  \n\nb'), 'a\n\n$$\nx\n$$  \n|\nb');
+});
+
+test('displayTabExit: 식 끝 ✓ · 식 중간 null · 인라인 null · 한 줄 $$x|$$ ✓ · \\[x|\\] → \\] 뒤 · \\end{aligned}| ✓ · 빈 블록 ✓(나가기만)', () => {
+  const go = (src) => { const pos = src.indexOf('|'); const doc = src.slice(0, pos) + src.slice(pos + 1); const p = displayTabExit(doc, pos, regionOf(doc, pos)); return p ? applyExit(doc, p) : null; };
+  assert.equal(go('$$\nx|\n$$\n\nb'), '$$\nx\n$$\n|\nb');
+  assert.equal(go('$$\nx| \n\n$$\n\nb'), '$$\nx \n\n$$\n|\nb');
+  assert.equal(go('$$\nx|+1\n$$\n\nb'), null);
+  assert.equal(go('a $x|$ b'), null);
+  assert.equal(go('$$x|$$\n\nb'), '$$x$$\n|\nb');
+  assert.equal(go('\\[x|\\] b'), '\\[x\\]| b');
+  assert.equal(go('$$\n\\begin{aligned}\n  a &= 1\n\\end{aligned}|\n$$\n\nb'), '$$\n\\begin{aligned}\n  a &= 1\n\\end{aligned}\n$$\n|\nb');
+  assert.equal(go('$$\n|\n$$\n\nb'), '$$\n\n$$\n|\nb');
+});
+
+test('emptyDisplayDeleteRange: 가운데 → 문단 경계 하나 · 문서 시작/끝 → 패딩 없음 · 단독 → 빈 문서 · 한 줄 $$$$ → region만 (전부 저장 정규형)', () => {
+  const go = (doc, pos) => { const r = emptyDisplayDeleteRange(doc, regionOf(doc, pos)); const d = doc.slice(0, r.from) + r.insert + doc.slice(r.to); return { d, c: r.cursor }; };
+  assert.deepEqual(go('foo\n\n$$\n\n$$\n\nbar', 7), { d: 'foo\n\nbar', c: 3 });
+  assert.deepEqual(go('foo \n\n$$\n \n$$\n\n\nbar', 8), { d: 'foo\n\nbar', c: 3 });
+  assert.deepEqual(go('$$\n\n$$\n\nbar', 3), { d: 'bar', c: 0 });
+  assert.deepEqual(go('foo\n\n$$\n\n$$', 7), { d: 'foo', c: 3 });
+  assert.deepEqual(go('$$\n\n$$', 3), { d: '', c: 0 });
+  assert.deepEqual(go('foo $$$$ bar', 6), { d: 'foo  bar', c: 4 });
+});

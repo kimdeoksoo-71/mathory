@@ -249,14 +249,9 @@ export function advanceQueue(entries: readonly PendingIns[], changes: readonly C
 }
 
 /* ── keydown 시점의 영역 판정은 "삽입 뒤의 문서"로 한다 (2026-10-08 덕수 실물 검수 K8) ──────────────
-   `$` 버튼이 넣는 `$|$`가 **행 끝**이면 스캐너(R-$$ (a))가 `$$`를 display 펜스로 읽어 커서를 "밖"으로 판정한다 →
-   첫 키가 기록되지 않아 한글로 남고, 글자가 들어간 뒤 `$ㅏ$`는 인라인이라 둘째 키부터 치환됐다(실측 `$ㅏ(x)$`).
-   글자 하나를 넣어 본 문서로 판정하면 updateListener(삽입 시작 `fb`에서 판정)와 기준이 같아진다. */
-export interface ProbeResult { region: MathRegion | null; probe: string }
-export function probeInsertionRegion(doc: string, pos: number): ProbeResult {
-  const probe = doc.slice(0, pos) + 'x' + doc.slice(pos);
-  return { region: mathRegionAt(scanMathRegions(probe), pos), probe };
-}
+   본체는 Phase 68b Q9로 `lib/mathRegions.ts`로 옮겼다(68b 나오기 판정 `exitRegionAt`과 원천을 공유). 여기서는 re-export —
+   소비처(`MarkdownEditor` keydown capture · `tests/mathAscii`)는 무변경. */
+export { probeInsertionRegion, type ProbeResult } from './mathRegions';
 
 /* ── `\text` 계열 인자 안 판정 (D13) ───────────────────────────────────────── */
 export const TEXT_CMDS: readonly string[] = [

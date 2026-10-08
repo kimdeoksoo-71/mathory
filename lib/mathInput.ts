@@ -15,6 +15,9 @@
  *   - autoFracAt                        `(A)/` → `\frac{A}{}` 판정(D19)
  *   - rowEnterPlan                      행 환경 안 Enter(D16)
  *   - layoutRowEnvs                     정돈 R5 — 펜스형 `$$` 안 행 환경 레이아웃(D17)
+ *   - isFencedDisplay                   R5의 "펜스형" 판정 단일 원천(68b D8)
+ *   - mathExitPos / displayTabExit      Phase 68b — 수식 나오기 위치(D5) · Tab ⑥′(D7). 안/밖 판정은 `mathRegions.exitRegionAt`
+ *   - isEmptyDisplay / emptyDisplayDeleteRange  68b Q11 — 빈 블록 `$$\n\n$$`를 Ctrl+M이 지우는 범위
  *
  * ⚠ 행 단위 정규식은 `[ \t]*`(`\s*` 금지 — 개행을 빨아들인다, CLAUDE.md 규약).
  */
@@ -438,10 +441,7 @@ export function layoutRowEnvs(text: string): { text: string; changed: boolean } 
   let changed = false;
   for (let k = regions.length - 1; k >= 0; k--) {
     const r = regions[k];
-    const openRest = text.slice(r.innerFrom, lineEndOf(text, r.innerFrom));
-    if (openRest.trim() !== '') continue;                                // (b)·(c)가 아닌 펜스형만
-    const closeLineStart = lineStartOf(text, r.innerTo);
-    if (text.slice(closeLineStart, r.innerTo).trim() !== '') continue;
+    if (!isFencedDisplay(text, r)) continue;                             // (b)·(c)가 아닌 펜스형만 (Phase 68b D8 — 원천 하나)
     const inner = text.slice(r.innerFrom, r.innerTo);
     if (!ROW_ENV_RE.test(inner)) continue;
     const lines = layoutSeg(inner, 0);
@@ -451,4 +451,67 @@ export function layoutRowEnvs(text: string): { text: string; changed: boolean } 
     changed = true;
   }
   return { text: out, changed };
+}
+
+/* ─── Phase 68b — 수식 나오기(D5·D7·D8) ────────────────────────────────────
+   키 바인딩·dispatch는 `lib/math-editor-extensions.ts`(양쪽 편집기 공용)와 `MarkdownEditor`(Tab ⑥′)가 맡는다.
+   "안/밖" 판정은 `lib/mathRegions.exitRegionAt`(삽입 뒤 문서 기준 — 행 끝 `$|$` 함정) — 여기서는 받은 region으로 **위치만** 센다. */
+
+/** D8 — 펜스형 `$$`: 여는 `$$` 뒤 행 나머지 공백 ∧ 닫는 `$$` 앞 행 머리 공백. 정돈 R5(`layoutRowEnvs`) 전용 판정 */
+export function isFencedDisplay(doc: string, region: MathRegion): boolean {
+  if (region.kind !== 'display' || region.delimiter !== '$$' || !region.closed || region.empty) return false;
+  if (doc.slice(region.innerFrom, lineEndOf(doc, region.innerFrom)).trim() !== '') return false;
+  return doc.slice(lineStartOf(doc, region.innerTo), region.innerTo).trim() === '';
+}
+
+/** D5 ①′ — 닫힌 `$$` display이고 안이 공백뿐(한 줄 `$$$$` 포함). Ctrl+M·Shift+Esc가 블록째 지우는 대상(Q11) */
+export function isEmptyDisplay(doc: string, region: MathRegion): boolean {
+  return region.kind === 'display' && region.delimiter === '$$' && region.closed && !region.empty
+    && doc.slice(region.innerFrom, region.innerTo).trim() === '';
+}
+
+export interface ExitPlan {
+  /** insert 적용 **뒤** 좌표 */
+  pos: number;
+  insert?: '\n';
+  /** insert를 넣을 자리(원 문서 좌표) */
+  at?: number;
+}
+
+/** D5 — 수식 전체에서 나오는 위치.
+ *  ③ 인라인(`$`·`\(`) · `\[…\]` · 미닫힘                      → region.to
+ *  ② 닫힌 `$$`(한 줄·펜스형·닫는 `$$` 앞 글자 — 펜스 여부 무관): 닫는 `$$` 뒤 행 나머지 비공백 → region.to
+ *     ②-a 다음 행 있고 공백뿐 → 다음 행 시작  ②-b 다음 행 없음·비공백 → `\n`을 넣어 빈 행을 만들고 그 행
+ *  한 줄 `$$x$$`도 ②인 이유(v3 F1): 저장 정규화가 어차피 앞뒤를 가르므로 화면에서도 처음부터 다음 행에 쓰게 한다. */
+export function mathExitPos(doc: string, region: MathRegion): ExitPlan {
+  if (region.kind !== 'display' || region.delimiter !== '$$' || !region.closed) return { pos: region.to };
+  const lineEnd = lineEndOf(doc, region.to);
+  if (doc.slice(region.to, lineEnd).trim() !== '') return { pos: region.to };
+  if (lineEnd >= doc.length) return { pos: lineEnd + 1, insert: '\n', at: lineEnd };
+  const nextStart = lineEnd + 1;
+  const nextEnd = lineEndOf(doc, nextStart);
+  if (doc.slice(nextStart, nextEnd).trim() !== '') return { pos: lineEnd + 1, insert: '\n', at: lineEnd };
+  return { pos: nextStart };
+}
+
+/** D7 — Tab ⑥′: 닫힌 비empty display 안에서 커서 뒤가 `innerTo`까지 공백뿐일 때만 나간다(식 중간에서 튀지 않게). 아니면 null */
+export function displayTabExit(doc: string, pos: number, region: MathRegion): ExitPlan | null {
+  if (region.kind !== 'display' || !region.closed || region.empty) return null;
+  if (pos < region.innerFrom || pos > region.innerTo) return null;
+  if (doc.slice(pos, region.innerTo).trim() !== '') return null;
+  return mathExitPos(doc, region);
+}
+
+/** D5 ①′ — 빈 블록 삭제 범위(v4 I1). `insertDisplayMathBlock`의 역연산이되 흡수된 공백은 되살릴 수 없으므로 **문단 경계 하나**로 되돌린다.
+ *  다행(여는·닫는 `$$`가 다른 행): 좌우 공백(개행 포함) 끝까지를 `''`(문서 시작/끝) 또는 `\n\n`으로. 커서 = 범위 시작(누르기 직전 자리).
+ *  한 줄 `$$$$`: region만 지운다. 결과는 저장 정규화(`normalizeDisplayMathSpacing` + 앞뒤 trim) 뒤와 바이트 동일(테스트가 고정) */
+export function emptyDisplayDeleteRange(doc: string, region: MathRegion): { from: number; to: number; insert: '' | '\n\n'; cursor: number } {
+  const oneLine = lineEndOf(doc, region.from) >= region.to;
+  if (oneLine) return { from: region.from, to: region.to, insert: '', cursor: region.from };
+  let a = region.from;
+  while (a > 0 && /\s/.test(doc[a - 1])) a--;
+  let b = region.to;
+  while (b < doc.length && /\s/.test(doc[b])) b++;
+  const insert = a === 0 || b === doc.length ? '' : '\n\n';
+  return { from: a, to: b, insert, cursor: a };
 }

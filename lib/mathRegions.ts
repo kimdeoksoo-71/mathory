@@ -166,3 +166,34 @@ export function mathRegionAt(regions: MathRegion[], pos: number): MathRegion | n
   }
   return null;
 }
+
+/* ── keydown 시점의 영역 판정은 "삽입 뒤의 문서"로 한다 (Phase 68a K8 · 2026-10-08 덕수 실물 검수) ──────────
+   `$` 버튼·Ctrl+M이 넣는 `$|$`가 **행 끝**이면 R-$$ (a)가 `$$`를 display 펜스로 읽어 커서를 "밖"으로 판정한다 →
+   68a는 첫 키가 기록되지 않아 한글로 남았고(실측 `$ㅏ(x)$`), 68b는 두 번째 Ctrl+M이 "나오기" 대신 삽입을 돌려 `$ $|$ $`를
+   만든다. 글자 하나를 넣어 본 문서로 판정하면 updateListener(삽입 시작 `fb`에서 판정)와 기준이 같아진다.
+   Phase 68b Q9 — `lib/mathAscii.ts`에서 여기로 이관(그쪽은 re-export). 소비처: 68a keydown capture · 68b `exitRegionAt`. */
+export interface ProbeResult { region: MathRegion | null; probe: string }
+export function probeInsertionRegion(doc: string, pos: number): ProbeResult {
+  const probe = doc.slice(0, pos) + 'x' + doc.slice(pos);
+  return { region: mathRegionAt(scanMathRegions(probe), pos), probe };
+}
+
+/* ── Phase 68b D5′ — 수식 "나오기"의 안/밖 판정 ──────────────────────────────
+   ① 실문서 영역(비empty) → region  ② 실문서가 (c) 빈 쌍(행 중간 `$|$`) → empty(probe 불필요)
+   ③ 실문서 밖 → probe. probe도 밖 → null  ④ probe가 inline이고 안이 probe 글자뿐이며 **양옆이 `$`** → empty(행 끝 `$|$`)
+   ⑤ 그 밖 → null(밖). ⚠ ④의 양옆 `$` 가드(I2) — `a $|b` 같은 자리는 ①에서 미닫힘 region으로 잡혀 여기 오지 않지만,
+   온다 해도 `$|$`가 아닌 두 글자를 지우면 안 된다. */
+export type ExitRegion =
+  | { kind: 'region'; region: MathRegion }
+  | { kind: 'empty'; from: number; to: number };
+
+export function exitRegionAt(doc: string, pos: number): ExitRegion | null {
+  const r = mathRegionAt(scanMathRegions(doc), pos);
+  if (r) return r.empty ? { kind: 'empty', from: r.from, to: r.to } : { kind: 'region', region: r };
+  const p = probeInsertionRegion(doc, pos).region;
+  if (!p) return null;
+  if (p.kind === 'inline' && p.innerTo - p.innerFrom === 1 && doc[pos - 1] === '$' && doc[pos] === '$') {
+    return { kind: 'empty', from: pos - 1, to: pos + 1 };
+  }
+  return null;
+}
