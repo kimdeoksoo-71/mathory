@@ -110,8 +110,8 @@
 | Step 1: 불필요한 자동 서식 제거 | ✅ | 2026-03-14 | markdown() 확장 제거 → 이탤릭(_), 제목(#) 밑줄, 괄호 밑줄 해소 |
 | Step 1: 소괄호·대괄호 자동닫기 수식 밖 비활성화 | ✅ | 2026-03-14 | Prec.highest inputHandler로 수식 밖 (, [ 자동닫기 차단 |
 | Step 2: 중괄호 자동닫기 보완 | ✅ | 2026-03-14 | 수식 안 { 입력 시 뒤 문자 유무 무관하게 {} 자동삽입 |
-| Step 2: Alt+Tab 중괄호 순회 | ✅ | 2026-03-14 | findMathRegion 헬퍼, 수식 영역 내 {} 사이를 순환 이동 |
-| Step 3: Shift+Esc 범용 괄호 탈출 | ✅ | 2026-03-14 | findInnermostExit — (), {}, [], $, $$ 중첩 단계별 탈출 |
+| Step 2: Alt+Tab 중괄호 순회 | ✅ | 2026-03-14 | findMathRegion 헬퍼, 수식 영역 내 {} 사이를 순환 이동 (Phase 68b: 판정을 `mathRegions`로 치환, Mac 전용) |
+| Step 3: Shift+Esc 범용 괄호 탈출 | ✅ | 2026-03-14 | findInnermostExit — (), {}, [], $, $$ 중첩 단계별 탈출 (**Phase 68b에서 Ctrl+M 체계로 대체** — 수식 나오기 별칭만 남고 괄호 탈출은 Tab ⑤) |
 | 순열조합 툴바 불필요 공백 제거 | ✅ | 2026-03-14 | `\\ \\mathrm` → `\\mathrm` |
 
 ## Phase 17: LaTeX Lint 강화 ✅
@@ -2171,6 +2171,27 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 68b: 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출) ✅ 구현 (2026-10-09) · headless CDP 44/44 · **덕수 실물 검수 대기** · push 대기
+
+계획서: `docs/phasedocs/Phase68b 수식 입력 단축키 정비 v4 착수판.md` (§11 구현 기록 · 5커밋 S1~S4 + CDP 후속 1)
+(계보: 연구 v1 web → 계획 v1 web → v2 CLI 교차검토 + 독립 검증 에이전트(R-1~R-5) → v3 web 재검증(F1~F3·H1~H5·Q11) → v4 CLI 착수판(Q1~Q11 전항 권장안) → 구현)
+
+| 키 | 수식 밖 | 수식 안 |
+|---|---|---|
+| **Ctrl+M** (Mac도 Control) · Word 별칭 Alt+= / Ctrl+= | `$|$` · 선택은 `$sel$` (툴바 `$`와 같은 함수) | **한 번에 나오기** — 인라인·`\(`·`\[`·미닫힘은 닫는 구분자 뒤, 닫힌 `$$`는 닫는 행 다음 행(없으면 `\n`). 빈 쌍 `$|$`·빈 블록은 **삭제** |
+| **Ctrl+Shift+M** | `$$\n|\n$$` 상하 빈 줄 1개 · 선택은 블록 안 (툴바 `$$`와 같은 함수 — 옛 `insertText` 경로 폐기) | 같다 |
+| Shift+Esc | 항상 소비(Windows 작업 관리자 차단) | 같다(HWP 호환 별칭) |
+| Tab ⑥′ | — | 닫힌 display 식 끝(커서 뒤 공백뿐) → 밖. aligned 본문 마지막 행은 ④ `&`, `\end{…}` 뒤에서 밖 |
+| ~~Ctrl+N→M/N~~ | 폐지 — Windows 브라우저 예약 키라 페이지에 오지 않았다 | Mac은 CM Emacs cursorLineDown으로 복귀 |
+| Alt+Tab | `{` 순회 유지(Mac 전용) | — |
+
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0.** 신설 0 · 수정 7 + 2줄 · 삭제 약 250줄(`findInnermostExit`·`findMathRegion` 사본 4벌 · chord). 삽입·나오기·keymap의 원천은 `lib/math-editor-extensions.ts`(블록·댓글 편집기 한 벌). 안/밖 판정 `mathRegions.exitRegionAt`(삽입 뒤 문서 — 68a K8 함정 회피) · 위치 `mathInput.mathExitPos`. 로직 테스트 597 → **606**.
+
+- **가장 값비싼 발견**: ① 행 끝 `$|$`에서 `mathRegionAt`이 밖 → 두 번째 Ctrl+M이 `$ $|$ $`(독립 검증 R-1) ② 빈 쌍 잔재 `$$`가 저장 정규화에서 다음 블록과 짝지어짐(실행 확인) ③ CM history 500ms 그룹화로 삽입+삭제가 ⌘Z 한 번에 풀림(CDP ⑭ → `isolateHistory`)
+- ⚠ 남은 일: 덕수 실물(Windows 3브라우저 · 한글 조합 중 Ctrl+M) · dev 종료 뒤 `app/dev68b` 삭제 → build → push
+
+---
+
 ## Phase 68a: 수식 영역 자동 영문 입력(한/영 전환 없는 수식 타이핑) ✅ 구현 (2026-10-08) · **덕수 실물 검수 종결(2026-10-08, "이제 잘 작동")** · push 대기
 
 계획서: `docs/phasedocs/Phase68a 수식 영역 자동 영문 입력 v5 착수판.md` (§11 구현 기록 · 4커밋 S1~S4)
@@ -2196,7 +2217,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 | 항목 | 처방 |
 |---|---|
 | **스니펫** | 상용구 → 스니펫. 두 절: 단축키 상용구(현행 `⌃⌥1~9`) · 수식 단축어(수식 안 약어 뒤 Tab — 기본 8종 `b1·b2·log·sq·root·lim·int·sum` + 사용자 등록, 사용자 우선). Firestore `kind`·`abbrev` additive, `orderBy` 제거(필드 없는 문서 누락) · 구조 템플릿 삭제 |
-| **Tab** | 편집창 것(포커스 이탈 없음, 탈출 = Escape→Tab·Ctrl-m). ⓪IME ①자동완성 수락 ②약어 확장 ③자리 ④행 환경 `&` ⑤그룹 탈출→빈 괄호 ⑥인라인 `$` 밖 ⑦제자리. Command 더블탭·탭스톱 무장 삭제, Alt+Tab 유지 |
+| **Tab** | 편집창 것(포커스 이탈 없음, 탈출 = Escape→Tab · Mac Shift-Alt-m — Ctrl-m은 68b 인라인 수식). ⓪IME ①자동완성 수락 ②약어 확장 ③자리 ④행 환경 `&` ⑤그룹 탈출→빈 괄호 ⑥인라인 `$` 밖 ⑥′닫힌 display 식 끝 밖(68b) ⑦제자리. Command 더블탭·탭스톱 무장 삭제, Alt+Tab 유지 |
 | **자리** | `lib/mathSlots.ts` 자체 StateField — CM `snippet()`은 `\{` 이스케이프 위치 버그(N1 실측)라 미사용. `▢` 자리, 없으면 빈 괄호, 끝 탈출 |
 | **Enter** | 행 환경 본문: ` \\`+줄바꿈+들여쓰기 · 빈 행·이미 `\\`는 줄바꿈만 · `\end` 앞은 새 행+`\end` 자기 행 · Shift+Enter = 기본(standardKeymap) |
 | **정돈 R5** | 펜스형 `$$` 안 행 환경 레이아웃(`\begin`·`\end` 자기 줄 · 행 분리 · 2칸 들여쓰기 · 멱등). `ROW_ENVS` 단일 원천(R1 ① 포함) |
