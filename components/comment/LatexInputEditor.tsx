@@ -54,8 +54,8 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
 
     useEffect(() => {
       if (!containerRef.current) return;
-      // 수식 단축키 (Ctrl+N chord, Shift+Esc, Opt+Tab) — 인스턴스별 chord 상태
-      const { shortcuts: mathShortcuts, chordListener } = createMathShortcuts();
+      // 수식 단축키 (Phase 68b — Ctrl+M · Ctrl+Shift+M · Alt+= · Shift+Esc · Opt+Tab) — 블록 편집기와 같은 바인딩·삽입 함수
+      const { shortcuts: mathShortcuts } = createMathShortcuts();
       const latexAutocompletion = createLatexAutocompletion();
       const view = new EditorView({
         parent: containerRef.current,
@@ -65,7 +65,6 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             history(),
             markdown(),
             mathShortcuts,
-            chordListener,
             latexAutocompletion,
             // 수식 영역 내에서 ( [ { 입력 시 자동으로 짝 괄호 닫기 + 커서 중앙 배치.
             // 수식 밖에선 기본 동작(1글자 삽입)을 유지.
