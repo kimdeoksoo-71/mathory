@@ -8,7 +8,7 @@
  * Step 3 이후: MathToolbar 의존 제거 → 커스터마이징 가능한 그룹 시스템으로 교체.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { MathSnippet, SnippetInput } from '../../types/snippet';
 import MathSymbolPalette from './MathSymbolPalette';
 import MathSnippetMenu from './MathSnippetMenu';
@@ -197,8 +197,10 @@ interface UnifiedToolbarProps {
   searchOpen: boolean;
   onToggleSearch: () => void;
   /** M7 D1·D4 — `$` 버튼. 템플릿 삽입(`onInsert`)이 아니라 MarkdownEditor.insertInlineMath()로
-   *  간다(선택 감싸기 · 인접 `$` 공백). `$$` 블록 버튼은 종전대로 onInsert. */
+   *  간다(선택 감싸기 · 인접 `$` 공백). `$$` 버튼도 Phase 68b Q1부터 insertBlockMath()(Ctrl+Shift+M과 같은 함수 —
+   *  상하 빈 줄 1개 · 선택은 블록 안 · undo 1스텝). 두 키의 단축키는 툴팁에 표시한다(D12). */
   onInsertInlineMath: () => void;
+  onInsertBlockMath: () => void;
   proofreading: boolean;
   onRunProofread: () => void;
   /** M7 D19 — 블록 정돈(현재 탭): 분할 + 결정적 정형화. 교정은 이제 API 내용 검토만 한다 */
@@ -613,6 +615,7 @@ export default function UnifiedToolbar({
   searchOpen,
   onToggleSearch,
   onInsertInlineMath,
+  onInsertBlockMath,
   proofreading,
   onRunProofread,
   onTidyBlocks,
@@ -638,7 +641,11 @@ export default function UnifiedToolbar({
   const [tableDialogOpen, setTableDialogOpen] = useState(false);
 
   const insertInlineMath = () => onInsertInlineMath();
-  const insertBlockMath = () => onInsert('$$\n\n$$', 3);
+  const insertBlockMath = () => onInsertBlockMath();
+  /* Phase 68b D12 — 툴팁의 단축키 라벨. MathSnippetMenu.getModLabel과 같은 판별(navigator.platform), SSR 가드. 공용으로 뽑지 않는다(소비처 둘) */
+  const keyLabel = useMemo(() => (k: string) =>
+    (typeof navigator !== 'undefined' && navigator.platform?.includes('Mac'))
+      ? k.replace('Ctrl+Shift+', '⌃⇧').replace('Ctrl+', '⌃') : k, []);
 
   const insertTable = (rows: number, cols: number) => {
     const md = buildMarkdownTable(rows, cols);
@@ -862,11 +869,11 @@ export default function UnifiedToolbar({
                 서로 쪽으로 ~3.8px씩 → 글리프 간격 ≈9px. 창 이동은 아이콘 함수의
                 viewBoxShift가 담당한다 */}
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <IconButton title="인라인 수식 ($…$)" onClick={insertInlineMath}>
+              <IconButton title={`인라인 수식 ($…$) · ${keyLabel('Ctrl+M')}`} onClick={insertInlineMath}>
                 <InlineMathIcon />
               </IconButton>
               <span style={{ display: 'inline-flex', marginLeft: -8 }}>
-                <IconButton title="블록 수식 ($$…$$)" onClick={insertBlockMath}>
+                <IconButton title={`블록 수식 ($$…$$) · ${keyLabel('Ctrl+Shift+M')}`} onClick={insertBlockMath}>
                   <BlockMathIcon />
                 </IconButton>
               </span>

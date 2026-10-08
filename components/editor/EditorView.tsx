@@ -2504,6 +2504,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const handleInsertInlineMath = () => {
     if (activeBlockId) editorRefs.current[activeBlockId]?.insertInlineMath();
   };
+  /* Phase 68b Q1 — `$$` 버튼: Ctrl+Shift+M과 같은 insertDisplayMathBlock(상하 빈 줄 1개 · 선택은 블록 안). MarkdownEditor가 소유한다 */
+  const handleInsertBlockMath = () => {
+    if (activeBlockId) editorRefs.current[activeBlockId]?.insertBlockMath();
+  };
 
   /* ─── Phase 61c: agent 대화 선택 영역 → 활성 블록에 삽입 ─── */
   const handleInsertFromChat = useCallback((text: string): 'inserted' | 'no-target' => {
@@ -3763,6 +3767,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           showToolbar={!!showToolbar}
           onInsert={handleInsert}
           onInsertInlineMath={handleInsertInlineMath}
+          onInsertBlockMath={handleInsertBlockMath}
           snippets={snippets}
           abbrevs={abbrevMap}
           userAbbrevs={userAbbrevs}
