@@ -118,6 +118,11 @@ function LineWrapIcon() {
   return <PhIcon d={PH.arrowElbowDownLeft} size={Math.round(ICON_SIZE * 0.8)} />;
 }
 
+/** 수식 안 자동 영문 입력 토글 (Phase 68a D11) — 도안 하나(keyboard), 상태는 박스(active)가 나른다(줄바꿈 토글과 같은 규약) */
+function MathAsciiIcon() {
+  return <PhIcon d={PH.keyboard} size={ICON_SIZE} />;
+}
+
 /** 강조(핵심문장) — highlighter */
 function KeySentenceIcon() {
   return <PhIcon d={PH.highlighter} size={ICON_SIZE} />;
@@ -213,6 +218,9 @@ interface UnifiedToolbarProps {
   /** Phase 65 — 편집창 줄바꿈 켬/끔 (⌥Z). 끄면 긴 줄이 블록 안에서 좌우 스크롤된다. */
   lineWrap: boolean;
   onToggleLineWrap: () => void;
+  /** Phase 68a — 수식 영역 안 자동 영문 입력 켬/끔(기본 켬). 끄면 한글 IME 글자가 그대로 들어간다 */
+  mathAscii: boolean;
+  onToggleMathAscii: () => void;
   /** Phase 58 P3 — 선택 영역을 `**…**`로 감싸기/해제 */
   onToggleKey: () => void;
   /** 직전 토글이 규칙 위반으로 거부됐는가 (버튼 흔들림 피드백) */
@@ -620,6 +628,8 @@ export default function UnifiedToolbar({
   canPaste,
   lineWrap,
   onToggleLineWrap,
+  mathAscii,
+  onToggleMathAscii,
   onToggleKey,
   keyToggleRejected,
 }: UnifiedToolbarProps) {
@@ -792,6 +802,19 @@ export default function UnifiedToolbar({
          상태를 함께 나르지만 여기는 박스뿐이라, !lineWrap으로 두면 ↵가 켜졌는데
          줄바꿈은 꺼져 있는 상태가 되어 읽히지 않는다. 기본값(켬)에서 늘 켜져 보이는 것은
          수용한 대가다(덕수 2026-09-08). */
+    /* Phase 68a D11 — 수식 안 자동 영문 입력. 줄바꿈 **왼쪽**(배열 끝에서부터 숨으므로 lineWrap → mathAscii 순으로 사라진다) */
+    {
+      key: 'mathAscii',
+      node: (
+        <IconButton
+          title={mathAscii ? '수식 안 자동 영문 입력 끄기' : '수식 안 자동 영문 입력 켜기'}
+          onClick={onToggleMathAscii}
+          active={mathAscii}
+        >
+          <MathAsciiIcon />
+        </IconButton>
+      ),
+    },
     {
       key: 'lineWrap',
       node: (

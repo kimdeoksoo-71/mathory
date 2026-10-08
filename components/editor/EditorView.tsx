@@ -251,6 +251,15 @@ function getStoredLineWrap(): boolean {
 function setStoredLineWrap(on: boolean) {
   try { localStorage.setItem(LINE_WRAP_KEY, on ? 'on' : 'off'); } catch {}
 }
+/* Phase 68a D11 — 수식 영역 자동 영문 입력 토글. 줄바꿈 토글과 같은 꼴(기본 켬 · 마운트 후 localStorage 반영). */
+const MATH_ASCII_KEY = 'mathory-editor-mathascii';
+function getStoredMathAscii(): boolean {
+  if (typeof window === 'undefined') return true;
+  try { return localStorage.getItem(MATH_ASCII_KEY) !== 'off'; } catch { return true; }
+}
+function setStoredMathAscii(on: boolean) {
+  try { localStorage.setItem(MATH_ASCII_KEY, on ? 'on' : 'off'); } catch {}
+}
 
 /* ═══ EmptyBlockChips: 빈 텍스트 블록에 그림/선택지 빠른 전환 칩 ═══ */
 
@@ -721,6 +730,7 @@ function SortableEditorBlock({
   onSplitBlock,
   canSplitBlock,
   lineWrap,
+  mathAscii,
 }: {
   block: LocalBlock;
   index: number;
@@ -728,6 +738,8 @@ function SortableEditorBlock({
   canDelete: boolean;
   /** Phase 65: 줄바꿈 켬/끔 (⌥Z) — 전 블록이 함께 움직인다 */
   lineWrap: boolean;
+  /** Phase 68a: 수식 안 자동 영문 입력 — 전 블록이 함께 움직인다 */
+  mathAscii: boolean;
   editorRefs: React.MutableRefObject<Record<string, MarkdownEditorHandle | null>>;
   collapseMode: boolean;
   selected: boolean;
@@ -1010,6 +1022,7 @@ function SortableEditorBlock({
               initialValue={block.raw_text}
               onChange={onChange}
               lineWrap={lineWrap}
+              mathAscii={mathAscii}
               onSnippetShortcut={onSnippetShortcut}
               abbrevs={abbrevs}
               onCursorActivity={onCursorActivity
@@ -1107,6 +1120,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
      (가로폭 선례 — 초기값을 서버·클라가 같게 두어 hydration mismatch를 피한다). */
   const [lineWrap, setLineWrap] = useState(true);
   useEffect(() => { setLineWrap(getStoredLineWrap()); }, []);
+  /* Phase 68a — 수식 안 자동 영문 입력(기본 켬). IME 조합 중 토글을 막지 않는다 — Compartment 재구성이 없어 Phase 65 D12의 이유가 없다 */
+  const [mathAscii, setMathAscii] = useState(true);
+  useEffect(() => { setMathAscii(getStoredMathAscii()); }, []);
+  const toggleMathAscii = useCallback(() => {
+    setMathAscii((prev) => { const next = !prev; setStoredMathAscii(next); return next; });
+  }, []);
   /* 덕수 요청(2026-08-28) — 3번째 이후 탭의 이름 변경·삭제 버튼은 평소에 숨기고
      hover 0.5초 뒤에 나타낸다. 두 버튼이 상시 보이면 탭 줄이 시끄럽고, 삭제가
      늘 노출돼 있는 것도 좋지 않다.
@@ -3769,6 +3788,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           canPaste={canPasteBlocks}
           lineWrap={lineWrap}
           onToggleLineWrap={toggleLineWrap}
+          mathAscii={mathAscii}
+          onToggleMathAscii={toggleMathAscii}
           onToggleKey={handleToggleKey}
           keyToggleRejected={keyToggleRejected}
         />
@@ -3992,6 +4013,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                     onSplitBlock={handleSplitBlock}
                     canSplitBlock={SPLITTABLE_TYPES.has(block.type)}
                     lineWrap={lineWrap}
+                    mathAscii={mathAscii}
                   />
                   {proofData && (
                     <ProofreadResultBox

@@ -104,6 +104,8 @@ const ICONS = {
   // ToggleSwitch가 트랙+손잡이 도안으로 복귀해 소비처 0. 되살리지 말 것.
   // ── Phase 66a (문답 검증 질문 리스트) ──
   listDashes: ['list-dashes', 'regular'],                  // IconQuestionList — agent 탭 질문 목록.
+  // ── Phase 68a (수식 영역 자동 영문 입력) ──
+  keyboard: ['keyboard', 'regular'],                       // MathAsciiIcon — Row 2 토글(줄바꿈 왼쪽). 상태는 박스(active)가 나른다
   // ⚠ listChecks(교정)를 재사용하지 말 것 — EditorView는 Row 2 툴바와 agent 드로어가 동시에 보인다.
 };
 
