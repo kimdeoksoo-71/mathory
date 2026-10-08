@@ -4,7 +4,7 @@ import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
 import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
-import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
+import { EditorState, Prec, Compartment, Extension, Annotation, Transaction } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion, completionStatus, acceptCompletion } from '@codemirror/autocomplete';
 import { isolateHistory } from '@codemirror/commands';
@@ -32,6 +32,43 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 import { scanMathRegions, mathRegionAt } from '../../lib/mathRegions';
 import { nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, findEnclosingEnv, groupDepth, AMP_ENVS } from '../../lib/mathInput';
 import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from '../../lib/mathSlots';
+/* Phase 68a — 수식 영역 자동 영문 입력. 판정·짝짓기·큐 관리는 lib/mathAscii(순수), 여기는 CM 배선뿐(아래 ═══ Phase 68a 절). */
+import {
+  classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, isInTextArg, advanceQueue,
+  INS_WAIT_MS, ANOMALY_WARN_AT,
+} from '../../lib/mathAscii';
+import type { RecordedKey, PendingIns, ChangeDesc } from '../../lib/mathAscii';
+
+/* ═══ Phase 68a — 수식 영역 자동 영문 입력 (한/영 전환 없는 수식 타이핑) ═══════════════════════════
+   원리: 한글 IME를 켠 채로 두고, 수식 영역 안에서 IME가 넣은 글자를 **물리 키(event.code)의 US 글자**로 사후 치환한다.
+   절차(reconcile — 계획서 D7, 순서가 불변식이다):
+     ① 끊기: `view.compositionStarted`면 contentDOM.blur() → contentDOM.focus({preventScroll}) — 브라우저가 진짜 compositionend를
+        낸다. 치환을 **먼저** 하면 Blink가 "끝낼 조합이 없다"고 보아 compositionend를 안 내고 `view.composing`이 영구 고착된다
+        (실험 2 실측 — Tab·Enter·후위 변환·closeBrackets가 전부 "조합 중"으로 멈춘다).
+     ② 지우기: 보류 삽입 범위가 아직 같은 글자열이면 삭제(별도 트랜잭션).
+     ③ 재생: 글자 단위로 inputHandler 체인을 태운다(typeText) — Phase 68 후위 변환·closeBrackets가 영문 IME와 같게 발화한다.
+     ⚠ ②와 ③을 한 트랜잭션으로 합치지 말 것 — 첫 글자를 "범위 대체"로 넣으면 inputHandler가 선택 있음으로 읽어
+        D22(`(`·`[`·`{` → \left…\right 감싸기)·closeBrackets가 지우려던 한글을 감싼다(E16).
+   끊기의 blur·focus는 래퍼 div의 **capture** 리스너가 `breakingRef` 동안 stopImmediatePropagation으로 삼킨다(D10′) —
+     CM이 보면 자동완성이 10ms 뒤 닫히고(autocomplete dist 1262-1268) `observers.focus`가 옛 scrollLeft를 복원한다(view dist 5120-5124).
+     브라우저의 compositionend는 별개 이벤트라 그대로 CM에 닿는다.
+   keydown은 래퍼 div **네이티브 capture** — CM은 조합 중(composing>0) 키 이벤트를 handlers에 넘기지 않는다(view dist 4544-4548).
+   ⚠ focus는 `view.focus()`가 아니라 `contentDOM.focus()` — 실험 3이 실증한 경로. 레코드 측면은 둘이 같다
+     (`view.update()`가 매 dispatch에 observer.clear()). "금지"가 아니라 "실증 경로 유지"다.
+   ⚠ 보류 삽입 좌표는 **안쪽 결합**(lib/mathAscii.advanceQueue) — mathSlots의 바깥 결합과 반대이며 의도다. */
+const mathAsciiTx = Annotation.define<boolean>();
+
+/** 재생 한 글자 — CM 기본 타자와 같은 체인(inputHandler facet 루프 → 기본 삽입).
+ *  ⚠ `insert`는 **Transaction**을 돌려줘야 한다 — Phase 68 핸들러가 `view.dispatch(insert())`한다. 재생은 `input.type` +
+ *  `scrollIntoView`(M7 D5 가로 중앙 추적이 그대로 발화) + 우리 annotation(updateListener가 자기 삽입을 큐에 넣지 않게). */
+function typeText(view: EditorView, ch: string) {
+  const { from, to } = view.state.selection.main;
+  let tr: Transaction | null = null;
+  const insert = () => tr || (tr = view.state.update(view.state.replaceSelection(ch), {
+    userEvent: 'input.type', scrollIntoView: true, annotations: mathAsciiTx.of(true),
+  }));
+  if (!view.state.facet(EditorView.inputHandler).some((h) => h(view, from, to, ch, insert))) view.dispatch(insert());
+}
 
 /* ═══ Phase 65 — 줄바꿈 켬/끔 (⌥Z) ═══════════════════════════════════
    CodeMirror의 "줄을 접는가"는 **클래스가 아니라 computed white-space**로 정해진다
@@ -161,6 +198,8 @@ interface MarkdownEditorProps {
   lineWrap?: boolean;
   /** Phase 68: 수식 단축어 맵(기본 8종 + 사용자, 사용자 우선). 수식 안에서 약어 뒤 Tab이 확장한다. ref로 보관해 keymap 클로저가 최신값을 읽는다 */
   abbrevs?: Record<string, string>;
+  /** Phase 68a: 수식 영역 안 자동 영문 입력(기본 켬). 끄면 한글 IME 글자가 그대로 들어간다 */
+  mathAscii?: boolean;
 }
 
 export interface MarkdownEditorHandle {
@@ -436,7 +475,7 @@ const latexLinter = linter((view) => {
 });
 
 const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
-  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity, lineWrap = true, abbrevs }, ref) => {
+  ({ initialValue = '', onChange, autoHeight = false, onSnippetShortcut, onCursorActivity, lineWrap = true, abbrevs, mathAscii = true }, ref) => {
     const editorRef = useRef<HTMLDivElement>(null);
     const viewRef = useRef<EditorView | null>(null);
     /* Phase 65 — 줄바꿈 Compartment. 뷰마다 하나이고, 초기 state는 마운트 시점의
@@ -449,6 +488,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
     /* Phase 68 — Tab 핸들러가 읽는 약어 맵(snippetCallbackRef 패턴). Command 더블탭(lastMetaDownRef)·탭스톱 무장(tabStopsRef)은 D14로 제거 */
     const abbrevsRef = useRef<Record<string, string>>(abbrevs ?? {});
     useEffect(() => { abbrevsRef.current = abbrevs ?? {}; }, [abbrevs]);
+    /* Phase 68a — 상태 전부 ref(effect deps는 []). 켬/끔은 reconfigure할 것이 없어 ref만 갱신한다 */
+    const mathAsciiRef = useRef(mathAscii);
+    mathAsciiRef.current = mathAscii;
+    const keysRef = useRef<RecordedKey[]>([]);            // 기록 키 FIFO (record 경로)
+    const insRef = useRef<PendingIns[]>([]);               // 보류 삽입(IME가 넣은 글자) — 좌표는 advanceQueue가 따라간다
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastReplacedRef = useRef<{ text: string; t: number } | null>(null);
+    const breakingRef = useRef(false);                     // 끊기(blur→focus) 동기 구간 — capture 리스너가 그 사이 blur·focus를 삼킨다
+    const anomalyRef = useRef(0);
     /* 마우스 버튼이 눌려 있는 동안(=드래그 선택 진행 중)인가.
        CM은 드래그 중 mousemove마다 userEvent 'select.pointer' 트랜잭션을 만들므로,
        이것만으로 "클릭"을 판정하면 드래그 내내 정렬이 실시간 발화한다. (Phase 56 D17) */
@@ -766,6 +814,63 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         { key: 'Enter', run: rowEnter },
       ]));
 
+      /* ═══ Phase 68a — reconcile(끊기 → 지우기 → 재생). 파일 상단 절 참조. setTimeout이다 — 트랜잭션 안에서 dispatch 금지 ═══ */
+      const scheduleReconcile = (ms: number) => {
+        if (timerRef.current !== null) return;               // 이미 예약됨(가장 이른 것만 산다)
+        timerRef.current = setTimeout(() => { timerRef.current = null; reconcile(); }, ms);
+      };
+      const noteAnomaly = () => {
+        anomalyRef.current++;
+        if (anomalyRef.current === ANOMALY_WARN_AT && process.env.NODE_ENV !== 'production') {
+          console.warn('[Phase68a] 수식 자동 영문 입력 이상 상태 10건 — 짝 없는 키·메아리·범위 소실·합성 compositionend');
+        }
+      };
+      const reconcile = () => {
+        const view = viewRef.current;
+        if (!view) return;                                    // 블록 언마운트 뒤 타이머(H4)
+        const now = performance.now();
+        keysRef.current = expireKeys(keysRef.current, now);
+        while (insRef.current.length) {
+          const h = insRef.current[0];
+          const r = pairInsertion({ text: h.text, t: h.t, keys: keysRef.current, now, lastReplaced: lastReplacedRef.current });
+          if (r.wait) { scheduleReconcile(20); return; }     // Safari — keydown이 뒤에 온다
+          keysRef.current = keysRef.current.slice(r.consumed);
+          insRef.current.shift();
+          if (r.kept) { anomalyRef.current += r.kept - 1; noteAnomaly(); }
+          if (!r.replay) continue;                            // 글자도 같고 체인을 태울 ASCII 조합도 아니다
+          // ① 끊기 — 포커스가 있을 때만(없으면 되빼앗는다, F2). breakingRef는 try 안에서만 참(I5 — 누수가 다음 진짜 blur를 삼킨다)
+          if (view.compositionStarted && view.hasFocus) {
+            try {
+              breakingRef.current = true;
+              view.contentDOM.blur();
+              view.contentDOM.focus({ preventScroll: true });
+            } finally {
+              breakingRef.current = false;
+            }
+          }
+          if (view.compositionStarted) {                      // 안전망(실험 3에서 0회) — 데스크톱은 비-EditContext라 관찰자가 받는다
+            view.contentDOM.dispatchEvent(new CompositionEvent('compositionend', { data: '', bubbles: true }));
+            noteAnomaly();
+          }
+          // ② 지우기 — 범위가 아직 그 글자열일 때만. 아니면(블러가 조합 글자를 지운 경우) 선택만 두고 재생
+          const still = h.to <= view.state.doc.length && view.state.doc.sliceString(h.from, h.to) === h.text;
+          if (still) {
+            view.dispatch({
+              changes: { from: h.from, to: h.to, insert: '' }, selection: { anchor: h.from },
+              userEvent: 'input.type', annotations: mathAsciiTx.of(true),
+            });
+          } else {
+            view.dispatch({ selection: { anchor: Math.min(h.from, view.state.doc.length) }, annotations: mathAsciiTx.of(true) });
+            noteAnomaly();
+          }
+          // ③ 재생 — 글자 단위로 inputHandler 체인
+          for (const c of r.rep) typeText(view, c);
+          lastReplacedRef.current = { text: h.text, t: performance.now() };
+          if (r.echo) noteAnomaly();
+        }
+        if (keysRef.current.length) scheduleReconcile(40);    // 고아 키 TTL 정리
+      };
+
       // ── Cmd+F / Ctrl+F 내장 검색 패널 차단 (커스텀 FindReplacePanel만 사용) ──
       const disableBuiltinSearch = Prec.highest(keymap.of([
         { key: 'Mod-f', run: () => true, preventDefault: true },
@@ -1018,6 +1123,41 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
           wrapCompartment.current.of(wrapExtensions(lineWrapRef.current)),
           latexHighlightPlugin,
           latexHighlightTheme,
+          /* Phase 68a — 보류 삽입 큐. 변경을 모아 advanceQueue(순수)에 넘길 뿐이다 — 겹침·키 폐기·좌표 매핑은 거기서(I1~I4).
+             자격(qualifies) = 우리 트랜잭션 아님 · paste 아님 · 토글 켬 · needsReplay(한글 또는 compose) · 수식 안 · \text 밖.
+             ⚠ 우리 삭제·재생(mathAsciiTx)·Phase 68 2차 dispatch·closeBrackets도 **좌표 매핑에는 참여**해야 한다 — 비자격으로 넘긴다. */
+          EditorView.updateListener.of((u) => {
+            if (!u.docChanged) return;
+            if (u.transactions.some((t) => t.isUserEvent('undo') || t.isUserEvent('redo'))) {
+              insRef.current = []; keysRef.current = [];
+              return;
+            }
+            const own = u.transactions.some((t) => t.annotation(mathAsciiTx));
+            const paste = u.transactions.some((t) => t.isUserEvent('input.paste'));
+            const ue = u.transactions.map((t) => t.annotation(Transaction.userEvent)).find(Boolean);
+            const docStr = u.state.doc.toString();
+            const regions = own || paste || !mathAsciiRef.current ? null : scanMathRegions(docStr);
+            /* 이 flush 때 조합이 살아 있었나 — 살아 있었으면 CM이 inputHandler 체인을 건너뛰었으므로 ASCII 조합도 재생한다.
+               compositionend가 먼저 온 동기 조합(Windows식)은 체인이 이미 돌았다 → 재생하면 이중 적용(lib/mathAscii.needsReplay 주석) */
+            const live = u.view.compositionStarted;
+            const changes: ChangeDesc[] = [];
+            u.changes.iterChanges((fa, ta, fb, tb, ins) => {
+              const s = ins.toString();
+              let qualifies = false;
+              if (regions && s && needsReplay(s, ue, live)) {
+                const r = mathRegionAt(regions, fb);
+                qualifies = !!r && !isInTextArg(docStr, fb, r);
+              }
+              // 재생하지 않는 삽입이 큐 머리 키와 같은 글자로 시작하면 그 키는 이미 소비된 것(동기 조합의 `(`→`()` · 조합 중 `{`→`{}`)
+              if (!own && !qualifies && s) keysRef.current = consumeTypedKeys(keysRef.current, s);
+              changes.push({ fa, ta, fb, tb, ins: s, qualifies });
+            });
+            if (!changes.length) return;
+            const res = advanceQueue(insRef.current, changes, performance.now());
+            insRef.current = res.entries;
+            if (res.dropKeysBeforeT !== null) keysRef.current = dropKeysBefore(keysRef.current, res.dropKeysBeforeT);
+            if (res.added.length) scheduleReconcile(0);
+          }),
           EditorView.updateListener.of((update) => {
             if (update.docChanged && onChange) {
               onChange(update.state.doc.toString());
@@ -1296,9 +1436,43 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       document.addEventListener('mousedown', onPointerDown, true);
       document.addEventListener('mouseup', onPointerUp);
 
+      /* ═══ Phase 68a — 래퍼 div capture 리스너 셋 (keydown · blur · focus). 파일 상단 절 참조 ═══ */
+      const wrapperEl = editorRef.current;
+      const onMathAsciiKeydown = (e: KeyboardEvent) => {
+        if (!mathAsciiRef.current || !view.contentDOM.contains(e.target as Node)) return;
+        const { cls, ch } = classifyKey({
+          key: e.key, code: e.code, keyCode: e.keyCode, isComposing: e.isComposing,
+          ctrlKey: e.ctrlKey, metaKey: e.metaKey, altKey: e.altKey, shiftKey: e.shiftKey,
+          caps: e.getModifierState('CapsLock'),
+        });
+        if (cls === 'pass' || cls === 'latin' || ch === null) return;
+        const doc = view.state.doc.toString();
+        const head = view.state.selection.main.head;
+        const region = mathRegionAt(scanMathRegions(doc), head);
+        if (!region || isInTextArg(doc, head, region)) return;
+        const now = performance.now();
+        // 직접 경로(Mac 390 종성·₩) — 단 Safari처럼 삽입이 먼저 와 큐에 있으면 기록 경로로(D8)
+        if (cls === 'direct' && !insRef.current.some((h) => now - h.t < INS_WAIT_MS)) {
+          e.preventDefault();
+          typeText(view, ch);
+          return;
+        }
+        keysRef.current.push({ ch, t: now });
+      };
+      const swallowOwnFocusEvents = (e: FocusEvent) => {
+        if (breakingRef.current) e.stopImmediatePropagation();
+      };
+      wrapperEl.addEventListener('keydown', onMathAsciiKeydown, true);
+      wrapperEl.addEventListener('blur', swallowOwnFocusEvents, true);
+      wrapperEl.addEventListener('focus', swallowOwnFocusEvents, true);
+
       return () => {
         document.removeEventListener('mousedown', onPointerDown, true);
         document.removeEventListener('mouseup', onPointerUp);
+        wrapperEl.removeEventListener('keydown', onMathAsciiKeydown, true);
+        wrapperEl.removeEventListener('blur', swallowOwnFocusEvents, true);
+        wrapperEl.removeEventListener('focus', swallowOwnFocusEvents, true);
+        if (timerRef.current !== null) { clearTimeout(timerRef.current); timerRef.current = null; }   // destroy() 앞(H6)
         gutterRO?.disconnect();
         view.destroy();
         if (chordTimerRef.current) clearTimeout(chordTimerRef.current);

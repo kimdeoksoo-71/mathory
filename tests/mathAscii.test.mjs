@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const {
-  US_KEYS, usCharFor, classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, advanceQueue, isInTextArg,
+  US_KEYS, usCharFor, classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, advanceQueue, isInTextArg,
   TEXT_CMDS, INS_WAIT_MS, ECHO_WINDOW_MS, KEY_TTL_MS, HANGUL_RE,
 } = await import('../.test-build/lib/mathAscii.js');
 const { scanMathRegions, mathRegionAt } = await import('../.test-build/lib/mathRegions.js');
@@ -66,7 +66,7 @@ test('classifyKey: 수식 키·Dead·HangulMode·표 밖 code → pass (E6)', ()
 
 /* ── 짝짓기 — 시간 순 (D5′) ── */
 test('pairInsertion: 자모 하나 ↔ 그 앞의 키 하나', () => {
-  assert.deepEqual(pair('ㅁ', 10, keys('i@5'), 11), { rep: 'i', consumed: 1, wait: false, echo: false, kept: 0 });
+  assert.deepEqual(pair('ㅁ', 10, keys('i@5'), 11), { rep: 'i', consumed: 1, wait: false, echo: false, kept: 0, replay: true });
 });
 test('pairInsertion: 음절 하나가 앞선 키 전부를 받는다 (E2 — 2벌식 마=2키 · 닭=4키)', () => {
   assert.equal(pair('마', 10, keys('f@5', 'k@8'), 11).rep, 'fk');
@@ -74,13 +74,15 @@ test('pairInsertion: 음절 하나가 앞선 키 전부를 받는다 (E2 — 2�
   assert.equal(r.rep, 'ekfr'); assert.equal(r.consumed, 4);
 });
 test('pairInsertion: 뒤에 온 키는 먹지 않는다', () => {
-  assert.deepEqual(pair('ㅁ', 10, keys('i@5', 'k@12'), 13), { rep: 'i', consumed: 1, wait: false, echo: false, kept: 0 });
+  assert.deepEqual(pair('ㅁ', 10, keys('i@5', 'k@12'), 13), { rep: 'i', consumed: 1, wait: false, echo: false, kept: 0, replay: true });
 });
 test('pairInsertion: 커밋+ASCII 한 삽입(`ㅔ{`) — 꼬리 ASCII는 같은 키와 짝', () => {
-  assert.deepEqual(pair('ㅔ{', 10, keys('c@5', '{@8'), 11), { rep: 'c{', consumed: 2, wait: false, echo: false, kept: 0 });
+  assert.deepEqual(pair('ㅔ{', 10, keys('c@5', '{@8'), 11), { rep: 'c{', consumed: 2, wait: false, echo: false, kept: 0, replay: true });
 });
-test('pairInsertion: Windows ASCII 조합(`,`) — 글자 그대로 · 키만 소비', () => {
-  assert.deepEqual(pair(',', 10, keys(',@5'), 11), { rep: ',', consumed: 1, wait: false, echo: false, kept: 0 });
+test('pairInsertion: Windows ASCII 조합(`,`·`(`) — 글자 그대로지만 **replay**(체인을 태워 closeBrackets·후위 변환 파리티, D6 ⓑ)', () => {
+  assert.equal(pair('(', 10, keys('(@5'), 11).replay, true);
+  assert.equal(pair(' ', 10, [], 11).replay, false);          // Mac Space 확정 — 키 없음 → 체인 불필요
+  assert.deepEqual(pair(',', 10, keys(',@5'), 11), { rep: ',', consumed: 1, wait: false, echo: false, kept: 0, replay: true });
 });
 test('pairInsertion: 키 없이 남은 비한글 글자는 보존(Mac Space 확정 `ㅁ `, `ㅁa`)', () => {
   assert.equal(pair('ㅁ ', 10, keys('f@5'), 11).rep, 'f ');
@@ -89,17 +91,17 @@ test('pairInsertion: 키 없이 남은 비한글 글자는 보존(Mac Space 확�
 });
 test('pairInsertion: Safari 순서 — 키 없으면 INS_WAIT 안 대기, 지난 뒤 늦은 키 하나만', () => {
   assert.equal(pair('ㅏ', 10, [], 10 + INS_WAIT_MS - 1).wait, true);
-  assert.deepEqual(pair('ㅏ', 10, keys('k@15', 'x@30'), 10 + INS_WAIT_MS + 20), { rep: 'k', consumed: 1, wait: false, echo: false, kept: 0 });
+  assert.deepEqual(pair('ㅏ', 10, keys('k@15', 'x@30'), 10 + INS_WAIT_MS + 20), { rep: 'k', consumed: 1, wait: false, echo: false, kept: 0, replay: true });
 });
 test('pairInsertion: 메아리는 "직전에 지운 같은 글자열 + ECHO_WINDOW 안"에서만 (E15)', () => {
   const now = 100;
-  assert.deepEqual(pair('ㅏ', 10, [], now, { text: 'ㅏ', t: now - ECHO_WINDOW_MS + 10 }), { rep: '', consumed: 0, wait: false, echo: true, kept: 0 });
-  assert.deepEqual(pair('ㅏ', 10, [], now, { text: 'ㅁ', t: now - 10 }), { rep: 'ㅏ', consumed: 0, wait: false, echo: false, kept: 1 });
+  assert.deepEqual(pair('ㅏ', 10, [], now, { text: 'ㅏ', t: now - ECHO_WINDOW_MS + 10 }), { rep: '', consumed: 0, wait: false, echo: true, kept: 0, replay: true });
+  assert.deepEqual(pair('ㅏ', 10, [], now, { text: 'ㅁ', t: now - 10 }), { rep: 'ㅏ', consumed: 0, wait: false, echo: false, kept: 1, replay: false });
   assert.equal(pair('ㅏ', 10, [], now, { text: 'ㅏ', t: now - ECHO_WINDOW_MS - 1 }).kept, 1);
   assert.equal(pair('ㅏ', 10, [], now, null).kept, 1);
 });
 test('pairInsertion: 한글도 ASCII도 아닌 글자(한자)는 무접촉 · 키 소비 0 (D5′ ⑤)', () => {
-  assert.deepEqual(pair('漢', 10, keys('a@5'), 11), { rep: '漢', consumed: 0, wait: false, echo: false, kept: 0 });
+  assert.deepEqual(pair('漢', 10, keys('a@5'), 11), { rep: '漢', consumed: 0, wait: false, echo: false, kept: 0, replay: false });
   assert.equal(pair('，', 10, keys(',@5'), 11).consumed, 0);                 // 전각 쉼표 — 같은 글자가 아니다
   assert.equal(pair(',', 10, keys('f@3', ',@5'), 11).consumed, 2);           // 고아 f는 `,`와 함께 소비(정렬 유지)
 });
@@ -116,15 +118,24 @@ test('dropKeysBefore · expireKeys', () => {
 });
 
 /* ── 재생 대상 ── */
-test('needsReplay: 한글 또는 compose(.start 포함) · paste·프로그램적 제외', () => {
-  assert.ok(needsReplay('ㅁ', 'input.type.compose'));
-  assert.ok(needsReplay(',', 'input.type.compose'));
-  assert.ok(needsReplay(',', 'input.type.compose.start'));
-  assert.ok(!needsReplay('x', 'input.type'));
-  assert.ok(!needsReplay('ㅁ', 'input.paste') === false);   // 한글이면 userEvent 무관 — paste 제외는 호출부(own·paste 플래그)가 한다
-  assert.ok(needsReplay('ㅏ', 'input.type'));              // Safari
-  assert.ok(!needsReplay('x', undefined));
-  assert.ok(!needsReplay('', 'input.type.compose'));
+test('needsReplay: 한글은 항상 · ASCII compose는 **조합이 살아 있던 flush**에서만 · paste·프로그램적 제외', () => {
+  assert.ok(needsReplay('ㅁ', 'input.type.compose', true));
+  assert.ok(needsReplay('ㅁ', 'input.type.compose', false));          // 한글은 live 무관
+  assert.ok(needsReplay(',', 'input.type.compose', true));
+  assert.ok(needsReplay(',', 'input.type.compose.start', true));
+  assert.ok(!needsReplay(',', 'input.type.compose', false));         // 동기 조합 — 체인이 이미 돌았다
+  assert.ok(!needsReplay('x', 'input.type', true));
+  assert.ok(needsReplay('ㅏ', 'input.type', false));                  // Safari
+  assert.ok(!needsReplay('x', undefined, true));
+  assert.ok(!needsReplay('', 'input.type.compose', true));
+});
+test('consumeTypedKeys: 재생 안 한 삽입의 첫 글자가 큐 머리 키와 같으면 하나 소비', () => {
+  assert.deepEqual(consumeTypedKeys(keys('(@1', 'a@2'), '()'), keys('a@2'));
+  assert.deepEqual(consumeTypedKeys(keys('{@1'), '{}'), []);
+  assert.deepEqual(consumeTypedKeys(keys('^@1'), '^'), []);
+  assert.deepEqual(consumeTypedKeys(keys('a@1'), '()'), keys('a@1'));   // 다른 글자 — 손대지 않는다
+  assert.deepEqual(consumeTypedKeys([], '('), []);
+  assert.deepEqual(consumeTypedKeys(keys('(@1'), ''), keys('(@1'));
 });
 
 /* ── 큐 관리 (I1~I4) ── */

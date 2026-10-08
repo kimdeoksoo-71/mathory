@@ -104,6 +104,9 @@ export interface PairResult {
   echo: boolean;
   /** 키 없이 남긴 한글 글자 수(이상 카운터용) */
   kept: number;
+  /** 삭제·재생을 실제로 할 것인가 — `rep !== text`이거나, **키와 짝지어진 ASCII 조합**(Windows `^`·`(`·`/`)이라 글자는 같아도
+   *  inputHandler 체인(후위 변환·closeBrackets)을 태워야 영문 IME와 결과가 같아지는 경우(D6 ⓑ) */
+  replay: boolean;
 }
 
 /**
@@ -122,13 +125,13 @@ export function pairInsertion(p: PairInput): PairResult {
   while (n < keys.length && keys[n].t <= p.t) n++;
 
   if (n === 0) {
-    if (!hasHangul) return { rep: text, consumed: 0, wait: false, echo: false, kept: 0 };
-    if (p.now - p.t < INS_WAIT_MS) return { rep: text, consumed: 0, wait: true, echo: false, kept: 0 };
+    if (!hasHangul) return { rep: text, consumed: 0, wait: false, echo: false, kept: 0, replay: false };
+    if (p.now - p.t < INS_WAIT_MS) return { rep: text, consumed: 0, wait: true, echo: false, kept: 0, replay: false };
     if (keys.length > 0) n = 1;                                                          // Safari — 늦게 온 키 하나
     else if (p.lastReplaced && text === p.lastReplaced.text && p.now - p.lastReplaced.t < ECHO_WINDOW_MS) {
-      return { rep: '', consumed: 0, wait: false, echo: true, kept: 0 };
+      return { rep: '', consumed: 0, wait: false, echo: true, kept: 0, replay: true };
     } else {
-      return { rep: text, consumed: 0, wait: false, echo: false, kept: countHangul(text) };
+      return { rep: text, consumed: 0, wait: false, echo: false, kept: countHangul(text), replay: false };
     }
   }
 
@@ -147,15 +150,16 @@ export function pairInsertion(p: PairInput): PairResult {
   if (firstHangul === -1) {
     // 한글 없음 — 글자는 그대로. 꼬리 ASCII가 키와 짝지어졌으면(Windows `,`) 거기까지의 키를 소비(정렬 유지 — 앞의 고아 키도 함께),
     // 하나도 안 맞으면(한자 변환·전각 기호 — D5′ ⑤) 키 소비 0
-    return { rep: text, consumed: ptr < eligible.length ? n : 0, wait: false, echo: false, kept: 0 };
+    const matched = ptr < eligible.length;
+    return { rep: text, consumed: matched ? n : 0, wait: false, echo: false, kept: 0, replay: matched };
   }
   if (forHangul === '') {
-    // 꼬리 ASCII가 키를 다 가져갔다 — 한글은 둘 수밖에 없다
-    return { rep: text, consumed: n, wait: false, echo: false, kept: countHangul(text) };
+    // 꼬리 ASCII가 키를 다 가져갔다 — 한글은 둘 수밖에 없다(글자는 같지만 ASCII 쪽은 체인을 태운다)
+    return { rep: text, consumed: n, wait: false, echo: false, kept: countHangul(text), replay: true };
   }
   const stripped = text.replace(HANGUL_G, '');
   const rep = stripped.slice(0, firstHangul) + forHangul + stripped.slice(firstHangul);
-  return { rep, consumed: n, wait: false, echo: false, kept: 0 };
+  return { rep, consumed: n, wait: false, echo: false, kept: 0, replay: true };
 }
 
 function countHangul(text: string): number {
@@ -172,11 +176,26 @@ export function expireKeys(keys: readonly RecordedKey[], now: number): RecordedK
   return keys.filter((k) => now - k.t <= KEY_TTL_MS);
 }
 
-/** D6 — 재생 대상: 한글을 품었거나 IME 조합 삽입(`input.type.compose`·`.compose.start`) */
-export function needsReplay(text: string, userEvent: string | undefined): boolean {
+/**
+ * D6 — 재생 대상: 한글을 품었거나, IME 조합 삽입(`input.type.compose`·`.compose.start`)이면서 **flush 시점에 조합이 살아 있던** 것.
+ * ⚠ `compositionLive`(= 그 업데이트 때의 `view.compositionStarted`)가 거짓이면 ASCII 조합은 재생하지 않는다 — compositionend가
+ *   CM flush보다 먼저 온 **동기 조합**(Windows식 `^`·`(`, Mac의 조합 중 `{`)에서는 CM이 그 글자에 대해 inputHandler 체인을
+ *   **이미 태웠다**(`composing=-1`). 그 위에 재생하면 이중 적용이다(실측: `^{}`가 두 번 돌아 커서가 `^|{}`에 남았다).
+ *   조합이 살아 있던 flush(`composing>0`)에서는 Mathory 가드·closeBrackets가 전부 건너뛰므로 재생이 체인을 대신한다.
+ */
+export function needsReplay(text: string, userEvent: string | undefined, compositionLive: boolean): boolean {
   if (!text) return false;
   if (HANGUL_RE.test(text)) return true;
-  return !!userEvent && userEvent.startsWith('input.type.compose');
+  return compositionLive && !!userEvent && userEvent.startsWith('input.type.compose');
+}
+
+/**
+ * 재생하지 않은 삽입이 큐 머리 키와 **같은 글자로 시작**하면 그 키는 브라우저·체인이 이미 넣은 것이다 — 소비한다.
+ * (동기 조합의 `(` → closeBrackets `()`, Mac 조합 중 `{` → `{}`, D20 `^`.) 안 버리면 TTL 250ms 안의 다음 한글 삽입에 **앞에 붙는다**(실측 `(a`).
+ */
+export function consumeTypedKeys(keys: readonly RecordedKey[], ins: string): RecordedKey[] {
+  if (!keys.length || !ins || keys[0].ch !== ins[0]) return keys.slice();
+  return keys.slice(1);
 }
 
 /* ── 큐 관리 (I4) ───────────────────────────────────────────────────────────── */
