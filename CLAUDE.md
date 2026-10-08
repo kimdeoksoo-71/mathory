@@ -476,7 +476,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 68a — 수식 영역 자동 영문 입력(한/영 전환 없는 수식 타이핑)** — 구현 완료(2026-10-08) · 4커밋(S1~S4) · **덕수 실물 검수 대기(§9-3)** · push 대기
+## 현재 Phase: **Phase 68a — 수식 영역 자동 영문 입력(한/영 전환 없는 수식 타이핑)** — 구현 완료(2026-10-08) · 4커밋(S1~S4) + 검수 후속 1(`a103488`) · **덕수 실물 검수 종결(2026-10-08, Mac Chrome 390 — "이제 잘 작동")** · push 대기
 
 문서: `docs/phasedocs/Phase68a 수식 영역 자동 영문 입력 v5 착수판.md`
 (계보: 덕수 구상 → 실험 1·2·3(프로브 HTML 3종 — A안 keydown preventDefault 사망 · B안 "끊기→지우기→재생" 성립 · C안 폐기) → v2 web → v3 CLI(E1~E17 — 시간 순 짝짓기 · capture 억제 · Dead 키) → v4 web(F1~F4·H1~H8) → **v5 CLI 착수판**(I1~I6 — v3·v4 큐 관리 버그 셋 · F1 근거 철회) → 구현. §11이 구현 기록)
@@ -487,7 +487,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **하니스 함정(K4~K7)**: CDP IME 에뮬레이션이 브라우저 프로세스를 멎게 한다 → 페이지 안 합성 · `$$`만 둔 문서는 커서가 밖 · `$x$`의 `(`는 영문 IME도 안 닫힌다
 - 검증: `test:mathascii` 32 · 전 스위트 598 · tsc 무오류 · CDP **29/29** · `icons:check` 62종 · 프로덕션 빌드(S4)
 - **실물 검수 1차(2026-10-08)**: 첫 글자만 한글(`$ㅏ(x)$`) → K8 — keydown 영역 판정을 삽입 뒤 문서로(`probeInsertionRegion`). 후속 커밋 1
-- ⚠ 남은 일: 덕수 실물 검수 §9-3(Mac Chrome 390 → 2벌식 → Safari → Windows — **어느 조합 갈래(동기/비동기)로 오는지 기록**) · push 뒤 Vercel 빌드 로그 `[icons:check] OK — 62종`
+- **덕수 실물 검수 종결(2026-10-08)** — 1차에서 K8(행 끝 `$|$` 첫 글자) 1건 → 후속 `a103488` → "이제 잘 작동". 2벌식·Safari·Windows는 실사용에서 만나는 대로(§9-3 12~15 — **어느 조합 갈래(동기/비동기)로 오는지 기록**)
+- ⚠ 남은 일: push 뒤 Vercel 빌드 로그 `[icons:check] OK — 62종`
 
 ### 이전: **Phase 68 — 스니펫·수식 자동 확장** — 구현 완료(2026-10-07) · 7커밋(S0~S7) + docs 1 · **덕수 실물 검수 종결(2026-10-08, "다 잘 작동")** · push 대기
 
