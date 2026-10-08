@@ -2171,6 +2171,23 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 68a: 수식 영역 자동 영문 입력(한/영 전환 없는 수식 타이핑) ✅ 구현 (2026-10-08) · 덕수 실물 검수 대기 · push 대기
+
+계획서: `docs/phasedocs/Phase68a 수식 영역 자동 영문 입력 v5 착수판.md` (§11 구현 기록 · 4커밋 S1~S4)
+(계보: 덕수 구상 → 실험 1·2·3(프로브 HTML 3종, A안 사망 · B안 성립) → v2 web → v3 CLI 교차검토(E1~E17) → v4 web(F1~F4·H1~H8) → **v5 CLI 착수판**(I1~I6 — v3·v4 큐 관리 버그 셋) → 구현)
+
+| 항목 | 처방 |
+|---|---|
+| **원리** | 한글 IME를 켠 채로 두고, 수식 영역 안에서 IME가 넣은 글자를 **물리 키(`event.code`)의 US 글자**로 사후 치환. 수식 밖·`\text` 10종 인자 안은 무접촉. 라틴 자판은 어떤 배열이든 무접촉 |
+| **절차** | reconcile(setTimeout 0): **끊기**(blur→focus — 브라우저가 진짜 compositionend) → **지우기** → **재생**(글자 단위로 inputHandler 체인 → D20·D19·closeBrackets가 영문 IME와 같게). 순서·분리 둘 다 불변식 |
+| **짝짓기** | 시간 순(`pairInsertion`) — "한글 1자 = 키 n개"를 세지 않는다(음절 형성·자판별 분해표 회피). 메아리는 "지운 글자와 같다 + 120ms"에서만 삭제 |
+| **큐** | `advanceQueue`(순수) — **안쪽 결합**(from +1 · to −1, mathSlots와 반대·의도) · 키 폐기는 순수 삭제에서만 · 동기 조합(compositionend가 flush보다 먼저)은 체인이 이미 돌았으므로 ASCII 재생 금지(`needsReplay(live)`) + 체인이 넣은 글자의 키 소비(`consumeTypedKeys`) |
+| **끊기 보호** | 래퍼 div capture에서 우리 blur·focus를 `stopImmediatePropagation` — CM이 보면 자동완성이 닫히고 `observers.focus`가 옛 scrollLeft를 복원한다. 포커스는 `contentDOM.focus()`(실증 경로) |
+| **키 분류** | pass(수식 키·표 밖·길이>1 `Dead`·`HangulMode`) / latin(ASCII·비조합) / direct(비ASCII·keyCode 실값 — Mac 390 종성·`₩`: preventDefault + 즉시 삽입) / record(229·`Process`) |
+| **토글** | Row 2 `keyboard`(줄바꿈 왼쪽) · 기본 켬 · `mathory-editor-mathascii` · 단축키 없음 |
+
+신설 `lib/mathAscii.ts`(순수 · `test:mathascii` 31) · `MarkdownEditor` 배선 · 로직 테스트 23종 566 → **24종 597건** · headless Chrome CDP **26/26**(조합은 페이지 안 합성 — CDP IME 에뮬레이션이 브라우저 프로세스를 멎게 한다) · 서버 0 · 규칙 0 · 스키마 0 · 렌더 5사이트 0 · 폰 0 · 댓글 에디터 0 · ICONS 62종.
+
 ## Phase 68: 스니펫·수식 자동 확장 ✅ 구현 (2026-10-07) · **덕수 실물 검수 종결(2026-10-08, "다 잘 작동")** · push 대기
 
 계획서: `docs/phasedocs/Phase68 스니펫·수식 자동 확장 v4 착수판.md` (§11 구현 기록 · 7커밋 S0~S7)
