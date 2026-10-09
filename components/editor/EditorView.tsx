@@ -2820,6 +2820,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     setSelectedBlockIds(new Set());
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /* Phase 68c H2 — window 단축키의 지연 실행(조합 끝난 뒤)은 keydown 때 잡은 옛 클로저를 부를 수 있다
+     (그 사이 compositionend → handleBlockChange → 재렌더). 매 렌더 최신 핸들러·활성 블록을 ref로 든다 */
+  const latestShortcutRef = useRef({ handleSplitBlock, handleAIComplete, handleSplitMathLines, activeBlockId });
+  latestShortcutRef.current = { handleSplitBlock, handleAIComplete, handleSplitMathLines, activeBlockId };
+
   // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo · ⌥Z 줄바꿈 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -2869,26 +2874,40 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
         return;
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+      /* Phase 68c D2″ — F·B·J도 e.code(C5 — 나머지 넷과 통일 · Windows 한글 IME는 Ctrl 조합에서 key가 'Process'·229로 올 수 있다).
+         `plain`(!shift·!alt·!repeat — Q10): 옛 `e.key === 'b'`는 Shift면 'B'라 ⌘⇧B(Chrome 북마크 바)를 암묵 배제했다 → 명시 배제.
+         문서를 바꾸는 셋(⌘B·⌘J·⌘⇧L)은 **항상** 핸들 `whenSettled`를 거친다 — 조합 중이면 확정 뒤(지연 — IME가 그 키로 확정 중이다),
+         아니면 즉시(그 전에 flushMathAscii). preventDefault는 keydown에서 그대로(Windows Ctrl+J = 다운로드 · 229 keydown의 preventDefault는
+         IME 확정에 영향이 없다 — 68a 실험 1). ⌘F는 패널 열기뿐이라 지연 없음. */
+      const plain = !e.shiftKey && !e.altKey && !e.repeat;
+      const settled = (run: () => void) => {
+        const id = latestShortcutRef.current.activeBlockId;
+        const h = id ? editorRefs.current[id] : null;
+        if (h) h.whenSettled(run, { composingAtKey: isImeKey(e) });
+        else run();
+      };
+      if ((e.ctrlKey || e.metaKey) && plain && e.code === 'KeyF') {
         e.preventDefault();
         setSearchOpen(true);
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+      if ((e.ctrlKey || e.metaKey) && plain && e.code === 'KeyB') {
         e.preventDefault();
-        handleSplitBlock();
+        settled(() => latestShortcutRef.current.handleSplitBlock());
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'j') {
+      if ((e.ctrlKey || e.metaKey) && plain && e.code === 'KeyJ') {
         e.preventDefault();
-        handleAIComplete();
+        const id = latestShortcutRef.current.activeBlockId;           // R11 — 지연 중 블록을 옮겨도 키를 누른 블록에
+        settled(() => latestShortcutRef.current.handleAIComplete(id ?? undefined));
       }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyL') {
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.repeat && e.code === 'KeyL') {
         e.preventDefault();
-        handleSplitMathLines();
+        const id = latestShortcutRef.current.activeBlockId;
+        settled(() => latestShortcutRef.current.handleSplitMathLines(id ?? undefined));
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleSplitBlock, handleAIComplete, handleSplitMathLines, undoBlocks, redoBlocks, toggleLineWrap, handleCopyBlocks, handlePasteBlocks]);
+  }, [undoBlocks, redoBlocks, toggleLineWrap, handleCopyBlocks, handlePasteBlocks]);   // F·B·J·L은 latestShortcutRef(68c H2)
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
