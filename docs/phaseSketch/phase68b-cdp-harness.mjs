@@ -317,6 +317,20 @@ for (const w of ['ed', 'cm']) {
 }
 await check('390 ⌘Z 1회 = 블록 통째(undo 1스텝)', 'ed', 'foo|bar', [layoutKey('ed', { key: '1', keyCode: 49, shift: true }), cmdZ], 'foo|bar');
 
+// ── 2026-10-10 `$$ … $$` 본문 Enter = ` \\` 행바꿈(행 환경 밖 — displayEnterPlan). 두 편집기 같은 기대값 ──
+for (const w of ['ed', 'cm']) {
+  const tag = w === 'ed' ? '편집창' : '댓글';
+  await check(`$$Enter ${tag} 본문 행 끝 → \\\\ + 새 행`, w, '$$\na = 1|\n$$', [enterKey], '$$\na = 1 \\\\\n|\n$$');
+  await check(`$$Enter ${tag} 빈 행 → 줄바꿈만`, w, '$$\n|\n$$', [enterKey], '$$\n\n|\n$$');
+  await check(`$$Enter ${tag} Shift+Enter → \\\\ 없이`, w, '$$\na = 1|\n$$', [shiftEnter], '$$\na = 1\n|\n$$');
+  await check(`$$Enter ${tag} \\frac 안 → 기본 Enter`, w, '$$\n\\frac{a|}{b}\n$$', [enterKey], '$$\n\\frac{a\n|}{b}\n$$');
+  await check(`$$Enter ${tag} 환경 있는 블록의 환경 밖 → 기본 Enter`, w, '$$\n\\begin{aligned} a &= 1 \\end{aligned}\nx|\n$$', [enterKey], '$$\n\\begin{aligned} a &= 1 \\end{aligned}\nx\n|\n$$');
+  await check(`$$Enter ${tag} 행 환경 안은 종전대로`, w, ALN('  a &= 1|'), [enterKey], ALN('  a &= 1 \\\\\n  |'));
+  await check(`$$Enter ${tag} 인라인 $…$ 무접촉`, w, 'a $x|$ b', [enterKey], 'a $x\n|$ b');
+  await check(`$$Enter ${tag} 두 번 → 두 행 + 빈 행`, w, '$$\na|\n$$', [enterKey, typeStr('b'), enterKey], '$$\na \\\\\nb \\\\\n|\n$$');
+}
+await check('$$Enter 자동 영문 보류 치환 뒤 Enter(flush)', 'ed', '$$\n|\n$$', [() => imeKeys('ed', ['KeyX']), () => imeInsert('ed', 'ㅌ'), enterKey], '$$\nx \\\\\n|\n$$');
+
 const fails = results.filter((r) => !r.ok).length;
 console.log(`\n== ${results.length - fails}/${results.length} pass`);
 ws.close();

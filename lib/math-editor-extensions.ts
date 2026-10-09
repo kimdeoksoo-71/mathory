@@ -46,7 +46,7 @@ import { LATEX_COMPLETIONS, isInsideMath } from './latex-completions';
 import { scanMathRegions, mathRegionAt, exitRegionAt, type ExitRegion } from './mathRegions';
 import {
   mathExitPos, isEmptyDisplay, emptyDisplayDeleteRange, type ExitPlan,
-  matchAbbrev, findEnclosingEnv, groupDepth, nextSlot, displayTabExit, AMP_ENVS, autoFracAt, rowEnterPlan,
+  matchAbbrev, findEnclosingEnv, groupDepth, nextSlot, displayTabExit, AMP_ENVS, autoFracAt, rowEnterPlan, displayEnterPlan,
 } from './mathInput';
 import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from './mathSlots';
 import {
@@ -781,7 +781,8 @@ export function rowEnterCommand(view: EditorView): boolean {
   const doc = view.state.doc.toString();
   const region = mathRegionAt(scanMathRegions(doc), sel.head);
   if (!region) return false;
-  const plan = rowEnterPlan(doc, sel.head, region);
+  // 행 환경 안이면 ⓐ~ⓔ, 아니면 펜스형 `$$` 본문 규칙(2026-10-10 — 같은 ⓑ·ⓓ·ⓔ, 가드는 lib/mathInput.displayEnterPlan 주석)
+  const plan = rowEnterPlan(doc, sel.head, region) ?? displayEnterPlan(doc, sel.head, region);
   if (!plan) return false;
   view.dispatch({
     changes: { from: plan.from, to: plan.to, insert: plan.insert },

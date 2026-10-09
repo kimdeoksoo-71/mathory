@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 const {
   ROW_ENVS, AMP_ENVS, ROW_ENV_RE, DEFAULT_ABBREVS, SLOT_CHAR,
-  parseSlots, findEnclosingEnv, groupDepth, nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, layoutRowEnvs,
+  parseSlots, findEnclosingEnv, groupDepth, nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, displayEnterPlan, layoutRowEnvs,
 } = await import('../.test-build/lib/mathInput.js');
 const { scanMathRegions, mathRegionAt } = await import('../.test-build/lib/mathRegions.js');
 
@@ -291,4 +291,31 @@ test('emptyDisplayDeleteRange: 가운데 → 문단 경계 하나 · 문서 시�
   assert.deepEqual(go('foo\n\n$$\n\n$$', 7), { d: 'foo', c: 3 });
   assert.deepEqual(go('$$\n\n$$', 3), { d: '', c: 0 });
   assert.deepEqual(go('foo $$$$ bar', 6), { d: 'foo  bar', c: 4 });
+});
+
+/* ── displayEnterPlan (2026-10-10 — `$$ … $$` 본문 Enter) ── */
+test('displayEnterPlan: 펜스형 $$ 본문 ⓑ·ⓓ·ⓔ · 가드(여는/닫는 줄·환경 있음·중괄호·\\left·\\text·한 줄 $$·인라인)', () => {
+  const run = (src) => { const { doc, pos, region } = at(src); if (!region) return 'noregion'; const p = displayEnterPlan(doc, pos, region); if (!p) return null;
+    const out = doc.slice(0, p.from) + p.insert + doc.slice(p.to); return { out, cursor: p.cursor }; };
+  let r = run('$$\na = 1|\n$$');
+  assert.equal(r.out, '$$\na = 1 \\\\\n\n$$');
+  assert.equal(r.cursor, '$$\na = 1 \\\\\n'.length);
+  r = run('$$\n  a = 1  |\n$$');
+  assert.equal(r.out, '$$\n  a = 1 \\\\\n  \n$$');
+  assert.equal(run('$$\n(a + b|\n$$').out, '$$\n(a + b \\\\\n\n$$');                              // 소괄호는 그룹이 아니다
+  assert.equal(run('$$\n|\n$$').out, '$$\n\n\n$$');                                              // ⓑ
+  assert.equal(run('$$\na \\\\|\n$$').out, '$$\na \\\\\n\n$$');                                  // ⓓ
+  assert.equal(run('$$\na \\\\[4pt]|\n$$').out, '$$\na \\\\[4pt]\n\n$$');
+  assert.equal(run('$$\na +| b\n$$').out, '$$\na + \\\\\n b\n$$');                               // 행 중간
+  assert.equal(run('$$|\na\n$$'), null);                                                       // ④ 여는 줄
+  assert.equal(run('$$\na\n|$$'), null);                                                       // ④ 닫는 줄
+  assert.equal(run('$$\n\\begin{aligned} a &= 1 \\end{aligned}\nx|\n$$'), null);               // ② 환경 있음
+  assert.equal(run('$$\n\\frac{a|}{b}\n$$'), null);                                            // ③ 중괄호
+  assert.equal(run('$$\n\\left( a| \\right)\n$$'), null);                                      // ③ \left
+  assert.equal(run('$$\n\\left( a \\right) b|\n$$').out, '$$\n\\left( a \\right) b \\\\\n\n$$');
+  assert.equal(run('$$\n\\text{가|}\n$$'), null);                                              // ③ \text
+  assert.equal(run('$$\n\\{ a|\n$$').out, '$$\n\\{ a \\\\\n\n$$');                              // `\{`는 그룹 아님
+  assert.equal(run('$$a|$$'), null);                                                           // ① 한 줄
+  assert.equal(run('a $x|$ b'), null);                                                         // ① 인라인
+  assert.equal(run('$$\na|'), null);                                                           // ① 미닫힘
 });

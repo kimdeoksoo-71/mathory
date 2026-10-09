@@ -147,6 +147,8 @@ export function preprocessMath(text: string): string {
         /\\\\(\s*\[[^\]]*\])?\s*/g,
         (m, spacing) => `\\\\${spacing || ''}\n\\displaystyle `
       );
+      // 꼬리 `\\`(마지막 행 끝에서 Enter 친 직후·그대로 둔 것) — array는 aligned와 달리 빈 꼬리 행을 1줄 높이로 그린다(KaTeX 실측) → 구분자째 뗀다
+      wrapped = wrapped.replace(/\s*\\\\(\[[^\]]*\])?\n\\displaystyle\s*$/, '');
       return `$$\n\\begin{array}{l}\n${wrapped}\n\\end{array}\n$$`;
     }
     return match;

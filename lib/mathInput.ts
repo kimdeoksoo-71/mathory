@@ -24,6 +24,7 @@
 
 import { scanMathRegions, type MathRegion } from './mathRegions';
 import { readGroup, skipEnvArgs } from './latexScan';
+import { isInTextArg } from './mathAscii';
 
 /* ─── 행 환경 ─────────────────────────────────────────────────────────── */
 
@@ -312,6 +313,62 @@ export function rowEnterPlan(doc: string, pos: number, region: MathRegion): Ente
     return { from, to: pos + ws, insert: head + '\n' + env.beginIndent, cursor: from + head.length };
   }
   if (rowEmpty || alreadyBroken) {                         // ⓑ · ⓓ
+    const insert = '\n' + rowIndent;
+    return { from: pos, to: pos, insert, cursor: pos + insert.length };
+  }
+  const insert = ' \\\\\n' + rowIndent;                    // ⓔ
+  const from = pos - trailing;
+  return { from, to: pos, insert, cursor: from + insert.length };
+}
+
+/* ─── displayEnterPlan (2026-10-10 덕수 요청 — `$$ … $$` 안에서도 Enter = ` \\` 행바꿈) ─────── */
+
+/** `from`~`pos`의 중괄호 깊이(`\{` 제외). 소괄호·대괄호는 세지 않는다 — TeX에서 `(a \\ b)`는 정상 행바꿈이고 그룹이 아니다 */
+function braceDepth(doc: string, from: number, pos: number): number {
+  let d = 0;
+  for (let i = from; i < pos; i++) {
+    const c = doc[i];
+    if (c === '\\') { i++; continue; }
+    if (c === '{') d++; else if (c === '}') d--;
+  }
+  return d;
+}
+/** `from`~`pos`에서 `\left`가 `\right`보다 많이 열려 있는가(그 안의 `\\`는 KaTeX가 무시한다 — 실측) */
+function insideLeftRight(doc: string, from: number, pos: number): boolean {
+  let d = 0;
+  const re = /\\(left|right)(?![A-Za-z])/g;
+  re.lastIndex = from;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(doc)) !== null && m.index < pos) {
+    if (isEscaped(doc, m.index)) continue;
+    d += m[1] === 'left' ? 1 : -1;
+  }
+  return d > 0;
+}
+
+/**
+ * 펜스형 `$$ … $$` 안(행 환경 밖) Enter. 행 환경 규칙 ⓑ·ⓓ·ⓔ를 "환경 = `$$` 펜스"로 그대로 쓴다. 비관여면 null(기본 Enter).
+ * 근거: 렌더 전처리(`EditorPreview.preprocessMath`·`lib/preprocess.ts`)가 `$$` 안 맨 `\\`를 `\begin{array}{l}`로 감싸 행으로 그린다 —
+ * KaTeX 자체는 `$$` 최상위 `\\`를 무시하므로(strict warn 실측) 이 규칙은 그 전처리에 **의존**한다. 그래서 전처리가 감싸지 않는 자리는 전부 비관여:
+ *   ① 펜스형 `$$`만(`isFencedDisplay` — 한 줄 `$$x$$`·`\[…\]`는 스캐너·렌더 판정이 엇갈린다)
+ *   ② 본문에 `\begin{`이 있으면 비관여(전처리 `hasEnvironment` — 환경 밖 맨 `\\`는 그대로 무시된다. 환경 안은 rowEnterPlan 몫)
+ *   ③ 중괄호 깊이 0 · `\left…\right` 밖 · `\text{…}` 계열 인자 밖(그 안의 `\\`는 오류 없이 **무시**된다 — KaTeX 실측)
+ *   ④ 여는 `$$` 줄·닫는 `$$` 줄 위는 기본 Enter
+ * 소스만 나누는 줄바꿈은 Shift+Enter(standardKeymap — 행 환경과 같은 탈출구).
+ */
+export function displayEnterPlan(doc: string, pos: number, region: MathRegion): EnterPlan | null {
+  if (!isFencedDisplay(doc, region)) return null;
+  if (pos < region.innerFrom || pos > region.innerTo) return null;
+  const body = doc.slice(region.innerFrom, region.innerTo);
+  if (/\\begin\s*\{/.test(body)) return null;
+  const ls = lineStartOf(doc, pos);
+  if (ls <= region.innerFrom || ls >= lineStartOf(doc, region.innerTo)) return null;   // 여는·닫는 `$$` 줄
+  if (braceDepth(doc, region.innerFrom, pos) > 0 || insideLeftRight(doc, region.innerFrom, pos) || isInTextArg(doc, pos, region)) return null;
+  const before = doc.slice(ls, pos);
+  const rowIndent = leadingWs(before);
+  const rowEmpty = before.trim() === '';
+  const trailing = (before.match(/[ \t]*$/) as RegExpMatchArray)[0].length;
+  if (rowEmpty || ROW_END_RE.test(before)) {                // ⓑ · ⓓ
     const insert = '\n' + rowIndent;
     return { from: pos, to: pos, insert, cursor: pos + insert.length };
   }
