@@ -7,7 +7,11 @@ import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
-import { createMathShortcuts, createLatexAutocompletion } from '../../lib/math-editor-extensions';
+import { createMathShortcuts, createLatexAutocompletion, createMathTab } from '../../lib/math-editor-extensions';
+import { getAbbrevs, primeAbbrevs } from '../../lib/abbrevStore';
+import { setSlots } from '../../lib/mathSlots';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../../lib/firebase';
 import { isInsideMath } from '../../lib/latex-completions';
 
 export interface LatexInputEditorHandle {
@@ -52,6 +56,10 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
     const onSubmitRef = useRef(onSubmit);
     useEffect(() => { onSubmitRef.current = onSubmit; }, [onSubmit]);
 
+    /* Phase 68b 후속 — 사용자 수식 단축어(편집창을 안 거친 화면에서도). 사용자당 1회 읽고, 편집창이 열리면 그쪽 최신 맵이 덮는다 */
+    // ⚠ useAuth를 쓰지 않는다 — 그 훅은 구독마다 users/{uid} 프로필을 upsert한다(입력창이 열릴 때마다 Firestore 쓰기)
+    useEffect(() => onAuthStateChanged(auth, (u) => primeAbbrevs(u?.uid ?? null)), []);
+
     useEffect(() => {
       if (!containerRef.current) return;
       // 수식 단축키 (Phase 68b — Ctrl+M · Ctrl+Shift+M · Alt+= · Shift+Esc · Opt+Tab) — 블록 편집기와 같은 바인딩·삽입 함수
@@ -65,6 +73,8 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             history(),
             markdown(),
             mathShortcuts,
+            // Phase 68b 후속(덕수 검수 21) — 편집창과 같은 Tab 엔진(약어 확장·자리·`&`·그룹 탈출·`$` 밖). 약어 맵은 lib/abbrevStore
+            createMathTab(getAbbrevs),
             latexAutocompletion,
             // 수식 영역 내에서 ( [ { 입력 시 자동으로 짝 괄호 닫기 + 커서 중앙 배치.
             // 수식 밖에선 기본 동작(1글자 삽입)을 유지.
@@ -148,7 +158,9 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
       setValue(text: string) {
         const view = viewRef.current;
         if (!view) return;
+        // 68b 후속 — 문서 통째 교체(전송 뒤 비우기)는 Tab 자리를 해제한다. 매핑하면 자리가 [0, 끝]으로 늘어나 다음 Tab이 전체를 선택한다
         view.dispatch({
+          effects: setSlots.of(null),
           changes: { from: 0, to: view.state.doc.length, insert: text },
         });
       },

@@ -426,3 +426,13 @@ R-1 행 끝 `$|$` → D5′ · R-2 빈 쌍 → Q8 · R-3 비펜스 닫힘 → D5
 
 - 덕수 실물 §9-2 — 특히 **Windows Chrome·Edge·Firefox**에서 `Ctrl+M`(음소거)·`Ctrl+Shift+M`(프로필/반응형)·`Shift+Esc`(작업 관리자)가 페이지에 먹히는지, 한글 조합 중 `Ctrl+M`의 갈래
 - dev 서버 종료 뒤 `app/dev68b` 삭제 → `npm run build` → push
+
+### 11-4. 덕수 맥 크롬 검수(2026-10-09) — 21항 중 19항 정상 · 후속 2건
+
+| # | 증상 | 원인 | 처방 |
+|---|---|---|---|
+| 17 | 한글 조합 중(`한` 직후) ⌃M → `한` 확정만 되고 끝 | 맥 한글 IME가 ⌃M을 조합 확정에 쓰고 keydown은 조합 중(`isComposing`·229)으로 온다. CM은 `composing > 0`이면 키 이벤트를 버린다(계획서 R2가 "재현되면 받을 자리"로 미뤄 둔 것) | `composingRescue`(lib/math-editor-extensions) — 편집기 루트 capture keydown에서 조합 중 Ctrl+M·Ctrl+Shift+M·별칭을 기억했다가 compositionend 뒤 CM 반영을 기다려 같은 명령 실행. preventDefault 없음 · 조합 밖 229(F3)도 처리 · `defaultPrevented`면 건너뜀 · 800ms 안에 확정이 없으면 버림. **68a 래퍼 capture가 아니라 CM 플러그인에 둔 이유**: 댓글 입력창에는 68a가 없다 |
+| 21 | 댓글·agent 입력창 Tab이 다음 버튼으로 포커스 이동 | Phase 68 Tab 엔진이 `MarkdownEditor` 안에만 있었다 | Tab 엔진을 `mathTabCommand`·`mathShiftTabCommand`·`createMathTab`으로 lib에 옮겨 두 편집기 공용. 약어 맵은 `lib/abbrevStore`(신설) — `useSnippets`가 올리고, 편집창을 안 거친 화면은 사용자당 1회 읽는다. 입력창에서 `useAuth`를 쓰지 않는다(구독마다 프로필 upsert) |
+| 21′ | (하니스에서 발견) 활성 자리를 둔 채 문서를 통째 교체하면 자리가 `[0, 끝]`으로 늘어 다음 Tab이 전체 선택 | `slotsField`의 바깥 결합 매핑 | `setValue`·`setContent`에 `setSlots.of(null)` — 실사용에선 자리가 살아 있는 채 댓글 전송 |
+
+CDP 44 → **61/61**(⑰ 9건 · ㉑ 8건 추가 — 조합은 페이지 안 합성. ⚠ 진짜 IME의 이벤트 순서는 합성이 대신하지 못한다 — 17은 실물 재확인 필요). 댓글 입력창의 Enter(행 환경 ` \\`)·후위 변환은 아직 편집창 전용(검수 범위 밖).

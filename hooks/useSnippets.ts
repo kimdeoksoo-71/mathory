@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { MathSnippet, SnippetInput } from '../types/snippet';
 import { listSnippets, createSnippet, updateSnippet, deleteSnippet } from '../lib/snippets';
-import { DEFAULT_ABBREVS } from '../lib/mathInput';
+import { buildAbbrevMap, publishAbbrevs } from '../lib/abbrevStore';
 import useAuth from './useAuth';
 
 export default function useSnippets() {
@@ -68,11 +68,11 @@ export default function useSnippets() {
 
   /* Phase 68 D5 — 수식 단축어 맵: 기본 8종 위에 사용자 것을 덮는다(같은 약어면 사용자 우선).
      MarkdownEditor의 Tab 핸들러가 ref로 읽는다. */
-  const abbrevMap = useMemo<Record<string, string>>(() => {
-    const out: Record<string, string> = { ...DEFAULT_ABBREVS };
-    for (const s of snippets) if (s.kind === 'abbrev' && s.abbrev) out[s.abbrev] = s.content;
-    return out;
-  }, [snippets]);
+  const abbrevMap = useMemo<Record<string, string>>(() => buildAbbrevMap(snippets), [snippets]);
+  /* Phase 68b 후속 — 댓글·agent 입력창(LatexInputEditor)도 같은 맵으로 Tab 확장을 하도록 모듈 스토어에 올린다 */
+  useEffect(() => {
+    if (!loading) publishAbbrevs(user?.uid ?? null, abbrevMap);
+  }, [abbrevMap, loading, user]);
 
   /** 사용자가 등록한 약어 집합(메뉴 "대체됨" 표시·중복 검사) */
   const userAbbrevs = useMemo<Set<string>>(

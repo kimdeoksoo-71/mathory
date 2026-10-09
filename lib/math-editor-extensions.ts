@@ -9,6 +9,8 @@
  *  - jumpToNextBrace           Alt+Tab(수식 내 `{` 순회 — 채운 칸까지, Mac 전용: Windows는 OS가 가져간다)
  *  - latexCompletionSource     `\`로 시작하는 LaTeX 명령 자동완성 소스
  *  - createMathShortcuts()     Ctrl+M · Ctrl+Shift+M · Alt+=(mac Ctrl+=) · Shift+Esc · Alt+Tab 묶음 (Phase 68b)
+ *                              + IME 조합 중 단축키 구제(조합 확정 뒤 실행 — 검수 17)
+ *  - mathTabCommand / createMathTab  편집창 Tab 엔진 ⓪~⑦(Phase 68 · 68b ⑥′) — 댓글·agent 입력창과 공용(검수 21)
  *  - createLatexAutocompletion() autocompletion 확장 (`\` 트리거)
  *
  * ── Phase 68b 키 체계 ─────────────────────────────────────────────────────────
@@ -23,17 +25,23 @@
  *  keymap `run`은 IME 조합 중엔 도달하지 않는다(`ignoreDuringComposition`) — `view.composing` 가드를 두지 않는 이유.
  */
 
-import { keymap, EditorView } from '@codemirror/view';
+import { keymap, EditorView, ViewPlugin } from '@codemirror/view';
 import { Prec, type Extension } from '@codemirror/state';
 import { isolateHistory } from '@codemirror/commands';
 import {
   autocompletion,
+  completionStatus,
+  acceptCompletion,
   CompletionContext,
   Completion,
 } from '@codemirror/autocomplete';
 import { LATEX_COMPLETIONS, isInsideMath } from './latex-completions';
 import { scanMathRegions, mathRegionAt, exitRegionAt, type ExitRegion } from './mathRegions';
-import { mathExitPos, isEmptyDisplay, emptyDisplayDeleteRange, type ExitPlan } from './mathInput';
+import {
+  mathExitPos, isEmptyDisplay, emptyDisplayDeleteRange, type ExitPlan,
+  matchAbbrev, findEnclosingEnv, groupDepth, nextSlot, displayTabExit, AMP_ENVS,
+} from './mathInput';
+import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from './mathSlots';
 
 // ─────────────────────────────────────────────
 // 1) 삽입 (M7 D1·D4 · 68b D2·D2′)
@@ -133,6 +141,131 @@ export function jumpToNextBrace(view: EditorView): boolean {
 }
 
 // ─────────────────────────────────────────────
+// 3′) Tab 엔진 (Phase 68 D9~D14 · 68b ⑥′) — 편집창·댓글·agent 입력창 **한 벌** (2026-10-09 덕수 검수 21)
+// ─────────────────────────────────────────────
+/* Tab은 편집기에 포커스가 있으면 **항상** 편집기 것이다(return true — 포커스 이탈 없음). 밖으로 나가는 길은 CM 내장
+   Escape 뒤 2초 안 Tab · mac Shift-Alt-m. 순서(첫 성공에서 멈춤): ⓪ IME 조합 중 → 제자리 ① 자동완성 열림 → 수락
+   ② 수식 안 + 커서 앞 약어 → 확장(활성 자리 안에서도 — 새 자리 목록이 옛 것을 대체) ③ 활성 자리 → 다음 자리
+   ④ 수식 안 + 행 환경 본문 + 그룹 깊이 0 + AMP_ENVS → `&` ⑤ 수식 안 → 자리 이동(그룹 탈출 우선 → 커서 뒤 빈 괄호)
+   ⑥ 인라인 `$…$` 안 → 닫는 `$` 뒤(P22) ⑥′ 닫힌 display 식 끝 → 밖(68b D7 — `$$`는 다음 행, `\[`는 `\]` 뒤) ⑦ 제자리.
+   ⚠ 약어 맵은 **누를 때마다** `getAbbrevs()`로 읽는다 — 편집창은 abbrevsRef, 댓글 쪽은 `lib/abbrevStore`. 판정은 전부 lib/mathInput,
+   자리 상태는 lib/mathSlots(`slotsField`가 그 편집기 extensions에 있어야 한다 — `createMathTab`이 함께 넣는다). */
+export function mathTabCommand(getAbbrevs: () => Record<string, string>) {
+  return (view: EditorView): boolean => {
+    if (view.composing) return true;
+    if (completionStatus(view.state) === 'active') { acceptCompletion(view); return true; }
+    const doc = view.state.doc.toString();
+    const sel = view.state.selection.main;
+    const pos = sel.head;
+    const region = mathRegionAt(scanMathRegions(doc), pos);
+    if (region && sel.empty) {
+      const m = matchAbbrev(doc, pos, getAbbrevs(), region);
+      if (m) { insertWithSlots(view, m.from, pos, m.content); return true; }
+    }
+    if (hasActiveSlots(view.state) && nextSlotCmd(view)) return true;
+    if (region) {
+      const env = findEnclosingEnv(doc, pos, region);
+      if (env && AMP_ENVS.has(env.name) && pos >= env.bodyFrom && pos <= env.bodyTo
+          && groupDepth(doc, env.bodyFrom, pos) === 0) {
+        view.dispatch({
+          changes: { from: sel.from, to: sel.to, insert: '&' },
+          selection: { anchor: sel.from + 1 }, scrollIntoView: true, userEvent: 'input.type',
+        });
+        return true;
+      }
+      const slot = nextSlot(doc, pos, region);
+      if (slot !== null) { view.dispatch({ selection: { anchor: slot }, scrollIntoView: true }); return true; }
+      if (region.kind === 'inline' && region.closed && !region.empty) {
+        view.dispatch({ selection: { anchor: region.to }, scrollIntoView: true });
+        return true;
+      }
+      const dx = displayTabExit(doc, pos, region);
+      if (dx) return dispatchExit(view, dx);
+    }
+    return true;
+  };
+}
+
+export function mathShiftTabCommand(view: EditorView): boolean {
+  if (view.composing) return true;
+  if (hasActiveSlots(view.state)) prevSlotCmd(view);
+  return true;
+}
+
+/** 댓글·agent 입력창용 묶음: 자리 StateField + Tab/Shift+Tab(`Prec.high` — 편집창 mathKeys와 같은 우선순위) */
+export function createMathTab(getAbbrevs: () => Record<string, string>): Extension {
+  return [
+    slotsField,
+    Prec.high(keymap.of([{ key: 'Tab', run: mathTabCommand(getAbbrevs), shift: mathShiftTabCommand }])),
+  ];
+}
+
+// ─────────────────────────────────────────────
+// 3″) IME 조합 중 단축키 구제 (2026-10-09 덕수 검수 17 · 계획서 R2)
+// ─────────────────────────────────────────────
+/* 맥 한글 IME에서 `한`을 치자마자 Ctrl+M을 누르면 IME가 그 키를 **조합 확정**에 쓰고 keydown은 조합 중(`isComposing`·keyCode 229)으로
+   온다. CM은 `composing > 0`이면 키 이벤트를 통째로 버리므로(view dist `ignoreDuringComposition`) keymap이 돌지 않고 `한` 확정만 남았다.
+   → 편집기 루트 **capture** keydown에서 조합 중 Ctrl+M 계열을 기억해 두고, compositionend(조합 확정) 뒤 CM이 확정 글자를 문서에
+   반영한 다음 같은 명령을 실행한다. preventDefault는 하지 않는다(확정 동작을 IME에 그대로 맡긴다).
+   조합 밖인데 keyCode 229로 오는 경우(계획서 F3 — `base[229]`가 없어 keymap이 못 맞춘다)는 짧게 기다렸다 실행한다.
+   ⚠ CM이 이미 처리한 키(`defaultPrevented`)는 건너뛴다 — 두 번 돌지 않게. 68a 래퍼 capture는 수정자 조합을 `pass`해 겹치지 않는다. */
+const RESCUE_POLL_MS = 20;
+const RESCUE_GIVE_UP_MS = 800;
+
+type MathKeyKind = 'inline' | 'display';
+function matchMathKey(e: KeyboardEvent, mac: boolean): MathKeyKind | null {
+  if (e.metaKey) return null;
+  if (e.code === 'KeyM' && e.ctrlKey && !e.altKey) return e.shiftKey ? 'display' : 'inline';
+  if (e.code === 'Equal' && !e.shiftKey && (mac ? e.ctrlKey && !e.altKey : e.altKey && !e.ctrlKey)) return 'inline';
+  return null;
+}
+
+function composingRescue(enter: (kind: MathKeyKind) => (view: EditorView) => boolean): Extension {
+  return ViewPlugin.fromClass(class {
+    pending: { kind: MathKeyKind; ev: KeyboardEvent; composing: boolean; ended: boolean; t: number } | null = null;
+    timer: ReturnType<typeof setTimeout> | null = null;
+    readonly mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+    constructor(readonly view: EditorView) {
+      view.dom.addEventListener('keydown', this.onKeyDown, true);
+      view.contentDOM.addEventListener('compositionend', this.onCompositionEnd);
+    }
+    onKeyDown = (e: KeyboardEvent) => {
+      const composing = e.isComposing || this.view.composing;
+      if (!composing && e.keyCode !== 229) return;   // 평소 키는 CM keymap 몫
+      const kind = matchMathKey(e, this.mac);
+      if (!kind) return;
+      this.pending = { kind, ev: e, composing, ended: false, t: Date.now() };
+      this.arm();
+      if (process.env.NODE_ENV !== 'production') {
+        console.info(`[68b] 조합 중 수식 단축키(${kind}) — keyCode ${e.keyCode} · isComposing ${e.isComposing} · 조합 확정 뒤 실행`);
+      }
+    };
+    onCompositionEnd = () => {
+      if (this.pending) { this.pending.ended = true; this.arm(); }
+    };
+    arm() {
+      if (this.timer !== null) clearTimeout(this.timer);
+      this.timer = setTimeout(this.tick, RESCUE_POLL_MS);
+    }
+    tick = () => {
+      this.timer = null;
+      const p = this.pending;
+      if (!p) return;
+      if (Date.now() - p.t > RESCUE_GIVE_UP_MS) { this.pending = null; return; }
+      if (p.ev.defaultPrevented) { this.pending = null; return; }        // CM keymap이 이미 처리했다
+      if ((p.composing && !p.ended) || this.view.composing) { this.arm(); return; }
+      this.pending = null;
+      if (this.view.hasFocus) enter(p.kind)(this.view);
+    };
+    destroy() {
+      this.view.dom.removeEventListener('keydown', this.onKeyDown, true);
+      this.view.contentDOM.removeEventListener('compositionend', this.onCompositionEnd);
+      if (this.timer !== null) clearTimeout(this.timer);
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
 // 4) LaTeX 자동완성 소스 (`\` 트리거)
 // ─────────────────────────────────────────────
 export function latexCompletionSource(context: CompletionContext) {
@@ -205,5 +338,5 @@ export function createMathShortcuts(): MathShortcutsResult {
     { key: 'Alt-Tab', run: jumpToNextBrace },
   ]));
 
-  return { shortcuts };
+  return { shortcuts: [shortcuts, composingRescue(enter)] };
 }

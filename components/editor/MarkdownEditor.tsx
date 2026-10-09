@@ -6,7 +6,7 @@ import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
 import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
 import { EditorState, Prec, Compartment, Extension, Annotation, Transaction } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
-import { autocompletion, CompletionContext, Completion, completionStatus, acceptCompletion } from '@codemirror/autocomplete';
+import { autocompletion, CompletionContext, Completion, completionStatus } from '@codemirror/autocomplete';
 import { isolateHistory } from '@codemirror/commands';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 // search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
@@ -30,10 +30,12 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 /* Phase 68 — 수식 입력 보조: 판정(lib/mathInput) · 자리 상태(lib/mathSlots) · 영역(lib/mathRegions).
    ⚠ `@codemirror/autocomplete`의 snippet·snippetKeymap·clearSnippet을 import하지 말 것 — lib/mathSlots.ts 머리 주석(N1). */
 import { scanMathRegions, mathRegionAt } from '../../lib/mathRegions';
-import { nextSlot, matchAbbrev, autoFracAt, rowEnterPlan, findEnclosingEnv, groupDepth, AMP_ENVS, displayTabExit } from '../../lib/mathInput';
+import { autoFracAt, rowEnterPlan } from '../../lib/mathInput';
 /* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
-import { insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, dispatchExit } from '../../lib/math-editor-extensions';
-import { slotsField, insertWithSlots, nextSlotCmd, prevSlotCmd, hasActiveSlots } from '../../lib/mathSlots';
+import {
+  insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, mathTabCommand, mathShiftTabCommand,
+} from '../../lib/math-editor-extensions';
+import { slotsField, insertWithSlots, setSlots } from '../../lib/mathSlots';
 /* Phase 68a — 수식 영역 자동 영문 입력. 판정·짝짓기·큐 관리는 lib/mathAscii(순수), 여기는 CM 배선뿐(아래 ═══ Phase 68a 절). */
 import {
   classifyKey, pairInsertion, dropKeysBefore, expireKeys, needsReplay, consumeTypedKeys, isInTextArg, advanceQueue,
@@ -422,6 +424,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         if (!view) return;
         view.dispatch({
           changes: { from: 0, to: view.state.doc.length, insert: text },
+          effects: setSlots.of(null),   // 68b 후속 — 통째 교체는 Tab 자리 해제(매핑하면 [0, 끝]으로 늘어난다)
         });
       },
       setSelection(from: number, to: number) {
@@ -601,46 +604,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
          ⚠ ④가 ⑤보다 앞이라 환경 본문 깊이 0에서는 같은 행 뒤쪽 빈 `{}`로 Tab으로는 못 간다(Alt+Tab은 간다) — 예측 가능성과의 교환(P15).
          Enter: 행 환경 본문 안이면 ` \\`+줄바꿈+들여쓰기(lib/mathInput.rowEnterPlan ⓐ~ⓔ). `shift`를 묶지 않는다 —
          Shift+Enter는 standardKeymap의 insertNewlineAndIndent(들여쓰기 유지 줄바꿈, `\\` 없음)가 탈출구다. */
-      const mathTab = (view: EditorView): boolean => {
-        if (view.composing) return true;
-        if (completionStatus(view.state) === 'active') { acceptCompletion(view); return true; }
-        const doc = view.state.doc.toString();
-        const sel = view.state.selection.main;
-        const pos = sel.head;
-        const region = mathRegionAt(scanMathRegions(doc), pos);
-        if (region && sel.empty) {
-          const m = matchAbbrev(doc, pos, abbrevsRef.current, region);
-          if (m) { insertWithSlots(view, m.from, pos, m.content); return true; }
-        }
-        if (hasActiveSlots(view.state) && nextSlotCmd(view)) return true;
-        if (region) {
-          const env = findEnclosingEnv(doc, pos, region);
-          if (env && AMP_ENVS.has(env.name) && pos >= env.bodyFrom && pos <= env.bodyTo
-              && groupDepth(doc, env.bodyFrom, pos) === 0) {
-            view.dispatch({
-              changes: { from: sel.from, to: sel.to, insert: '&' },
-              selection: { anchor: sel.from + 1 }, scrollIntoView: true, userEvent: 'input.type',
-            });
-            return true;
-          }
-          const slot = nextSlot(doc, pos, region);
-          if (slot !== null) { view.dispatch({ selection: { anchor: slot }, scrollIntoView: true }); return true; }
-          if (region.kind === 'inline' && region.closed && !region.empty) {
-            view.dispatch({ selection: { anchor: region.to }, scrollIntoView: true });
-            return true;
-          }
-          /* ⑥′ Phase 68b D7 — 닫힌 display(`$$`·`\[`) 식 끝(커서 뒤 공백뿐)에서 밖으로: `$$`는 닫는 행 다음 행, `\[`는 `\]` 뒤.
-             ④가 먼저라 aligned 본문 마지막 행 끝은 `&`이고 나가는 자리는 `\end{…}` 뒤. 빈 블록에서는 나가기만(지우기는 Ctrl+M) */
-          const dx = displayTabExit(doc, pos, region);
-          if (dx) return dispatchExit(view, dx);
-        }
-        return true;
-      };
-      const mathShiftTab = (view: EditorView): boolean => {
-        if (view.composing) return true;
-        if (hasActiveSlots(view.state)) prevSlotCmd(view);
-        return true;
-      };
+      /* Tab·Shift+Tab 엔진은 lib/math-editor-extensions가 소유한다(댓글·agent 입력창과 한 벌 — 68b 후속, 덕수 검수 21).
+         약어 맵은 누를 때마다 abbrevsRef로 읽는다. 순서 ⓪~⑦·⑥′ 설명은 그 파일 3′ 절 */
+      const mathTab = mathTabCommand(() => abbrevsRef.current);
+      const mathShiftTab = mathShiftTabCommand;
       const rowEnter = (view: EditorView): boolean => {
         if (view.composing || completionStatus(view.state) === 'active') return false;
         const sel = view.state.selection.main;
