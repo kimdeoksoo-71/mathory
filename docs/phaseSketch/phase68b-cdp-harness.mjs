@@ -331,6 +331,29 @@ for (const w of ['ed', 'cm']) {
 }
 await check('$$Enter 자동 영문 보류 치환 뒤 Enter(flush)', 'ed', '$$\n|\n$$', [() => imeKeys('ed', ['KeyX']), () => imeInsert('ed', 'ㅌ'), enterKey], '$$\nx \\\\\n|\n$$');
 
+// ── 2026-10-10 390 Shift 층(조합 없는 ASCII 숫자·기호) — 수식 안에서 물리 키의 US 글자로(classifyKey ⓒ′). 신뢰 keydown + 기본 동작(글자 삽입)까지 재현 ──
+const layoutDirect = (w, key, code, keyCode, shift) => () => ev(`(() => {
+  const v = window.__h.view(${J(w)}); const c = v.contentDOM;
+  const k = new KeyboardEvent('keydown', { key: ${J(key)}, code: ${J(code)}, shiftKey: ${shift}, bubbles: true, cancelable: true });
+  Object.defineProperty(k, 'keyCode', { get: () => ${keyCode} });
+  const prevented = !c.dispatchEvent(k);
+  if (!prevented) v.dispatch(v.state.update(v.state.replaceSelection(${J(key)}), { userEvent: 'input.type' }));   // 브라우저 기본 삽입 모사
+  return 1;
+})()`).then(() => sleep(60));
+const J = JSON.stringify;
+for (const w of ['ed', 'cm']) {
+  const tag = w === 'ed' ? '편집창' : '댓글';
+  await check(`390 ${tag} 수식 안 Shift+M("1") → M`, w, 'a $|$ b', [layoutDirect(w, '1', 'KeyM', 49, true)], 'a $M|$ b');
+  await check(`390 ${tag} 수식 안 Shift+,("2") → <`, w, 'a $x|$ b', [layoutDirect(w, '2', 'Comma', 50, true)], 'a $x<|$ b');
+  await check(`390 ${tag} 수식 안 Shift+.("3") → >`, w, 'a $x|$ b', [layoutDirect(w, '3', 'Period', 51, true)], 'a $x>|$ b');
+  await check(`390 ${tag} 수식 밖은 그대로 "1"`, w, 'ab|', [layoutDirect(w, '1', 'KeyM', 49, true)], 'ab1|');
+  await check(`390 ${tag} \\text 안은 그대로 "1"`, w, '$\\text{|}$', [layoutDirect(w, '1', 'KeyM', 49, true)], '$\\text{1|}$');
+  await check(`390 ${tag} 진짜 숫자 키 Digit1은 그대로`, w, 'a $|$ b', [layoutDirect(w, '1', 'Digit1', 49, false)], 'a $1|$ b');
+  await check(`390 ${tag} 영문 모드 Shift+M("M")은 그대로`, w, 'a $|$ b', [layoutDirect(w, 'M', 'KeyM', 77, true)], 'a $M|$ b');
+}
+await check('390 토글 끔이면 숫자 그대로(댓글 — 편집창은 Row 2 토글 ref라 localStorage를 직접 안 읽는다, 68a와 같다)', 'cm', 'a $|$ b', [() => setPref('off'), layoutDirect('cm', '1', 'KeyM', 49, true)], 'a $1|$ b');
+await setPref('on');
+
 const fails = results.filter((r) => !r.ok).length;
 console.log(`\n== ${results.length - fails}/${results.length} pass`);
 ws.close();

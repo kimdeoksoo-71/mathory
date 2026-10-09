@@ -63,6 +63,13 @@ export function usCharFor(code: string, shift: boolean, caps: boolean): string |
   return shift ? pair[1] : pair[0];
 }
 
+/** ⓒ′ — 글자 키가 글자 아닌 것을 냈거나(390 Shift 층의 `1`~`9`·기호), 숫자 키가 아닌 키가 숫자를 냈다(390의 `<`·`>` → `2`·`3`) */
+export function isLayoutMismatch(code: string, key: string): boolean {
+  if (code.startsWith('Key')) return !/^[A-Za-z]$/.test(key);
+  if (/^[0-9]$/.test(key)) return !code.startsWith('Digit') && !code.startsWith('Numpad');
+  return false;
+}
+
 export type KeyClass = 'pass' | 'latin' | 'direct' | 'record';
 export interface KeyLike {
   key: string; code: string; keyCode: number; isComposing: boolean;
@@ -74,6 +81,11 @@ export interface KeyLike {
  * ⓐ ctrl·meta·alt → pass ⓑ code가 US 표에 없다(Tab·Enter·Space·Lang1…) → pass
  * ⓑ′ key가 두 글자 이상이고 'Process'가 아니다(Dead·HangulMode·Unidentified…) → pass
  *     (이 갈래가 없으면 국제 자판의 사자 키 `Dead`(code Digit6)가 ⓓ로 떨어져 `^`를 넣고 사자 키를 삼킨다 — E6)
+ * ⓒ′ **자판 불일치**(2026-10-10 덕수 보고 — 390의 Shift 층): key가 ASCII 한 글자 · 조합 아님 · keyCode≠229인데
+ *     **글자 키(KeyA~Z)가 글자가 아닌 것을 냈거나, 숫자 키(Digit·Numpad)가 아닌 키가 숫자를 냈다** → direct(US 글자로)
+ *     — 세벌식 390은 Shift+M·<·>·J·K·L·U·I·O를 조합 없이 ASCII `1`~`9`로 보낸다(진단 기록 `key="1" code=KeyM keyCode=49`).
+ *     ⓒ에 걸리면 "영문을 친 것"으로 보여 숫자가 그대로 남았다. Dvorak(글자 키 → 다른 글자)·US는 이 갈래에 안 걸린다.
+ *     알고 두는 손실: AZERTY의 KeyM(`,`)처럼 글자 키가 구두점을 내는 라틴 자판은 수식 안에서 US 글자로 바뀐다(토글로 끌 수 있다)
  * ⓒ key가 ASCII 한 글자 · 조합 아님 · keyCode≠229 → latin(어떤 자판이든 손대지 않는다)
  * ⓓ keyCode≠229 · 조합 아님(비ASCII 한 글자 key — Mac 390 종성 `ᆼ`·`₩`) → direct(preventDefault + 즉시 삽입)
  * ⓔ 그 밖(229 · 'Process' · isComposing) → record(기록 뒤 시간 순 짝짓기)
@@ -84,7 +96,10 @@ export function classifyKey(e: KeyLike): { cls: KeyClass; ch: string | null } {
   if (ch === null) return { cls: 'pass', ch: null };
   if (e.key.length > 1 && e.key !== 'Process') return { cls: 'pass', ch: null };
   const plain = !e.isComposing && e.keyCode !== 229;
-  if (plain && ASCII_PRINTABLE_RE.test(e.key)) return { cls: 'latin', ch: null };
+  if (plain && ASCII_PRINTABLE_RE.test(e.key)) {
+    if (e.key !== ch && isLayoutMismatch(e.code, e.key)) return { cls: 'direct', ch };   // ⓒ′
+    return { cls: 'latin', ch: null };
+  }
   if (plain && e.key !== 'Process') return { cls: 'direct', ch };
   return { cls: 'record', ch };
 }

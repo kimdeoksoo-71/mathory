@@ -210,3 +210,22 @@ test('probeInsertionRegion: 행 끝 `$|$`(R-$$ (a) 펜스 오판)도 안 · `$$|
   assert.equal(at2('|함수').region, null);
   const r = at2('$\\text{|}$'); assert.ok(r.region && isInTextArg(r.probe, 7, r.region), '\\text 안은 probe 문서로 판정');
 });
+
+/* ── ⓒ′ 자판 불일치 (2026-10-10 — 390 Shift 층이 조합 없이 ASCII 숫자를 낸다) ── */
+test('classifyKey ⓒ′: 390 Shift+M → "1"(code KeyM)는 direct "M" · Shift+, → "2"(Comma)는 direct "<" · 영문·Dvorak은 latin', () => {
+  const base = { isComposing: false, ctrlKey: false, metaKey: false, altKey: false, caps: false };
+  const k = (key, code, keyCode, shift) => classifyKey({ ...base, key, code, keyCode, shiftKey: shift });
+  assert.deepEqual(k('1', 'KeyM', 49, true), { cls: 'direct', ch: 'M' });
+  assert.deepEqual(k('2', 'Comma', 50, true), { cls: 'direct', ch: '<' });
+  assert.deepEqual(k('3', 'Period', 51, true), { cls: 'direct', ch: '>' });
+  assert.deepEqual(k('9', 'KeyO', 57, true), { cls: 'direct', ch: 'O' });
+  assert.deepEqual(k('*', 'KeyP', 56, true), { cls: 'direct', ch: 'P' });     // 글자 키가 기호를 냄
+  assert.equal(k('m', 'KeyM', 77, false).cls, 'latin');                        // US 영문
+  assert.equal(k('M', 'KeyM', 77, true).cls, 'latin');
+  assert.equal(k('t', 'KeyK', 75, false).cls, 'latin');                        // Dvorak: 글자 키 → 다른 글자
+  assert.equal(k('1', 'Digit1', 49, false).cls, 'latin');                      // 진짜 숫자 키
+  assert.equal(k('!', 'Digit1', 49, true).cls, 'latin');
+  assert.equal(k('<', 'Comma', 188, true).cls, 'latin');                       // US Shift+,
+  assert.equal(k('1', 'Numpad1', 97, false).cls, 'latin');
+  assert.equal(k('1', 'KeyM', 49, true).cls === 'direct' && k('1', 'KeyM', 229, true).cls, 'record');   // 229면 기록 경로
+});
