@@ -58,6 +58,7 @@
     "firebase": "^12.9.0",
     "google-auth-library": "^11.0.2",
     "katex": "^0.16.28",
+    "mathml-to-latex": "^1.8.0",
     "nanoid": "^5.1.11",
     "next": "14.2.5",
     "openai": "^6.39.1",

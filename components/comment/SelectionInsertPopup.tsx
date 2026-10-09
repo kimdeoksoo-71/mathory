@@ -16,10 +16,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  buildRenderedMathIndex, stripPreviewArtifacts, serializeNodes,
-} from '../../lib/chatExtract';
-import type { SNode } from '../../lib/chatExtract';
+import { buildRenderedMathIndex, serializeNodes } from '../../lib/chatExtract';
+/* Phase 68c H6 — DOM 어댑터(fallbackMath·toSNodes)는 붙여넣기와 한 벌로 lib/snodeDom이 소유한다 */
+import { HOST_SEL, fallbackMath, toSNodes, type MathInfo } from '../../lib/snodeDom';
 
 interface Props {
   /** 메시지 리스트 스크롤 컨테이너 — 스크롤하면 팝업을 접는다 */
@@ -31,7 +30,6 @@ interface Props {
   onInsertToEditor?: (text: string) => 'inserted' | 'no-target';
 }
 
-const HOST_SEL = '.katex, .katex-error';
 const POPUP_W = 190;
 const POPUP_H = 34;
 
@@ -40,18 +38,6 @@ const POPUP_H = 34;
 function asElement(n: Node | null): HTMLElement | null {
   if (!n) return null;
   return (n.nodeType === 1 ? (n as HTMLElement) : n.parentElement) || null;
-}
-
-/** range가 node를 통째로 품는가.
- *  ⚠ `Range`에는 `containsNode`가 없다 — 그건 `Selection`의 메서드다.
- *  `comparePoint(node, offset)`: 그 점이 range보다 앞이면 -1, 안이면 0, 뒤면 1. */
-function rangeContainsNode(range: Range, node: Node): boolean {
-  try {
-    return range.comparePoint(node, 0) >= 0
-        && range.comparePoint(node, node.childNodes.length) <= 0;
-  } catch {
-    return false;
-  }
 }
 
 /** 선택 양끝이 수식 안에 걸리면 그 수식 전체를 포함하도록 넓힌다(D6). 원본 Range는 건드리지 않는다 */
@@ -73,8 +59,6 @@ function singleCommentBody(range: Range): HTMLElement | null {
 }
 
 /* ═══ 수식 복원 ═══ */
-
-interface MathInfo { latex: string; display: boolean }
 
 /**
  * 그 댓글의 수식 호스트 → 복원된 latex(구분자 포함).
@@ -116,67 +100,6 @@ function buildMathMap(body: HTMLElement, source: string | null): Map<Element, Ma
   return map;
 }
 
-function fallbackMath(el: Element, inPreview: boolean): MathInfo {
-  const isErr = el.classList.contains('katex-error');
-  const raw = isErr
-    ? (el.textContent || '')
-    : (el.querySelector('annotation')?.textContent || '');
-  const tex = stripPreviewArtifacts(raw);
-  if (!tex) return { latex: '', display: false };
-  /* 에러 span에는 조상 단서가 없다(rehype-katex가 `.math-display` 요소를 splice로 지운다)
-     → 개행 유무가 유일하게 남은 신호다. 카드 안은 언제나 인라인. */
-  const display = inPreview && (isErr ? tex.indexOf('\n') !== -1 : !!el.closest('.katex-display'));
-  return { latex: display ? `$$\n${tex}\n$$` : `$${tex}$`, display };
-}
-
-/* ═══ DOM → 미니 트리 ═══ */
-
-const ATTR_KEYS = ['href', 'src', 'alt', 'start'];
-
-function toSNodes(range: Range, root: Node, math: Map<Element, MathInfo>): SNode[] {
-  const conv = (node: Node): SNode | null => {
-    if (node.nodeType === 3) {
-      const full = node.nodeValue || '';
-      let text = full;
-      if (node === range.startContainer && node === range.endContainer) {
-        text = full.slice(range.startOffset, range.endOffset);
-      } else if (node === range.startContainer) {
-        text = full.slice(range.startOffset);
-      } else if (node === range.endContainer) {
-        text = full.slice(0, range.endOffset);
-      } else if (!range.intersectsNode(node)) {
-        return null;
-      }
-      if (!text) return null;
-      return { tag: null, cls: [], text, children: [] };
-    }
-    if (node.nodeType !== 1) return null;
-    const el = node as HTMLElement;
-    if (!range.intersectsNode(el)) return null;
-
-    const attrs: Record<string, string> = {};
-    for (const k of ATTR_KEYS) {
-      const v = el.getAttribute(k);
-      if (v !== null) attrs[k] = v;
-    }
-    const info = math.get(el);
-    const out: SNode = {
-      tag: el.tagName.toLowerCase(),
-      cls: Array.from(el.classList),
-      text: null,
-      attrs,
-      /* 수식 호스트의 서브트리는 들어가지 않는다 — `.katex-mathml`과 `.katex-html`이
-         같은 내용을 두 벌 담고 있어 그대로 훑으면 수식이 두 번 나온다 */
-      children: info ? [] : Array.from(el.childNodes).map(conv).filter(Boolean) as SNode[],
-      math: info || null,
-    };
-    if (out.tag === 'table') out.complete = rangeContainsNode(range, el);
-    return out;
-  };
-  const r = conv(root);
-  return r ? [r] : [];
-}
-
 /** 선택 → Mathory 마크다운. 빈 결과면 null */
 export function serializeSelection(
   range: Range,
@@ -188,7 +111,7 @@ export function serializeSelection(
   const id = body.getAttribute('data-comment-id');
   const source = id ? getSource(id) : null;
   const math = buildMathMap(body, source);
-  const out = serializeNodes(toSNodes(expanded, body, math));
+  const out = serializeNodes(toSNodes(body, math, expanded));
   return out || null;
 }
 
