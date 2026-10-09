@@ -308,14 +308,24 @@ function isToggleShortcut(e: KeyboardEvent, mac: boolean): boolean {
   if (matchMathKey(e, mac)) return true;
   return e.key === 'Escape' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
 }
-/** Prec.highest domEventHandlers — CM keymap 처리기(Prec.default의 keydown 핸들러)보다 먼저 돈다. 반복 keydown은 소비만(preventDefault) */
-function toggleRepeatGuard(): Extension {
+/* ── 수식 단축키는 **물리 키(`e.code`)로 직접** 처리한다 — CM keymap 이름 매칭에 맡기지 않는다 (2026-10-10 덕수 진단 기록) ──
+   세벌식 390 자판(Mac)은 Shift+M을 숫자 `1`로 보고한다 — keydown이 `key="1" code=KeyM keyCode=49`로 온다. CM keymap은 `key`(→ "Ctrl-Shift-1")와
+   `base[keyCode]`(49 → "1") 두 경로 다 `Ctrl-Shift-m`에 닿지 못해 **입력 소스가 390 한글일 때만** Ctrl+Shift+M이 죽었다(영문 ABC면 `key="M"` → 정상.
+   Ctrl+M은 390에서도 keyCode 77이 유지돼 폴백이 살아 "Ctrl+M은 되는데 Ctrl+Shift+M만 됐다 안 됐다"). 68b 맥 검수가 통과한 건 그때 영문 모드였던 것.
+   → `matchMathKey`(e.code)로 판정해 여기서 실행한다. keymap의 같은 항목은 **이 핸들러가 먼저 소비하므로 폴백일 뿐**(`Prec.highest` domEventHandlers가
+   keymap 처리기(Prec.default)보다 앞). 조합 중(`composing > 0`)엔 CM이 이 핸들러에 키를 안 넘긴다 → `composingRescue`(네이티브 capture)가 맡는다.
+   ⚠ Shift+Esc·Alt+Tab은 `Escape`·`Tab` 이름이 자판과 무관하라 keymap에 둔다. */
+function codeBasedMathKeys(enter: (kind: MathKeyKind) => (view: EditorView) => boolean): Extension {
   const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
   return Prec.highest(EditorView.domEventHandlers({
-    keydown(e) {
-      if (!e.repeat || !isToggleShortcut(e, mac)) return false;
-      diag('  toggle repeat ignored');
-      return true;
+    keydown(e, view) {
+      if (!isToggleShortcut(e, mac)) return false;
+      if (e.repeat) { diag('  toggle repeat ignored'); return true; }     // 반복 keydown은 소비만(위 주석)
+      const kind = matchMathKey(e, mac);
+      if (!kind) return false;                                           // Shift+Esc → keymap
+      if (e.isComposing || e.keyCode === 229) return false;              // 조합 꼬리 — rescue 몫(CM이 keymap도 안 돌린다)
+      diag(`  math key ${kind} by code (key=${JSON.stringify(e.key)} keyCode=${e.keyCode})`);
+      return enter(kind)(view);
     },
   }));
 }
@@ -841,6 +851,7 @@ export function createMathShortcuts(): MathShortcutsResult {
   /* `Prec.highest` — basicSetup/defaultKeymap의 Windows `Ctrl-m`(toggleTabFocusMode)을 덮는다. 편집창 밖으로 나가는 길은
      Escape → Tab(Mac은 Shift-Alt-m도). Word 별칭은 Mac에서 `Alt+=`가 `≠`를 넣고 CM base 폴백도 꺼져 `Ctrl+=`로. */
   const shortcuts = Prec.highest(keymap.of([
+    // ⚠ 아래 셋은 **폴백**이다 — 실제 실행은 codeBasedMathKeys(e.code)가 먼저 한다(390 자판의 Shift+M = `1` 문제). 바인딩 이름을 믿지 말 것
     { key: 'Ctrl-m', run: enter('inline') },
     { key: 'Ctrl-Shift-m', run: enter('display') },
     { key: 'Alt-=', mac: 'Ctrl-=', run: enter('inline') },
@@ -856,7 +867,7 @@ export function createMathShortcuts(): MathShortcutsResult {
     { key: 'Alt-Tab', run: jumpToNextBrace },
   ]));
 
-  return { shortcuts: [toggleRepeatGuard(), shortcuts, composingRescue(enter), diagUpdates] };
+  return { shortcuts: [codeBasedMathKeys(enter), shortcuts, composingRescue(enter), diagUpdates] };
 }
 
 

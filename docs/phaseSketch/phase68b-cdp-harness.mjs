@@ -300,6 +300,23 @@ for (const n of [1, 2]) {
   await check(`반복 조합 중 Ctrl+Shift+M + 조합 중·확정 뒤 반복 ${n}회 → 블록 하나`, 'ed', 'abc 한|', [composeThenRepeat(n, 77)], 'abc 한\n\n$$\n|\n$$');
 }
 
+// ── 2026-10-10 세벌식 390(Mac) — Shift+M이 key="1"·keyCode 49로 온다(덕수 진단 기록). 물리 키 code=KeyM만 믿어야 한다 ──
+const layoutKey = (w, { key, keyCode, shift, ctrl = true, alt = false }) => () => ev(`(() => {
+  const c = window.__h.view(${JSON.stringify(w)}).contentDOM;
+  const k = new KeyboardEvent('keydown', { key: ${JSON.stringify(key)}, code: 'KeyM', ctrlKey: ${ctrl}, shiftKey: ${shift}, altKey: ${alt}, bubbles: true, cancelable: true });
+  Object.defineProperty(k, 'keyCode', { get: () => ${keyCode} });
+  c.dispatchEvent(k); return 1;
+})()`).then(() => sleep(60));
+for (const w of ['ed', 'cm']) {
+  const tag = w === 'ed' ? '편집창' : '댓글';
+  await check(`390 ${tag} Ctrl+Shift+M (key "1" keyCode 49) → 블록`, w, 'foo|bar', [layoutKey(w, { key: '1', keyCode: 49, shift: true })], 'foo\n\n$$\n|\n$$\n\nbar', undoIs(1));
+  await check(`390 ${tag} Ctrl+Shift+M 빈 블록 안 → 삭제(토글)`, w, 'foo\n\n$$\n|\n$$\n\nbar', [layoutKey(w, { key: '1', keyCode: 49, shift: true })], 'foo|\n\nbar');
+  await check(`390 ${tag} Ctrl+M (key "ㅡ" keyCode 77) → $|$`, w, 'abc |def', [layoutKey(w, { key: 'ㅡ', keyCode: 77, shift: false })], 'abc $|$def');
+  await check(`390 ${tag} 영문 모드 Ctrl+Shift+M (key "M") 회귀`, w, 'foo|bar', [layoutKey(w, { key: 'M', keyCode: 77, shift: true })], 'foo\n\n$$\n|\n$$\n\nbar');
+  await check(`390 ${tag} Ctrl+Alt+M(AltGr 꼴) → 무반응`, w, 'ab|c', [layoutKey(w, { key: 'µ', keyCode: 77, shift: false, alt: true })], 'ab|c');
+}
+await check('390 ⌘Z 1회 = 블록 통째(undo 1스텝)', 'ed', 'foo|bar', [layoutKey('ed', { key: '1', keyCode: 49, shift: true }), cmdZ], 'foo|bar');
+
 const fails = results.filter((r) => !r.ok).length;
 console.log(`\n== ${results.length - fails}/${results.length} pass`);
 ws.close();
