@@ -9,6 +9,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import {
   createMathShortcuts, createLatexAutocompletion, createMathKeys, createMathInput, createMathAscii, readMathAsciiPref,
+  createMathPaste, commitComposition,
 } from '../../lib/math-editor-extensions';
 import { getAbbrevs, primeAbbrevs } from '../../lib/abbrevStore';
 import { setSlots } from '../../lib/mathSlots';
@@ -19,6 +20,8 @@ export interface LatexInputEditorHandle {
   insertAtCursor(text: string, cursorOffset?: number): void;
   setValue(text: string): void;
   focus(): void;
+  /** Phase 68c D3 — 조합 중이면 지금 확정시킨다(+ 68a 보류 치환 완료) */
+  commitComposition(): boolean;
 }
 
 interface LatexInputEditorProps {
@@ -82,6 +85,8 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             latexAutocompletion,
             // 후위 변환(^→^{} · (A)/→\frac) · 선택 \left 감싸기 · \left 쌍 · 괄호 자동닫기(closeBrackets — 건너뛰기·Backspace 짝 지우기)
             createMathInput(),
+            // 붙여넣기(Phase 68c — 편집창과 한 벌): 구분자 정규화 · 수식 안 유니코드→LaTeX · `<math` 든 HTML은 61c 직렬화기
+            createMathPaste(),
             latexHighlightPlugin,
             latexHighlightTheme,
             EditorView.lineWrapping,
@@ -141,6 +146,7 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
       insertAtCursor(text: string, cursorOffset?: number) {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);   // Phase 68c D3 — OCR·그림·툴바 삽입 직전 조합 확정(편집창 삽입 핸들과 같다)
         const { from, to } = view.state.selection.main;
         view.dispatch({
           changes: { from, to, insert: text },
@@ -158,6 +164,10 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
         });
       },
       focus() { viewRef.current?.focus(); },
+      commitComposition() {
+        const view = viewRef.current;
+        return view ? commitComposition(view) : false;
+      },
     }));
 
     return <div ref={containerRef} style={{ width: '100%' }} />;

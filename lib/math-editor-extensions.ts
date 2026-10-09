@@ -54,6 +54,9 @@ import {
   probeInsertionRegion, INS_WAIT_MS, ANOMALY_WARN_AT,
 } from './mathAscii';
 import type { RecordedKey, PendingIns, ChangeDesc } from './mathAscii';
+import { serializeNodes, type SNode } from './chatExtract';
+import { htmlToSNodes, type BareConverter } from './snodeDom';
+import { smartPasteText } from './mathPaste';
 
 /** 68a 자기 트랜잭션 표시(삭제·재생) — update가 자기 삽입을 큐에 넣지 않게 · 진단 기록이 구분하게 */
 const mathAsciiTx = Annotation.define<boolean>();
@@ -441,6 +444,26 @@ export function flushMathAscii(view: EditorView): void {
   mathAsciiInstances.get(view)?.flush();
 }
 
+/* ── Phase 68c D3 — 프로그램 호출 삽입(AI 완성·OCR·61c 삽입·툴바) 직전의 조합 **확정** ──
+   조합 중이면 68a 끊기와 같은 경로(contentDOM.blur → focus{preventScroll})로 브라우저가 조합을 확정하게 하고, 이어서 flushMathAscii
+   (확정 직후 삽입이 68a 치환 전 문서를 보지 않게 — 68b 윈도우 검수의 `liㅡ` 경합과 같은 자리).
+   ⚠ 68a 억제(breaking) 밖이라 CM이 blur를 본다 → 자동완성이 닫히고 끔 모드에선 옛 scrollLeft가 복원될 수 있다 — 삽입 직전이라 무해(P3).
+   ⚠ **키 경로(window 단축키)에는 쓰지 않는다** — 그쪽은 IME가 그 키로 확정 중인 순간이라 `runAfterComposition`(지연)이다(v2 E7).
+   반환값 = 끊었는가(진단용). */
+export function commitComposition(view: EditorView): boolean {
+  let broke = false;
+  if (view.compositionStarted && view.hasFocus) {
+    view.contentDOM.blur();
+    view.contentDOM.focus({ preventScroll: true });
+    broke = true;
+    diag('  68c commitComposition');
+    // 안전망(68a와 같다) — 블러가 compositionend를 못 냈으면 CM이 '조합 중'에 고착되지 않게 합성한다
+    if (view.compositionStarted) view.contentDOM.dispatchEvent(new CompositionEvent('compositionend', { data: '', bubbles: true }));
+  }
+  flushMathAscii(view);
+  return broke;
+}
+
 export function createMathAscii(enabled: () => boolean): Extension {
   return ViewPlugin.fromClass(class {
     keys: RecordedKey[] = [];                       // 기록 키 FIFO (record 경로)
@@ -810,4 +833,63 @@ export function createMathShortcuts(): MathShortcutsResult {
   ]));
 
   return { shortcuts: [shortcuts, composingRescue(enter), diagUpdates] };
+}
+
+
+// ─────────────────────────────────────────────
+// 6) 스마트 붙여넣기 (Phase 68c D5~D11) — 블록·댓글 편집기 **한 벌**(작업 규칙 9 · 미통일 ① 해소)
+// ─────────────────────────────────────────────
+/* 경로 둘:
+   ① 평문 — CM 내장 paste(text/plain)·drop이 `clipboardInputFilter`를 탄다 → `smartPasteText`(stripInvisibles → 구분자 정규화 → 수식 안 유니코드)
+   ② HTML — `text/html`에 `<math`가 **있을 때만** 여기 paste 핸들러가 가로챈다(플러그인 핸들러가 내장보다 먼저 — view dist computeHandlers).
+      DOMParser → `htmlToSNodes`(수식 호스트 정규화) → 61c `serializeNodes`(굵게·목록·표·링크까지 Mathory 마크다운) → `smartPasteText`.
+      annotation 없는 `<math>`가 있으면 `mathml-to-latex`를 **동적 import**(P9(b) — 첫 사용 1회 로드). 그 사이 문서가 바뀌었으면 현재 주 선택에(Q14).
+   ⚠ dispatch는 반드시 `userEvent: 'input.paste'` — 68a 리스너는 한글이 들면 userEvent 무관하게 큐에 올리고 `input.paste`만 뺀다(v2 B7).
+   ⚠ `<math` 없는 HTML은 보지 않는다(P10) — 일반 웹 페이지 복사가 마크다운으로 바뀌지 않는다. drop엔 HTML 경로가 없다(D10).
+   ⚠ `⌘⇧V`(서식 없이)는 평문 경로 — Mathory 미리보기 복사의 text/plain은 KaTeX 글자 나열이라 두 벌로 들어간다(알고 두는 손실, D11). */
+let mathmlConverter: Promise<BareConverter | null> | null = null;
+function loadMathmlConverter(): Promise<BareConverter | null> {
+  if (!mathmlConverter) {
+    mathmlConverter = import('mathml-to-latex')
+      .then((mod) => ((el: Element) => {
+        try { return mod.MathMLToLaTeX.convert(el.outerHTML) || null; } catch { return null; }
+      }) as BareConverter)
+      .catch(() => { mathmlConverter = null; return null; });   // 실패면 다음 붙여넣기에 다시 시도
+  }
+  return mathmlConverter;
+}
+
+export function createMathPaste(): Extension {
+  return [
+    EditorView.domEventHandlers({
+      paste(event, view) {
+        const html = event.clipboardData?.getData('text/html');
+        if (!html || !/<math[\s>]/i.test(html) || typeof DOMParser === 'undefined') return false;   // 평문 경로
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const { from, to } = view.state.selection.main;
+        const docAtPaste = view.state.doc;
+        const finish = (nodes: SNode[]) => {
+          const text = serializeNodes(nodes);
+          if (!text) return;
+          const at = view.state.doc === docAtPaste ? { from, to } : view.state.selection.main;   // Q14
+          const out = smartPasteText(text, view.state.doc.toString(), at.from, at.to);
+          diag(`  68c paste html → ${out.length}자`);
+          view.dispatch({
+            changes: { from: at.from, to: at.to, insert: out },
+            selection: { anchor: at.from + out.length }, userEvent: 'input.paste', scrollIntoView: true,
+          });
+        };
+        const first = htmlToSNodes(doc);
+        if (!first.bare.length) { finish(first.nodes); return true; }
+        loadMathmlConverter().then((conv) => {
+          if (view.dom.isConnected) finish(conv ? htmlToSNodes(doc, conv).nodes : first.nodes);   // 실패 = textContent 폴백
+        });
+        return true;
+      },
+    }),
+    EditorView.clipboardInputFilter.of((text, state) => {
+      const { from, to } = state.selection.main;
+      return smartPasteText(text, state.doc.toString(), from, to);
+    }),
+  ];
 }

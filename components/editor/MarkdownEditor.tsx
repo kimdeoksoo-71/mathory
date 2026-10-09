@@ -3,7 +3,7 @@
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { EditorView } from 'codemirror';
 import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
-import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
+import { INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
 import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
 import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
@@ -31,6 +31,7 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 /* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
 import {
   insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, createMathKeys, createMathInput, createMathAscii,
+  commitComposition, runAfterComposition, createMathPaste,
 } from '../../lib/math-editor-extensions';
 import { slotsField, insertWithSlots, setSlots } from '../../lib/mathSlots';
 /* Phase 68a — 수식 영역 자동 영문 입력의 CM 배선(keydown capture · 보류 삽입 큐 · reconcile 끊기→지우기→재생)은
@@ -206,6 +207,10 @@ export interface MarkdownEditorHandle {
   hasFocus: () => boolean;
   /** 한글 IME 조합 중인가. 조합 중 스크롤/데코레이션 변동은 조합을 깨뜨린다. */
   isComposing: () => boolean;
+  /** Phase 68c D3 — 조합 중이면 지금 확정시킨다(+ 68a 보류 치환 완료). 프로그램 호출 삽입 직전용. 반환 = 끊었는가 */
+  commitComposition: () => boolean;
+  /** Phase 68c D2″ — 키 경로(window 단축키): 조합이 끝난 뒤 fn(조합 아니면 즉시). `composingAtKey` = 그 키가 조합 키였나(isImeKey) */
+  whenSettled: (fn: () => void, opts?: { composingAtKey?: boolean }) => void;
   /** 선택 영역이 비어 있는가(= 커서만 있음). 드래그로 범위를 잡은 상태와 구분한다. */
   isSelectionEmpty: () => boolean;
   /** Phase 58 P3 — 선택 영역을 key sentence(`**…**`)로 감싸거나 해제한다.
@@ -313,6 +318,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       insertText(text: string, cursorOffset: number) {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);   // Phase 68c D3 — 삽입 핸들 여섯은 머리에서 조합을 확정한다
 
         const { from, to } = view.state.selection.main;
 
@@ -340,16 +346,19 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       insertInlineMath() {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);
         insertInlineMathIn(view);
       },
       insertBlockMath() {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);
         insertDisplayMathBlock(view);
       },
       insertPlainText(text: string) {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);
         const { from, to } = view.state.selection.main;
         // CM6은 selection을 changes 적용 **후** 문서 기준으로 해석한다 → 한 dispatch = undo 1스텝
         view.dispatch({
@@ -361,6 +370,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       insertMathSnippet(content: string) {
         const view = viewRef.current;
         if (!view) return;
+        commitComposition(view);
         const { from, to } = view.state.selection.main;
         insertWithSlots(view, from, to, content);   // 한 트랜잭션 = undo 1스텝, 첫 자리에 커서
         view.focus();
@@ -462,6 +472,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       isComposing() {
         return viewRef.current?.composing ?? false;
+      },
+      commitComposition() {
+        const view = viewRef.current;
+        return view ? commitComposition(view) : false;
+      },
+      whenSettled(fn: () => void, opts?: { composingAtKey?: boolean }) {
+        const view = viewRef.current;
+        if (!view) { fn(); return; }
+        runAfterComposition(view, fn, { composingAtKey: opts?.composingAtKey, label: 'window shortcut' });
       },
       isSelectionEmpty() {
         return viewRef.current?.state.selection.main.empty ?? true;
@@ -611,8 +630,9 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
              highlightSpecialChars와 설정이 합쳐지고 플러그인은 싱글턴이라 두 번 등록해도 무해(@codemirror/view 6.39).
              ⚠ 초성은 **단독**만 — 범위 전체면 붙여넣은 NFD 한글의 초성이 전부 점이 된다. */
           highlightSpecialChars({ addSpecialChars: INVISIBLE_SPECIAL_CHARS }),
-          /* M9 D24-1′·Q12 — 붙여넣은 텍스트만 정규화(IME 조합·타자에는 닿지 않는다) */
-          EditorView.clipboardInputFilter.of((text) => stripInvisibles(text)),
+          /* M9 D24-1′·Q12 → Phase 68c — 붙여넣기는 lib/math-editor-extensions `createMathPaste`(댓글 입력창과 한 벌):
+             stripInvisibles → 구분자 정규화 → 수식 안 유니코드→LaTeX + `<math` 든 HTML은 61c 직렬화기. IME 조합·타자에는 닿지 않는다 */
+          createMathPaste(),
           /* 툴팁을 에디터 밖 전용 호스트로(M7 D25′) — 끔 모드에서 .cm-editor 에 transform 이 걸리므로
              (fixed 거터의 containing block) 에디터 안의 fixed 툴팁은 좌표를 잃는다. 컨테이너는
              view.themeClasses 를 그대로 받아 아래 .cm-tooltip 테마가 계속 적용된다.

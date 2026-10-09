@@ -1,0 +1,115 @@
+'use client';
+/* Phase 68c 임시 검증 라우트 — headless Chrome CDP 하니스(docs/phaseSketch/phase68c-cdp-harness.mjs)가 쓴다.
+   되살리기: 이 파일을 app/dev68c/page.tsx로 복사(+ OldSIP.tsx = 68c 이전 SelectionInsertPopup, `git show 5690a77:components/comment/SelectionInsertPopup.tsx`)
+   → dev 서버에서 하니스 실행 → 검증 뒤 삭제(dev 서버가 도는 동안은 삭제 금지). */
+import { useEffect, useRef } from 'react';
+import katex from 'katex';
+import { EditorView } from '@codemirror/view';
+import { undoDepth } from '@codemirror/commands';
+import MarkdownEditor, { MarkdownEditorHandle } from '../../components/editor/MarkdownEditor';
+import LatexInputEditor, { LatexInputEditorHandle } from '../../components/comment/LatexInputEditor';
+import EditorPreview from '../../components/editor/EditorPreview';
+import { serializeSelection as newSerialize } from '../../components/comment/SelectionInsertPopup';
+import { serializeSelection as oldSerialize } from './OldSIP';
+import { DEFAULT_ABBREVS } from '../../lib/mathInput';
+import { setSlots } from '../../lib/mathSlots';
+import { isImeKey } from '../../lib/imeKey';
+
+const CHAT_SRC = [
+  '풀이는 다음과 같다. $x^2 + 1 = 0$ 이고 **핵심**은 $\\frac{a}{b}$ 이다.',
+  '',
+  '$$',
+  'a = \\sqrt{2} \\tag{1}',
+  '$$',
+  '',
+  '- 첫째 $\\alpha$',
+  '- 둘째 `code`',
+  '',
+  '| 열 | 값 |',
+  '| --- | --- |',
+  '| $x$ | 3 |',
+  '',
+  '가격은 \\$5 이다. (가) 항목',
+].join('\n');
+
+type W = 'ed' | 'cm' | 'cm2';
+
+export default function Dev68cPage() {
+  const edRef = useRef<MarkdownEditorHandle>(null);
+  const cmRef = useRef<LatexInputEditorHandle>(null);
+  const cm2Ref = useRef<LatexInputEditorHandle>(null);
+  const boxes = { ed: useRef<HTMLDivElement>(null), cm: useRef<HTMLDivElement>(null), cm2: useRef<HTMLDivElement>(null) };
+
+  useEffect(() => {
+    const view = (w: W) => {
+      const el = boxes[w].current?.querySelector('.cm-editor');
+      return el ? EditorView.findFromDOM(el as HTMLElement) : null;
+    };
+    const fired: Array<{ doc: string; from: number; t: number; composing: boolean }> = [];
+    const H: Record<string, any> = {
+      ed: edRef.current, cm: cmRef.current, cm2: cm2Ref.current, view, fired,
+      state: (w: W) => {
+        const v = view(w);
+        if (!v) return null;
+        const sel = v.state.selection.main;
+        return { doc: v.state.doc.toString(), from: sel.from, to: sel.to, undo: undoDepth(v.state), composing: v.compositionStarted };
+      },
+      set: (w: W, doc: string, from: number, to?: number) => {
+        const v = view(w);
+        if (!v) return;
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: doc }, effects: setSlots.of(null) });
+        v.dispatch({ selection: { anchor: from, head: to ?? from } });
+        v.focus();
+      },
+      katex: (tex: string, display: boolean) => katex.renderToString(tex, { displayMode: display, throwOnError: false }),
+      paste: (w: W, html: string | null, plain: string) => {
+        const dt = new DataTransfer();
+        if (html !== null) dt.setData('text/html', html);
+        dt.setData('text/plain', plain);
+        const ev = new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true });
+        view(w)!.contentDOM.dispatchEvent(ev);
+        return ev.defaultPrevented;
+      },
+      serialize: () => {
+        const body = document.querySelector('#chat .comment-body') as HTMLElement;
+        const r = document.createRange();
+        r.selectNodeContents(body);
+        const get = () => CHAT_SRC;
+        return { old: oldSerialize(r, get), now: newSerialize(r, get) };
+      },
+      lastTx: '' as string,
+    };
+    (window as unknown as { __h68c: unknown }).__h68c = H;
+    /* EditorView window 단축키와 같은 꼴(68c D2″) — ⌘B·⌘J 대용: 실행 시점의 편집창 문서·커서를 기록한다 */
+    const onKey = (e: KeyboardEvent) => {
+      const plain = !e.shiftKey && !e.altKey && !e.repeat;
+      if ((e.ctrlKey || e.metaKey) && plain && e.code === 'KeyB') {
+        e.preventDefault();
+        const rec = () => { const s = H.state('ed'); fired.push({ doc: s.doc, from: s.from, t: performance.now(), composing: s.composing }); };
+        edRef.current!.whenSettled(rec, { composingAtKey: isImeKey(e) });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ padding: 24, maxWidth: 900 }}>
+      <h1>dev68c</h1>
+      <button type="button">before</button>
+      <div ref={boxes.ed} style={{ border: '1px solid #ccc', marginTop: 8 }}>
+        <MarkdownEditor ref={edRef} initialValue="" abbrevs={{ ...DEFAULT_ABBREVS }} />
+      </div>
+      <div ref={boxes.cm} style={{ border: '1px solid #ccc', marginTop: 16 }}>
+        <LatexInputEditor ref={cmRef} initialValue="" minHeight={60} />
+      </div>
+      <div ref={boxes.cm2} style={{ border: '1px solid #ccc', marginTop: 16 }}>
+        <LatexInputEditor ref={cm2Ref} initialValue="" minHeight={40} maxLength={12} />
+      </div>
+      <div id="chat" style={{ marginTop: 16 }}>
+        <div className="comment-body" data-comment-id="c1"><EditorPreview content={CHAT_SRC} borderless /></div>
+      </div>
+      <button type="button">after</button>
+    </div>
+  );
+}
