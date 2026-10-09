@@ -2171,7 +2171,27 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## Phase 68b: 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출) ✅ 구현 (2026-10-09) · headless CDP 44/44 · **덕수 실물 검수 대기** · push 대기
+## Phase 68c: 한국어 IME 안전 트리거 층 · 스마트 붙여넣기 ✅ 구현 (2026-10-09) · headless CDP 68c 35/35 · 68b 118/118 · **덕수 실물 검수 대기** · push 대기
+
+계획서: `docs/phasedocs/Phase68c 한국어 IME 안전 트리거 층·스마트 붙여넣기 v3 착수판.md` (§11 구현 기록 · 6커밋 S0~S4 + 후속 1)
+(계보: 카탈로그 v1 우선순위 3·4 → v1 web → v2 CLI 교차검토(E1~E18·G1~G20·Q1~Q11) → v3 web 재검증 착수판(F1~F8·H1~H8·Q12~Q14) → 구현)
+
+| 항목 | 68c 뒤 |
+|---|---|
+| React 입력창 Enter 15곳 | `lib/imeKey.isImeKey` — 조합 중·Safari 꼬리 keydown(229) Enter를 거른다 |
+| window 단축키 ⌘F·⌘B·⌘J·⌘⇧L | `e.code` + `!shift·!alt·!repeat` · 문서를 바꾸는 셋은 조합 중이면 **compositionend 뒤** 실행(`runAfterComposition` — 68b `composingRescue`와 한 벌) · 최신 클로저 ref |
+| 삽입 핸들 여섯(편집창 5 + 댓글 `insertAtCursor`) | 머리에서 `commitComposition`(조합 확정 + 68a flush) |
+| 평문 붙여넣기(두 편집기) | `\(`→`$` · `\[`→펜스형 `$$` · 수식 안 유니코드→LaTeX(`≤`→`\le` · `√2x`→`\sqrt{2}x` · `x²`→`x^{2}` · 전각→ASCII) · 폭 0 문자 제거 |
+| HTML 붙여넣기(`<math` 있을 때) | KaTeX·MathJax·위키·Mathory 미리보기의 annotation → 원 LaTeX · 굵게·목록·표는 61c 직렬화기 그대로 · annotation 없는 `<math>`는 `mathml-to-latex`(동적 import) |
+
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0.** 신설 `lib/imeKey.ts`·`lib/mathPaste.ts`·`lib/snodeDom.ts`(61c 어댑터 이관) · 로직 테스트 606 → **622**. 작업 규칙 9 미통일 ①(붙여넣기 정규화) 해소.
+
+- **가장 값비싼 발견**: ① v1·v2가 설계한 HTML 변환기는 61c 직렬화기와 같은 일이었다(v3 F5 — 재사용) ② prelaunch 1번(조합 중 ⌘B 끝글자 중복)에 과거 실패 기록(blur 강제 커밋 · 고정 60ms 지연)이 있었는데 세 판본 모두 보지 않았다(§11 I7 — 68c 키 경로는 실제 compositionend 대기라 다르지만 미검증) ③ 외부 HTML의 소스 공백·위키 `{\displaystyle}` 껍질·문장 중간 `\[`의 펜스(I1~I3)
+- ⚠ 남은 일: 덕수 실물(§9-3 — 맥 크롬 → Safari → 윈도우 크롬, prelaunch 1번 표본 `# 수정은` + ⌘B) · push
+
+---
+
+## Phase 68b: 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출) ✅ 구현 (2026-10-09) · headless CDP 118/118 · **덕수 맥·윈도우 11 크롬 검수 종결(2026-10-09)** · 배포 완료
 
 계획서: `docs/phasedocs/Phase68b 수식 입력 단축키 정비 v4 착수판.md` (§11 구현 기록 · 5커밋 S1~S4 + CDP 후속 1)
 (계보: 연구 v1 web → 계획 v1 web → v2 CLI 교차검토 + 독립 검증 에이전트(R-1~R-5) → v3 web 재검증(F1~F3·H1~H5·Q11) → v4 CLI 착수판(Q1~Q11 전항 권장안) → 구현)
@@ -2188,7 +2208,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 **서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0.** 신설 0 · 수정 7 + 2줄 · 삭제 약 250줄(`findInnermostExit`·`findMathRegion` 사본 4벌 · chord). 삽입·나오기·keymap의 원천은 `lib/math-editor-extensions.ts`(블록·댓글 편집기 한 벌). 안/밖 판정 `mathRegions.exitRegionAt`(삽입 뒤 문서 — 68a K8 함정 회피) · 위치 `mathInput.mathExitPos`. 로직 테스트 597 → **606**.
 
 - **가장 값비싼 발견**: ① 행 끝 `$|$`에서 `mathRegionAt`이 밖 → 두 번째 Ctrl+M이 `$ $|$ $`(독립 검증 R-1) ② 빈 쌍 잔재 `$$`가 저장 정규화에서 다음 블록과 짝지어짐(실행 확인) ③ CM history 500ms 그룹화로 삽입+삭제가 ⌘Z 한 번에 풀림(CDP ⑭ → `isolateHistory`)
-- ⚠ 남은 일: 덕수 실물(Windows 3브라우저 · 한글 조합 중 Ctrl+M) · dev 종료 뒤 `app/dev68b` 삭제 → build → push
+- 검수 종결(2026-10-09): 맥·윈도우 11 크롬 — 윈도우 잔여 셋은 상주 텍스트 확장(Breevy)이 Tab을 삼킨 외부 원인(진단 기록 실증)
 
 ---
 
