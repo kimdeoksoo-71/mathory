@@ -486,7 +486,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 68b — 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출)** — 구현 완료(2026-10-09) · S1~S5 + 검수 후속 3 · headless CDP **108/108** · **덕수 맥 크롬 검수 종결(2026-10-09)** · 프로덕션 빌드 통과 · push 대기 → 윈도우 크롬 검수
+## 현재 Phase: **Phase 68b — 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출)** — 구현 완료(2026-10-09) · S1~S5 + 검수 후속 4 · headless CDP **118/118** · **덕수 맥·윈도우 11 크롬 검수 종결(2026-10-09)** · 배포 완료
 
 문서: `docs/phasedocs/Phase68b 수식 입력 단축키 정비 v4 착수판.md`
 (계보: 연구 v1 web(해외 도구 조사) → 계획 v1 web → v2 CLI 교차검토 + **독립 검증 에이전트 1회**(R-1~R-5) → v3 web 재검증(F1~F3·H1~H5·Q11) → **v4 CLI 착수판**(Q1~Q11 전항 권장안 확정) → 구현. §11이 구현 기록)
@@ -498,7 +498,7 @@ HWP에서 온 `Ctrl+N`→`M`/`N` 연타·`Shift+Esc`를 LaTeX/Markdown 진영 �
 - **CDP가 잡은 것(§11)**: 삽입+삭제가 CM history 500ms 그룹에 합쳐져 ⌘Z 한 번에 통째로 풀림 → `isolateHistory.of('full')` · Mac `Ctrl+N`은 CM Emacs `cursorLineDown`으로 복귀(문서 불변)
 - **덕수 맥 크롬 검수(2026-10-09)**: 21항 중 19항 정상. 후속 2건 — **17** 조합 중 ⌃M이 `한` 확정만 하고 끝남 → `composingRescue` · **21** 댓글·agent 입력창 Tab이 포커스 이동 → Tab 엔진 공유 + `abbrevStore`. CDP 44 → **61/61**
 - **후속 2(같은 날)**: 댓글·agent 입력창의 수식 안 자동 영문 입력이 안 됨(68a가 편집창 전용이었다) → 68a CM 배선을 `createMathAscii` 플러그인으로 옮겨 두 편집기 공용. **작업 규칙 9 신설**(수식 입력 방식 일관성 — 덕수 원칙). CDP **76/76**(68a 표본 15건 — 편집창 무회귀 + 댓글) · 덕수 맥 재확인 정상
-- **윈도우 11 크롬 검수(2026-10-09)**: 1차는 옛 배포본 + IME **전각** 모드라 무효(전각 `＄`는 수식 구분자가 아니다 — Shift+Space 전환). 강력 새로고침·반각으로 재검수 → 12항 중 10항 정상. 후속: 단축어 Tab 경합(`flushMathAscii`) · 7 윈도우 순서(60ms 갈래) · 입력 진단 기록. **5 Alt+=는 미해결**(진단 기록으로 원인 확인 예정). CDP **118/118**
+- **윈도우 11 크롬 검수(2026-10-09) 종결**: 1차는 옛 배포본 + IME **전각** 모드라 무효(전각 `＄`는 수식 구분자가 아니다 — Shift+Space 전환). 강력 새로고침·반각으로 재검수 → 12항 중 10항 정상. 후속: 단축어 Tab 경합(`flushMathAscii`) · 7 윈도우 순서(60ms 갈래) · 입력 진단 기록. 남은 셋(단축어 Tab이 `lim_{{->}{}}}}`로 깨짐 · 5 Alt+= · 7)은 **진단 기록이 밝힌 외부 원인** — 상주 텍스트 확장 프로그램 **Breevy**(+PowerToys)가 Tab keydown을 삼키고 자기 단축어를 키 입력으로 쳐 넣었다(기록: Tab keydown 부재 · 수정자 풀기 묶음 · Backspace ×3 · 글자 단위 keydown). 끄니 전항 정상. ⚠ **"윈도우에서만 깨진다"는 보고는 먼저 진단 기록으로 keydown이 페이지에 오는지부터 볼 것** — 텍스트 확장·키 매핑 도구가 끼어든 것일 수 있다. CDP **118/118**
 - **후속 3(같은 날, 덕수 지정)**: 미통일 5종 중 1~3 통일 — 행 환경 Enter(`createMathKeys`) · 후위 변환·`\left` 감싸기·`\left` 쌍·괄호 자동닫기(`createMathInput` = 편집창 입력 처리기 + CM `closeBrackets` + 짝 지우기). CDP **108/108**(16표본 × 두 편집기 같은 기대값). `MarkdownEditor` 1506 → **948행**
 - **덕수 맥 크롬 검수 종결(2026-10-09)** — 21항 + 후속 재확인(조합 중 ⌃M · 댓글 Tab · 댓글 자동 영문 4항 · 통일 5항) 전항 정상. 임시 라우트 `app/dev68b` 삭제 · `npm run build` 통과(`[icons:check] OK — 62종`)
 - ⚠ 남은 일: push(덕수) → **윈도우 11 크롬 검수**(검수 범위는 덕수 결정으로 두 OS의 크롬만 — Edge·Firefox·Safari 제외) · 남은 미통일 2종(작업 규칙 9)

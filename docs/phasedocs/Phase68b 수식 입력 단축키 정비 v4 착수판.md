@@ -482,3 +482,16 @@ CDP 44 → **61/61**(⑰ 9건 · ㉑ 8건 추가 — 조합은 페이지 안 합
 
 - **입력 진단 기록(신설, 꺼짐이 기본)**: 콘솔 `localStorage.setItem('mathory-input-diag','on')` → 새로고침 → 재현 → `copy(__mathoryInputDiag.dump())`. 키·조합·beforeinput·편집기 트랜잭션·rescue/flush 결정 최근 400줄. 꺼져 있으면 리스너 0, 서버 전송 없음
 - CDP 108 → **118/118**(윈도우 순서 5표본 × 두 편집기). 하니스 표본 "확정 신호가 안 옴"이 조합을 열어 둔 채 끝나 다음 표본을 오염시키던 것을 정리(코드가 아니라 하니스 문제 — `compositionStarted` 판정은 유지)
+
+### 11-9. 윈도우 11 크롬 검수 종결 (2026-10-09)
+
+남아 있던 셋(단축어 Tab 깨짐 · 5 Alt+= · 7 조합 중 Ctrl+M)은 **Mathory 밖**이었다. 입력 진단 기록이 보여 준 것:
+
+- Tab을 누른 자리에 **Tab keydown이 없고 keyup만** 있다 → Mathory의 Tab 처리는 시작조차 못 했다
+- 그 자리에 Ctrl 좌우·Shift 좌우를 눌렀다 떼는 묶음 → Backspace ×3 → `l i m _ { - > } { }`가 **실제 키 입력**(keydown·keyup·beforeinput 각각)으로 수 ms 간격 — 텍스트 확장 프로그램의 전형(수정자 풀기 → 지우기 → 보내기)
+- 한글 IME에선 `>`가 `3`으로(`code=Period`+Shift가 IME를 거쳐 `compositionupdate data="3"`) — 입력기 의존 결과의 정체
+- Mathory의 괄호 자동 닫기가 그 `{`마다 `}`를 덧붙여 `lim_{{->}{}}}}`
+
+상주 프로그램 **Breevy**(텍스트 확장)와 PowerToys를 끄자 전항 정상(덕수). 결론: 맥·윈도우 11 크롬 **검수 종결**. 진단 기록 기능은 남긴다(기본 꺼짐).
+
+교훈: "특정 OS에서만 깨진다"는 보고는 코드 차이보다 **그 PC의 상주 도구**를 먼저 의심하고, keydown이 페이지에 오는지부터 기록으로 확인한다.
