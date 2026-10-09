@@ -460,3 +460,10 @@ CDP 44 → **61/61**(⑰ 9건 · ㉑ 8건 추가 — 조합은 페이지 안 합
 - 댓글 입력창에서 `createMathKeys`를 `markdown()` **앞**에 — 그 언어의 Enter(목록 이어 쓰기)도 `Prec.high`라 배열 순서가 승부를 가른다
 - CDP 76 → **108/108**: 16표본(Enter 3 · 후위 변환 5 · 선택 감싸기·`\left` 쌍 2 · 괄호 6) × 두 편집기 **같은 기대값**. `MarkdownEditor` 1065 → 948행
 - 남은 미통일: 붙여넣기 비가시 문자 정규화 · LaTeX 린트(CLAUDE.md 작업 규칙 9 목록)
+
+### 11-7. 맥 크롬 검수 종결 · 빌드 (2026-10-09)
+
+- 덕수 맥 크롬: 21항 + 후속 재확인(조합 중 ⌃M · 댓글 Tab · 댓글 자동 영문 4항 · 통일 5항) **전항 정상**
+- 검수 범위 결정(덕수): **맥 크롬 · 윈도우 11 크롬 두 곳만** — Edge·Firefox·Safari는 제외(§9-2 1·3의 다른 브라우저 항목 포함)
+- dev 종료 → 임시 라우트 `app/dev68b` 삭제 → `npm run build` 통과(`[icons:check] OK — 62종`) → dev 재시작. 하니스 `docs/phaseSketch/phase68b-cdp-harness.mjs`(108건)와 임시 라우트 소스 `docs/phaseSketch/phase68b-dev68b-page.tsx.txt`를 함께 보관 — 되살리려면 후자를 `app/dev68b/page.tsx`로 복사하고 dev 서버에서 하니스를 돌린 뒤 지운다(라우트는 git에 커밋하지 않는다)
+- 남은 일: push → 윈도우 11 크롬 검수
