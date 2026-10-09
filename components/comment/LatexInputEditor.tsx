@@ -7,7 +7,9 @@ import { EditorState, Compartment, Prec } from '@codemirror/state';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
-import { createMathShortcuts, createLatexAutocompletion, createMathTab } from '../../lib/math-editor-extensions';
+import {
+  createMathShortcuts, createLatexAutocompletion, createMathTab, createMathAscii, readMathAsciiPref,
+} from '../../lib/math-editor-extensions';
 import { getAbbrevs, primeAbbrevs } from '../../lib/abbrevStore';
 import { setSlots } from '../../lib/mathSlots';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -75,6 +77,8 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
             mathShortcuts,
             // Phase 68b 후속(덕수 검수 21) — 편집창과 같은 Tab 엔진(약어 확장·자리·`&`·그룹 탈출·`$` 밖). 약어 맵은 lib/abbrevStore
             createMathTab(getAbbrevs),
+            // Phase 68a(2026-10-09 편입) — 수식 안 자동 영문 입력. 켜고 끄기는 편집창 Row 2 토글 저장값을 누를 때마다 읽는다
+            createMathAscii(readMathAsciiPref),
             latexAutocompletion,
             // 수식 영역 내에서 ( [ { 입력 시 자동으로 짝 괄호 닫기 + 커서 중앙 배치.
             // 수식 밖에선 기본 동작(1글자 삽입)을 유지.

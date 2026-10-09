@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { readMathAsciiPref, writeMathAsciiPref } from '../../lib/math-editor-extensions';
 import { Problem, Block, ProblemWithBlocks, Folder, TabMeta, ProblemComment, DiscussionSession, DEFAULT_TABS, tabSubcollection, VerifyKind, VerifyReport } from '../../types/problem';
 import {
   getProblemWithBlocks, updateProblem, setVerification,
@@ -252,14 +253,9 @@ function setStoredLineWrap(on: boolean) {
   try { localStorage.setItem(LINE_WRAP_KEY, on ? 'on' : 'off'); } catch {}
 }
 /* Phase 68a D11 — 수식 영역 자동 영문 입력 토글. 줄바꿈 토글과 같은 꼴(기본 켬 · 마운트 후 localStorage 반영). */
-const MATH_ASCII_KEY = 'mathory-editor-mathascii';
-function getStoredMathAscii(): boolean {
-  if (typeof window === 'undefined') return true;
-  try { return localStorage.getItem(MATH_ASCII_KEY) !== 'off'; } catch { return true; }
-}
-function setStoredMathAscii(on: boolean) {
-  try { localStorage.setItem(MATH_ASCII_KEY, on ? 'on' : 'off'); } catch {}
-}
+/* Phase 68a 토글 저장값 — 키·읽기·쓰기는 lib/math-editor-extensions가 소유한다(댓글·agent 입력창이 같은 값을 따른다) */
+const getStoredMathAscii = readMathAsciiPref;
+const setStoredMathAscii = writeMathAsciiPref;
 
 /* ═══ EmptyBlockChips: 빈 텍스트 블록에 그림/선택지 빠른 전환 칩 ═══ */
 
