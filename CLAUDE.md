@@ -496,7 +496,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 (계보: 카탈로그 v1 우선순위 3·4 → v1 web → v2 CLI 교차검토(E1~E18·G1~G20) → v3 web 재검증 착수판(F1~F8·H1~H8 · Q12~Q14 권장안) → 구현. §11이 구현 기록 — 이탈·보완 I1~I8)
 
 편집창 **밖**에 남은 IME 구멍(React 입력창 Enter 15곳 · window 단축키 ⌘F·⌘B·⌘J의 `e.key` · 삽입 핸들 조합 가드)을 막고, 붙여넣기를 똑똑하게 했다 — ChatGPT·KaTeX·MathJax·위키·Mathory 미리보기의 수식이 원 LaTeX로, `\(`·`\[`는 `$`로, 수식 안 유니코드는 명령으로.
-**서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0 · 아이콘 0.** 신설 3(`lib/imeKey.ts` · `lib/mathPaste.ts` · `lib/snodeDom.ts` — 61c 어댑터 이관) · 의존성 +1(`mathml-to-latex`, 지연 청크 전용) · 로직 테스트 24종 606 → **26종 622건**(`test:imekey` 6 · `test:mathpaste` 10). 작업 규칙 9 미통일 ① 해소. **규약은 「핵심 패턴」 맨 앞의 붙여넣기 절과 「Korean IME」 절이 소유한다.**
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0 · 아이콘 0.** 신설 3(`lib/imeKey.ts` · `lib/mathPaste.ts` · `lib/snodeDom.ts` — 61c 어댑터 이관) · 의존성 +1(`mathml-to-latex`, 지연 청크 전용) · 로직 테스트 +16건(`test:imekey` 6 · `test:mathpaste` 10) — 2026-10-09 실측 **26종(test:rules 제외) 573건 전부 통과**(68b의 "606"은 다른 기준으로 센 값). 작업 규칙 9 미통일 ① 해소. **규약은 「핵심 패턴」 맨 앞의 붙여넣기 절과 「Korean IME」 절이 소유한다.**
 
 - **v3를 그대로 넣었으면 어긋났을 것(§11-2)**: 외부 HTML 텍스트의 소스 공백(I1) · 위키 `{\displaystyle}` 껍질(I2) · 문장 중간 `\[`의 펜스가 행 중간(I3) · `composingRescue` 조합 밖 229가 20→60ms(I4 — `defer` 분리) · 다른 입력창 조합 중 ⌘B가 사라짐(I5)
 - **v1~v3가 놓친 선행 기록(I7)**: prelaunch 1번(조합 중 ⌘B 끝글자 중복 `# 수정은`→`# 수정은은`)에서 blur 강제 커밋·고정 60ms 지연이 **이미 실패**했다. 68c 키 경로는 실제 compositionend를 기다린다는 점이 다르지만 **CDP로 재현되지 않는 버그라 미검증** — 실물 §9-3 2′

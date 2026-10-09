@@ -82,7 +82,7 @@ S0 `isImeKey`·15곳·`runAfterComposition` → S1 `lib/mathPaste` → S2 `lib/s
 
 ## 9. 검증
 
-### 9-1. 자동 — 26종 622건(68b 606 + `test:imekey` 6 + `test:mathpaste` 10)
+### 9-1. 자동 — +16건(`test:imekey` 6 · `test:mathpaste` 10) · 실측 26종(test:rules 제외) **573건 전부 통과**(2026-10-09 — 68b 문서의 "606"은 다른 기준으로 센 값이라 그대로 더하지 않는다)
 
 - `test:mathpaste` 10: 구분자(펜스형 · `\\[4pt]` · 이스케이프 · 미닫힘 · 빈 짝 · 코드 · 기존 수식 · 인접 `$`) · 표 대표 28종 · 결합 문자·항등·한글 부재 · **중복 43종 스냅샷** · 변환(공백 · 첨자 런 · `√` 토큰 · 전각 · `＄`) · 영역(수식 안 커서 · 본문 · 평문 `$` · 본문 전각 · 기존 수식 · `\text{}` · 선택 대체) · URL·파일명 · 폭 0
 - 회귀: `test:extract` 42(v3가 적은 52는 오기) · `test:invisibles` 8 · `test:proofread` 50 · `test:mathregions` 13 · `test:mathascii` 32 · `test:mathinput` 19 · `test:tidy` 21 · tsc · `npm run build`(`[icons:check] OK — 62종`)

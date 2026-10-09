@@ -2184,7 +2184,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 | 평문 붙여넣기(두 편집기) | `\(`→`$` · `\[`→펜스형 `$$` · 수식 안 유니코드→LaTeX(`≤`→`\le` · `√2x`→`\sqrt{2}x` · `x²`→`x^{2}` · 전각→ASCII) · 폭 0 문자 제거 |
 | HTML 붙여넣기(`<math` 있을 때) | KaTeX·MathJax·위키·Mathory 미리보기의 annotation → 원 LaTeX · 굵게·목록·표는 61c 직렬화기 그대로 · annotation 없는 `<math>`는 `mathml-to-latex`(동적 import) |
 
-**서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0.** 신설 `lib/imeKey.ts`·`lib/mathPaste.ts`·`lib/snodeDom.ts`(61c 어댑터 이관) · 로직 테스트 606 → **622**. 작업 규칙 9 미통일 ①(붙여넣기 정규화) 해소.
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0.** 신설 `lib/imeKey.ts`·`lib/mathPaste.ts`·`lib/snodeDom.ts`(61c 어댑터 이관) · 로직 테스트 +16(실측 26종 573건 전부 통과 — test:rules 제외). 작업 규칙 9 미통일 ①(붙여넣기 정규화) 해소.
 
 - **가장 값비싼 발견**: ① v1·v2가 설계한 HTML 변환기는 61c 직렬화기와 같은 일이었다(v3 F5 — 재사용) ② prelaunch 1번(조합 중 ⌘B 끝글자 중복)에 과거 실패 기록(blur 강제 커밋 · 고정 60ms 지연)이 있었는데 세 판본 모두 보지 않았다(§11 I7 — 68c 키 경로는 실제 compositionend 대기라 다르지만 미검증) ③ 외부 HTML의 소스 공백·위키 `{\displaystyle}` 껍질·문장 중간 `\[`의 펜스(I1~I3)
 - ⚠ 남은 일: 덕수 실물(§9-3 — 맥 크롬 → Safari → 윈도우 크롬, prelaunch 1번 표본 `# 수정은` + ⌘B) · push
