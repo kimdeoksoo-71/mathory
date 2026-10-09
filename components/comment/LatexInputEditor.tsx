@@ -8,13 +8,12 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
 import {
-  createMathShortcuts, createLatexAutocompletion, createMathTab, createMathAscii, readMathAsciiPref,
+  createMathShortcuts, createLatexAutocompletion, createMathKeys, createMathInput, createMathAscii, readMathAsciiPref,
 } from '../../lib/math-editor-extensions';
 import { getAbbrevs, primeAbbrevs } from '../../lib/abbrevStore';
 import { setSlots } from '../../lib/mathSlots';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../../lib/firebase';
-import { isInsideMath } from '../../lib/latex-completions';
 
 export interface LatexInputEditorHandle {
   insertAtCursor(text: string, cursorOffset?: number): void;
@@ -73,26 +72,16 @@ const LatexInputEditor = forwardRef<LatexInputEditorHandle, LatexInputEditorProp
           doc: initialValue,
           extensions: [
             history(),
+            // ── 수식 입력 — 편집창과 한 벌(작업 규칙 9). lib/math-editor-extensions ──
+            // Tab·Shift+Tab·행 환경 Enter. ⚠ markdown()보다 앞 — 그 언어의 Enter(목록 이어 쓰기)도 Prec.high라 배열 순서가 승부를 가른다
+            createMathKeys(getAbbrevs),
             markdown(),
             mathShortcuts,
-            // Phase 68b 후속(덕수 검수 21) — 편집창과 같은 Tab 엔진(약어 확장·자리·`&`·그룹 탈출·`$` 밖). 약어 맵은 lib/abbrevStore
-            createMathTab(getAbbrevs),
-            // Phase 68a(2026-10-09 편입) — 수식 안 자동 영문 입력. 켜고 끄기는 편집창 Row 2 토글 저장값을 누를 때마다 읽는다
+            // 수식 안 자동 영문 입력(68a). 켜고 끄기는 편집창 Row 2 토글 저장값을 누를 때마다 읽는다
             createMathAscii(readMathAsciiPref),
             latexAutocompletion,
-            // 수식 영역 내에서 ( [ { 입력 시 자동으로 짝 괄호 닫기 + 커서 중앙 배치.
-            // 수식 밖에선 기본 동작(1글자 삽입)을 유지.
-            Prec.highest(EditorView.inputHandler.of((view, from, to, text) => {
-              if (text !== '(' && text !== '[' && text !== '{') return false;
-              const doc = view.state.doc.toString();
-              if (!isInsideMath(doc, from)) return false;
-              const pair = text === '(' ? '()' : text === '[' ? '[]' : '{}';
-              view.dispatch({
-                changes: { from, to, insert: pair },
-                selection: { anchor: from + 1 },
-              });
-              return true;
-            })),
+            // 후위 변환(^→^{} · (A)/→\frac) · 선택 \left 감싸기 · \left 쌍 · 괄호 자동닫기(closeBrackets — 건너뛰기·Backspace 짝 지우기)
+            createMathInput(),
             latexHighlightPlugin,
             latexHighlightTheme,
             EditorView.lineWrapping,

@@ -6,8 +6,7 @@ import { keymap, tooltips, highlightSpecialChars } from '@codemirror/view';
 import { stripInvisibles, INVISIBLE_SPECIAL_CHARS } from '../../lib/invisibles';
 import { EditorState, Prec, Compartment, Extension } from '@codemirror/state';
 import { basicSetup } from 'codemirror';
-import { autocompletion, CompletionContext, Completion, completionStatus } from '@codemirror/autocomplete';
-import { isolateHistory } from '@codemirror/commands';
+import { autocompletion, CompletionContext, Completion } from '@codemirror/autocomplete';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 // search 하이라이트는 커스텀 FindReplacePanel + StateField로 처리
 import { latexHighlightPlugin, latexHighlightTheme } from '../../lib/latex-highlight';
@@ -29,11 +28,9 @@ import { lintLaTeX } from '../../lib/latex-linter';
 import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/editorScroll';
 /* Phase 68 — 수식 입력 보조: 판정(lib/mathInput) · 자리 상태(lib/mathSlots) · 영역(lib/mathRegions).
    ⚠ `@codemirror/autocomplete`의 snippet·snippetKeymap·clearSnippet을 import하지 말 것 — lib/mathSlots.ts 머리 주석(N1). */
-import { scanMathRegions, mathRegionAt } from '../../lib/mathRegions';
-import { autoFracAt, rowEnterPlan } from '../../lib/mathInput';
 /* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
 import {
-  insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, mathTabCommand, mathShiftTabCommand, createMathAscii,
+  insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, createMathKeys, createMathInput, createMathAscii,
 } from '../../lib/math-editor-extensions';
 import { slotsField, insertWithSlots, setSlots } from '../../lib/mathSlots';
 /* Phase 68a — 수식 영역 자동 영문 입력의 CM 배선(keydown capture · 보류 삽입 큐 · reconcile 끊기→지우기→재생)은
@@ -563,29 +560,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
          ⚠ ④가 ⑤보다 앞이라 환경 본문 깊이 0에서는 같은 행 뒤쪽 빈 `{}`로 Tab으로는 못 간다(Alt+Tab은 간다) — 예측 가능성과의 교환(P15).
          Enter: 행 환경 본문 안이면 ` \\`+줄바꿈+들여쓰기(lib/mathInput.rowEnterPlan ⓐ~ⓔ). `shift`를 묶지 않는다 —
          Shift+Enter는 standardKeymap의 insertNewlineAndIndent(들여쓰기 유지 줄바꿈, `\\` 없음)가 탈출구다. */
-      /* Tab·Shift+Tab 엔진은 lib/math-editor-extensions가 소유한다(댓글·agent 입력창과 한 벌 — 68b 후속, 덕수 검수 21).
-         약어 맵은 누를 때마다 abbrevsRef로 읽는다. 순서 ⓪~⑦·⑥′ 설명은 그 파일 3′ 절 */
-      const mathTab = mathTabCommand(() => abbrevsRef.current);
-      const mathShiftTab = mathShiftTabCommand;
-      const rowEnter = (view: EditorView): boolean => {
-        if (view.composing || completionStatus(view.state) === 'active') return false;
-        const sel = view.state.selection.main;
-        if (!sel.empty) return false;
-        const doc = view.state.doc.toString();
-        const region = mathRegionAt(scanMathRegions(doc), sel.head);
-        if (!region) return false;
-        const plan = rowEnterPlan(doc, sel.head, region);
-        if (!plan) return false;
-        view.dispatch({
-          changes: { from: plan.from, to: plan.to, insert: plan.insert },
-          selection: { anchor: plan.cursor }, scrollIntoView: true, userEvent: 'input.type',
-        });
-        return true;
-      };
-      const mathKeys = Prec.high(keymap.of([
-        { key: 'Tab', run: mathTab, shift: mathShiftTab },
-        { key: 'Enter', run: rowEnter },
-      ]));
+      // Tab·Shift+Tab·행 환경 Enter — lib/math-editor-extensions `createMathKeys`(댓글 입력창과 한 벌). 약어 맵은 누를 때마다 abbrevsRef
+      const mathKeys = createMathKeys(() => abbrevsRef.current);
 
       // ── Cmd+F / Ctrl+F 내장 검색 패널 차단 (커스텀 FindReplacePanel만 사용) ──
       const disableBuiltinSearch = Prec.highest(keymap.of([
@@ -643,101 +619,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
              ⚠ parent 를 document.body 로 되돌리지 말 것 — 파일 상단 tooltipHost() 주석(문서 높이 누수). */
           tooltips({ parent: tooltipHost(), position: 'fixed' }),
           latexAutocompletion,
-          // ── 괄호 자동닫기 제어 ──
-          Prec.highest(EditorView.inputHandler.of((view, from, to, text, insert) => {
-            const doc = view.state.doc.toString();
-            const inMath = isInsideMath(doc, from);
-
-            /* ═══ Phase 68 — 선택 감싸기·후위 변환 (D19~D22) ═══════════════════════════════
-               IME 조합 중에는 관여하지 않는다(inputHandler는 조합 중에도 불린다 — view dist 4257-4260).
-               변환은 "친 글자 그대로"(`insert()` — CM 기본 타자와 같은 userEvent·scrollIntoView라 M7 D5 가로 중앙 추적이 그대로
-               발화) 다음 **별도 트랜잭션**(isolateHistory 'before') → ⌘Z 1회면 변환만 풀리고 친 글자는 남는다. */
-            if (!view.composing) {
-              // D22 선택 감싸기 — 양끝이 **같은** 수식 영역 안일 때만. 밖은 현행(선택 대체)
-              if (from !== to && (text === '(' || text === '[' || text === '{')) {
-                const regions = scanMathRegions(doc);
-                const a = mathRegionAt(regions, from);
-                if (a && a === mathRegionAt(regions, to)) {
-                  const [open, close] = text === '(' ? ['\\left(', '\\right)']
-                    : text === '[' ? ['\\left[', '\\right]'] : ['\\left\\{', '\\right\\}'];
-                  const wrapped = open + doc.slice(from, to) + close;
-                  view.dispatch({
-                    changes: { from, to, insert: wrapped },
-                    selection: { anchor: from, head: from + wrapped.length }, userEvent: 'input.type',
-                  });
-                  return true;
-                }
-              }
-              if (inMath && from === to) {
-                // D20 `^`·`_` → `^{}`·`_{}` — 다음 글자가 `{`이거나 앞 글자가 `\`(`\^`)면 그냥 입력
-                if ((text === '^' || text === '_') && doc[from] !== '{' && doc[from - 1] !== '\\') {
-                  view.dispatch(insert());
-                  view.dispatch({
-                    changes: { from: from + 1, insert: '{}' }, selection: { anchor: from + 2 },
-                    annotations: isolateHistory.of('before'),
-                  });
-                  return true;
-                }
-                // D19 자동 분수 `(A)/` → `\frac{A}{}` — `(`가 항의 시작일 때만(f(x)/ · \left(x\right)/ 제외)
-                if (text === '/') {
-                  const region = mathRegionAt(scanMathRegions(doc), from);
-                  const f = region ? autoFracAt(doc, from, region) : null;
-                  if (f) {
-                    view.dispatch(insert());
-                    const repl = `\\frac{${f.numerator}}{}`;
-                    view.dispatch({
-                      changes: { from: f.from, to: from + 1, insert: repl }, selection: { anchor: f.from + repl.length - 1 },
-                      annotations: isolateHistory.of('before'),
-                    });
-                    return true;
-                  }
-                }
-              }
-            }
-
-            // ── \left( / \bigl[ / \Bigl| 등: 좌측 구분자 입력 시 \right 쌍 자동 완성 ──
-            const PAIR: Record<string, [string, string]> = {
-              '(': ['(', ')'], '[': ['[', ']'], '{': ['\\{', '\\}'], '|': ['|', '|'],
-            };
-            if (inMath && PAIR[text]) {
-              const before = doc.slice(Math.max(0, from - 6), from);
-              const lm = before.match(/\\(left|bigl|Bigl|biggl|Biggl)$/);
-              if (lm) {
-                const RIGHT: Record<string, string> = {
-                  left: 'right', bigl: 'bigr', Bigl: 'Bigr', biggl: 'biggr', Biggl: 'Biggr',
-                };
-                const [open, close] = PAIR[text];
-                const insert = `${open}\\${RIGHT[lm[1]]}${close}`;
-                view.dispatch({
-                  changes: { from, to, insert },
-                  selection: { anchor: from + open.length }, // 여는 구분자 바로 뒤
-                });
-                return true;
-              }
-            }
-
-            // 소괄호·대괄호: 수식 밖에서 자동닫기 차단
-            if (text === '(' || text === '[') {
-              if (inMath) return false; // 수식 안 → closeBrackets가 처리
-              view.dispatch({
-                changes: { from, to, insert: text },
-                selection: { anchor: from + 1 },
-              });
-              return true;
-            }
-
-            // 중괄호: 수식 안에서 항상 자동닫기 (뒤 문자 무관)
-            if (text === '{') {
-              if (!inMath) return false; // 수식 밖 → 기본 동작
-              view.dispatch({
-                changes: { from, to, insert: '{}' },
-                selection: { anchor: from + 1 },
-              });
-              return true;
-            }
-
-            return false;
-          })),
+          // ── 수식 입력 처리기(후위 변환·\\left 감싸기·괄호 규칙) — lib/math-editor-extensions `createMathInput`(댓글 입력창과 한 벌) ──
+          createMathInput(),
           // ── 린트 (LaTeX 오류) ──
           latexLinter,
           lintGutter(),
