@@ -589,41 +589,45 @@ p:has(.marker-circled) {
 /* ═══ 텍스트 행 꼬리표 (\tag on text lines) ═══ */
 /* Phase 57 P4: \tag{N}은 "수식 바깥에서 쓰는 것"이 표준 → 참조번호도 본문 글꼴·크기를 따른다.
    .tag-marker는 .katex 바깥이라 --katex-scale(1.08) 영향을 받지 않으므로 inherit로 충분. */
+/* 2026-10-10 덕수 판정 — 참조 번호의 세로 위치는 **그 블록(문단·display)의 세로 중앙**이다.
+   옛 `float:right`는 번호를 **문단 첫 줄의 상단**에 붙여, 키 큰 `\displaystyle` 인라인 수식이 든 한 줄 문단에서
+   번호가 위로 떠 보였다(실측 15px: 중앙보다 13px 위). 문단 기준 절대배치 + `top:50%`로 문단 전체 중앙에 둔다
+   (여러 줄로 감긴 문단도 문단 중앙 — LaTeX `split` 관례. HWP의 "마지막 줄"과 다르지만 키 큰 마지막 줄에서도 어긋나지 않는다).
+   본문이 번호 밑으로 들어가지 않게 문단에 오른쪽 패딩을 둔다(옛 float이 첫 줄에서 하던 역할). */
 .tag-marker {
-  float: right;
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   white-space: nowrap;
-  margin-left: 2em;
+  line-height: 1;
   font-family: inherit;
   font-size: inherit;
 }
+.preview-content :is(p, li, h1, h2, h3):has(.tag-marker) {
+  position: relative;
+  padding-right: 3em;
+}
 
-/* ═══ 독립행 수식 참조 번호(\tag) 마지막 행 정렬 ═══ */
-/* KaTeX 기본은 .tag 안의 full-height strut이 번호를 수식 중앙축에 고정함.
-   strut을 무력화해 .tag 박스를 번호 크기로 줄인 뒤 bottom 앵커.
-   bottom 값으로 번호 baseline을 마지막 행 baseline에 맞춤(행 수 무관). */
+/* ═══ 독립행 수식 참조 번호(\tag) — 블록 세로 중앙 ═══ */
+/* 2026-10-10 덕수 판정 — 번호는 display 블록(`.katex-html` 상자)의 **세로 중앙**. LaTeX(amsmath `centertags`)·KaTeX 기본과 같은 자리다.
+   Phase 57 P4·M1 D16의 "마지막 행 기준선" 앵커(`bottom` + `.mtable` 갈래)는 키 큰 단일행(적분)에서 번호를 중앙보다 약 1em 아래로
+   처지게 했다(실측 11/15/24px: +11.6/+15.4/+24.9px) → 철거. ⚠ KaTeX 기본 strut(기준선 정렬)에 그냥 맡기면 아래 글꼴 통일 규칙
+   (번호 15px vs .katex 16.2px)과 strut의 em 기준이 어긋나 번호가 중앙보다 0.6em **위**로 간다(실측 −9.1px@15) → strut을 끄고
+   `top:50%` + 변환으로 상자 중앙에 명시적으로 둔다(실측 11/15/24px·인쇄 전부 |오차| < 1px). 되돌리지 말 것 — 다시 "마지막 행"이
+   필요하면 amsmath `tbtags`에 해당하는 **선택** 기능으로 만들 것. */
 .katex-display > .katex > .katex-html > .tag {
-  top: auto;
-  /* Phase 57 P4: 0.85em은 14px 기준 눈맞춤 값이었다. 번호가 본문 15px Pretendard로 바뀌면
-     em 기준과 폰트 baseline 메트릭이 함께 바뀌므로 재보정(0.85 × 14/15 ≈ 0.79에서 출발). */
-  bottom: 0.79em;
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
   line-height: 1;
 }
 .katex-display > .katex > .katex-html > .tag > .strut {
   display: none;
 }
-/* 개선묶음 M1 D16 — **단일행** 수식은 앵커가 다르다.
-   ⚠ 0.79em은 다행(array/aligned)에 맞춘 값이다. 단일행에서는 번호가 9.8px 떠 있었다(CDP 실측).
-     다행은 `.katex-html` 바닥이 vlist 깊이를 품지만 단일행은 그 행 자체가 바닥이라 여백이 다르다.
-   ⚠ 판별자는 `.mtable`이다 — array·aligned·cases·matrix 계열이 만든다.
-     `.vlist`로 가르면 안 된다: `\frac` 하나만 있어도 단일행에 vlist가 생긴다.
-   실측(15px 본문): 보정 전 행바닥−번호바닥 = 9.84px → 보정 후 −0.06px. */
-.katex-display > .katex > .katex-html:not(:has(.mtable)) > .tag {
-  bottom: 0.13em;
-}
 /* Phase 57 P4/D6 — 수식 안 \tag 번호도 수식 밖(tag-marker)과 같은 모양으로 통일.
-   ⚠ \tag{n}은 preprocessMath에서 \tag*{(n)}이 되어 "수학 모드"로 렌더된다
-     → 실제 노드는 .mopen/.mord/.mclose이고 .text는 생기지 않는다.
-       그래서 .text만 지정하는 방식으로는 아무것도 바뀌지 않는다 → 서브트리 전칭으로 잡는다.
+   ⚠ KaTeX는 \tag*{(n)}을 `\text{}`로 감싸 **텍스트 모드**로 그린다(LaTeX amsmath도 `\normalfont` 텍스트) — KaTeX 0.16 실측 DOM은
+     `.tag > .mord.text > .mord`. 글꼴만 KaTeX_Main이라 본문 글꼴로 바꾸는 것이고(LaTeX 원칙 = 문서 본문 글꼴), 서브트리 전칭으로 잡는다.
    ⚠ font-size는 절대값이어야 한다. 1em/inherit로 주면 .katex의 --katex-scale(1.08)을
      다시 물어 번호가 본문보다 커진다. */
 .katex-display > .katex > .katex-html > .tag,
@@ -834,7 +838,9 @@ p:has(.marker-circled) {
   position: static;
   display: block;
   text-align: right;
+  top: auto;
   bottom: auto;
+  transform: none;
   margin-top: 0.35em;
 }
 /* 짧은 원문이 지나치게 좁아 보이지 않게 하한만 준다(겹침 방지용이 아니다) */

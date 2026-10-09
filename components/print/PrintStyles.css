@@ -99,25 +99,28 @@
 .print-body th { font-weight: 600; background-color: #f5f5f5; }
 
 /* Phase 57 P4: 참조번호는 본문 글꼴·크기(인쇄는 명조 var(--font-print), 10pt) */
-.tag-marker {
-  float: right;
+/* 2026-10-10 — 번호는 문단 세로 중앙(화면 globals.css와 같은 규칙 · 근거는 그쪽 주석). ⚠ `.print-body` 접두 필수 — 이 파일은 화면에도 로드된다 */
+.print-body .tag-marker {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
   white-space: nowrap;
-  margin-left: 2em;
+  line-height: 1;
   font-family: inherit;
   font-size: inherit;
 }
-
-/* 독립행 수식 참조 번호(\tag) 마지막 행 정렬 — strut 무력화 후 bottom 앵커
-   ⚠ `.print-body` 접두 필수 — 이 파일은 편집 화면에도 로드된다(EditorView.tsx:56).
-     값은 화면 globals.css와 같아 결과는 불변이고, "새어 드는 규칙"만 없앤다(M1 D16). */
-.print-body .katex-display > .katex > .katex-html > .tag {
-  top: auto;
-  bottom: 0.79em;   /* Phase 57 P4: 글꼴·크기 변경에 맞춘 재보정 (화면 globals.css와 동일) */
-  line-height: 1;
+.print-body :is(p, li, h1, h2, h3):has(.tag-marker) {
+  position: relative;
+  padding-right: 3em;
 }
-/* 단일행은 앵커가 다르다 (M1 D16 — 판별자는 .mtable) */
-.print-body .katex-display > .katex > .katex-html:not(:has(.mtable)) > .tag {
-  bottom: 0.13em;
+
+/* 독립행 수식 참조 번호(\tag) — 블록 세로 중앙(화면 globals.css와 같은 규칙 · 근거는 그쪽 주석). 2026-10-10 옛 "마지막 행" bottom 앵커 철거 */
+.print-body .katex-display > .katex > .katex-html > .tag {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+  line-height: 1;
 }
 .print-body .katex-display > .katex > .katex-html > .tag > .strut {
   display: none;

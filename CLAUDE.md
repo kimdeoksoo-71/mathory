@@ -122,7 +122,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 ```
 (뒤 두 단계는 Phase 54 레거시 `**Case n.**` / `- **Case na.**` 표기 전용. `lib/preprocess.ts:196-197`)
 
-- `\tag{n}`: 수식 내 → `\tag*{(n)}` (**수학 모드**라 `.mopen/.mord/.mclose`로 렌더 — `.text`가 아니다), 텍스트 행 끝 → `<span class="tag-marker">(n)</span>`
+- `\tag{n}`: 수식 내 → `\tag*{(n)}` (KaTeX가 `\text{}`로 감싸 **텍스트 모드**로 그린다 — 0.16 실측 DOM `.tag > .mord.text > .mord`. LaTeX amsmath도 `\normalfont` 텍스트라 번호를 본문 글꼴로 맞추는 것이 원칙과 같다 — 2026-10-10 덕수 확인), 텍스트 행 끝 → `<span class="tag-marker">(n)</span>`
 - `\ref{n}`: 수식 내 → `\text{(n)}`, 텍스트 → `(n)` 직접 치환
 - `①~⑮`: 문자 그대로 보존 (행 시작분만 `<span class="marker-circled">`로 감싸 내어쓰기). 글리프는 `@font-face 'MathoryCircled'` + `unicode-range: U+2460-2473`이 AppleGothic으로 대체 — **마크업 없음**
 - **`(가)~(차)` · `ㄱ.~ㅊ.`을 그대로 입력·저장하고 렌더에서만 span을 씌운다 (각 10개, Phase 60)**
@@ -430,9 +430,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
   PrintStyles에서 새어 드는 600을 화면에서만 되돌린다. **인쇄가 굵은 것은 의도된 예외다.**
   ⚠ `PrintStyles.css`는 인쇄 전용이 **아니다** — `EditorView.tsx:56`이 import해 앱 전 화면에 로드된다.
   접두 없는 규칙은 곧 화면 규칙이므로, 이 파일에 규칙을 더할 때는 `.print-body` 접두가 필수다
-- **`\tag` 세로 앵커는 단일행/다행이 다르다 (M1 D16)**: `bottom: 0.79em`은 다행(array·aligned)에
-  맞춘 값이고 단일행에서는 번호가 9.8px 떠 있었다(CDP 실측). 단일행은 `0.13em`으로 따로 잡는다.
-  ⚠ 판별자는 **`.mtable`**이다 — `.vlist`로 가르면 `\frac` 하나만 있어도 단일행이 오판된다
+- **참조 번호 `\tag`의 세로 위치는 "그 블록의 세로 중앙"이다 (2026-10-10 덕수 판정 — M1 D16 폐기)**: 수식 안 번호는 `.katex-html` 상자 중앙(`top:50%` + 변환, strut 끔 — LaTeX amsmath `centertags`·KaTeX 기본과 같은 자리), 수식 밖 `.tag-marker`는 **문단**(p·li·h1~3) 기준 절대배치 중앙(여러 줄로 감긴 문단도 문단 전체 중앙 — HWP의 "마지막 줄"과 다르지만 키 큰 마지막 줄에서도 어긋나지 않는다 · 문단 `padding-right: 3em`이 본문을 번호 밑에서 비켜 준다). ⚠ 옛 규약 둘을 되살리지 말 것 — ① M1 D16 "마지막 행 기준선" `bottom` 앵커(`.mtable` 갈래)는 키 큰 단일행에서 번호를 1em 아래로 처지게 했다(실측 +15.4px@15) ② `.tag-marker { float:right }`는 문단 **첫 줄 상단**에 붙어 키 큰 인라인 수식이 든 줄에서 번호가 떴다(−13px@15). ⚠ KaTeX 기본 strut(기준선 정렬)에 맡기지도 말 것 — 번호 글꼴 통일(15px vs `.katex` 16.2px)과 strut의 em 기준이 어긋나 0.6em 위로 간다(−9.1px). 실측 11/15/24px·인쇄 전부 |오차| ≤ 0.5px. 사본 2벌(globals.css · PrintStyles.css `.print-body`) + 말풍선 `.ref-tooltip` 흐름 배치 override(`top:auto; transform:none`). ⚠ **하니스 함정**: headless 페이지는 Next dev의 CSS `<link>`가 늦게 붙어 **globals.css 없이** 측정될 수 있다 — `document.styleSheets`에 `layout.css`·`page.css`가 있는지 기다린 뒤 재야 한다(안 기다리고 세 번 잰 값이 전부 달랐다)
 - **GFM 표 셀의 파이프는 실측으로만 규칙을 세울 것 (M1 W1)**: bare `|`는 셀을 쪼개 표·수식을 파괴하고,
   `\|`는 셀을 살리면서 **수식 노드에 `\|` 그대로** 전달되며(‖), `\\|`는 다시 셀을 쪼갠다.
   → 수식 **안** bare `|`는 `\vert`, **밖**은 `\|`, 기존 `\|`는 그대로. **`\\|`를 만들지 말 것**
