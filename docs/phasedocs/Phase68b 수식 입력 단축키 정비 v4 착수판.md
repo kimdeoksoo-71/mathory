@@ -467,3 +467,18 @@ CDP 44 → **61/61**(⑰ 9건 · ㉑ 8건 추가 — 조합은 페이지 안 합
 - 검수 범위 결정(덕수): **맥 크롬 · 윈도우 11 크롬 두 곳만** — Edge·Firefox·Safari는 제외(§9-2 1·3의 다른 브라우저 항목 포함)
 - dev 종료 → 임시 라우트 `app/dev68b` 삭제 → `npm run build` 통과(`[icons:check] OK — 62종`) → dev 재시작. 하니스 `docs/phaseSketch/phase68b-cdp-harness.mjs`(108건)와 임시 라우트 소스 `docs/phaseSketch/phase68b-dev68b-page.tsx.txt`를 함께 보관 — 되살리려면 후자를 `app/dev68b/page.tsx`로 복사하고 dev 서버에서 하니스를 돌린 뒤 지운다(라우트는 git에 커밋하지 않는다)
 - 남은 일: push → 윈도우 11 크롬 검수
+
+### 11-8. 윈도우 11 크롬 검수 (2026-10-09)
+
+**1차(무효)** — 증상 대부분이 **옛 배포본**(68b 이전)의 동작과 정확히 일치했다. 결정적 단서는 Ctrl+Shift+M에 뜬 "No diagnostics" — 옛 코드에선 그 키가 CM `lintKeymap`의 `Mod-Shift-m`(린트 패널, 맥은 ⌘⇧M이라 안 겹친다)이고 새 코드에선 우리 `Prec.highest` 바인딩이 이긴다. 겹쳐서 MS 한글 IME가 **전각** 모드였다(검수 메모 자체가 `ｃｔｒｌ`·`＄＄`) — 전각 `＄`는 수식 구분자가 아니라 "손으로 친 `$`를 인식 못 함"·`＾`/`（` 무변환·댓글 수식 불가가 함께 설명됐다. 배포본 번들에 새 바인딩이 있음을 확인(`Ctrl-Shift-m`·`Alt-=`·설정 키), push 14:51.
+
+**2차** — Ctrl+Shift+R + 반각으로 재검수: 12항 중 10항 정상. 남은 셋:
+
+| # | 증상 | 원인 | 처방 |
+|---|---|---|---|
+| 신규 | 수식 단축어 + Tab이 "됐다 안 됐다" — 확장 안 된 `sqrt`·`lim`(백슬래시 없음)에 괄호가 엉뚱하게 섞임 | 윈도우 IME는 마지막 자모(`ㅡ`)를 확정하면서 Tab을 같은 순간 보낸다. 68a 치환은 setTimeout 뒤라 Tab이 `liㅡ`를 보고 단축어를 못 찾아 자리 이동으로 넘어갔다. 맥은 Tab이 한 박자 늦게 와 안 보였다. **CDP 재현**(자모 삽입 직후 같은 태스크에 Tab keydown) | `flushMathAscii(view)` — 수식 명령 머리에서 대기 중인 68a 치환을 즉시 끝낸다(Tab·행 Enter·Ctrl+M 계열·Shift+Esc). 레지스트리는 WeakMap |
+| 7 | 조합 중 Ctrl+M → 확정만 | (추정) 윈도우는 Ctrl을 누르는 순간 확정(compositionend)을 **먼저** 내고 keydown이 뒤에 온다 → 이미 지나간 확정 신호를 기다리다 포기 | 조합이 살아 있지 않으면 60ms 뒤 실행(`RESCUE_END_GRACE_MS`). 실기기 순서는 진단 기록으로 확인 예정 |
+| 5 | Alt+= → 크롬 메뉴 버튼 활성 | 미확인 — keydown이 페이지에 오지 않거나 다른 모양으로 온다(한국어 자판의 오른쪽 Alt는 한/영 키라는 점도 후보) | **진단 기록**으로 확인 후 결정 |
+
+- **입력 진단 기록(신설, 꺼짐이 기본)**: 콘솔 `localStorage.setItem('mathory-input-diag','on')` → 새로고침 → 재현 → `copy(__mathoryInputDiag.dump())`. 키·조합·beforeinput·편집기 트랜잭션·rescue/flush 결정 최근 400줄. 꺼져 있으면 리스너 0, 서버 전송 없음
+- CDP 108 → **118/118**(윈도우 순서 5표본 × 두 편집기). 하니스 표본 "확정 신호가 안 옴"이 조합을 열어 둔 채 끝나 다음 표본을 오염시키던 것을 정리(코드가 아니라 하니스 문제 — `compositionStarted` 판정은 유지)

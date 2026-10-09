@@ -55,6 +55,59 @@ import {
 } from './mathAscii';
 import type { RecordedKey, PendingIns, ChangeDesc } from './mathAscii';
 
+/** 68a 자기 트랜잭션 표시(삭제·재생) — update가 자기 삽입을 큐에 넣지 않게 · 진단 기록이 구분하게 */
+const mathAsciiTx = Annotation.define<boolean>();
+
+// ─────────────────────────────────────────────
+// 0) 입력 진단 기록 (2026-10-09 윈도우 검수 — 실기기 IME 이벤트 순서를 보려고)
+// ─────────────────────────────────────────────
+/* 켜기: 브라우저 콘솔에서 `localStorage.setItem('mathory-input-diag', 'on')` → 새로고침. 끄기: 'off' 또는 removeItem.
+   재현 뒤 콘솔에서 `copy(__mathoryInputDiag.dump())` → 클립보드에 최근 400줄. **꺼져 있으면 아무것도 하지 않는다**(리스너 0).
+   서버로 보내지 않는다 — 브라우저 메모리에만 있다. 기록: keydown/keyup(키·코드·keyCode·조합 표시·수정자) · CM preventDefault 여부 ·
+   composition 3종 · beforeinput · 편집기 트랜잭션(userEvent·삽입/삭제 요약 · 68a 자기 트랜잭션 표시) · 수식 명령 결정(rescue·flush). */
+const DIAG_KEY = 'mathory-input-diag';
+const diagBuf: string[] = [];
+let diagOn: boolean | null = null;
+let diagT0 = 0;
+function diagEnabled(): boolean {
+  if (diagOn !== null) return diagOn;
+  try { diagOn = typeof window !== 'undefined' && localStorage.getItem(DIAG_KEY) === 'on'; } catch { diagOn = false; }
+  if (diagOn) installDiag();
+  return diagOn;
+}
+function diag(line: string): void {
+  if (!diagEnabled()) return;
+  diagBuf.push(`${(performance.now() - diagT0).toFixed(0).padStart(7)}ms ${line}`);
+  if (diagBuf.length > 400) diagBuf.shift();
+}
+function installDiag(): void {
+  diagT0 = performance.now();
+  const mods = (e: KeyboardEvent) => ['ctrl', 'alt', 'shift', 'meta'].filter((m) => (e as unknown as Record<string, boolean>)[`${m}Key`]).join('+');
+  const keyLine = (e: KeyboardEvent) => `${e.type} key=${JSON.stringify(e.key)} code=${e.code} keyCode=${e.keyCode} isComposing=${e.isComposing}${mods(e) ? ' ' + mods(e) : ''}`;
+  window.addEventListener('keydown', (e) => diag(keyLine(e)), true);
+  window.addEventListener('keydown', (e) => diag(`  └ keydown ${e.code} defaultPrevented=${e.defaultPrevented}`));
+  window.addEventListener('keyup', (e) => diag(keyLine(e)), true);
+  for (const t of ['compositionstart', 'compositionupdate', 'compositionend'] as const) {
+    window.addEventListener(t, (e) => diag(`${t} data=${JSON.stringify((e as CompositionEvent).data)}`), true);
+  }
+  window.addEventListener('beforeinput', (e) => diag(`beforeinput ${(e as InputEvent).inputType} data=${JSON.stringify((e as InputEvent).data)}`), true);
+  (window as unknown as Record<string, unknown>).__mathoryInputDiag = {
+    dump: () => [`mathory input diag · ${navigator.userAgent} · platform=${navigator.platform}`, ...diagBuf].join('\n'),
+    clear: () => { diagBuf.length = 0; diagT0 = performance.now(); },
+  };
+  console.info("[mathory] 입력 진단 기록 켜짐 — 재현 뒤 콘솔에서 copy(__mathoryInputDiag.dump())");
+}
+/** 편집기 트랜잭션 기록(진단이 켜졌을 때만 내용을 남긴다) */
+const diagUpdates = EditorView.updateListener.of((u) => {
+  if (!u.docChanged || !diagEnabled()) return;
+  for (const tr of u.transactions) {
+    if (!tr.docChanged) continue;
+    const parts: string[] = [];
+    tr.changes.iterChanges((fa, ta, _fb, _tb, ins) => { parts.push(`[${fa},${ta})→${JSON.stringify(ins.toString())}`); });
+    diag(`  tx ${tr.annotation(Transaction.userEvent) ?? '-'}${tr.annotation(mathAsciiTx) ? ' (68a)' : ''} ${parts.join(' ')} composing=${u.view.composing}`);
+  }
+});
+
 // ─────────────────────────────────────────────
 // 1) 삽입 (M7 D1·D4 · 68b D2·D2′)
 // ─────────────────────────────────────────────
@@ -165,6 +218,7 @@ export function jumpToNextBrace(view: EditorView): boolean {
 export function mathTabCommand(getAbbrevs: () => Record<string, string>) {
   return (view: EditorView): boolean => {
     if (view.composing) return true;
+    flushMathAscii(view);   // 윈도우 경합 — 확정 직후 Tab이 68a 치환 전 문서(`liㅡ`)를 보지 않게
     if (completionStatus(view.state) === 'active') { acceptCompletion(view); return true; }
     const doc = view.state.doc.toString();
     const sel = view.state.selection.main;
@@ -227,6 +281,10 @@ export function createMathKeys(getAbbrevs: () => Record<string, string>): Extens
    ⚠ CM이 이미 처리한 키(`defaultPrevented`)는 건너뛴다 — 두 번 돌지 않게. 68a 래퍼 capture는 수정자 조합을 `pass`해 겹치지 않는다. */
 const RESCUE_POLL_MS = 20;
 const RESCUE_GIVE_UP_MS = 800;
+/* 윈도우 검수(2026-10-09) 7 — 윈도우 IME는 Ctrl을 누르는 순간 조합을 **먼저** 확정하고(compositionend) 그 뒤에 조합 중 표시가 남은
+   keydown을 보낼 수 있다. 그러면 기다릴 compositionend가 이미 지나갔다 → 조합이 살아 있지 않으면 이 시간 뒤 확정 신호 없이 실행.
+   맥 순서(keydown → compositionend)는 그동안 `compositionStarted`가 참이라 이 갈래에 들어오지 않는다 */
+const RESCUE_END_GRACE_MS = 60;
 
 type MathKeyKind = 'inline' | 'display';
 function matchMathKey(e: KeyboardEvent, mac: boolean): MathKeyKind | null {
@@ -252,6 +310,7 @@ function composingRescue(enter: (kind: MathKeyKind) => (view: EditorView) => boo
       if (!kind) return;
       this.pending = { kind, ev: e, composing, ended: false, t: Date.now() };
       this.arm();
+      diag(`  rescue armed ${kind} (composing=${composing})`);
       if (process.env.NODE_ENV !== 'production') {
         console.info(`[68b] 조합 중 수식 단축키(${kind}) — keyCode ${e.keyCode} · isComposing ${e.isComposing} · 조합 확정 뒤 실행`);
       }
@@ -267,10 +326,13 @@ function composingRescue(enter: (kind: MathKeyKind) => (view: EditorView) => boo
       this.timer = null;
       const p = this.pending;
       if (!p) return;
-      if (Date.now() - p.t > RESCUE_GIVE_UP_MS) { this.pending = null; return; }
-      if (p.ev.defaultPrevented) { this.pending = null; return; }        // CM keymap이 이미 처리했다
-      if ((p.composing && !p.ended) || this.view.composing) { this.arm(); return; }
+      if (Date.now() - p.t > RESCUE_GIVE_UP_MS) { this.pending = null; diag('  rescue gave up'); return; }
+      if (p.ev.defaultPrevented) { this.pending = null; diag('  rescue skip — CM handled'); return; }        // CM keymap이 이미 처리했다
+      const live = this.view.composing || this.view.compositionStarted;
+      if (live) { this.arm(); return; }
+      if (p.composing && !p.ended && Date.now() - p.t < RESCUE_END_GRACE_MS) { this.arm(); return; }
       this.pending = null;
+      diag(`  rescue fire ${p.kind} (ended=${p.ended} hasFocus=${this.view.hasFocus})`);
       if (this.view.hasFocus) enter(p.kind)(this.view);
     };
     destroy() {
@@ -308,7 +370,6 @@ export function writeMathAsciiPref(on: boolean): void {
   try { localStorage.setItem(MATH_ASCII_PREF_KEY, on ? 'on' : 'off'); } catch { /* 사파리 사생활 모드 등 — 세션 값만 산다 */ }
 }
 
-const mathAsciiTx = Annotation.define<boolean>();
 
 /** 재생 한 글자 — CM 기본 타자와 같은 체인(inputHandler facet 루프 → 기본 삽입).
  *  ⚠ `insert`는 **Transaction**을 돌려줘야 한다 — Phase 68 핸들러가 `view.dispatch(insert())`한다. 재생은 `input.type` +
@@ -322,6 +383,17 @@ function typeText(view: EditorView, ch: string) {
   if (!view.state.facet(EditorView.inputHandler).some((h) => h(view, from, to, ch, insert))) view.dispatch(insert());
 }
 
+/* ⚠ 윈도우 검수(2026-10-09)에서 드러난 경합 — 한글 IME를 켠 채 수식 안에서 `lim`을 치고 곧바로 Tab을 누르면, 윈도우 IME는
+   마지막 자모(`ㅡ`)를 확정하면서 Tab을 **같은 순간** 보낸다. reconcile은 setTimeout 뒤라 Tab 처리 때 문서가 아직 `liㅡ`이고,
+   단축어가 확장되지 않은 채 Tab이 자리 이동으로 넘어갔다("됐다 안 됐다" — 손 속도에 따른 경합. 맥은 Tab이 한 박자 늦게 와서 안 보였다).
+   → 수식 명령(Tab·행 Enter·Ctrl+M 계열)은 실행 **직전** `flushMathAscii(view)`로 대기 중인 치환을 끝낸 문서를 본다.
+   레지스트리는 편집기(view)마다 플러그인 인스턴스 하나 — WeakMap이라 파기된 편집기를 붙잡지 않는다. */
+const mathAsciiInstances = new WeakMap<EditorView, { flush(): void }>();
+/** 대기 중인 68a 치환을 지금 끝낸다(없으면 아무 일 없음). 키맵 명령 안에서 불러도 된다 — 업데이트 사이클 밖이다 */
+export function flushMathAscii(view: EditorView): void {
+  mathAsciiInstances.get(view)?.flush();
+}
+
 export function createMathAscii(enabled: () => boolean): Extension {
   return ViewPlugin.fromClass(class {
     keys: RecordedKey[] = [];                       // 기록 키 FIFO (record 경로)
@@ -333,6 +405,7 @@ export function createMathAscii(enabled: () => boolean): Extension {
     destroyed = false;
 
     constructor(readonly view: EditorView) {
+      mathAsciiInstances.set(view, this);
       view.dom.addEventListener('keydown', this.onKeyDown, true);
       view.dom.addEventListener('blur', this.swallowOwnFocusEvents, true);
       view.dom.addEventListener('focus', this.swallowOwnFocusEvents, true);
@@ -459,8 +532,17 @@ export function createMathAscii(enabled: () => boolean): Extension {
       if (this.keys.length) this.scheduleReconcile(40);        // 고아 키 TTL 정리
     }
 
+    /** flushMathAscii — 예약된 reconcile을 취소하고 지금 돌린다. 보류 삽입이 없으면 아무 일 없음 */
+    flush() {
+      if (this.destroyed || !this.ins.length) return;
+      if (this.timer !== null) { clearTimeout(this.timer); this.timer = null; }
+      diag(`  68a flush (pending ${this.ins.length})`);
+      this.reconcile();
+    }
+
     destroy() {
       this.destroyed = true;
+      mathAsciiInstances.delete(this.view);
       this.view.dom.removeEventListener('keydown', this.onKeyDown, true);
       this.view.dom.removeEventListener('blur', this.swallowOwnFocusEvents, true);
       this.view.dom.removeEventListener('focus', this.swallowOwnFocusEvents, true);
@@ -589,6 +671,7 @@ export function createMathInput(): Extension {
  *  댓글 입력창 defaultKeymap 둘 다 같은 바인딩을 갖고 있다). */
 export function rowEnterCommand(view: EditorView): boolean {
   if (view.composing || completionStatus(view.state) === 'active') return false;
+  flushMathAscii(view);
   const sel = view.state.selection.main;
   if (!sel.empty) return false;
   const doc = view.state.doc.toString();
@@ -652,7 +735,9 @@ export interface MathShortcutsResult {
 }
 
 export function createMathShortcuts(): MathShortcutsResult {
+  diagEnabled();   // 진단 기록이 켜져 있으면 편집기를 만들 때 바로 리스너를 단다(첫 키부터 남도록)
   const enter = (kind: 'inline' | 'display') => (view: EditorView): boolean => {
+    flushMathAscii(view);
     const r = exitRegionOfSelection(view);
     if (r) return exitMath(view, r);                                          // 수식 안 → 한 번에 나오기(D5)
     if (kind === 'inline') insertInlineMathIn(view); else insertDisplayMathBlock(view);
@@ -669,6 +754,7 @@ export function createMathShortcuts(): MathShortcutsResult {
       // HWP 호환 별칭 — 수식 밖이면 아무것도 안 하고 소비(Windows Shift+Esc = 브라우저 작업 관리자)
       key: 'Shift-Escape',
       run: (view) => {
+        flushMathAscii(view);
         const r = exitRegionOfSelection(view);
         return r ? exitMath(view, r) : true;
       },
@@ -676,5 +762,5 @@ export function createMathShortcuts(): MathShortcutsResult {
     { key: 'Alt-Tab', run: jumpToNextBrace },
   ]));
 
-  return { shortcuts: [shortcuts, composingRescue(enter)] };
+  return { shortcuts: [shortcuts, composingRescue(enter), diagUpdates] };
 }
