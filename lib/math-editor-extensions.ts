@@ -86,7 +86,7 @@ function diag(line: string): void {
 function installDiag(): void {
   diagT0 = performance.now();
   const mods = (e: KeyboardEvent) => ['ctrl', 'alt', 'shift', 'meta'].filter((m) => (e as unknown as Record<string, boolean>)[`${m}Key`]).join('+');
-  const keyLine = (e: KeyboardEvent) => `${e.type} key=${JSON.stringify(e.key)} code=${e.code} keyCode=${e.keyCode} isComposing=${e.isComposing}${mods(e) ? ' ' + mods(e) : ''}`;
+  const keyLine = (e: KeyboardEvent) => `${e.type} key=${JSON.stringify(e.key)} code=${e.code} keyCode=${e.keyCode} isComposing=${e.isComposing}${mods(e) ? ' ' + mods(e) : ''}${e.repeat ? ' repeat' : ''}`;
   window.addEventListener('keydown', (e) => diag(keyLine(e)), true);
   window.addEventListener('keydown', (e) => diag(`  └ keydown ${e.code} defaultPrevented=${e.defaultPrevented}`));
   window.addEventListener('keyup', (e) => diag(keyLine(e)), true);
@@ -297,6 +297,29 @@ function matchMathKey(e: KeyboardEvent, mac: boolean): MathKeyKind | null {
   return null;
 }
 
+/* ── 토글 단축키는 키 반복(auto-repeat)을 버린다 (2026-10-10 덕수 보고 "Ctrl+Shift+M이 됐다 안 됐다") ──
+   Ctrl+M·Ctrl+Shift+M·별칭은 **토글**이다 — 밖에서 누르면 넣고, 방금 넣은 빈 쌍·빈 블록 안에서 다시 누르면 지운다(68b ①·①′).
+   키를 조금 길게 누르면 OS가 반복 keydown(`e.repeat`)을 보내 토글이 여러 번 돌고, 결과가 **반복 횟수의 홀짝**으로 갈렸다
+   (CDP 실측: 반복 0·2회 = 블록, 1·3회 = 사라짐 · 두 편집기·Ctrl+M 동일 · 조합 중 누른 첫 키(구제 대기) + 확정 뒤 반복도 합산).
+   세 키 화음은 M을 누르고 있는 시간이 길어 특히 잘 보였다. ⚠ 시간 디바운스로 바꾸지 말 것 — 의도적인 빠른 두 번(되돌리기)까지 막고
+   그 자체가 타이밍 의존이다. `e.repeat`는 OS가 주는 결정적 신호다. Shift+Esc도 같은 가드(나오기 → 빈 쌍 삭제가 반복으로 이어지지 않게).
+   ⚠ Tab·Enter·Alt+Tab은 반복이 의미 있는 키라 대상이 아니다. */
+function isToggleShortcut(e: KeyboardEvent, mac: boolean): boolean {
+  if (matchMathKey(e, mac)) return true;
+  return e.key === 'Escape' && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey;
+}
+/** Prec.highest domEventHandlers — CM keymap 처리기(Prec.default의 keydown 핸들러)보다 먼저 돈다. 반복 keydown은 소비만(preventDefault) */
+function toggleRepeatGuard(): Extension {
+  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
+  return Prec.highest(EditorView.domEventHandlers({
+    keydown(e) {
+      if (!e.repeat || !isToggleShortcut(e, mac)) return false;
+      diag('  toggle repeat ignored');
+      return true;
+    },
+  }));
+}
+
 /* ── Phase 68c G2 · Q11 — "조합이 끝난 뒤 실행"의 공용 헬퍼. composingRescue(68b)의 tick 로직을 일반화했다 ──
    소비처: ① composingRescue(편집기 capture keydown — 조합 중 Ctrl+M 계열) ② EditorView window 단축키(⌘B·⌘J·⌘⇧L — 핸들 `whenSettled`).
    · 조합 중이 아니고 키도 조합 키가 아니면 **즉시**(동기) — 그 전에 flushMathAscii(68a 보류 치환을 끝낸 문서를 보게)
@@ -368,6 +391,7 @@ function composingRescue(enter: (kind: MathKeyKind) => (view: EditorView) => boo
       view.dom.addEventListener('keydown', this.onKeyDown, true);
     }
     onKeyDown = (e: KeyboardEvent) => {
+      if (e.repeat) return;                          // 토글 반복 가드(toggleRepeatGuard 주석) — 첫 키의 대기만 산다
       const composing = e.isComposing || this.view.composing;
       if (!composing && e.keyCode !== 229) return;   // 평소 키는 CM keymap 몫
       const kind = matchMathKey(e, this.mac);
@@ -832,7 +856,7 @@ export function createMathShortcuts(): MathShortcutsResult {
     { key: 'Alt-Tab', run: jumpToNextBrace },
   ]));
 
-  return { shortcuts: [shortcuts, composingRescue(enter), diagUpdates] };
+  return { shortcuts: [toggleRepeatGuard(), shortcuts, composingRescue(enter), diagUpdates] };
 }
 
 
