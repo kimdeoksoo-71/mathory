@@ -9,6 +9,7 @@ import {
   dialogOverlay, dialogBody, dialogHead, dialogContent, dialogFoot,
   dialogInput, dialogBtn,
 } from './dialogStyles';
+import { isImeKey } from '../../lib/imeKey';
 
 /* 개선묶음 M2 A — `lib/dialogs.ts`가 요청하는 다이얼로그를 실제로 그리는 곳 (D3′·D4′).
    `app/layout.tsx`의 <body> 안에 한 번만 마운트한다(admin 라우트 포함 전 화면 커버).
@@ -110,7 +111,7 @@ export default function DialogHost() {
                 onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
                 onKeyDown={(e) => {
                   // 한글 IME 조합 중 Enter 무시 (NicknameSetupModal 규약)
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                  if (e.key === 'Enter' && !isImeKey(e)) {
                     e.preventDefault();
                     submitPrompt();
                   }

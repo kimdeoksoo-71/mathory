@@ -294,51 +294,98 @@ function matchMathKey(e: KeyboardEvent, mac: boolean): MathKeyKind | null {
   return null;
 }
 
+/* ── Phase 68c G2 · Q11 — "조합이 끝난 뒤 실행"의 공용 헬퍼. composingRescue(68b)의 tick 로직을 일반화했다 ──
+   소비처: ① composingRescue(편집기 capture keydown — 조합 중 Ctrl+M 계열) ② EditorView window 단축키(⌘B·⌘J·⌘⇧L — 핸들 `whenSettled`).
+   · 조합 중이 아니고 키도 조합 키가 아니면 **즉시**(동기) — 그 전에 flushMathAscii(68a 보류 치환을 끝낸 문서를 보게)
+   · 아니면 20ms 폴링으로 `!composing && !compositionStarted`를 기다린다. 맥 순서(keydown → compositionend)는 그동안 `compositionStarted`가 참.
+     윈도우 순서(compositionend가 keydown보다 먼저 — 키는 229로만 남는다)는 RESCUE_END_GRACE_MS 뒤 확정 신호 없이 실행.
+   · 800ms 안에 조합이 안 끝나면 버린다 · 지연 실행은 편집기에 포커스가 있을 때만(composingRescue 그대로)
+   ⚠ [v3 F7] 건너뜀 조건(`skipIf`)은 **호출부가 준다** — composingRescue는 `ev.defaultPrevented`(CM keymap이 이미 처리했나)를 주고,
+     window 단축키는 주지 않는다(그 핸들러는 자기 keydown을 스스로 preventDefault하므로 같은 검사를 하면 늘 건너뛴다).
+   반환값 = 취소 함수(composingRescue는 새 키가 오면 옛 대기를 취소한다 — "가장 최근 키만 산다"). */
+export interface AfterCompositionOpts {
+  /** 키 자체가 조합 키였나(`isComposing` ‖ keyCode 229 — lib/imeKey `isImeKey`). 참이면 즉시 갈래를 타지 않고,
+   *  compositionend를 못 봤으면 RESCUE_END_GRACE_MS까지 기다린다 */
+  composingAtKey?: boolean;
+  /** 조합이 아니어도 즉시 실행하지 않고 첫 폴링까지 미룬다(composingRescue의 조합 밖 229 — CM keymap이 처리할 기회를 준 뒤 skipIf로 거른다) */
+  defer?: boolean;
+  /** 참이면 실행하지 않고 끝낸다(폴링마다 본다) */
+  skipIf?: () => boolean;
+  /** 진단 기록 라벨 */
+  label?: string;
+}
+export function runAfterComposition(view: EditorView, fn: () => void, opts: AfterCompositionOpts = {}): () => void {
+  const label = opts.label ?? 'after-composition';
+  const live = () => view.composing || view.compositionStarted;
+  if (!opts.composingAtKey && !opts.defer && !live()) {
+    flushMathAscii(view);
+    fn();
+    return () => {};
+  }
+  const t0 = Date.now();
+  let ended = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let done = false;
+  const onEnd = () => {
+    ended = true;
+    if (!done) arm();                                  // 확정 직후 곧바로 한 번 더 본다
+  };
+  const finish = () => {
+    done = true;
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+    view.contentDOM.removeEventListener('compositionend', onEnd);
+  };
+  const arm = () => {
+    if (timer !== null) clearTimeout(timer);
+    timer = setTimeout(tick, RESCUE_POLL_MS);
+  };
+  const tick = () => {
+    timer = null;
+    if (done) return;
+    if (Date.now() - t0 > RESCUE_GIVE_UP_MS) { finish(); diag(`  ${label} gave up`); return; }
+    if (opts.skipIf?.()) { finish(); diag(`  ${label} skip`); return; }
+    if (live()) { arm(); return; }
+    if (opts.composingAtKey && !ended && Date.now() - t0 < RESCUE_END_GRACE_MS) { arm(); return; }
+    finish();
+    diag(`  ${label} fire (ended=${ended} hasFocus=${view.hasFocus})`);
+    if (!view.hasFocus) return;
+    flushMathAscii(view);
+    fn();
+  };
+  view.contentDOM.addEventListener('compositionend', onEnd);
+  arm();
+  return finish;
+}
+
 function composingRescue(enter: (kind: MathKeyKind) => (view: EditorView) => boolean): Extension {
   return ViewPlugin.fromClass(class {
-    pending: { kind: MathKeyKind; ev: KeyboardEvent; composing: boolean; ended: boolean; t: number } | null = null;
-    timer: ReturnType<typeof setTimeout> | null = null;
+    cancel: (() => void) | null = null;
     readonly mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
     constructor(readonly view: EditorView) {
       view.dom.addEventListener('keydown', this.onKeyDown, true);
-      view.contentDOM.addEventListener('compositionend', this.onCompositionEnd);
     }
     onKeyDown = (e: KeyboardEvent) => {
       const composing = e.isComposing || this.view.composing;
       if (!composing && e.keyCode !== 229) return;   // 평소 키는 CM keymap 몫
       const kind = matchMathKey(e, this.mac);
       if (!kind) return;
-      this.pending = { kind, ev: e, composing, ended: false, t: Date.now() };
-      this.arm();
+      this.cancel?.();                               // 가장 최근 키만 산다
       diag(`  rescue armed ${kind} (composing=${composing})`);
       if (process.env.NODE_ENV !== 'production') {
         console.info(`[68b] 조합 중 수식 단축키(${kind}) — keyCode ${e.keyCode} · isComposing ${e.isComposing} · 조합 확정 뒤 실행`);
       }
-    };
-    onCompositionEnd = () => {
-      if (this.pending) { this.pending.ended = true; this.arm(); }
-    };
-    arm() {
-      if (this.timer !== null) clearTimeout(this.timer);
-      this.timer = setTimeout(this.tick, RESCUE_POLL_MS);
-    }
-    tick = () => {
-      this.timer = null;
-      const p = this.pending;
-      if (!p) return;
-      if (Date.now() - p.t > RESCUE_GIVE_UP_MS) { this.pending = null; diag('  rescue gave up'); return; }
-      if (p.ev.defaultPrevented) { this.pending = null; diag('  rescue skip — CM handled'); return; }        // CM keymap이 이미 처리했다
-      const live = this.view.composing || this.view.compositionStarted;
-      if (live) { this.arm(); return; }
-      if (p.composing && !p.ended && Date.now() - p.t < RESCUE_END_GRACE_MS) { this.arm(); return; }
-      this.pending = null;
-      diag(`  rescue fire ${p.kind} (ended=${p.ended} hasFocus=${this.view.hasFocus})`);
-      if (this.view.hasFocus) enter(p.kind)(this.view);
+      /* defer — 즉시 갈래를 타면 CM keymap과 같은 키를 두 번 돈다(조합 밖 229도 "짧게 기다렸다 실행" — CM이 처리했으면 skipIf가 거른다).
+         composingAtKey = 키 시점 조합 여부(68b 그대로 — 조합 밖 229는 grace 없이 첫 폴링에 실행) */
+      this.cancel = runAfterComposition(this.view, () => { enter(kind)(this.view); }, {
+        composingAtKey: composing,
+        defer: true,
+        skipIf: () => e.defaultPrevented,            // CM keymap이 이미 처리했다
+        label: `rescue ${kind}`,
+      });
     };
     destroy() {
       this.view.dom.removeEventListener('keydown', this.onKeyDown, true);
-      this.view.contentDOM.removeEventListener('compositionend', this.onCompositionEnd);
-      if (this.timer !== null) clearTimeout(this.timer);
+      this.cancel?.();
     }
   });
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { updateNickname } from '../../lib/users';
+import { isImeKey } from '../../lib/imeKey';
 
 interface NicknameSetupModalProps {
   uid: string;
@@ -79,7 +80,7 @@ export default function NicknameSetupModal({
           placeholder="대화명 입력"
           onKeyDown={(e) => {
             // 한글 IME 조합 중 Enter 무시
-            if (e.key === 'Enter' && !e.nativeEvent.isComposing && canSave) {
+            if (e.key === 'Enter' && !isImeKey(e) && canSave) {
               handleSave();
             }
           }}

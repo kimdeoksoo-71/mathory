@@ -14,6 +14,7 @@ import { CSS } from '@dnd-kit/utilities';
 import SymbolCell from './SymbolCell';
 import { ALL_SYMBOLS } from '../../../lib/math-symbols';
 import type { ToolbarConfig, ToolbarGroup, MathSymbol } from '../../../types/toolbar-config';
+import { isImeKey } from '../../../lib/imeKey';
 
 const MAX_GROUPS = 12;
 const byId = new Map<number, MathSymbol>(ALL_SYMBOLS.map((s) => [s.id, s]));
@@ -151,7 +152,7 @@ export default function UserGroupEditor({ config, selectedGroupId, onSelectGroup
                     onClick={(e) => e.stopPropagation()}
                     onChange={(e) => setEditingName(e.target.value)}
                     onBlur={commitRename}
-                    onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setEditingId(null); }}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) commitRename(); if (e.key === 'Escape') setEditingId(null); }}
                     style={{ flex: 1, height: 24, padding: '0 6px', fontSize: 13, border: '1px solid var(--border-content-active, #B89B78)', borderRadius: 4, outline: 'none' }}
                   />
                 ) : (

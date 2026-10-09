@@ -35,6 +35,7 @@ import type { GraphBlockSave, GraphBlockFormat, GraphExportHandle } from '../vie
 import { IconDownload, IconComment, IconAgent } from '../ui/Icons';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H } from '../ui/dialogStyles';
+import { isImeKey } from '../../lib/imeKey';
 
 const HISTORY_LIMIT = 5;
 
@@ -1389,7 +1390,7 @@ function SessionTabBar({
               value={renameDraft}
               onChange={(e) => onChangeRenameDraft(e.target.value)}
               onKeyDown={(e) => {
-                if (e.nativeEvent.isComposing) return; // 한글 IME 조합 중 무시
+                if (isImeKey(e)) return; // 한글 IME 조합 중 무시(Safari 꼬리 keydown 229 포함 — lib/imeKey)
                 if (e.key === 'Enter') onSubmitRename(s.id);
                 else if (e.key === 'Escape') onCancelRename();
               }}
@@ -1423,7 +1424,7 @@ function SessionTabBar({
           value={newSessionName}
           onChange={(e) => onChangeNewName(e.target.value)}
           onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) return; // 한글 IME 조합 중 무시
+            if (isImeKey(e)) return; // 한글 IME 조합 중 무시(Safari 꼬리 keydown 229 포함 — lib/imeKey)
             if (e.key === 'Enter') onSubmitCreate();
             else if (e.key === 'Escape') onCancelCreate();
           }}

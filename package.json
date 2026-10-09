@@ -36,7 +36,9 @@
     "test:mathinput": "tsc lib/mathInput.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathInput.test.mjs",
     "test:mathascii": "tsc lib/mathAscii.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathAscii.test.mjs",
     "test:mathslots": "tsc lib/mathSlots.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathSlots.test.mjs",
-    "test:peek": "tsc lib/sidebarPeek.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sidebarPeek.test.mjs"
+    "test:peek": "tsc lib/sidebarPeek.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sidebarPeek.test.mjs",
+    "test:imekey": "tsc lib/imeKey.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/imeKey.test.mjs",
+    "test:mathpaste": "tsc lib/mathPaste.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathPaste.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",

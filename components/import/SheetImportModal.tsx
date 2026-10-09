@@ -45,6 +45,7 @@ import ChoicesBlock from '../editor/ChoicesBlock';
 import { IconClose, IconChevron, IconChevronDown, IconFolder, IconPlus } from '../ui/Icons';
 import FolderGlyph from '../ui/FolderGlyph';
 import { promptDialog } from '../../lib/dialogs';
+import { isImeKey } from '../../lib/imeKey';
 
 type SheetName = 'Data_DS' | 'Stack';
 
@@ -695,7 +696,7 @@ function FormPane({
           style={S.input}
           value={rowsText}
           onChange={(e) => setRowsText(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') onEnter(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) onEnter(); }}
           placeholder="예: 15-32  또는  15, 17, 20-25"
         />
         <div style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 6 }}>

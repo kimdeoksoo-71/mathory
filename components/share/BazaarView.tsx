@@ -6,6 +6,7 @@ import {
   listBazaarFeed, deleteBazaarPost, BazaarFeedPage,
 } from '../../lib/bazaar';
 import { confirmDialog } from '../../lib/dialogs';
+import { isImeKey } from '../../lib/imeKey';
 
 /**
  * Phase 52 4단계 + 다듬기: Bazaar 전역 피드 + 검색/필터.
@@ -134,7 +135,7 @@ export default function BazaarView({
               <input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) submitSearch(); }}
                 placeholder={searchMode === 'nickname' ? '닉네임 정확히' : '제목 시작 글자'}
                 style={searchInputStyle}
               />

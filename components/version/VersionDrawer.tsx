@@ -11,6 +11,7 @@ import VersionTimeline from './VersionTimeline';
 import VersionDiff from './VersionDiff';
 import RestoreConfirm from './RestoreConfirm';
 import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H, PANEL_WIDTH_DEFAULT } from '../ui/dialogStyles';
+import { isImeKey } from '../../lib/imeKey';
 
 /**
  * Phase 55 Stage 5 — 우측 버전 기록 드로어.
@@ -264,7 +265,7 @@ export default function VersionDrawer({
       onChange={(e) => setNameEditor((p) => (p ? { ...p, value: e.target.value } : p))}
       onKeyDown={(e) => {
         // Korean IME: 조합 중 Enter는 확정용이라 커밋으로 세면 안 된다
-        if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+        if (e.key === 'Enter' && !isImeKey(e)) {
           e.preventDefault();
           onCommit(nameEditor?.value ?? '');
         } else if (e.key === 'Escape') {

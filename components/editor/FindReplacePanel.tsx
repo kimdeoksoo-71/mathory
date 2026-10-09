@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MarkdownEditorHandle } from './MarkdownEditor';
 import { fastScrollTo, computeBlockAwareScrollTop } from '../../lib/editorScroll';
+import { isImeKey } from '../../lib/imeKey';
 
 interface Match {
   blockId: string;
@@ -291,7 +292,7 @@ export default function FindReplacePanel({
   // ── 키보드 ──
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') onClose();
-    else if (e.key === 'Enter') { e.preventDefault(); e.shiftKey ? goPrev() : goNext(); }
+    else if (e.key === 'Enter' && !isImeKey(e)) { e.preventDefault(); e.shiftKey ? goPrev() : goNext(); }
   }
 
   if (!open) return null;

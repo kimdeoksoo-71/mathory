@@ -16,6 +16,7 @@ import { IconLoader, PhIcon } from '../ui/Icons';
 import { PH } from '../ui/phosphorPaths';
 import { ICON_SIZE } from './toolbarIcons';
 import { useHoverTip } from '../ui/HoverTip';
+import { isImeKey } from '../../lib/imeKey';
 
 // ═══════════════════════════════════════════════
 // Row 2 아이콘 — Phosphor regular · ICON_SIZE 20 (M4 · Final_V4 §3-1).
@@ -457,7 +458,7 @@ function TableInsertDialog({
               type="number" min={1} max={50}
               value={rows}
               onChange={(e) => setRows(Number(e.target.value) || 1)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) submit(); }}
               autoFocus
               style={{
                 width: 64, padding: '4px 8px', fontSize: 13,
@@ -472,7 +473,7 @@ function TableInsertDialog({
               type="number" min={1} max={20}
               value={cols}
               onChange={(e) => setCols(Number(e.target.value) || 1)}
-              onKeyDown={(e) => { if (e.key === 'Enter') submit(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) submit(); }}
               style={{
                 width: 64, padding: '4px 8px', fontSize: 13,
                 border: '1px solid var(--border-light)', borderRadius: 4,

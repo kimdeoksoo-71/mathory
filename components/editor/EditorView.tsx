@@ -85,6 +85,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { alertDialog, confirmDialog } from '../../lib/dialogs';
 import { PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
+import { isImeKey } from '../../lib/imeKey';
 
 /* ═══ 타입 & 상수 ═══ */
 
@@ -3820,7 +3821,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
                 onChange={(e) => setEditingTabLabel(e.target.value)}
                 onBlur={commitTabLabel}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') commitTabLabel();
+                  if (e.key === 'Enter' && !isImeKey(e)) commitTabLabel();
                   if (e.key === 'Escape') setEditingTabId(null);
                 }}
                 style={{

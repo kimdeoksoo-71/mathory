@@ -34,6 +34,7 @@ import { getChildren, getFolderPath } from '../../lib/folder-tree';
 import CoachBlock from '../ui/CoachBlock';
 import { isCoachBlock } from '../../lib/coachBlock';
 import BatchVerifyDialog from './BatchVerifyDialog';
+import { isImeKey } from '../../lib/imeKey';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
 const FONT_SIZE_DEFAULT = 15;
@@ -335,7 +336,7 @@ export default function FolderView({
   useEffect(() => {
     if (selectedIds.size !== 1) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Enter' || e.isComposing || e.repeat) return;
+      if (e.key !== 'Enter' || isImeKey(e) || e.repeat) return;
       const ae = document.activeElement as HTMLElement | null;
       if (ae && ae !== document.body && !ae.closest('.folder-row, .problem-card')) return;
       const id = [...selectedIds][0];

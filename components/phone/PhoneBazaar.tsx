@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { BazaarPost } from '../../types/problem';
 import { listBazaarFeed, deleteBazaarPost, BazaarFeedPage } from '../../lib/bazaar';
 import { confirmDialog } from '../../lib/dialogs';
+import { isImeKey } from '../../lib/imeKey';
 
 /* ═══════════════════════════════════════════════════════════════
    Phase 64 §6-5 — Bazaar 폰 화면(내용만 — 셸은 호출자: BazaarLanding·PhoneApp).
@@ -107,7 +108,7 @@ export default function PhoneBazaar({ uid, onOpenPost }: {
         <input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') submitSearch(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && !isImeKey(e)) submitSearch(); }}
           placeholder={searchMode === 'nickname' ? '닉네임 정확히' : '제목 시작 글자'}
           style={{
             flex: 1, minWidth: 0, height: 44, padding: '0 12px', fontSize: 14, boxSizing: 'border-box',

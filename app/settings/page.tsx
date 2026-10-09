@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '../../hooks/useAuth';
 import { getUserProfile, updateNickname } from '../../lib/users';
+import { isImeKey } from '../../lib/imeKey';
 
 type Status =
   | { kind: 'idle' }
@@ -131,7 +132,7 @@ export default function SettingsPage() {
               fontFamily: 'var(--font-ui)',
             }}
             onKeyDown={(e) => {
-              if (e.key === 'Enter' && dirty && status.kind !== 'saving') {
+              if (e.key === 'Enter' && !isImeKey(e) && dirty && status.kind !== 'saving') {
                 handleSave();
               }
             }}
