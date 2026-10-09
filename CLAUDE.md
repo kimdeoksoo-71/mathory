@@ -490,7 +490,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 68c — 한국어 IME 안전 트리거 층 · 스마트 붙여넣기** — 구현 완료(2026-10-09) · S0~S4 + 후속 1 · headless CDP 68c **35/35** · 68b **118/118** · 프로덕션 빌드 통과 · **덕수 실물 검수 대기** · push 대기
+## 현재 Phase: **Phase 68c — 한국어 IME 안전 트리거 층 · 스마트 붙여넣기** — 구현 완료(2026-10-09) · S0~S4 + 후속 1 · headless CDP 68c **35/35** · 68b **118/118** · 프로덕션 빌드 통과 · push 완료 · **prelaunch 1번 해결(덕수 실물 확인 2026-10-09)** · 나머지 실물 검수 대기
 
 문서: `docs/phasedocs/Phase68c 한국어 IME 안전 트리거 층·스마트 붙여넣기 v3 착수판.md`
 (계보: 카탈로그 v1 우선순위 3·4 → v1 web → v2 CLI 교차검토(E1~E18·G1~G20) → v3 web 재검증 착수판(F1~F8·H1~H8 · Q12~Q14 권장안) → 구현. §11이 구현 기록 — 이탈·보완 I1~I8)
@@ -499,8 +499,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 **서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0 · 아이콘 0.** 신설 3(`lib/imeKey.ts` · `lib/mathPaste.ts` · `lib/snodeDom.ts` — 61c 어댑터 이관) · 의존성 +1(`mathml-to-latex`, 지연 청크 전용) · 로직 테스트 +16건(`test:imekey` 6 · `test:mathpaste` 10) — 2026-10-09 실측 **26종(test:rules 제외) 573건 전부 통과**(68b의 "606"은 다른 기준으로 센 값). 작업 규칙 9 미통일 ① 해소. **규약은 「핵심 패턴」 맨 앞의 붙여넣기 절과 「Korean IME」 절이 소유한다.**
 
 - **v3를 그대로 넣었으면 어긋났을 것(§11-2)**: 외부 HTML 텍스트의 소스 공백(I1) · 위키 `{\displaystyle}` 껍질(I2) · 문장 중간 `\[`의 펜스가 행 중간(I3) · `composingRescue` 조합 밖 229가 20→60ms(I4 — `defer` 분리) · 다른 입력창 조합 중 ⌘B가 사라짐(I5)
-- **v1~v3가 놓친 선행 기록(I7)**: prelaunch 1번(조합 중 ⌘B 끝글자 중복 `# 수정은`→`# 수정은은`)에서 blur 강제 커밋·고정 60ms 지연이 **이미 실패**했다. 68c 키 경로는 실제 compositionend를 기다린다는 점이 다르지만 **CDP로 재현되지 않는 버그라 미검증** — 실물 §9-3 2′
-- ⚠ 남은 일: 덕수 실물 §9-3(맥 크롬 → Safari → 윈도우 크롬 · prelaunch 1번 표본) · push
+- **v1~v3가 놓친 선행 기록(I7)**: prelaunch 1번(조합 중 ⌘B 끝글자 중복 `# 수정은`→`# 수정은은`)에서 blur 강제 커밋·고정 60ms 지연이 **이미 실패**했다. 68c 키 경로는 실제 compositionend를 기다린다 — **덕수 실물(2026-10-09, `# 수정은` + ⌘B)에서 "아주 완벽하게 작동" → prelaunch 1번 해결**. ⚠ `whenSettled`를 즉시·고정 지연으로 되돌리지 말 것
+- ⚠ 남은 일: 나머지 실물 §9-3(붙여넣기 출처들 · Safari · 윈도우 크롬)
 
 ### 이전: **Phase 68b — 수식 입력 단축키 정비(Ctrl+M · Ctrl+Shift+M · Tab 탈출)** — 구현 완료(2026-10-09) · S1~S5 + 검수 후속 4 · headless CDP **118/118** · **덕수 맥·윈도우 11 크롬 검수 종결(2026-10-09)** · 배포 완료
 

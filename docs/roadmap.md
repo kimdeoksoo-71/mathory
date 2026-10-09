@@ -2171,7 +2171,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## Phase 68c: 한국어 IME 안전 트리거 층 · 스마트 붙여넣기 ✅ 구현 (2026-10-09) · headless CDP 68c 35/35 · 68b 118/118 · **덕수 실물 검수 대기** · push 대기
+## Phase 68c: 한국어 IME 안전 트리거 층 · 스마트 붙여넣기 ✅ 구현 (2026-10-09) · headless CDP 68c 35/35 · 68b 118/118 · push 완료 · **prelaunch 1번 해결(덕수 실물 확인)** · 나머지 실물 검수 대기
 
 계획서: `docs/phasedocs/Phase68c 한국어 IME 안전 트리거 층·스마트 붙여넣기 v3 착수판.md` (§11 구현 기록 · 6커밋 S0~S4 + 후속 1)
 (계보: 카탈로그 v1 우선순위 3·4 → v1 web → v2 CLI 교차검토(E1~E18·G1~G20·Q1~Q11) → v3 web 재검증 착수판(F1~F8·H1~H8·Q12~Q14) → 구현)
@@ -2187,7 +2187,8 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 **서버 0 · 규칙 0 · 스키마 0 · raw_text 규약 0 · 렌더 5사이트 0 · 폰 0.** 신설 `lib/imeKey.ts`·`lib/mathPaste.ts`·`lib/snodeDom.ts`(61c 어댑터 이관) · 로직 테스트 +16(실측 26종 573건 전부 통과 — test:rules 제외). 작업 규칙 9 미통일 ①(붙여넣기 정규화) 해소.
 
 - **가장 값비싼 발견**: ① v1·v2가 설계한 HTML 변환기는 61c 직렬화기와 같은 일이었다(v3 F5 — 재사용) ② prelaunch 1번(조합 중 ⌘B 끝글자 중복)에 과거 실패 기록(blur 강제 커밋 · 고정 60ms 지연)이 있었는데 세 판본 모두 보지 않았다(§11 I7 — 68c 키 경로는 실제 compositionend 대기라 다르지만 미검증) ③ 외부 HTML의 소스 공백·위키 `{\displaystyle}` 껍질·문장 중간 `\[`의 펜스(I1~I3)
-- ⚠ 남은 일: 덕수 실물(§9-3 — 맥 크롬 → Safari → 윈도우 크롬, prelaunch 1번 표본 `# 수정은` + ⌘B) · push
+- **덕수 실물(2026-10-09)**: prelaunch 1번 표본(`# 수정은` + ⌘B) — "아주 완벽하게 작동" → **prelaunch 1번 해결**(과거 실패한 고정 60ms 지연과 달리 실제 compositionend를 기다린 것이 처방)
+- ⚠ 남은 일: 나머지 실물 §9-3(붙여넣기 출처들 · Safari · 윈도우 크롬)
 
 ---
 
@@ -2663,7 +2664,7 @@ S1의 "경우 줄만"은 CLI v1이 "rail을 막는 것은 경우 줄뿐"이라�
 ## 공개 전 버그 청소 리스트
 
 공개 직전에 몰아서 처리할 버그 목록: `docs/prelaunch-bug-cleanup.md`
-(1번 한글 IME 조합 중 ⌘B 끝글자 중복, 2번 저장 왕복 중 타이핑 유실, 3번 저장 후 CodeMirror remount,
+(1번 한글 IME 조합 중 ⌘B 끝글자 중복 — Phase 68c에서 해결, 2번 저장 왕복 중 타이핑 유실, 3번 저장 후 CodeMirror remount,
 4번 키입력마다 전체 리렌더, 5번 `/api/copyright/register` 무인증,
 6번 내보낸 md에서 heading 블록이 탭 제목과 같은 레벨 — 제목 블록 디자인 개편 때 처리,
 7번 아이콘 시스템 잔여 부채, 8번 좌우 스크롤 시 편집창 행번호 거터 밀림 — Phase 65 후속에서 해결)

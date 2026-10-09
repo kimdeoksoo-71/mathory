@@ -72,7 +72,7 @@
 | R7 | annotation 없는 `<math>` | `mathml-to-latex`(`\leq` 꼴 출력 — 정본 `\le`와 다른 긴 꼴이 들어온다, 알고 두는 차이) |
 | R12 | 번들 | **확인됨** — 라이브러리 본체(xmldom·변환기)는 지연 청크 2개(약 170KB)에만, 진입 청크에는 `import()` 참조 한 줄 |
 | R17 | HTML 경로의 텍스트 속 날것 `\[…\]`는 61c `normalizeMathDelimiters`가 한 줄 `$$…$$`로 만든다(평문 경로는 펜스형) | 수용 — 61c 무수정 |
-| R19 | **prelaunch 1번은 미검증** — 지연 모델이 과거 실패한 "고정 60ms 지연"과 달리 실제 compositionend를 기다리지만, CDP로 재현되지 않는 버그라 실물만 판정한다 | §9-3 2′ |
+| R19 | ~~prelaunch 1번은 미검증~~ | **해결(2026-10-09 덕수 실물 — Mac 크롬 "아주 완벽하게 작동")**. 과거 실패한 고정 60ms 지연과 달리 실제 compositionend를 기다린 것이 처방 — 되돌리지 말 것 |
 
 ---
 
@@ -103,7 +103,7 @@ S0 `isImeKey`·15곳·`runAfterComposition` → S1 `lib/mathPaste` → S2 `lib/s
 
 1. Windows Chrome 한글 모드 `Ctrl+B`·`Ctrl+J`·`Ctrl+F` 발화(Breevy·PowerToys 끈 채)
 2. 한글 `함수 f` 조합 끝나기 전 `⌘B` → `함수 f` 뒤에서 갈리고 유실·중복 없음 · `⌘J` 동일
-2′. **prelaunch 1번 재현 표본 그대로** — `# 수정은`의 `은`을 조합 중(밑줄)인 채 `⌘B` → `# 수정은은`이 되는가. 안 되면 prelaunch 1번을 해결로 옮긴다(68c D2″의 효과). 되면 원인이 실행 시점이 아니라 CM 조합 반영 자체 — prelaunch 문서의 이분 탐색 계획으로
+2′. ✅ **(2026-10-09 통과 — prelaunch 1번 해결)** **prelaunch 1번 재현 표본 그대로** — `# 수정은`의 `은`을 조합 중(밑줄)인 채 `⌘B` → `# 수정은은`이 되는가. 안 되면 prelaunch 1번을 해결로 옮긴다(68c D2″의 효과). 되면 원인이 실행 시점이 아니라 CM 조합 반영 자체 — prelaunch 문서의 이분 탐색 계획으로
 3. 끔 모드 긴 수식에서 조합 중 툴바 `\frac` 클릭 → 가로 위치가 커서를 따라간다
 4. 찾기 패널 한글 질의 중 Enter — 마지막 글자 살고 "다음" 한 번(Safari 특히)
 5. 탭 이름 `풀이2` 입력 중 Enter
