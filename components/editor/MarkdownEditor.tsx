@@ -479,7 +479,8 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       whenSettled(fn: () => void, opts?: { composingAtKey?: boolean }) {
         const view = viewRef.current;
-        if (!view) { fn(); return; }
+        // 편집기에 포커스가 없으면 그 조합은 이 편집기 것이 아니다(제목·탭 이름 입력창 등) — 기다리지 않는다(지연 갈래는 hasFocus를 요구한다)
+        if (!view || !view.hasFocus) { fn(); return; }
         runAfterComposition(view, fn, { composingAtKey: opts?.composingAtKey, label: 'window shortcut' });
       },
       isSelectionEmpty() {
