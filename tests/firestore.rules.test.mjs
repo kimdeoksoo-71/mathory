@@ -42,6 +42,8 @@
  *   64) 본인 read/write 허용  65) 타인 read/write 거부
  *   [M9 D23-1′·D23-4′: 문항 단위 원자 저장]
  *   66) 문항 update + 블록 delete/set 한 배치 허용(M5)  67) 문항 doc 생성 + 하위 블록 한 배치 거부(get()이 배치 이전 상태)
+ *   [Phase 69: iPad 필기 입력 users/{uid}/ink_jobs · ink_state]
+ *   68) ink_jobs 본인 허용  69) ink_jobs 타인·비로그인 거부  70) ink_state 본인 허용  71) ink_state 타인 거부
  */
 import { readFileSync } from 'node:fs';
 import { test, before, after } from 'node:test';
@@ -544,4 +546,38 @@ test('67. 문항 doc 생성 + 하위 블록을 한 배치로 쓰면 거부 (pare
   b.set(doc(db, 'problems/newp'), { authorUid: OWNER, title: 't' });
   b.set(doc(collection(db, 'problems/newp/question_blocks')), { order: 0, type: 'text', raw_text: '' });
   await assertFails(b.commit());
+});
+
+// ── Phase 69: iPad 필기 입력 (users/{uid}/ink_jobs · ink_state — ask_questions와 같은 규칙) ──
+const inkJob = { status: 'ready', ocrText: '$x$', imagePath: 'ink/u/j.png', imageUrl: 'u', strokesPath: 'ink/u/j.json' };
+
+test('68. 본인 uid의 ink_jobs read/write(where 쿼리 포함) 허용', async () => {
+  const db = as(OWNER);
+  await assertSucceeds(setDoc(doc(db, `users/${OWNER}/ink_jobs/j1`), inkJob));
+  await assertSucceeds(getDoc(doc(db, `users/${OWNER}/ink_jobs/j1`)));
+  await assertSucceeds(getDocs(query(collection(db, `users/${OWNER}/ink_jobs`), where('status', '==', 'ready'))));
+  await assertSucceeds(updateDoc(doc(db, `users/${OWNER}/ink_jobs/j1`), { status: 'inserted', problemId: 'p' }));
+  await assertSucceeds(deleteDoc(doc(db, `users/${OWNER}/ink_jobs/j1`)));
+});
+test('69. 타인·비로그인의 ink_jobs read/write 거부', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `users/${OWNER}/ink_jobs/j2`), inkJob);
+  });
+  await assertFails(getDoc(doc(as(STRANGER), `users/${OWNER}/ink_jobs/j2`)));
+  await assertFails(setDoc(doc(as(STRANGER), `users/${OWNER}/ink_jobs/j3`), inkJob));
+  await assertFails(deleteDoc(doc(as(STRANGER), `users/${OWNER}/ink_jobs/j2`)));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), `users/${OWNER}/ink_jobs/j2`)));
+});
+test('70. 본인 uid의 ink_state/presence read/write 허용', async () => {
+  const db = as(OWNER);
+  await assertSucceeds(setDoc(doc(db, `users/${OWNER}/ink_state/presence`), { canInsert: true, label: 'x', updatedAt: serverTimestamp() }));
+  await assertSucceeds(getDoc(doc(db, `users/${OWNER}/ink_state/presence`)));
+  await assertSucceeds(deleteDoc(doc(db, `users/${OWNER}/ink_state/presence`)));
+});
+test('71. 타인의 ink_state/presence read/write 거부', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await setDoc(doc(ctx.firestore(), `users/${OWNER}/ink_state/presence`), { canInsert: false });
+  });
+  await assertFails(getDoc(doc(as(STRANGER), `users/${OWNER}/ink_state/presence`)));
+  await assertFails(setDoc(doc(as(STRANGER), `users/${OWNER}/ink_state/presence`), { canInsert: true }));
 });

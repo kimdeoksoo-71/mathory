@@ -40,6 +40,15 @@ service cloud.firestore {
       match /ask_questions/{qid} {
         allow read, write: if request.auth != null && request.auth.uid == userId;
       }
+
+      // iPad 필기 입력(Phase 69): 데스크톱 편집창 준비 상태(presence) · 필기 job(=첨부). 본인만.
+      // ⚠ problems/{id}/… 밑에 두지 말 것 — 그 와일드카드는 _blocks 아닌 서브컬렉션을 공개·멤버에게 read 허용한다
+      match /ink_state/{docId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+      match /ink_jobs/{jobId} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
     }
 
     // ===== nicknames 컬렉션 (Phase 48: 닉네임 전역 유일성 예약) =====

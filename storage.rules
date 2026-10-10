@@ -30,6 +30,18 @@ service firebase.storage {
       allow delete: if request.auth != null;
     }
 
+    // iPad 필기 입력(Phase 69): ink/{uid}/{jobId}.png · .json — 소유자만(경로에 uid가 있어 좁힐 수 있다).
+    // ⚠ create/update와 delete를 갈라 둔다(위 Phase 61e 주석 — delete엔 request.resource가 없다).
+    // ⚠ getDownloadURL의 토큰 URL은 규칙과 무관하게 읽힌다 — URL은 본인 전용 문서(users/{uid}/ink_jobs)에만 둔다
+    match /ink/{uid}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && (request.resource.contentType == 'image/png'
+            || request.resource.contentType == 'application/json');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // 기타 경로는 기본 차단
     match /{allPaths=**} {
       allow read, write: if false;
