@@ -97,6 +97,11 @@ function PasteBlocksIcon() {
   return <PhIcon d={PH.clipboardText} size={ICON_SIZE} />;
 }
 
+/** Phase 69 D14 — 필기 첨부(scribble — "손으로 쓴 것") */
+function InkAttachmentsIcon() {
+  return <PhIcon d={PH.scribble} size={ICON_SIZE} />;
+}
+
 function SpecialCharIcon() {
   return <PhIcon d={PH.numberCircleOne} size={ICON_SIZE} />;
 }
@@ -218,6 +223,8 @@ interface UnifiedToolbarProps {
   onPasteBlocks: () => void;
   canCopy: boolean;
   canPaste: boolean;
+  /** Phase 69 D14 — 필기 첨부(iPad에서 받아 삽입한 원본) 목록. 탭 단위(블록 게이트 없음) */
+  onOpenInkAttachments: () => void;
   /** Phase 65 — 편집창 줄바꿈 켬/끔 (⌥Z). 끄면 긴 줄이 블록 안에서 좌우 스크롤된다. */
   lineWrap: boolean;
   onToggleLineWrap: () => void;
@@ -630,6 +637,7 @@ export default function UnifiedToolbar({
   onPasteBlocks,
   canCopy,
   canPaste,
+  onOpenInkAttachments,
   lineWrap,
   onToggleLineWrap,
   mathAscii,
@@ -801,6 +809,15 @@ export default function UnifiedToolbar({
       node: (
         <IconButton title="블록 붙여넣기 (⌘V — 접힘 모드에서 선택한 블록 아래)" onClick={onPasteBlocks} inactive={!canPaste}>
           <PasteBlocksIcon />
+        </IconButton>
+      ),
+    },
+    /* Phase 69 D14 — 필기 첨부. pasteBlocks 뒤(끝에서부터 숨으므로 lineWrap → mathAscii → 이것 순으로 사라진다) · 배지 없음(툴바 배지 선례 0) */
+    {
+      key: 'inkAttachments',
+      node: (
+        <IconButton title="필기 첨부 — iPad에서 받은 원본" onClick={onOpenInkAttachments}>
+          <InkAttachmentsIcon />
         </IconButton>
       ),
     },

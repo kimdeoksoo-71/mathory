@@ -106,6 +106,7 @@ const ICONS = {
   listDashes: ['list-dashes', 'regular'],                  // IconQuestionList — agent 탭 질문 목록.
   // ── Phase 68a (수식 영역 자동 영문 입력) ──
   keyboard: ['keyboard', 'regular'],                       // MathAsciiIcon — Row 2 토글(줄바꿈 왼쪽). 상태는 박스(active)가 나른다
+  scribble: ['scribble', 'regular'],                       // InkAttachmentsIcon — Row 2 필기 첨부 (Phase 69 D14)
   // ⚠ listChecks(교정)를 재사용하지 말 것 — EditorView는 Row 2 툴바와 agent 드로어가 동시에 보인다.
 };
 

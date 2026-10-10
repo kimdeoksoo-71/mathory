@@ -66,6 +66,10 @@ import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';
 import { panelKey, readPanel, updatePanel, getPanelWidth, setPanelWidth } from '../../lib/panelStore';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
+import InkInbox from './InkInbox';
+import InkAttachmentsDialog from './InkAttachmentsDialog';
+import { writePresence, clearPresence } from '../../lib/inkJobs';
+import { PRESENCE_DEBOUNCE_MS, PRESENCE_HEARTBEAT_MS, presenceLabel, type PresenceReason } from '../../lib/ink/presence';
 import {
   IconChevronLeft, IconGrip, IconPlus,
   IconTrash,
@@ -2828,6 +2832,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo · ⌥Z 줄바꿈 ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      /* Phase 69 D12′ — iPad 필기 카드(InkInbox, body 포털) 안의 키는 아래 단축키를 하나도 타지 않는다.
+         ⌘B·⌘J·⌘⇧L은 포커스를 보지 않고 **활성 블록**에 작용해, 카드 편집창의 ⌘B가 뒤의 블록을 분할했다.
+         CM 자체 keymap(⌘Enter 확인·Ctrl+M·Tab …)은 contentDOM에서 먼저 처리되므로 무영향 */
+      if ((e.target as Element | null)?.closest?.('[data-ink-card]')) return;
       /* Phase 65 D10 — ⌥Z(Windows Alt+Z) 줄바꿈 토글. VS Code와 같은 키다.
          ⚠ preventDefault 필수: macOS에서 ⌥Z는 'Ω'를 입력하므로 막지 않으면 글자가 들어간다.
          e.code를 쓰는 이유는 아래 ⌘Z 분기와 같다(C5 — 한글 IME에서 e.key가 흔들린다).
@@ -3371,6 +3379,47 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     return () => window.removeEventListener('beforeunload', handler);
   }, [problemId, dirty, allBlocks, tabs, editTitle, editAnswer]);
 
+  /* ─── Phase 69 D9 — iPad 필기 입력: 편집창 준비 상태(presence) ───
+     삽입 가능 판정은 여기서 한다(TEXT_BASED_TYPES는 이 파일 지역 상수 · 접힌 블록은 CM이 없다 — iPad에 사본을 만들지 않는다).
+     쓰는 때: 입력 변경(1초 디바운스) · 45초 heartbeat · 탭이 다시 보일 때 · 언마운트·pagehide에서 삭제(best-effort — 만료 150초가 덮는다) */
+  const inkActiveBlock = currentBlocks.find((b) => b.id === activeBlockId) ?? null;
+  const inkBlockIndex = inkActiveBlock ? currentBlocks.indexOf(inkActiveBlock) : -1;
+  const inkReason: PresenceReason | undefined = !inkActiveBlock ? 'no-block'
+    : !TEXT_BASED_TYPES.has(inkActiveBlock.type) ? 'not-text'
+    : inkActiveBlock.collapsed ? 'collapsed'
+    : undefined;
+  const inkCanInsert = !inkReason;
+  const inkTabLabel = tabs.find((t) => t.id === activeTab)?.label ?? activeTab;
+  const inkLabel = inkCanInsert ? presenceLabel(editTitle, inkTabLabel, inkBlockIndex) : undefined;
+  const inkPresenceRef = useRef<{ canInsert: boolean; reason?: PresenceReason; label?: string }>({ canInsert: false });
+  inkPresenceRef.current = { canInsert: inkCanInsert, reason: inkReason, label: inkLabel };
+  const inkUid = user?.uid ?? null;
+  useEffect(() => {
+    if (!inkUid) return;
+    const t = setTimeout(() => { writePresence(inkUid, inkPresenceRef.current).catch(() => {}); }, PRESENCE_DEBOUNCE_MS);
+    return () => clearTimeout(t);
+  }, [inkUid, inkCanInsert, inkReason, inkLabel]);
+  useEffect(() => {
+    if (!inkUid) return;
+    const beat = () => { writePresence(inkUid, inkPresenceRef.current).catch(() => {}); };
+    const id = setInterval(beat, PRESENCE_HEARTBEAT_MS);
+    const onVis = () => { if (document.visibilityState === 'visible') beat(); };
+    const onHide = () => { clearPresence(inkUid).catch(() => {}); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pagehide', onHide);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pagehide', onHide);
+      clearPresence(inkUid).catch(() => {});
+    };
+  }, [inkUid]);
+  const getInkEditor = useCallback(
+    () => (activeBlockId ? editorRefs.current[activeBlockId] ?? null : null),
+    [activeBlockId],
+  );
+  const [inkAttachmentsOpen, setInkAttachmentsOpen] = useState(false);
+
   /* ─── 로딩 / 에러 ─── */
   if (loading) {
     return <div style={{ padding: 32, textAlign: 'center', color: 'var(--text-muted)' }}>로딩 중...</div>;
@@ -3807,6 +3856,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onPasteBlocks={handlePasteBlocks}
           canCopy={canCopyBlocks}
           canPaste={canPasteBlocks}
+          onOpenInkAttachments={() => setInkAttachmentsOpen(true)}
           lineWrap={lineWrap}
           onToggleLineWrap={toggleLineWrap}
           mathAscii={mathAscii}
@@ -4241,6 +4291,24 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         </div>
         </div>
       </div>
+
+      {/* Phase 69 — iPad 필기 수신 카드(body 포털 · 하단 도킹 비모달) · 필기 첨부 목록 */}
+      {user && problem && (
+        <InkInbox
+          uid={user.uid}
+          problemId={problem.id}
+          tabId={activeTab}
+          tabLabel={inkTabLabel}
+          blockId={activeBlockId}
+          blockIndex={inkBlockIndex}
+          canInsert={inkCanInsert}
+          reason={inkReason}
+          getEditor={getInkEditor}
+        />
+      )}
+      {inkAttachmentsOpen && user && problem && (
+        <InkAttachmentsDialog uid={user.uid} problemId={problem.id} tabs={tabs} onClose={() => setInkAttachmentsOpen(false)} />
+      )}
 
       {/* 댓글/agent 패널 — 우측 슬라이드 (ProblemView와 동일 패턴) */}
       {panelMode && user && problem && (
