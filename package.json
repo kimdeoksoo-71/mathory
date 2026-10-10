@@ -38,7 +38,8 @@
     "test:mathslots": "tsc lib/mathSlots.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathSlots.test.mjs",
     "test:peek": "tsc lib/sidebarPeek.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sidebarPeek.test.mjs",
     "test:imekey": "tsc lib/imeKey.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/imeKey.test.mjs",
-    "test:mathpaste": "tsc lib/mathPaste.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathPaste.test.mjs"
+    "test:mathpaste": "tsc lib/mathPaste.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathPaste.test.mjs",
+    "test:ink": "tsc lib/ink/strokes.ts lib/ink/view.ts lib/ink/payload.ts lib/ink/presence.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ink.test.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
