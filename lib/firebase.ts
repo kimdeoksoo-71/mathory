@@ -16,9 +16,10 @@ export { app };
 export const db = getFirestore(app);
 export const auth = getAuth(app);
 // Phase 52: 지속 로그인 — localStorage 사용. 새 탭/공개 페이지(/p·/shared·/bazaar)에서도
-//   로그인 유지(이전 sessionStorage는 새 탭마다 로그아웃). 단일 활성 세션(sessions/{uid})은
-//   claim/watch로 유지 — watch 충돌 시 kick(view 리셋)만 하고 signOut은 안 하므로 연쇄 로그아웃 없음.
-//   명시적 로그아웃 시에만 전 탭 로그아웃.
+//   로그인 유지(이전 sessionStorage는 새 탭마다 로그아웃).
+// 단일 활성 세션(lib/session — sessions/{uid})은 **AppShell만** claim/watch한다. 다른 탭·기기가 claim하면
+//   watch가 kick(홈으로) 뒤 **signOut한다**(session.ts watchSession — Phase 69에서 옛 "signOut 안 함" 서술 정정).
+//   공개 라우트(/p·/shared·/bazaar)·폰 셸·iPad 필기 패드(/ink)는 claim하지 않으므로 데스크톱과 공존한다.
 if (typeof window !== 'undefined') {
   setPersistence(auth, browserLocalPersistence).catch((e) => {
     console.error('Auth persistence 설정 실패:', e);

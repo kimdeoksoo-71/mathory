@@ -2171,6 +2171,25 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 69: iPad 필기 보조 입력(`/ink`) ✅ 구현 (2026-10-10) · 규칙 테스트 73/73 · test:ink 21 · headless CDP 캔버스 18/18 · 카드 22/22 · **덕수: 규칙 배포 → push → iPad 실물 검수 대기**
+
+계획서: `docs/phasedocs/Phase69 iPad 필기 보조 입력(ink) v4 착수판.md` (§13 구현 기록 · 커밋 S1~S7)
+(계보: v1 web → v2 CLI 교차검토(E1~E17·G1~G20) → v3 web 재검증(H1~H7·F1~F12) → v4 CLI 착수판(v3 점검 K1~K12 · **두 손가락 확대·이동 추가** — 덕수 2026-10-10) → 구현)
+
+| 항목 | 69 뒤 |
+|---|---|
+| iPad 필기 패드 `/ink` | AppShell 밖(claim 없음 — 데스크톱이 튕기지 않는다) · 팝업 로그인 · 확정 디자인(5줄 · 보조선 2개 · 예시 수식) · Pencil = 쓰기 · **두 손가락 = 확대(1~3배)·이동**(손바닥 규칙) · 완료 = PNG·획 JSON·OCR 병렬 → `ink_jobs`(ready) · 상단 바에 데스크톱 준비 상태 |
+| 데스크톱 편집창 | `ready` job → **하단 도킹 비모달 3단 카드**(좌 원본 · 중 KaTeX · 우 LaTeX 편집) · 확인 = 커서 자리(선택이면 대체) · 수식 안이면 구분자 벗김 · ⌘Z 1회 · 포커스를 가져가지 않는다 |
+| 필기 첨부 | Row 2 **필기 첨부**(scribble) — 문항의 `inserted` job 목록·크게·삭제(본문 LaTeX는 그대로) |
+| `/api/ocr` | `withLatex: true`일 때만 `latex_styled`(단일 식 판정을 Mathpix가) — 편집창·댓글 OCR 바이트 불변 |
+
+**서버 라우트 신설 0 · 문항 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0 · 단일 세션 코드 0 · 의존성 0.** Firestore 규칙 +2(`users/{uid}/ink_jobs`·`ink_state`) · Storage 규칙 +1(`ink/{uid}/`) · ICONS 62 → 63 · 신설 `lib/ink/{strokes,view,payload,presence}`(import 0) · `lib/inkJobs.ts` · `components/ink/*` · `InkInbox` · `InkAttachmentsDialog`.
+
+- **계획서 왕복이 잡은 것**: `viewing` 상태의 job 영구 소실 · Safari 리디렉트 폴백 무효 · iPad 쪽 삽입 판정 사본·접힌 블록 · 카드 안 ⌘B가 뒤 블록 분할 · `confirmDialog` 인자 · 상태 점 색 · `@media` 금지 · 내보내기 축척 DPR 무관 · `latex_styled` opt-in
+- ⚠ 남은 일: 규칙 배포(덕수) · push · iPad 실물 §11-3 — **손바닥 규칙 상수 조율**(착지 차 250ms · 펜 뒤 300ms · 6px · 3배) · Storage 규칙 Playground
+
+---
+
 ## Phase 68c: 한국어 IME 안전 트리거 층 · 스마트 붙여넣기 ✅ 구현 (2026-10-09) · headless CDP 68c 35/35 · 68b 118/118 · push 완료 · **prelaunch 1번 해결(덕수 실물 확인)** · 나머지 실물 검수 대기
 
 계획서: `docs/phasedocs/Phase68c 한국어 IME 안전 트리거 층·스마트 붙여넣기 v3 착수판.md` (§11 구현 기록 · 6커밋 S0~S4 + 후속 1)
