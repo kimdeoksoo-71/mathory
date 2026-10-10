@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = (await req.json()) as { src?: string; languages?: string[] };
+    const body = (await req.json()) as { src?: string; languages?: string[]; withLatex?: boolean };
     if (!body.src || typeof body.src !== 'string') {
       return NextResponse.json({ error: '이미지 데이터(src)가 없습니다.' }, { status: 400 });
     }
@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         src: body.src,
-        formats: ['text'],
+        // Phase 69 (P25) — iPad 필기만 opt-in으로 `latex_styled`("이미지 전체가 식 하나로 환원될 때만" 온다 — Mathpix 문서)를
+        // 함께 받는다. 편집창·댓글 OCR(withLatex 없음)의 요청·응답은 바이트 그대로다.
+        formats: body.withLatex === true ? ['text', 'latex_styled'] : ['text'],
         math_inline_delimiters: ['$', '$'],
         math_display_delimiters: ['$$', '$$'],
         rm_spaces: true,
@@ -69,6 +71,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '인식된 내용이 없습니다.' }, { status: 422 });
     }
 
+    if (body.withLatex === true) {
+      return NextResponse.json({ text, confidence: data.confidence, latex: data.latex_styled, isHandwritten: data.is_handwritten });
+    }
     return NextResponse.json({ text, confidence: data.confidence });
   } catch (err: any) {
     console.error('[ocr] error:', err);

@@ -1247,3 +1247,21 @@ p:has(.marker-circled) {
 @keyframes phone-sheet-out { from { transform: translateY(0); opacity: 1; }   to { transform: translateY(28px); opacity: 0; } }
 @keyframes phone-dim-in    { from { opacity: 0; } to { opacity: 1; } }
 @keyframes phone-dim-out   { from { opacity: 1; } to { opacity: 0; } }
+
+/* Phase 69 — iPad 필기 패드(/ink) 상단 바 버튼. 확정 샘플 「Mathory Ink Pad」 v4의 `.ib` 규격(높이 36 · radius 8 · 아이콘 18 + 13px).
+   ⚠ .ink-pad 스코프 밖으로 새지 않게. :hover는 @media (hover: hover) 안(Phase 64 §7-5 규약) — iPad는 :active로 눌림을 보인다 */
+.ink-pad .ink-btn {
+  height: 36px; min-width: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent;
+  color: var(--text-secondary); font: inherit; font-size: 13px; display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; cursor: pointer; white-space: nowrap; font-variant-numeric: tabular-nums;
+}
+.ink-pad .ink-btn:active:not(:disabled) { background: rgba(0, 0, 0, 0.09); }
+.ink-pad .ink-btn:disabled { color: var(--text-muted); opacity: 0.5; cursor: default; }
+.ink-pad .ink-btn:focus-visible { outline: 2px solid var(--mathory-red); outline-offset: 1px; }
+.ink-pad .ink-btn.primary { background: var(--mathory-red-dark); color: #fff; font-weight: 500; padding: 0 14px; }
+.ink-pad .ink-btn.primary:active:not(:disabled) { background: var(--wordmark-small); }
+.ink-pad .ink-btn.primary:disabled { color: #fff; }
+@media (hover: hover) {
+  .ink-pad .ink-btn:hover:not(:disabled) { background: rgba(0, 0, 0, 0.05); }
+  .ink-pad .ink-btn.primary:hover:not(:disabled) { background: var(--wordmark-small); }
+}
