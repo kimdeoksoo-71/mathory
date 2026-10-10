@@ -1,6 +1,8 @@
 /* Phase 69 — lib/ink/{strokes,view,payload,presence}.ts (전부 import 0). npm run test:ink */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import {
   strokeBounds, exportPlan, toMathpixStrokes, guideYs, exampleLayout, GUIDE, STROKE_WIDTH,
 } from '../.test-build/lib/ink/strokes.js';
@@ -68,6 +70,28 @@ test('exampleLayout — 기준선·첨자·분수선 위치와 진행 순서', (
   for (let i = 1; i < order.length; i++) assert.ok(order[i] > order[i - 1], `x 단조 ${i}`);
   assert.ok(width > by('x', 1).x);
   assert.equal(by('∫').family, 'size2'); assert.equal(by('b').family, 'math'); assert.equal(by('4').family, 'main');
+});
+
+test('exampleLayout — 프로덕션 압축(SWC)본도 같은 배치 (2026-10-10 iPad: 압축이 += 연쇄를 합쳐 분수 뒤 글자가 겹쳤다)', async (t) => {
+  let minify;
+  try { ({ minify } = createRequire(import.meta.url)('next/dist/build/swc')); } catch { t.skip('next swc 없음'); return; }
+  const code = readFileSync(new URL('../.test-build/lib/ink/strokes.js', import.meta.url), 'utf8');
+  const { code: min } = await minify(code, { compress: true, mangle: true });
+  const mod = { exports: {} };
+  new Function('exports', 'module', min)(mod.exports, mod);
+  const measure = (s, size) => size * (s === '∫' ? 0.556 : 0.5);
+  const a = exampleLayout(53.4, 106.9, measure);
+  const b = mod.exports.exampleLayout(53.4, 106.9, measure);
+  assert.equal(b.ops.length, a.ops.length);
+  near(b.width, a.width, 1e-9);
+  a.ops.forEach((o, i) => {
+    const q = b.ops[i];
+    if (o.kind === 'text') { assert.equal(q.text, o.text); near(q.x, o.x, 1e-9); near(q.y, o.y, 1e-9); }
+    else { near(q.x0, o.x0, 1e-9); near(q.x1, o.x1, 1e-9); }
+  });
+  // 압축본에서도 x 좌표 단조 증가(겹침 없음)
+  const xs = ['x', '2', 'd'].map((c) => b.ops.find((o) => o.kind === 'text' && o.text === c).x);
+  assert.ok(xs[0] < xs[1] && xs[1] < xs[2], `압축본 겹침: ${xs}`);
 });
 
 /* ── view (핀치 줌) ── */

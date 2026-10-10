@@ -105,43 +105,52 @@ export type MeasureFn = (text: string, size: number, family: ExampleFamily) => n
 /**
  * 예시 수식의 그리기 명령. x는 수식 왼쪽 끝 기준(호출부가 `max(inset, W − 32 − width)`만큼 민다), y는 종이 좌표.
  * `yU`·`yB` = 마지막 줄의 윗선·기준선.
+ *
+ * ⚠ **위치는 전부 상수로 한 단계씩 넘긴다 — 닫힌 함수가 바깥의 `let` 커서를 읽는 꼴로 되돌리지 말 것.**
+ *   옛 꼴(`let x` + `x += put(…)` 연쇄, `put`이 클로저로 `x`를 읽음)은 프로덕션 SWC 압축이 연쇄를
+ *   `x += a + put() + put() + …` 한 식으로 합쳐 각 `put`이 **갱신 전 x**를 읽었다 — 분수 뒤 글자 넷이
+ *   한자리에 쌓였다(2026-10-10 iPad 실물. 개발 모드는 압축하지 않아 하니스가 못 봤다). `test:ink`가
+ *   압축본으로도 이 함수를 돌린다.
  */
 export function exampleLayout(yU: number, yB: number, measure: MeasureFn): { ops: ExampleOp[]; width: number } {
   const bh = yB - yU, F = bh / 0.72, yM = (yU + yB) / 2;
   const ops: ExampleOp[] = [];
-  let x = 0;
-  const text = (t: string, size: number, family: ExampleFamily, dx: number, y: number): number => {
-    ops.push({ kind: 'text', text: t, size, family, x: x + dx, y });
+  /** 글자 하나를 `at`(수식 왼쪽 끝 기준)에 놓고 그 폭을 돌려준다 — 바깥 상태를 읽지 않는다 */
+  const put = (t: string, size: number, family: ExampleFamily, at: number, y: number): number => {
+    ops.push({ kind: 'text', text: t, size, family, x: at, y });
     return measure(t, size, family);
   };
 
   // ∫ — KaTeX display 적분 글리프(높이 1.36em · 깊이 0.862em)
   const iH = bh * 2.2, iS = iH / 2.222, iTop = yM - iH / 2;
-  const iW = text('∫', iS, 'size2', 0, iTop + 1.36 * iS);
+  const iW = put('∫', iS, 'size2', 0, iTop + 1.36 * iS);
   // 적분 한계(KaTeX 배치): 위첨자 b는 글리프 폭 + 이탤릭 보정(0.444em) 뒤 · 아래첨자 a는 글리프 폭 바로 뒤
   const sF = F * 0.62;
   const bX = iW + iS * 0.444;
-  const wb = text('b', sF, 'math', bX, iTop + sF * 0.72);
+  const wb = put('b', sF, 'math', bX, iTop + sF * 0.72);
   const aX = iW + iS * 0.02;
-  const wa = text('a', sF, 'math', aX, iTop + iH + sF * 0.02);
-  x += Math.max(bX + wb, aX + wa) + F * 0.22;
+  const wa = put('a', sF, 'math', aX, iTop + iH + sF * 0.02);
 
   // 분수 4/3 — 가로줄이 두 선 사이 가운데
+  const fx = Math.max(bX + wb, aX + wa) + F * 0.22;
   const nF = F * 0.8;
   const w4 = measure('4', nF, 'main'), w3 = measure('3', nF, 'main');
-  const fw = Math.max(w4, w3) + F * 0.24, fx = x;
-  text('4', nF, 'main', (fw - w4) / 2, yM - F * 0.13);
-  text('3', nF, 'main', (fw - w3) / 2, yM + F * 0.13 + nF * 0.68);
+  const fw = Math.max(w4, w3) + F * 0.24;
+  put('4', nF, 'main', fx + (fw - w4) / 2, yM - F * 0.13);
+  put('3', nF, 'main', fx + (fw - w3) / 2, yM + F * 0.13 + nF * 0.68);
   ops.push({ kind: 'line', x0: fx, x1: fx + fw, y: yM, width: Math.max(1, F * 0.03) });
-  x += fw + F * 0.12;
 
   // x² — 소스 `x^{2} dx`엔 `\,`이 없다 — LaTeX대로 붙여 쓴다
-  x += text('x', F, 'math', 0, yB);
-  x += text('2', sF, 'main', F * 0.02, yU + bh * 0.2) + F * 0.08;
+  const xX = fx + fw + F * 0.12;
+  const wX = put('x', F, 'math', xX, yB);
+  const x2 = xX + wX + F * 0.02;
+  const w2 = put('2', sF, 'main', x2, yU + bh * 0.2);
 
   // dx — 둘 다 수식 이탤릭
-  x += text('d', F, 'math', 0, yB);
-  x += text('x', F, 'math', 0, yB);
+  const xD = x2 + w2 + F * 0.06;
+  const wD = put('d', F, 'math', xD, yB);
+  const xX2 = xD + wD;
+  const wX2 = put('x', F, 'math', xX2, yB);
 
-  return { ops, width: x };
+  return { ops, width: xX2 + wX2 };
 }
