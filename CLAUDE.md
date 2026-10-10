@@ -166,6 +166,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
    ⚠ 옮기지 않으면 phaseSketch 정리 때 **그 Phase의 유일한 사양이 사라진다** —
    2026-08-27에 Phase 60·61a~61d가 실제로 그랬고(포인터 5개가 끊겼다) 복구했다.
    중간 판본(v1~vN-1)은 phaseSketch에 두거나 지운다. **확정본만 phasedocs로.**
+   **끝난 Phase의 작업물은 지우지 않고 `docs/phaseSketch/_archive/<Phase>/`로 옮긴다**(2026-10-10 덕수 — 로컬 전용·`.gitignore`. 공개 레포라 초안·검수 스크린샷을 커밋하지 않는다). 옛 문서가 `docs/phaseSketch/<파일>`을 가리키면 `_archive/README.md`의 색인에서 찾는다. phaseSketch 최상위에는 **지금도 쓰는 도구만** 남긴다(68b·68c CDP 하니스 · 68a IME 프로브 · `m9-ocr/` OCR 프로브 입력)
 8. **폰 화면을 만진 커밋은 기기 모드(A) → 실기기(R) 순으로 검수한다** — 위 「폰 검수 순서」 절. 데스크톱 픽셀 무변경이 기본 계약이라 데스크톱 3곳 워드마크·드로어를 함께 본다
 9. **편집창과 댓글·agent 입력창의 수식 입력 방식은 같아야 한다 (덕수 원칙, 2026-10-09)** — 두 편집기는 `MarkdownEditor`(블록 편집창)와
    `LatexInputEditor`(댓글·agent·공개 페이지 댓글) 두 CM 인스턴스다. 수식 입력에 관한 동작(단축키·Tab·Enter·자동 영문·후위 변환·괄호 자동닫기·
@@ -498,7 +499,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 69 — iPad 필기 보조 입력(`/ink`)** — 구현 완료(2026-10-10) · S1~S7 · 규칙 테스트 **73/73** · `test:ink` **22**(압축본 포함) · headless CDP 캔버스 **18/18** · 카드 **22/22** · 프로덕션 빌드 통과 · ⚠ **덕수: 규칙 배포(`firebase deploy --only firestore:rules,storage`) → push → iPad 실물 검수(§11-3)** 대기
+## 현재 Phase: **Phase 69 — iPad 필기 보조 입력(`/ink`)** — 구현 완료(2026-10-10) · S1~S7 + 실물 후속 3 · 규칙 테스트 **73/73** · `test:ink` **22**(압축본 포함) · headless CDP 캔버스 **18/18** · 카드 **22/22** · 프로덕션 빌드 통과 · **규칙 배포·push 완료(덕수)** · **덕수 iPad 실물 확인(2026-10-10 — "잘 작동", 입력·핀치 정상 · 구분선 15% "딱 좋아")**
 
 문서: `docs/phasedocs/Phase69 iPad 필기 보조 입력(ink) v4 착수판.md`
 (계보: v1 web → v2 CLI 교차검토(E1~E17·G1~G20) → v3 web 재검증(H1~H7·F1~F12) → **v4 CLI 착수판**(v3 점검 K1~K12 · 핀치 줌 추가) → 구현. §13이 구현 기록)
@@ -508,8 +509,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 - **계획서 왕복이 잡은 것**: `viewing` 상태의 job 영구 소실(v2 E3) · 리디렉트 폴백 무효(E2) · iPad 쪽 `TEXT_BASED_TYPES` 사본·접힌 블록(E5) · 카드 안 ⌘B 관통(E17) · `confirmDialog` 객체 인자(K1) · 상태 점 색 팔레트(K2) · `@media` 금지(K3) · 내보내기 축척 DPR 무관(K5) · `latex_styled` opt-in(K10)
 - **CDP가 잡은 것**: 코드 결함 0 — 첫 실행 실패 4건은 전부 하니스 쪽(펜 뒤 300ms 규칙이 핀치를 정확히 막은 것 · 선택 인덱스 · 자동완성은 수식 안에서만 · placeholder 글자)
-- **iPad 실물 1차(2026-10-10, 덕수)**: 입력·핀치 정상 · 예시 수식의 분수 뒤 글자가 겹침 → **프로덕션 SWC 압축 버그**(위 핵심 패턴 절) — 위치를 상수로 넘기도록 고치고 압축본 회귀 테스트 추가
-- ⚠ 남은 일: 규칙 배포(덕수 — 배포 전에는 로컬 dev도 쓰기 거부) · push · iPad 실물 §11-3(**손바닥 규칙 상수 조율** 포함) · Storage 규칙 Playground 4건
+- **iPad 실물(2026-10-10, 덕수)**: 입력·핀치 정상 · 후속 3 — ① 예시 수식의 분수 뒤 글자가 겹침 → **프로덕션 SWC 압축 버그**(위 핵심 패턴 절 — 위치를 상수로 넘기고 압축본 회귀 테스트) ② 줄 사이 구분선 7% → 12% → **15%**(밝은 화면에서 보조 점선과 구분 — "딱 좋아") ③ (문서) 필기 첨부는 편집창 Row 2 「필기 첨부」에서 다시 본다
+- 남은 확인(실사용 중 만나는 대로): 손바닥 규칙 상수(현행 그대로 — 거슬리면 `lib/ink/view.ts` 한 곳) · Mathpix `latex_styled`가 손글씨 단일 식에 실제로 오는 비율 · Storage 규칙 Playground 4건 · Windows 크롬 수신 쪽
 
 ### 이전: **Phase 68c — 한국어 IME 안전 트리거 층 · 스마트 붙여넣기** — 구현 완료(2026-10-09) · S0~S4 + 후속 1 · headless CDP 68c **35/35** · 68b **118/118** · 프로덕션 빌드 통과 · **배포 완료(2026-10-10 — 빌드 로그 `[icons:check] OK — 62종`)** · prelaunch 1번 해결(덕수 실물 확인) · 후속 3건(토글 키 반복·390 자판 단축키·`$$` Enter·390 Shift 층 자동 영문) 실물 확인·배포 · 나머지 실물 검수(붙여넣기 출처들·Safari·윈도우) 대기
 
@@ -673,7 +674,7 @@ ICONS 60 → **61종** · 로직 검증 439 → **446건** · 규칙 블록 65 �
 ### 이전: **개선묶음 M8 — 모바일 웹 디자인·기능 개선** — 구현·**덕수 검수 종결(2026-09-12, "모두 정상")** · **배포 완료(2026-09-12)** — 배포본 검수 정상
 
 문서: `docs/phasedocs/개선묶음 M8 모바일 웹 디자인·기능 개선 v1 실행판.md`
-(계보: 덕수 메모 `docs/phaseSketch/M8-mobileWeb-design-improving.md` → **v1 CLI 실측 = 실행판**(§9가 구현·검수 기록). 별도 검증 턴 없이 착수 — v1이 이미 CLI 실측판)
+(계보: 덕수 메모 `docs/phaseSketch/_archive/M8/M8-mobileWeb-design-improving.md`(로컬 보관) → **v1 CLI 실측 = 실행판**(§9가 구현·검수 기록). 별도 검증 턴 없이 착수 — v1이 이미 CLI 실측판)
 
 Phase 64 폰 셸을 실사용한 덕수 판정 4건 — 로고 사양 뒤처짐 · 탭 행과 중복된 이동 버튼 2종 · 시트 속 상자(이중 크롬) · 가로 보기에서 크롬이 화면의 1/4 — 을 닫았다.
 **서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 데스크톱 픽셀 0.** 수정 10 · 신설 2(`lib/chromeAutoHide.ts` · 테스트) · 커밋 S1~S4 · 로직 검증 387 → **398건**(`test:chrome` 11).

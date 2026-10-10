@@ -1,0 +1,77 @@
+'use client';
+/* Phase 68b 임시 검증 라우트 — headless Chrome CDP 하니스(docs/phaseSketch/phase68b-cdp-harness.mjs)가 쓴다.
+   되살리기: 이 파일을 app/dev68b/page.tsx로 복사 → dev 서버에서 하니스 실행 → 검증 뒤 삭제(dev 서버가 도는 동안은 삭제 금지). */
+import { useEffect, useRef } from 'react';
+import { EditorView } from '@codemirror/view';
+import { undoDepth } from '@codemirror/commands';
+import MarkdownEditor, { MarkdownEditorHandle } from '../../components/editor/MarkdownEditor';
+import LatexInputEditor, { LatexInputEditorHandle } from '../../components/comment/LatexInputEditor';
+import { DEFAULT_ABBREVS } from '../../lib/mathInput';
+import { setSlots } from '../../lib/mathSlots';
+
+declare global {
+  interface Window {
+    __h?: {
+      ed: MarkdownEditorHandle | null;
+      cm: LatexInputEditorHandle | null;
+      view: (which: 'ed' | 'cm') => EditorView | null;
+      state: (which: 'ed' | 'cm') => { doc: string; from: number; to: number; undo: number } | null;
+      set: (which: 'ed' | 'cm', doc: string, from: number, to?: number) => void;
+      lastKey: { key: string; shift: boolean; prevented: boolean } | null;
+    };
+  }
+}
+
+export default function Dev68bPage() {
+  const edRef = useRef<MarkdownEditorHandle>(null);
+  const cmRef = useRef<LatexInputEditorHandle>(null);
+  const edBox = useRef<HTMLDivElement>(null);
+  const cmBox = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const view = (which: 'ed' | 'cm') => {
+      const box = which === 'ed' ? edBox.current : cmBox.current;
+      const el = box?.querySelector('.cm-editor');
+      return el ? EditorView.findFromDOM(el as HTMLElement) : null;
+    };
+    window.__h = {
+      ed: edRef.current,
+      cm: cmRef.current,
+      view,
+      state: (which) => {
+        const v = view(which);
+        if (!v) return null;
+        const sel = v.state.selection.main;
+        return { doc: v.state.doc.toString(), from: sel.from, to: sel.to, undo: undoDepth(v.state) };
+      },
+      set: (which, doc, from, to) => {
+        const v = view(which);
+        if (!v) return;
+        v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: doc }, effects: setSlots.of(null) });
+        v.dispatch({ selection: { anchor: from, head: to ?? from } });
+        v.focus();
+      },
+      lastKey: null,
+    };
+    const onKey = (e: KeyboardEvent) => {
+      // 버블 단계의 document 리스너 — CM이 preventDefault를 걸었는지 본다(D-g · D6)
+      if (window.__h) window.__h.lastKey = { key: e.key, shift: e.shiftKey, prevented: e.defaultPrevented };
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
+
+  return (
+    <div style={{ padding: 24, maxWidth: 900 }}>
+      <h1>dev68b</h1>
+      <button type="button">before</button>
+      <div ref={edBox} style={{ border: '1px solid #ccc', marginTop: 8 }}>
+        <MarkdownEditor ref={edRef} initialValue="" abbrevs={{ ...DEFAULT_ABBREVS }} />
+      </div>
+      <div ref={cmBox} style={{ border: '1px solid #ccc', marginTop: 16 }}>
+        <LatexInputEditor ref={cmRef} initialValue="" minHeight={80} />
+      </div>
+      <button type="button">after</button>
+    </div>
+  );
+}

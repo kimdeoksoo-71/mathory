@@ -2171,7 +2171,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## Phase 69: iPad 필기 보조 입력(`/ink`) ✅ 구현 (2026-10-10) · 규칙 테스트 73/73 · test:ink 21 · headless CDP 캔버스 18/18 · 카드 22/22 · **덕수: 규칙 배포 → push → iPad 실물 검수 대기**
+## Phase 69: iPad 필기 보조 입력(`/ink`) ✅ 구현 (2026-10-10) · 규칙 테스트 73/73 · test:ink 22(압축본 포함) · headless CDP 캔버스 18/18 · 카드 22/22 · 규칙 배포·push 완료 · **덕수 iPad 실물 확인("잘 작동")**
 
 계획서: `docs/phasedocs/Phase69 iPad 필기 보조 입력(ink) v4 착수판.md` (§13 구현 기록 · 커밋 S1~S7)
 (계보: v1 web → v2 CLI 교차검토(E1~E17·G1~G20) → v3 web 재검증(H1~H7·F1~F12) → v4 CLI 착수판(v3 점검 K1~K12 · **두 손가락 확대·이동 추가** — 덕수 2026-10-10) → 구현)
@@ -2186,7 +2186,8 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 **서버 라우트 신설 0 · 문항 스키마 0 · raw_text 0 · 전처리 0 · 렌더 5사이트 0 · 폰 0 · 단일 세션 코드 0 · 의존성 0.** Firestore 규칙 +2(`users/{uid}/ink_jobs`·`ink_state`) · Storage 규칙 +1(`ink/{uid}/`) · ICONS 62 → 63 · 신설 `lib/ink/{strokes,view,payload,presence}`(import 0) · `lib/inkJobs.ts` · `components/ink/*` · `InkInbox` · `InkAttachmentsDialog`.
 
 - **계획서 왕복이 잡은 것**: `viewing` 상태의 job 영구 소실 · Safari 리디렉트 폴백 무효 · iPad 쪽 삽입 판정 사본·접힌 블록 · 카드 안 ⌘B가 뒤 블록 분할 · `confirmDialog` 인자 · 상태 점 색 · `@media` 금지 · 내보내기 축척 DPR 무관 · `latex_styled` opt-in
-- ⚠ 남은 일: 규칙 배포(덕수) · push · iPad 실물 §11-3 — **손바닥 규칙 상수 조율**(착지 차 250ms · 펜 뒤 300ms · 6px · 3배) · Storage 규칙 Playground
+- **iPad 실물 후속(2026-10-10)**: 예시 수식 겹침 = 프로덕션 SWC 압축 버그(클로저가 읽는 `let` + `+=` 연쇄 — dev 하니스는 못 본다, 압축본 회귀 테스트 추가) · 줄 사이 구분선 7% → 15%
+- 남은 확인(실사용 중): 손바닥 규칙 상수(착지 차 250ms · 펜 뒤 300ms · 6px · 3배 — 현행 유지) · `latex_styled` 실제 비율 · Storage 규칙 Playground · Windows 크롬 수신 쪽
 
 ---
 
@@ -2528,7 +2529,7 @@ B열 복구 1행(1공통13) · 제어열 파괴 0건 · `stemHash` 전 행 불�
 밀린다). 아이콘 색 `--mathory-red-dark`(상태 표시기 3:1 규약, 최악 배경 #E8DFCE에서 3.28:1).
 **카드 보기는 현행 유지**(수정일 내림차순 기본 + SortControls). 제목 비교에 `'ko' + numeric`
 추가("문제2" < "문제10") — 카드 보기 이름 정렬(`FolderView.compareBySort`)도 같은 옵션.
-원본 메모: `docs/phaseSketch/정렬기능 개선.md`
+원본 메모: `docs/phaseSketch/_archive/Phase61d-62-정렬/정렬기능 개선.md`(로컬 보관 — 2026-10-10 phaseSketch 정리)
 
 ---
 
