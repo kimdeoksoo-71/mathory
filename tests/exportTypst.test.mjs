@@ -19,7 +19,8 @@ import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 
 import { buildExportDoc } from '../.test-build/lib/export/ir.js';
-import { serializeTypst, escTyp, typStr, quadCases } from '../.test-build/lib/export/typst.js';
+import { serializeTypst, escTyp, typStr, quadCases, normalizeEnvsForMitex } from '../.test-build/lib/export/typst.js';
+import { ROW_ENVS } from '../.test-build/lib/mathInput.js';
 import { sampleProblem } from './fixtures/export/sampleProblem.mjs';
 import { ensureExportFonts } from './helpers/exportFonts.mjs';
 
@@ -136,4 +137,15 @@ test('Y8 그림 경로가 없으면 자리 상자 · ggb·graph 자리 상자', 
   assert.ok(source.includes('#ph-box[그림을 불러오지 못했습니다]'));
   assert.ok(source.includes('#ph-box[GeoGebra — 화면에서 확인]'));
   assert.ok(source.includes('#ph-box[그래프 — 화면에서 확인]'));
+});
+
+test('Y9 Mathory 행 환경(ROW_ENVS) 전부가 mitex를 통과한다 — 모르는 13종은 동치 환경으로(Stage 0)', { skip: skipNoFonts }, () => {
+  const arg = (e) => (/^(alignedat|alignat\*?)$/.test(e) ? '{2}' : /^d?array$/.test(e) ? '{ll}' : /matrix\*$/.test(e) ? '[r]' : '');
+  const blocks = ROW_ENVS.map((e, i) => ({ id: `e${i}`, type: 'text', raw_text: `$$\n\\begin{${e}}${arg(e)} a & b \\\\ c & d \\end{${e}}\n$$` }));
+  const out = typ({ title: 't', tabs: [{ id: 'question', label: '문제', blocks }] });
+  assert.equal(out.formulas.length, ROW_ENVS.length);
+  const { errors } = compile(out.source);
+  assert.deepEqual(errors, []);
+  assert.equal(normalizeEnvsForMitex(R`\begin{Vmatrix} a \end{Vmatrix}`), R`\left\| \begin{matrix} a \end{matrix} \right\|`);
+  assert.equal(normalizeEnvsForMitex(R`\begin{pmatrix*}[r] 1 \end{pmatrix*}`), R`\begin{pmatrix} 1 \end{pmatrix}`);
 });

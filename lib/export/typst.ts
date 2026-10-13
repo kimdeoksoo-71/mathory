@@ -89,6 +89,25 @@ export function quadCases(latex: string): string {
   return out;
 }
 
+/**
+ * mitex 0.2.7이 모르는 환경 → 동치 환경 (Stage 0 실측: Mathory `ROW_ENVS` 29종 중 13종이 "unknown environment").
+ * `test:exporttypst`가 ROW_ENVS 전부를 실제로 컴파일해 고정한다. ⚠ latex.ts는 무변경 — LaTeX(amsmath·mathtools)는 원래 안다.
+ * 알고 두는 손실: dcases·drcases의 "칸마다 display 꼴"은 cases·rcases로 내려간다 · `*matrix*[r]`의 열 정렬 인수는 버린다.
+ */
+export function normalizeEnvsForMitex(latex: string): string {
+  return latex
+    .replace(/\\begin\{([pbvVB]?matrix)\*\}(\[[^\]]*\])?/g, '\\begin{$1}')
+    .replace(/\\end\{([pbvVB]?matrix)\*\}/g, '\\end{$1}')
+    // Vmatrix — mitex 0.2.7 구분자 처리 오류("expected exactly one character")
+    .replace(/\\begin\{Vmatrix\}/g, '\\left\\| \\begin{matrix}')
+    .replace(/\\end\{Vmatrix\}/g, '\\end{matrix} \\right\\|')
+    .replace(/\\(begin|end)\{alignat\*?\}/g, '\\$1{alignedat}')
+    .replace(/\\(begin|end)\{gather\*\}/g, '\\$1{gathered}')
+    .replace(/\\(begin|end)\{darray\}/g, '\\$1{array}')
+    .replace(/\\(begin|end)\{dcases\}/g, '\\$1{cases}')
+    .replace(/\\(begin|end)\{drcases\}/g, '\\$1{rcases}');
+}
+
 /** 코칭 아이콘(D31) — Phosphor chat-centered-text(regular, viewBox 256) */
 const COACH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path fill="black" d="${PH.chatCenteredText}"/></svg>`;
 
@@ -157,7 +176,7 @@ class TypstWriter {
 
   /** 수식 하나 → mitex 호출(또는 실패 상자) */
   private mathCall(latex: string, display: boolean): string {
-    const src = quadCases(latex);
+    const src = quadCases(normalizeEnvsForMitex(latex));
     const { failed } = this.nextMath(src, display);
     if (failed) return display ? `math-fail(${typStr(latex)}, block: true)` : `math-fail(${typStr(latex)})`;
     return display ? `mitex(${typStr(src)})` : `mi(${typStr(src)})`;

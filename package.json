@@ -15,6 +15,7 @@
     "test:case": "tsc lib/solutionOutline.ts --outDir .test-build --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/caseBlock.test.mjs",
     "test:locale": "tsc lib/locale.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/locale.test.mjs",
     "probe:ocr": "node scripts/ocrProbe.mjs",
+    "probe:export": "npm run test:exporttypst --silent && node scripts/exportProbe.mjs",
     "probe:verify": "npm run test:verify --silent && node scripts/verifyProbe.mjs",
     "test:verify": "tsc lib/verify/providerParams.ts lib/verify/prompts.ts lib/verify/parse.ts lib/verify/figures.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/aiProviderParams.test.mjs tests/verify.test.mjs tests/figures.test.mjs",
     "test:extract": "tsc lib/chatExtract.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/chatExtract.test.mjs",
@@ -42,7 +43,7 @@
     "test:exportkinds": "tsc lib/export/blockKinds.ts lib/export/layout.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportKinds.test.mjs",
     "test:exportir": "tsc lib/export/ir.ts lib/preprocess.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportIr.test.mjs",
     "test:exportlatex": "tsc lib/export/ir.ts lib/export/latex.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportLatex.test.mjs",
-    "test:exporttypst": "tsc lib/export/ir.ts lib/export/typst.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportTypst.test.mjs",
+    "test:exporttypst": "tsc lib/export/ir.ts lib/export/typst.ts lib/mathInput.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportTypst.test.mjs",
     "test:exportassets": "tsc lib/export/ir.ts lib/export/assets.ts lib/export/overleaf.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck --lib es2022,dom && node --test tests/exportAssets.test.mjs",
     "test:ink": "tsc lib/ink/strokes.ts lib/ink/view.ts lib/ink/payload.ts lib/ink/presence.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ink.test.mjs"
   },
