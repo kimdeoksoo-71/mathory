@@ -51,13 +51,13 @@
 
 함수 #mi("\\displaystyle f(x)=\\frac{x^2+1}{x}");에 대하여 다음 조건을 만족시키는 실수 #mi("\\displaystyle a");의 값을 구하시오\. \[4점\]
 
-#block(width: 100%, stroke: 0.13mm, inset: (x: 3.5mm, y: 3.5mm), above: 21.74pt, below: 21.74pt, breakable: true)[
+#block(width: 100%, stroke: 0.13mm, inset: (x: 3.5mm, y: 7mm), above: 21.74pt, below: 21.74pt, breakable: true)[
 #grid(columns: (2.5em, 1fr), [#text(weight: 400)[(가)]], [#mi("\\displaystyle \\lim_{x \\to 0+} f(x) = \\infty");])
 
 #grid(columns: (2.5em, 1fr), [#text(weight: 400)[(나)]], [모든 실수 #mi("\\displaystyle x");에 대하여 #mi("\\displaystyle f(x) \\ge 2");이다\.])
 ]
 
-#block(width: 100%, stroke: 0.13mm, inset: (x: 3.5mm, y: 3.5mm), above: 21.74pt, below: 21.74pt, breakable: true)[
+#block(width: 100%, stroke: 0.13mm, inset: (x: 3.5mm, y: 7mm), above: 21.74pt, below: 21.74pt, breakable: true)[
 #grid(columns: (2.5em, 1fr), [#text(weight: 400)[ㄱ\.]], [#mi("\\displaystyle f(1)=2");])
 
 #grid(columns: (2.5em, 1fr), [#text(weight: 400)[ㄴ\.]], [#mi("\\displaystyle f");는 연속이다\.])
@@ -79,7 +79,7 @@
 #grid(columns: (1fr, auto), align: (left + horizon, right + horizon), [산술·기하평균에 의하여 #mi("\\displaystyle f(x) \\ge 2");이다\.], [(2)])
 
 #block(width: 100%, above: 20.58pt, below: 20.58pt, breakable: true)[
-#place(top + left, dx: -1.12em, dy: 0.56em, circle(radius: 0.22em, fill: black))#text(weight: 600)[C1. #mi("\\displaystyle x>0");인 경우]
+#text(weight: 600)[C1. #mi("\\displaystyle x>0");인 경우]
 
 #mitex("\\begin{cases} x+1 \\quad & (x<1) \\\\ x^2 \\quad & (x \\ge 1) \\end{cases}")
 ]
@@ -91,7 +91,7 @@
 ]
 
 #block(width: 100%, above: 20.58pt, below: 20.58pt, breakable: true)[
-#place(top + left, dx: -1.03em, dy: 0.65em, circle(radius: 0.13em, fill: black))#text(weight: 600)[C1a. #mi("\\displaystyle x=1");일 때]
+#text(weight: 600)[C1a. #mi("\\displaystyle x=1");일 때]
 
 값은 #mi("\\displaystyle \\text{(2)}");와 같다\.
 ]
@@ -127,7 +127,7 @@
 #heading(level: 2, outlined: false)[STEP 2]
 
 #block(width: 100%, above: 20.58pt, below: 20.58pt, breakable: true)[
-#place(top + left, dx: -1.12em, dy: 0.56em, circle(radius: 0.22em, fill: black))#text(weight: 600)[C1. 새 구간의 첫 경우]
+#text(weight: 600)[C1. 새 구간의 첫 경우]
 ]
 
 미래의 블록

@@ -9,7 +9,7 @@
  * ⚠ 글꼴 이름: Overleaf에 깔린 이름은 "Noto Serif CJK KR"이다(Google Fonts판 "Noto Serif KR"이 아니다, v2 E10).
  *   둘 다 없으면 TeX Live 기본 UnBatang으로 떨어진다.
  * ⚠ amsmath는 `[fleqn]`으로 **한 번만** 부른다 — 옵션 없이 한 번 더 부르면 Option clash(v2 E11).
- * 알고 두는 것: 코칭 아이콘(D31)·경우 dot(Q14)은 .tex에 없다 — PDF(Typst) 전용 장식이다.
+ * 알고 두는 것: 코칭 아이콘(D31)은 .tex에 없다 — PDF(Typst) 전용 장식이다(경우 dot은 70c에서 PDF에서도 뺐다).
  */
 
 import { imageWidthPt, choiceColumns, PX_TO_PT, INDENT_EM, STROKE_MM, FRAMED_INSET_MM, tabTitle } from './layout';
@@ -55,7 +55,8 @@ export const LATEX_PREAMBLE = [
   '\\setlength{\\parskip}{6pt}',
   // 70c G — 상자 선은 가늘게 · 안쪽 여백은 넉넉히(PDF와 같은 값 — layout.ts)
   `\\setlength{\\FrameRule}{${STROKE_MM.framed}mm}`,
-  `\\setlength{\\FrameSep}{${FRAMED_INSET_MM.y}mm}`,
+  // ⚠ framed의 FrameSep은 상하좌우 한 값이라 좌우(x)에 맞춘다 — PDF의 위아래 7mm는 .tex에 없다(A4 원고용)
+  `\\setlength{\\FrameSep}{${FRAMED_INSET_MM.x}mm}`,
   '\\renewenvironment{leftbar}{\\def\\FrameCommand{\\vrule width 0.3mm \\hspace{1em}}\\MakeFramed{\\advance\\hsize-\\width \\FrameRestore}}{\\endMakeFramed}',
 ].join('\n');
 

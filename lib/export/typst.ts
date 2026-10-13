@@ -15,7 +15,7 @@
 
 import {
   BODY_PT, TYPST_LEADING_EM, CSS_GAP_PT, typstGap, HEADING_PT, HEADING_WEIGHT, TAB_TITLE, tabTitle, INDENT_EM,
-  STROKE_MM, FRAMED_INSET_MM, WEIGHT, CASE_DOT, CHOICES, TABLE, CIRCLED_SCALE, CASES_GAP_EM,
+  STROKE_MM, FRAMED_INSET_MM, WEIGHT, CHOICES, TABLE, CIRCLED_SCALE, CASES_GAP_EM,
   SUNEUNG_PAGE, TRACKING_EM, WORD_SPACING_PCT, TYPST_TOP_EDGE, TYPST_BOTTOM_EDGE, imageWidthPt, PX_TO_PT, HEADING_ABOVE_EM,
 } from './layout';
 import type { ExportDoc, ExportBlock, Flow, Inline } from './ir';
@@ -225,12 +225,9 @@ class TypstWriter {
       case 'case': {
         const parts: string[] = [];
         if (b.title) {
-          const dotEm = b.variant === 'sub' ? CASE_DOT.subEm : CASE_DOT.topEm;
-          const r = dotEm / 2;
-          // 지름 0.44em(하위 0.26em) 원을 거터 −1.2em에 — 세로는 첫 행의 x-높이 가운데(시작값, 실물 ⑧로 확정)
-          const dot = `#place(top + left, dx: ${CASE_DOT.xEm - r}em, dy: ${Math.round((CASE_DOT.centerFromTopEm - r) * 100) / 100}em, circle(radius: ${r}em, fill: black))`;
+          // 70c — 거터 dot 없음(가운데 괘선과 붙어 보였다 · layout.ts 주석). 번호 + 굵기만
           const label = b.label ? `${escTyp(b.label)}. ` : '';
-          parts.push(`${dot}#text(weight: ${WEIGHT.caseTitle})[${label}${this.inline(b.title)}]`);
+          parts.push(`#text(weight: ${WEIGHT.caseTitle})[${label}${this.inline(b.title)}]`);
         }
         const body = this.flows(b.body);
         if (body) parts.push(body);

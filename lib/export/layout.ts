@@ -89,8 +89,8 @@ export const STROKE_MM = {
   hr: 0.1,             // hr #999
 } as const;
 
-/** 테두리 상자 안쪽 여백(mm) — 70c: 위아래를 넉넉히(템플릿 조건 상자 3.5mm · 옛 6pt 8pt) */
-export const FRAMED_INSET_MM = { y: 3.5, x: 3.5 } as const;
+/** 테두리 상자 안쪽 여백(mm) — 70c: 좌우 3.5(템플릿 조건 상자) · 위아래 7(덕수 피드백 2 — 3.5의 2배) */
+export const FRAMED_INSET_MM = { y: 7, x: 3.5 } as const;
 
 /** 마커·라벨 굵기 */
 export const WEIGHT = {
@@ -102,12 +102,10 @@ export const WEIGHT = {
   choiceLabel: 400,    // 선택지 라벨
 } as const;
 
-/**
- * 경우 dot(Q14 — dot만): 거터 −0.9em · 지름 0.44em(하위 0.26em) · 검정.
- * xEm: 옛 인쇄 −1.2em은 70c 양식의 가운데 세로 괘선(단 간격 11mm의 한가운데 ≈ 15.6pt)에 dot이 닿았다(오른쪽 단, PNG 확인) → −0.9em(≈10.4pt).
- * centerFromTopEm = 제목행 첫 줄 상자 위끝에서 dot 중심까지(줄 상자가 ascender부터라 cap-height 시절 0.38em보다 깊다 — PNG로 확인)
+/*
+ * 경우 dot은 PDF에 없다(70c 덕수 피드백 2 — rail처럼 제거). 오른쪽 단에서 거터의 dot이 가운데 세로 괘선과 붙어 보였다
+ * (−1.2em은 닿았고 −0.9em도 가까워 보였다). 경우는 제목행의 'C1.' 번호 + 굵기만으로 표시한다 — .tex와 같다.
  */
-export const CASE_DOT = { xEm: -0.9, topEm: 0.44, subEm: 0.26, centerFromTopEm: 0.78 } as const;
 
 /** 선택지 — 1~3개 3열 · 4~5개 5열(한 항목이라도 5열 칸을 넘으면 3열 — 70c F) · 열 간격 8pt · 라벨↔내용 0.5em · 세로 가운데 */
 export const CHOICES = { columnGapPt: 8, labelGapEm: 0.5, rowGapEm: 0.8 } as const;
