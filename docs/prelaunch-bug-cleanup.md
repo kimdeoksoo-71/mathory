@@ -194,3 +194,22 @@ document.addEventListener('scroll', (e) => {
 `.cm-scroller`가 찍히면 프로브와 실물이 갈리는 지점을 파고, 그 밖의 요소가 찍히면 그것이 범인이다.
 **요소를 특정하기 전의 처방은 전부 추측이다.** 상세는
 `docs/phasedocs/Phase65 편집창 줄바꿈 끄기·블록 내 가로 스크롤 v2 실행판.md` §9-4′ ②.
+
+---
+
+## 9. 렌더 전처리의 `\[`·`\(` 정규식에 뒤돌아보기가 없다 (Phase 70 v4 R10 · 2026-10-13 발견)
+
+**증상(잠재)**: 행바꿈 인수 `\\[4pt]`의 `\[`를 display 수식의 **여는 구분자**로 읽을 수 있다. 같은 블록 뒤쪽에 `\]`가
+있으면 그 사이 전체가 `$$…$$`로 바뀌어 조판이 깨진다. Phase 68 행 Enter·정돈 R5가 `\\[4pt]`류를 만든다.
+
+**위치**: 렌더 사본 두 벌 `lib/preprocess.ts:134`(인쇄) · `components/editor/EditorPreview.tsx:198`(화면) — 그리고 수식 **보호**
+정규식도 같다(`EditorPreview.tsx:105` · `lib/locale.ts` `protectMath`).
+**고친 판**: `lib/chatExtract.ts:142` `normalizeMathDelimiters`(`(?<!\\)` — 61a C6). 내보내기(Phase 70 `lib/export/prepare.ts`)는 이미
+고친 판을 쓴다 — 갈리는 문항은 **화면이 틀린 것**이다.
+**처방 후보**: 렌더 두 벌과 보호 정규식에 같은 뒤돌아보기. 실데이터에 `\\[` 다음 `\]`가 같은 블록에 오는 문항이 있는지 먼저 세어 볼 것.
+
+## 10. 사이드바 '최근 문항' ⋮ 'MD 다운로드'는 문제·풀이 탭만 내보낸다 (Phase 70 v4 J4 · 2026-10-13 확인)
+
+`AppShell.tsx:66` `downloadMarkdown`이 `question_blocks`·`solution_blocks`만 읽어 **추가 탭('AI 풀이' 등)을 버린다**. 진입은
+`Sidebar.tsx:651` 최근 문항 ⋮(`ContextMenu` 기본 항목) 하나이고 `listRecentProblems`가 본인 문항만이라 **누출 문제는 아니다**.
+ProblemView의 '내보내기… → Markdown'(Phase 70a — 선택 탭 전부)과 결과가 다르다. 처방 후보: 그 메뉴 항목을 내보내기 다이얼로그로 잇거나 같은 직렬화로.

@@ -28,3 +28,6 @@ public/icons/phosphor/
 
 # Phase 69 정리 — 끝난 Phase의 작업물(계획 초안·원 스케치·검수 스크린샷) 로컬 보관. 공개 레포라 커밋하지 않는다
 docs/phaseSketch/_archive/
+
+# Phase 70 N3′ — 수능 템플릿 원본 판(실제 수능 문항 sample·KICE 지면 캡처 compare-*.png 포함). 참고본은 docs/reference/suneung-typst-v1/
+docs/phaseSketch/suneung-template-v1/
