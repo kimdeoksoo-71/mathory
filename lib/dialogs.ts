@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    개선묶음 M2 A — 다이얼로그 모듈 싱글턴 (D3′)
 
-   네이티브 `alert`/`confirm`/`prompt`를 대체한다. 호출부는 React 밖(`lib/pdfPrint.tsx`)
+   네이티브 `alert`/`confirm`/`prompt`를 대체한다. 호출부는 React 밖(옛 `lib/pdfPrint.tsx` — Phase 70b 철거)
    에도 있으므로 훅이 아니라 **모듈 싱글턴 + Promise**여야 한다.
 
    ⚠ 이 파일은 React를 import하지 않는다 — 상태만 들고 `DialogHost`가 구독한다.

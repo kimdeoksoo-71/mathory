@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    Phase 58 P2 — key sentence 톤 시스템 판정 로직
    렌더 사이트 5곳(EditorView 미리보기 · ProblemView · FolderView ·
-   ProblemTabContent · PrintableContent)이 공유한다.
+   ProblemTabContent · 옛 PrintableContent — Phase 70b 철거 · 내보내기 lib/export/ir)이 공유한다.
 
    설계 요지 (Phase 58 D9·D13 + Phase 59a 기본화):
    - 강조 마커는 인라인 `**` **하나뿐**이다. 들여쓰기(callout) 블록은 위치만 담당하는

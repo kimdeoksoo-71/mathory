@@ -2,7 +2,7 @@
    Phase 59 — '경우(case)' 블록 공용 로직
 
    렌더 사이트 5곳(EditorView 미리보기 · ProblemView · FolderView ·
-   ProblemTabContent · PrintableContent)이 전부 이 모듈을 쓴다.
+   ProblemTabContent · 옛 PrintableContent — Phase 70b 철거 · 내보내기 lib/export/ir)이 전부 이 모듈을 쓴다.
 
    설계 요지 (v4 D9·D9′·D10·D15):
    - 첫 줄 = 제목행(조건), 둘째 줄부터 본문. 번호는 raw_text에 넣지 않는다.

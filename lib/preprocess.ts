@@ -6,8 +6,9 @@
  * 2. preprocessLocale() — 로케일 변환 (수식 태그, 열거, 그림/표 라벨, \ref{})
  * 3. preprocessMath() — 수식 문법 변환 (\tag{} → \tag*{}, \ref{} → \text{}, bare \\ → array)
  * 
- * 이 파이프라인은 PrintableContent에서 사용됩니다.
- * (EditorPreview는 자체 인라인 전처리를 사용)
+ * ⚠ Phase 70b — 이 파일을 쓰던 CSS 인쇄(PrintableContent)는 철거됐다. 화면은 EditorPreview 인라인 사본이 그린다.
+ *   남은 소비처: normalizeDisplayMathSpacing(저장 — lib/blocks/normalize) · preventSetextHeadings(내보내기 prepare) ·
+ *   `preprocess()` 전체는 `test:exportir` P0-9가 **렌더 기준 경로**로 쓴다(내보내기와 mdast 구조 동치 검사).
  */
 
 import {

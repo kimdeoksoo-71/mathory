@@ -60,7 +60,6 @@ import SvgViewer from '../viewer/SvgViewer';
 import GgbViewer from '../viewer/GgbViewer';
 import ImageTypeSelectModal, { ImageMediaKind } from './ImageTypeSelectModal';
 import { computeContentHash } from '../../lib/copyright';
-import '../print/PrintStyles.css';
 import useSnippets from '../../hooks/useSnippets';
 import useAuth from '../../hooks/useAuth';
 import { useDrawerResize } from '../../hooks/useDrawerResize';

@@ -1,5 +1,5 @@
 /**
- * M3 B2 — KaTeX 매크로 한 벌 (화면 EditorPreview · 인쇄 PrintableContent 공유).
+ * M3 B2 — KaTeX 매크로 한 벌 (화면 EditorPreview · 옛 인쇄 PrintableContent 공유 — 인쇄는 Phase 70b에서 철거, PDF는 Typst라 이 매크로를 안 쓴다).
  *
  * 정의 원천: `docs/phaseSketch/katex-frac-bar-and-vgap-v1.md` (KaTeX 0.16 로컬 검증,
  * 0.16.28 DOM 재검증 — M3 계획서 v3 §5). 분자·분모에 `\underline`/`\overline` 팬텀을

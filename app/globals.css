@@ -28,8 +28,8 @@
    ⚠ 전용 CSS 클래스가 없으므로(마크업을 만들지 않는 것이 이 방식의 요점) 크기를 조절할
      레버는 이 디스크립터 하나뿐이다. 글리프 아웃라인과 폰트 메트릭을 함께 스케일하므로
      라인박스 기여분까지 같이 줄어 vertical-align 수동 보정이 필요 없다.
-   ⚠ --font-print도 같은 family를 쓰므로 화면·인쇄가 함께 줄어든다(D11' — 의도된 것).
-     분리하려면 같은 src를 다른 family 이름으로 한 번 더 선언해야 한다.
+   (옛 --font-print도 같은 family였다 — Phase 70b에서 CSS 인쇄와 함께 삭제. PDF는 Typst가 Noto Serif KR 글리프를
+     0.88em으로 조판한다 — lib/export/layout.ts CIRCLED_SCALE)
    ⚠ 지원: Chrome 92+ / Firefox 92+ / Safari 17+. 미지원 브라우저는 이 줄을 무시할 뿐이라
      현행 크기가 유지된다(깨지지 않는다).
    ⚠ local() 폰트마다 원문자 글리프 크기가 달라 한 값이 기기별로 다르게 보인다.
@@ -161,7 +161,6 @@
   --font-logo: var(--font-ui);     /* 로고도 산스 통일 (명조 제거) */
   --font-content: var(--font-ui);  /* 화면 본문도 Pretendard (명조 → 산스) */
   --font-mono: 'D2Coding', 'JetBrains Mono', 'Menlo', 'Monaco', monospace;
-  --font-print: 'MathoryCircled', 'Noto Serif KR', 'Noto Serif CJK KR', 'Georgia', serif;  /* 인쇄·PDF 전용 */
 
   /* Weights — 3단계만 (700 금지).
      예외: 본문 heading(h1~h3)은 700을 쓴다 — Phase 58 D1''. EditorPreview 인라인 style. */
@@ -536,9 +535,8 @@ ol {
    import하는 덕에 "우연히" 앱 화면에도 걸려 있었다. 독립 공개 라우트(/shared·/p)는
    PrintStyles를 부르지 않아 규칙이 빠져 첫 줄이 0.8em 어긋났다 — 같은 스냅샷이
    "앱에서 열기"와 "새 탭"에서 다르게 보이던 원인이다.
-   → 화면은 여기가, 인쇄는 PrintStyles(.print-body 접두)가 소유한다.
-   ⚠ 인쇄 노드는 iframe이 아니라 document.body에 직접 붙는다(lib/pdfPrint.tsx) →
-     .preview-content 스코프가 없으면 이 규칙이 인쇄로 샌다.
+   → 화면은 여기가 소유한다. (옛 CSS 인쇄 PrintStyles는 Phase 70b에서 철거 — PDF는 Typst. 아래의
+     `.preview-content` 스코프는 그때 인쇄 노드가 같은 document에 붙던 시절의 처방이고, 지금도 무해하다)
    ⚠ min-width는 반드시 아래 p 내어쓰기 폭과 같은 값이어야 한다. 어긋나면 첫 줄
      본문 시작점과 랩 라인이 그 차이만큼 벌어진다.
    ⚠ text-indent: 0 — p의 내어쓰기(-2.5em)가 inline-block 안쪽 첫 줄에 다시 적용되는
@@ -1126,11 +1124,11 @@ p:has(.marker-circled) {
      여닫이라는 사실은 role="button" + aria-expanded와 톤·dot이 나른다. */
 
 /* ═══ Phase 57 P5 — 원문자(①~⑳)
-   구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui/--font-print 스택 한 줄이 전부다.
+   구현은 파일 상단 @font-face 'MathoryCircled' + --font-ui 스택 한 줄이 전부다(옛 --font-print는 Phase 70b에서 삭제).
    전용 CSS 클래스가 없는 것이 이 방식의 요점 — 마크업을 만들지 않는다.
    → 크기 조절도 여기가 아니라 @font-face의 size-adjust로 한다 (Phase 58 P5).
      p:has(.marker-circled)의 2em 내어쓰기는 고정값이므로, 원문자를 많이 줄이면
-     마커와 본문 사이가 벌어진다 — 화면·인쇄(PrintStyles) 두 곳을 1:1로 볼 것.
+     마커와 본문 사이가 벌어진다 — 화면과 PDF(Typst, lib/export/layout.ts INDENT_EM) 두 곳을 1:1로 볼 것.
 
    ⚠ 지난 시도(합성 원문자: 숫자를 inline-block span으로 감싸고 CSS로 원을 그림)는 실패했다.
      p:has(.marker-circled)의 text-indent: -2em(아래 참조)이 inline-block 안쪽 첫 줄에도
