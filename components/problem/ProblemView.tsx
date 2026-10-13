@@ -18,7 +18,6 @@ import { useDrawerResize } from '../../hooks/useDrawerResize';
 import { panelKey, readPanel, updatePanel, getPanelWidth, setPanelWidth } from '../../lib/panelStore';
 import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import { DRAWER_INSET, DRAWER_RADIUS, DRAWER_BORDER, DRAWER_ROW1_H, PANEL_WIDTH_DEFAULT, PANEL_WIDTH_MIN } from '../ui/dialogStyles';
-import { printProblemPdf, PdfPrintTab } from '../../lib/pdfPrint';
 import ShareSettingsPanel from '../share/ShareSettingsPanel';
 import CommentPanel from '../comment/CommentPanel';
 import { buildReportMarkdown } from '../comment/VerifyReportCard';
@@ -37,7 +36,6 @@ import {
   IconDocLines,
   IconChevron, IconChevronLeft, IconComment, IconTextWidth, IconAgent,
 } from '../ui/Icons';
-import { alertDialog } from '../../lib/dialogs';
 import SizeStepper, { FontSizeGlyph } from '../ui/SizeStepper';
 
 /* FONT_SIZE_* 5종은 Phase 64 D12에서 lib/constants.ts로 이관 — 폰 ⋯ 시트와 공유(값 무변경) */
@@ -518,32 +516,6 @@ export default function ProblemView({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  /* ─── PDF ─── */
-  const handlePdfConfirm = async (selectedTabIds: string[]) => {
-    if (!problem) return;
-    try {
-      const tabs = problem.tabs || DEFAULT_TABS;
-      const printTabs: PdfPrintTab[] = tabs
-        .filter((t) => selectedTabIds.includes(t.id))
-        .map((t) => ({
-          id: t.id,          // Phase 58 P2 — 인쇄 톤 스코프 판정용
-          label: t.label,
-          blocks: (problem.tabBlocks[t.id] || []).map((b) => ({
-            id: b.id, type: b.type, raw_text: b.raw_text, imageWidth: b.imageWidth,
-            imageTreatment: b.imageTreatment, imageGray: b.imageGray,
-            svg_initial_view: b.svg_initial_view, svg_height: b.svg_height,
-            ggb_initial_coords: b.ggb_initial_coords, ggb_height: b.ggb_height,
-          })),
-        }));
-      await printProblemPdf({ title: problem.title, tabs: printTabs });
-    } catch (e) {
-      console.error('PDF 생성 오류:', e);
-      await alertDialog('PDF 생성 중 오류가 발생했습니다.');
-    } finally {
-      setExportOpen(false);
-    }
   };
 
   if (loading) {
@@ -1268,7 +1240,6 @@ export default function ProblemView({
         title={problem.title}
         tabs={tabs}
         tabBlocks={problem.tabBlocks}
-        onPdf={handlePdfConfirm}
         onMarkdown={handleDownloadMarkdown}
       />
 

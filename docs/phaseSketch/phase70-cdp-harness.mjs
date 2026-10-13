@@ -46,7 +46,7 @@ const clickText = (sel, text) => ev(`(() => { const el = [...document.querySelec
 const pickFormat = (label) => clickText('[role=dialog] label', label);
 const confirm = () => ev(`(() => { const b = [...document.querySelectorAll('[role=dialog] button')].pop(); b.click(); return b.textContent; })()`);
 const dialogText = () => ev(`document.querySelector('[role=dialog]')?.innerText ?? ''`);
-async function waitFile(pred, ms = 20000) {
+async function waitFile(pred, ms = 60000) {
   for (let t = 0; t < ms; t += 200) { const f = readdirSync(dl).filter((n) => !n.endsWith('.crdownload')).find(pred); if (f) { await sleep(200); return join(dl, f); } await sleep(200); }
   return null;
 }
@@ -54,6 +54,28 @@ const clearDl = () => readdirSync(dl).forEach((f) => rmSync(join(dl, f)));
 
 // ① 기본 형식 PDF · 추가 형식 접힘
 check('① 기본 형식 PDF 선택 · 추가 형식 접힘', await ev(`(() => { const r = [...document.querySelectorAll('[role=dialog] input[type=radio]')]; return r.length === 2 && r[0].checked; })()`));
+
+// ⑬~⑯ PDF — Typst 컴파일(70b). 첫 실행 = wasm·글꼴 받기(P0-2) · 두 번째 = 캐시
+async function pdfRun(label) {
+  clearDl();
+  await ev(`document.getElementById('reopen').click(); 1`); await sleep(200);
+  await pickFormat('PDF');
+  const t0 = Date.now();
+  await confirm();
+  const f = await waitFile((n) => n.endsWith('.pdf'), 120000);
+  const ms = Date.now() - t0;
+  const bytes = f ? readFileSync(f) : null;
+  check(`${label} PDF 다운로드(${(ms / 1000).toFixed(1)}초)`, !!bytes && bytes.subarray(0, 5).toString() === '%PDF-' && bytes.length > 10000, f ?? 'no file');
+  return { ms, f };
+}
+const cold = await pdfRun('⑬ 첫');
+check('⑭ D28 — 미지원 수식 안내가 다이얼로그에', (await dialogText()).includes('변환하지 못한 수식 1개'));
+await clickText('[role=dialog] button', '닫기');
+const warm = await pdfRun('⑮ 두 번째');
+check('⑯ P0-2 — 첫 ≤ 15초 · 두 번째 ≤ 3초', cold.ms <= 15000 && warm.ms <= 3000, `첫 ${cold.ms}ms · 두 번째 ${warm.ms}ms`);
+if (warm.f) require('node:fs').copyFileSync(warm.f, join(ROOT, '.test-build/export-dev70b.pdf'));
+await clickText('[role=dialog] button', '닫기'); await ev(`document.getElementById('reopen').click(); 1`); await sleep(200);
+clearDl();
 
 // ② Typst .typ — zip(그림 있음)
 await clickText('[role=dialog] button', '추가 형식');
@@ -119,11 +141,7 @@ await ev(`(() => { const l = [...document.querySelectorAll('[role=dialog] label'
 await confirm(); await sleep(200);
 check('⑫ Markdown — 선택 탭만 콜백으로(Q15)', JSON.stringify(await ev('window.__h70.md')) === JSON.stringify([['question']]));
 
-// ⑬ PDF — 기존 경로 콜백
-await ev(`document.getElementById('reopen').click(); 1`); await sleep(200);
-await pickFormat('PDF');
-await confirm(); await sleep(300);
-check('⑬ PDF — 기존 인쇄 콜백(탭 전체 기본 선택)', JSON.stringify(await ev('window.__h70.pdf')) === JSON.stringify([['question', 'solution']]));
+
 
 const fail = results.filter((r) => !r.ok).length;
 console.log(`\n${results.length - fail}/${results.length} 통과`);

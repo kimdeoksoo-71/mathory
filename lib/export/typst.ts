@@ -180,7 +180,9 @@ class TypstWriter {
     if (!latex.replace(/\\displaystyle/g, '').trim()) return null;
     const src = quadCases(normalizeEnvsForMitex(latex));
     const { failed } = this.nextMath(src, display);
-    if (failed) return display ? `math-fail(${typStr(latex)}, block: true)` : `math-fail(${typStr(latex)})`;
+    // 상자에는 사용자가 쓴 원문만 — 우리가 주입한 앞머리 `\\displaystyle`(D9)은 뗀다
+    const shown = latex.replace(/^\\displaystyle\s*/, '');
+    if (failed) return display ? `math-fail(${typStr(shown)}, block: true)` : `math-fail(${typStr(shown)})`;
     return display ? `mitex(${typStr(src)})` : `mi(${typStr(src)})`;
   }
 

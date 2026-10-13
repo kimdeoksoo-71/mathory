@@ -31,6 +31,7 @@ $$
 $$`),
     b('s2', 'svg', '/icons/phosphor/2.1.1/regular/acorn.svg', { svg_height: 120 } as Partial<Block>),
     b('s3', 'text', '<img src="/does-not-exist.png" width="200" />'),
+    b('s4', 'text', R`정상 $x^2$ 그리고 미지원 $\textcircled{1}$ 끝`),
   ],
 };
 
@@ -59,7 +60,6 @@ export default function Dev70() {
         title="표본: 미적분 #21"
         tabs={tabs}
         tabBlocks={tabBlocks}
-        onPdf={async (ids) => { window.__h70.pdf.push(ids); setOpen(false); }}
         onMarkdown={(ids) => { window.__h70.md.push(ids); }}
       />
     </div>

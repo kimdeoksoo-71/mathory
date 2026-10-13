@@ -50,17 +50,20 @@ interface ExportDialogProps {
   /** 멤버 가시성 필터 뒤의 탭 */
   tabs: TabMeta[];
   tabBlocks: Record<string, Block[]>;
-  /** PDF(70a = 기존 CSS 인쇄) */
-  onPdf: (tabIds: string[]) => Promise<void>;
   /** Markdown(기존 원문 이어붙임) */
   onMarkdown: (tabIds: string[]) => void;
 }
 
-export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, onPdf, onMarkdown }: ExportDialogProps) {
+const STAGE_LABEL: Record<string, string> = {
+  compiler: '조판기 불러오는 중…', fonts: '글꼴 받는 중…', typeset: '조판 중…', isolate: '수식 점검 중…',
+};
+
+export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, onMarkdown }: ExportDialogProps) {
   const [format, setFormat] = useState<ExportFormat>('pdf');
   const [extraOpen, setExtraOpen] = useState(false);
   const [selection, setSelection] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
+  const [stage, setStage] = useState<string | null>(null);
   const [message, setMessage] = useState<{ kind: 'error' | 'info'; text: string } | null>(null);
 
   useEffect(() => {
@@ -84,7 +87,7 @@ export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, on
   if (!open) return null;
 
   const selectedIds = tabs.filter((t) => selection[t.id]).map((t) => t.id);
-  const confirmLabel = busy ? '준비 중…' : format === 'overleaf' ? '열기' : '다운로드';
+  const confirmLabel = busy ? (stage ? STAGE_LABEL[stage] ?? '준비 중…' : '준비 중…') : format === 'overleaf' ? '열기' : '다운로드';
 
   const pick = (f: ExportFormat) => { setFormat(f); saveFormat(f); setMessage(null); };
 
@@ -92,11 +95,6 @@ export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, on
     if (busy || selectedIds.length === 0) return;
     setMessage(null);
     if (format === 'md') { onMarkdown(selectedIds); onClose(); return; }
-    if (format === 'pdf') {
-      setBusy(true);
-      try { await onPdf(selectedIds); } finally { setBusy(false); }
-      return;
-    }
     // Overleaf: await 전에 창을 확보한다(사용자 활성)
     const win = format === 'overleaf' ? reserveOverleafWindow() : null;
     setBusy(true);
@@ -106,7 +104,7 @@ export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, on
         title,
         tabs: tabs.filter((t) => selection[t.id]).map((t) => ({ id: t.id, label: t.label, blocks: tabBlocks[t.id] || [] })),
       };
-      const res = await runFileExport(format, src, { overleafTarget: win ? OVERLEAF_WINDOW : '_blank' });
+      const res = await runFileExport(format, src, { overleafTarget: win ? OVERLEAF_WINDOW : '_blank', onStage: setStage });
       if (res.notices.length) setMessage({ kind: 'info', text: res.notices.join('\n') });
       else onClose();
     } catch (e) {
@@ -115,6 +113,7 @@ export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, on
       setMessage({ kind: 'error', text: `내보내기에 실패했습니다 — ${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setBusy(false);
+      setStage(null);
     }
   };
 
