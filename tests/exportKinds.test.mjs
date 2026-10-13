@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { BLOCK_KIND, kindOf, FALLBACK_KIND } from '../.test-build/lib/export/blockKinds.js';
 import {
   imageWidthPt, typstGap, typstColumnWidthMm, latexTextWidthMm, choiceColumns,
-  TYPST_LEADING_PT, CSS_GAP_PT,
+  TYPST_LEADING_PT, CSS_GAP_PT, GAP_SCALE, tabTitle, BODY_PT,
 } from '../.test-build/lib/export/layout.js';
 
 function unionTypes() {
@@ -60,25 +60,33 @@ test('K5 미지의 type → para 폴백 + known=false', () => {
   assert.equal(kindOf('choices').known, true);
 });
 
-test('L1 열 폭 — Typst A3 2단 123.5mm · LaTeX A4 1단 170mm', () => {
-  assert.equal(typstColumnWidthMm(), 123.5);
+test('L1 열 폭 — 수능 양식 A3 2단 112mm(70c) · LaTeX A4 1단 170mm', () => {
+  assert.equal(typstColumnWidthMm(), 112);
   assert.equal(latexTextWidthMm(), 170);
 });
 
 test('L2 그림 폭(D20) = min(px × 0.75, 열 폭 × 0.9)', () => {
-  assert.equal(imageWidthPt(400, 'typst'), 300);
-  assert.equal(imageWidthPt(undefined, 'typst'), 300, '기본 400px');
-  assert.equal(imageWidthPt(0, 'typst'), 300, '0·음수는 기본값');
-  assert.equal(imageWidthPt(600, 'typst'), 315.07, 'Typst 상한 111.15mm');
-  assert.equal(imageWidthPt(900, 'typst'), 315.07, '600px 상한이 먼저');
+  assert.equal(imageWidthPt(300, 'typst'), 225);
+  assert.equal(imageWidthPt(400, 'typst'), 285.73, '열 폭 112mm × 0.9 = 100.8mm 상한');
+  assert.equal(imageWidthPt(undefined, 'typst'), 285.73, '기본 400px');
+  assert.equal(imageWidthPt(0, 'typst'), 285.73, '0·음수는 기본값');
+  assert.equal(imageWidthPt(900, 'typst'), 285.73, '600px 상한이 먼저');
   assert.equal(imageWidthPt(600, 'latex'), 433.7, 'LaTeX 상한 153mm');
   assert.equal(imageWidthPt(200, 'latex'), 150);
 });
 
-test('L3 세로 간격 변환(D26) — 문단 사이 = leading + 6pt = 15.7pt', () => {
-  assert.equal(TYPST_LEADING_PT, 9.7);
-  assert.equal(typstGap(CSS_GAP_PT.paragraph), 15.7);
-  assert.equal(typstGap(CSS_GAP_PT.display), 20.7);
+test('L3 세로 간격 변환(D26·70c D) — CSS × 1.15 + leading(0.69em × 11.5pt)', () => {
+  assert.equal(BODY_PT, 11.5);
+  assert.ok(Math.abs(GAP_SCALE - 1.15) < 1e-9);
+  assert.ok(Math.abs(TYPST_LEADING_PT - 7.935) < 1e-9);
+  assert.ok(Math.abs(typstGap(CSS_GAP_PT.paragraph) - 14.84) < 0.011);
+  assert.ok(Math.abs(typstGap(CSS_GAP_PT.display) - 20.59) < 0.011);
+});
+
+test('L5 탭 제목(70c C) — 문제 · 해설 · 그 밖은 이름 그대로', () => {
+  assert.equal(tabTitle('question', '문제'), '문제');
+  assert.equal(tabTitle('solution', '풀이'), '해설');
+  assert.equal(tabTitle('extra_1', 'AI 풀이'), 'AI 풀이');
 });
 
 test('L4 선택지 열 수 — 1~3개 3열 · 4~5개 5열', () => {

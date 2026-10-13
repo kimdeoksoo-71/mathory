@@ -14,9 +14,9 @@
  */
 
 import {
-  BODY_PT, TYPST_LEADING_EM, CSS_GAP_PT, typstGap, HEADING_PT, HEADING_WEIGHT, TAB_LABEL, INDENT_EM,
-  STROKE_MM, FRAMED_INSET_PT, WEIGHT, CASE_DOT, CHOICES, choiceColumns, TABLE, CIRCLED_SCALE, CASES_GAP_EM,
-  TYPST_PAGE, imageWidthPt, PX_TO_PT, HEADING_ABOVE_EM,
+  BODY_PT, TYPST_LEADING_EM, CSS_GAP_PT, typstGap, HEADING_PT, HEADING_WEIGHT, TAB_TITLE, tabTitle, INDENT_EM,
+  STROKE_MM, FRAMED_INSET_MM, WEIGHT, CASE_DOT, CHOICES, TABLE, CIRCLED_SCALE, CASES_GAP_EM,
+  SUNEUNG_PAGE, TRACKING_EM, WORD_SPACING_PCT, TYPST_TOP_EDGE, TYPST_BOTTOM_EDGE, imageWidthPt, PX_TO_PT, HEADING_ABOVE_EM,
 } from './layout';
 import type { ExportDoc, ExportBlock, Flow, Inline } from './ir';
 import { PH } from '../../components/ui/phosphorPaths';
@@ -112,16 +112,32 @@ export function normalizeEnvsForMitex(latex: string): string {
 const COACH_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path fill="black" d="${PH.chatCenteredText}"/></svg>`;
 
 function header(mitexImport: string): string {
-  const p = TYPST_PAGE;
-  const blockGap = `${TYPST_LEADING_EM}em + ${CSS_GAP_PT.paragraph}pt`;
+  const p = SUNEUNG_PAGE;
+  const b = p.pageBox;
+  const paraGap = pt(typstGap(CSS_GAP_PT.paragraph));
   return [
     '// Mathory 내보내기 — Typst 0.14.2에서 검증 · 글꼴: Noto Serif KR(또는 Noto Serif CJK KR) · New Computer Modern Math',
+    '// 쪽: 수능 시험지 양식(머리말·글상자·확인 사항·저작권 문구 제외 · 모든 쪽 같은 규격) — Phase 70c',
     `#import ${typStr(mitexImport)}: mitex, mi`,
-    `#set page(paper: ${typStr(p.paper)}, margin: (top: ${p.marginYMm}mm, bottom: ${p.marginYMm}mm, x: ${p.marginXMm}mm), columns: ${p.columns})`,
+    `#set page(paper: ${typStr(p.paper)}, columns: ${p.columns},`,
+    `  margin: (left: ${p.sideMm}mm, right: ${p.sideMm}mm, top: ${p.bodyTopMm}mm, bottom: ${p.heightMm - p.bodyBottomMm}mm),`,
+    `  header: place(bottom, line(length: 100%, stroke: ${p.ruleWMm}mm + black)),`,
+    `  header-ascent: ${p.bodyTopMm - p.ruleYMm}mm,`,
+    `  footer: context {`,
+    `    let n = counter(page).get().first(); let t = counter(page).final().first()`,
+    `    place(center + top, dy: ${b.dyMm}mm, box(width: ${b.wMm}mm, height: ${b.hMm}mm, stroke: ${b.strokeMm}mm + black, {`,
+    `      place(line(start: (0mm, ${b.hMm}mm), end: (${b.wMm}mm, 0mm), stroke: ${b.strokeMm}mm + black))`,
+    `      place(top + left, dx: ${b.padXMm}mm, dy: ${b.padYMm}mm, text(size: ${b.pt}pt, tracking: 0em, str(n)))`,
+    `      place(bottom + right, dx: -${b.padXMm}mm, dy: -${b.padYMm}mm, text(size: ${b.pt}pt, tracking: 0em, str(t)))`,
+    `    }))`,
+    `  },`,
+    `  footer-descent: 0mm,`,
+    `  background: place(top + left, dx: 50%, dy: ${p.ruleYMm}mm, line(angle: 90deg, length: ${p.bodyBottomMm - p.ruleYMm}mm, stroke: ${p.colRuleWMm}mm + black)),`,
+    `)`,
     `#set columns(gutter: ${p.gutterMm}mm)`,
-    `#set text(font: ("Noto Serif KR", "Noto Serif CJK KR"), size: ${BODY_PT}pt, lang: "ko")`,
-    `#set par(leading: ${TYPST_LEADING_EM}em, spacing: ${blockGap}, justify: false)`,
-    `#set block(spacing: ${blockGap})`,
+    `#set text(font: ("Noto Serif KR", "Noto Serif CJK KR"), size: ${BODY_PT}pt, lang: "ko", region: "KR", tracking: ${TRACKING_EM}em, spacing: ${WORD_SPACING_PCT}%, top-edge: ${typStr(TYPST_TOP_EDGE)}, bottom-edge: ${typStr(TYPST_BOTTOM_EDGE)})`,
+    `#set par(leading: ${TYPST_LEADING_EM}em, spacing: ${paraGap}, justify: false)`,
+    `#set block(spacing: ${paraGap})`,
     '#set smartquote(enabled: false)',
     // D21 — 한글이 든 **어절 전체**(붙은 숫자·괄호·조사 포함)를 묶는다 = CSS keep-all. `[\p{Hangul}]+`만 묶으면 `[4점]`이 `[4`/`점]`으로 끊겼다(실측)
     '#show regex("[^\\s]*\\p{Hangul}[^\\s]*"): it => box(it)',
@@ -140,6 +156,16 @@ function header(mitexImport: string): string {
     `#let coach-icon = box(image(bytes(${typStr(COACH_SVG)}), format: "svg", height: 1.1em), baseline: 0.15em)`,
     `#let math-fail(src, block: false) = { let b = box(stroke: ${STROKE_MM.framed}mm, inset: (x: 2pt, y: 1pt), text(size: 0.85em, raw(src))); if block { pad(left: ${INDENT_EM.display}em, [⚠ #b]) } else { [⚠#b] } }`,
     `#let ph-box(label) = block(width: 100%, height: 3em, stroke: (paint: luma(150), thickness: 0.5pt, dash: "dashed"), align(center + horizon, text(fill: luma(90), label)))`,
+    // 70c F — 1~3개 3열 · 4~5개 5열, 단 한 항목이라도 5열 칸을 넘으면 3열(3+2). 라벨·내용 2칸 grid 세로 가운데(D29)
+    `#let choice-cell(l, c) = grid(columns: (auto, 1fr), column-gutter: ${CHOICES.labelGapEm}em, align: horizon, l, c)`,
+    `#let choices(..ps) = layout(size => {`,
+    `  let items = ps.pos()`,
+    `  let g = ${CHOICES.columnGapPt}pt`,
+    `  let w5 = (size.width - 4 * g) / 5`,
+    `  let fits = items.all(p => measure(box[#p.at(0)#h(${CHOICES.labelGapEm}em)#p.at(1)]).width <= w5)`,
+    `  let cols = if items.len() <= 3 { 3 } else if fits { 5 } else { 3 }`,
+    `  grid(columns: (1fr,) * cols, column-gutter: g, row-gutter: ${CHOICES.rowGapEm}em, ..items.map(p => choice-cell(p.at(0), p.at(1))))`,
+    `})`,
     '',
   ].join('\n');
 }
@@ -156,7 +182,7 @@ class TypstWriter {
       this.tone = tab.tone;
       if (i > 0) parts.push('#colbreak()');
       parts.push(
-        `#block(width: 100%, inset: (bottom: ${TAB_LABEL.padBelowPt}pt), stroke: (bottom: ${TAB_LABEL.ruleMm}mm + rgb(${typStr(TAB_LABEL.ruleColor)})), below: ${gap(CSS_GAP_PT.tabLabelBelow)})[#text(size: ${TAB_LABEL.pt}pt, weight: ${TAB_LABEL.weight})[${escTyp(tab.label)}]]`,
+        `#block(below: ${TAB_TITLE.belowPt}pt)[#text(size: ${TAB_TITLE.pt}pt, weight: ${TAB_TITLE.weight})[${escTyp(tabTitle(tab.id, tab.label))}]]`,
         '',
       );
       for (const b of tab.blocks) {
@@ -202,7 +228,7 @@ class TypstWriter {
           const dotEm = b.variant === 'sub' ? CASE_DOT.subEm : CASE_DOT.topEm;
           const r = dotEm / 2;
           // 지름 0.44em(하위 0.26em) 원을 거터 −1.2em에 — 세로는 첫 행의 x-높이 가운데(시작값, 실물 ⑧로 확정)
-          const dot = `#place(top + left, dx: ${CASE_DOT.xEm - r}em, dy: ${Math.round((0.38 - r) * 100) / 100}em, circle(radius: ${r}em, fill: black))`;
+          const dot = `#place(top + left, dx: ${CASE_DOT.xEm - r}em, dy: ${Math.round((CASE_DOT.centerFromTopEm - r) * 100) / 100}em, circle(radius: ${r}em, fill: black))`;
           const label = b.label ? `${escTyp(b.label)}. ` : '';
           parts.push(`${dot}#text(weight: ${WEIGHT.caseTitle})[${label}${this.inline(b.title)}]`);
         }
@@ -213,10 +239,8 @@ class TypstWriter {
       case 'framed':
         return this.framed(this.flows(b.body), CSS_GAP_PT.framed);
       case 'choices': {
-        const cols = choiceColumns(b.items.length);
-        const cells = b.items.map((it) =>
-          `grid(columns: (auto, 1fr), column-gutter: ${CHOICES.labelGapEm}em, align: horizon, [${escTyp(it.label)}], [${this.inline(it.inline)}])`);
-        return `#block(above: ${gap(CSS_GAP_PT.choices)}, below: ${gap(CSS_GAP_PT.choices)}, grid(columns: (1fr,) * ${cols}, column-gutter: ${CHOICES.columnGapPt}pt, row-gutter: 0.8em, ${cells.join(', ')}))`;
+        const pairs = b.items.map((it) => `([${escTyp(it.label)}], [${this.inline(it.inline)}])`);
+        return `#block(width: 100%, above: ${gap(CSS_GAP_PT.choices)}, below: ${gap(CSS_GAP_PT.choices)}, choices(${pairs.join(', ')}${pairs.length === 1 ? ',' : ''}))`;
       }
       case 'figure':
         return this.figure(b);
@@ -224,7 +248,7 @@ class TypstWriter {
   }
 
   private framed(body: string, cssGap: number): string {
-    return `#block(width: 100%, stroke: ${STROKE_MM.framed}mm, inset: (x: ${FRAMED_INSET_PT.x}pt, y: ${FRAMED_INSET_PT.y}pt), above: ${gap(cssGap)}, below: ${gap(cssGap)}, breakable: true)[\n${body}\n]`;
+    return `#block(width: 100%, stroke: ${STROKE_MM.framed}mm, inset: (x: ${FRAMED_INSET_MM.x}mm, y: ${FRAMED_INSET_MM.y}mm), above: ${gap(cssGap)}, below: ${gap(cssGap)}, breakable: true)[\n${body}\n]`;
   }
 
   private figure(b: Extract<ExportBlock, { kind: 'figure' }>): string {
@@ -286,7 +310,7 @@ class TypstWriter {
         const cell = (c: Inline[] | undefined) => `[${c ? this.inline(c) : ''}]`;
         const head = Array.from({ length: n }, (_, i) => `table.cell(fill: rgb(${typStr(TABLE.headFill)}))[#text(weight: ${TABLE.headWeight})${cell(f.head[i])}]`).join(', ');
         const body = f.rows.map((r) => Array.from({ length: n }, (_, i) => cell(r[i])).join(', ')).join(',\n  ');
-        return `#block(above: ${gap(CSS_GAP_PT.table)}, below: ${gap(CSS_GAP_PT.table)}, text(size: ${TABLE.pt}pt, table(columns: (1fr,) * ${n}, align: (${align}${n === 1 ? ',' : ''}), stroke: ${STROKE_MM.tableCell}mm, inset: (x: ${TABLE.padXPt}pt, y: ${TABLE.padYPt}pt),\n  table.header(${head}),\n  ${body}${body ? ',' : ''}\n)))`;
+        return `#block(width: 100%, above: ${gap(CSS_GAP_PT.table)}, below: ${gap(CSS_GAP_PT.table)}, align(center, text(size: ${TABLE.pt}pt, table(columns: ${n}, align: (${align}${n === 1 ? ',' : ''}), stroke: ${STROKE_MM.tableCell}mm, inset: (x: ${TABLE.padXPt}pt, y: ${TABLE.padYPt}pt),\n  table.header(${head}),\n  ${body}${body ? ',' : ''}\n))))`;
       }
       case 'hr':
         return `#line(length: 100%, stroke: ${STROKE_MM.hr}mm + rgb("#999999"))`;

@@ -12,7 +12,7 @@
  * 알고 두는 것: 코칭 아이콘(D31)·경우 dot(Q14)은 .tex에 없다 — PDF(Typst) 전용 장식이다.
  */
 
-import { imageWidthPt, choiceColumns, PX_TO_PT, INDENT_EM } from './layout';
+import { imageWidthPt, choiceColumns, PX_TO_PT, INDENT_EM, STROKE_MM, FRAMED_INSET_MM, tabTitle } from './layout';
 import type { ExportDoc, ExportBlock, Flow, Inline } from './ir';
 
 export interface LatexOptions {
@@ -53,8 +53,9 @@ export const LATEX_PREAMBLE = [
   '\\renewcommand{\\arraystretch}{1.3}',
   '\\setlength{\\parindent}{0pt}',
   '\\setlength{\\parskip}{6pt}',
-  '\\setlength{\\FrameRule}{0.3mm}',
-  '\\setlength{\\FrameSep}{6pt}',
+  // 70c G — 상자 선은 가늘게 · 안쪽 여백은 넉넉히(PDF와 같은 값 — layout.ts)
+  `\\setlength{\\FrameRule}{${STROKE_MM.framed}mm}`,
+  `\\setlength{\\FrameSep}{${FRAMED_INSET_MM.y}mm}`,
   '\\renewenvironment{leftbar}{\\def\\FrameCommand{\\vrule width 0.3mm \\hspace{1em}}\\MakeFramed{\\advance\\hsize-\\width \\FrameRestore}}{\\endMakeFramed}',
 ].join('\n');
 
@@ -66,7 +67,7 @@ class LatexWriter {
   document(): string {
     const parts: string[] = [LATEX_PREAMBLE, '', '\\begin{document}', '', `\\section*{${escTex(this.doc.title)}}`, ''];
     for (const tab of this.doc.tabs) {
-      parts.push(`\\subsection*{${escTex(tab.label)}}`, '');
+      parts.push(`\\subsection*{${escTex(tabTitle(tab.id, tab.label))}}`, '');
       for (const b of tab.blocks) {
         const s = this.block(b);
         if (s) parts.push(s, '');
@@ -130,7 +131,7 @@ class LatexWriter {
       case 'p': {
         const text = this.inline(f.inline) + (f.tag ? `\\hfill\\mbox{${escTex(f.tag)}}` : '');
         if (!f.marker) return text;
-        const m = `\\textbf{${escTex(f.marker.text)}}`;
+        const m = escTex(f.marker.text);   // 70c E — 마커는 본문 굵기
         if (f.marker.kind === 'circled') {
           const w = INDENT_EM.circled; const left = INDENT_EM.circledRunLeft;
           return `\\noindent\\hangindent=${w + left}em\\hangafter=1\\hspace*{${left}em}\\makebox[${w}em][l]{${m}}${text}`;

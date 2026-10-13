@@ -51,6 +51,7 @@ test('X4 제목 \\section* · 탭 \\subsection* · 본문 제목은 한 단 아�
   const t = one('## STEP 1', 'heading');
   assert.ok(t.includes(R`\section*{t}`));
   assert.ok(t.includes(R`\subsection*{문제}`));
+  assert.ok(!t.includes('textbf{(가)}'));
   assert.ok(t.includes(R`\subsubsection*{STEP 1}`));
 });
 
@@ -60,10 +61,10 @@ test('X5 display \\tag → \\tag*{(n)} · rows → array{l} + 행마다 \\displa
   assert.ok(one(R`값이다. \tag{2}`).includes(R`값이다.\hfill\mbox{(2)}`));
 });
 
-test('X6 마커 — (가) 2.5em 내어쓰기 · ① 2em + 밭 왼쪽 1em', () => {
+test('X6 마커 — (가) 2.5em 내어쓰기 · ① 2em + 밭 왼쪽 1em · 본문 굵기(70c E)', () => {
   const t = one('(가) 첫째\n① 둘째');
-  assert.ok(t.includes(R`\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{(가)}}첫째`));
-  assert.ok(t.includes(R`\hangindent=3em\hangafter=1\hspace*{1em}\makebox[2em][l]{\textbf{①}}둘째`));
+  assert.ok(t.includes(R`\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{(가)}첫째`));
+  assert.ok(t.includes(R`\hangindent=3em\hangafter=1\hspace*{1em}\makebox[2em][l]{①}둘째`));
 });
 
 test('X7 선택지 4개 → 5열 · 빈 칸 채움', () => {
