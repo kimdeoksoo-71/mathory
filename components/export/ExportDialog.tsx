@@ -3,7 +3,7 @@
 /* ═══════════════════════════════════════════════════════════════
    Phase 70a — 내보내기 다이얼로그 (옛 PdfDialog 대체 · D17′)
 
-   형식: PDF(기본) · Markdown · ── 추가 형식 ▸(LaTeX .tex · Overleaf에서 열기 · Typst .typ) — D6
+   형식: PDF(기본) · Markdown · ── 추가 형식 ›(사이드바 chevron · LaTeX .tex · Overleaf에서 열기 · Typst .typ) — D6
    탭: 넘겨받은 tabs(멤버 가시성 필터 뒤)만 고른다 — 모든 형식이 선택 탭만 내보낸다(Q15).
 
    ⚠ 규격은 components/ui/dialogStyles(M2 A — 새 규격 금지). 옛 PdfDialog의 자체 스타일은 승계하지 않는다.
@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from 'react';
 import type { TabMeta, Block } from '../../types/problem';
-import { IconDownload } from '../ui/Icons';
+import { IconDownload, IconChevron } from '../ui/Icons';
 import { dialogOverlay, dialogBody, dialogHead, dialogContent, dialogFoot, dialogBtn } from '../ui/dialogStyles';
 import { reserveOverleafWindow, OVERLEAF_WINDOW } from '../../lib/export/overleaf';
 
@@ -149,7 +149,14 @@ export default function ExportDialog({ open, onClose, title, tabs, tabBlocks, on
               fontSize: 12.5, color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)',
             }}
           >
-            <span style={{ display: 'inline-block', transform: extraOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.15s' }}>▸</span>
+            {/* 사이드바 섹션 헤더(SidebarSectionHeader)와 같은 chevron — 14 · --text-muted · 열리면 90° */}
+            <span style={{
+              display: 'flex', color: 'var(--text-muted)',
+              transform: extraOpen ? 'rotate(90deg)' : 'rotate(0)',
+              transition: 'transform var(--transition-fast, .15s)',
+            }}>
+              <IconChevron size={14} />
+            </span>
             추가 형식
           </button>
           {extraOpen ? <div style={{ paddingLeft: 18 }}>{EXTRA_FORMATS.map((f) => radio(f.id, f.label, f.hint))}</div> : null}
