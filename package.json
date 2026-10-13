@@ -39,6 +39,7 @@
     "test:peek": "tsc lib/sidebarPeek.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/sidebarPeek.test.mjs",
     "test:imekey": "tsc lib/imeKey.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/imeKey.test.mjs",
     "test:mathpaste": "tsc lib/mathPaste.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/mathPaste.test.mjs",
+    "test:exportkinds": "tsc lib/export/blockKinds.ts lib/export/layout.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportKinds.test.mjs",
     "test:ink": "tsc lib/ink/strokes.ts lib/ink/view.ts lib/ink/payload.ts lib/ink/presence.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ink.test.mjs"
   },
   "dependencies": {
