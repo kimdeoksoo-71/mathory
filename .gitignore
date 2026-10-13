@@ -34,3 +34,6 @@ docs/phaseSketch/suneung-template-v1/
 
 # Phase 70 Stage 0 — 덕수 문항 원문 덤프(임시 덤프 페이지 산출물). 커밋 금지
 docs/phaseSketch/mathory-dump.json
+
+# Phase 70b — Typst 웹 컴파일러 wasm(28MB · export:assets가 node_modules에서 복사 · 레포 무커밋)
+public/typst/*.wasm
