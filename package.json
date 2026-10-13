@@ -43,6 +43,7 @@
     "test:exportir": "tsc lib/export/ir.ts lib/preprocess.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportIr.test.mjs",
     "test:exportlatex": "tsc lib/export/ir.ts lib/export/latex.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportLatex.test.mjs",
     "test:exporttypst": "tsc lib/export/ir.ts lib/export/typst.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportTypst.test.mjs",
+    "test:exportassets": "tsc lib/export/ir.ts lib/export/assets.ts lib/export/overleaf.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck --lib es2022,dom && node --test tests/exportAssets.test.mjs",
     "test:ink": "tsc lib/ink/strokes.ts lib/ink/view.ts lib/ink/payload.ts lib/ink/presence.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ink.test.mjs"
   },
   "dependencies": {
@@ -60,6 +61,7 @@
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
     "dompurify": "^3.4.6",
+    "fflate": "0.8.3",
     "firebase": "^12.9.0",
     "google-auth-library": "^11.0.2",
     "katex": "^0.16.28",
