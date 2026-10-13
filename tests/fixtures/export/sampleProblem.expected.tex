@@ -1,0 +1,128 @@
+% Mathory 내보내기 — XeLaTeX(Overleaf: Compiler = XeLaTeX)
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=20mm]{geometry}
+\usepackage{kotex}
+\usepackage[fleqn]{amsmath}
+\usepackage{amssymb,graphicx,framed,tabularx,changepage,array}
+\setlength{\mathindent}{2em}
+\IfFontExistsTF{Noto Serif CJK KR}{\setmainfont{Noto Serif CJK KR}\setmainhangulfont{Noto Serif CJK KR}}
+  {\IfFontExistsTF{Noto Serif KR}{\setmainfont{Noto Serif KR}\setmainhangulfont{Noto Serif KR}}
+  {\setmainhangulfont{UnBatang}}}
+\renewcommand{\arraystretch}{1.3}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+\setlength{\FrameRule}{0.3mm}
+\setlength{\FrameSep}{6pt}
+\renewenvironment{leftbar}{\def\FrameCommand{\vrule width 0.3mm \hspace{1em}}\MakeFramed{\advance\hsize-\width \FrameRestore}}{\endMakeFramed}
+
+\begin{document}
+
+\section*{표본 문항: 미적분 \#21}
+
+\subsection*{문제}
+
+함수 $\displaystyle f(x)=\frac{x^2+1}{x}$에 대하여 다음 조건을 만족시키는 실수 $\displaystyle a$의 값을 구하시오. [4점]
+
+\begin{framed}
+\noindent\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{(가)}}$\displaystyle \lim_{x \to 0+} f(x) = \infty$
+
+\noindent\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{(나)}}모든 실수 $\displaystyle x$에 대하여 $\displaystyle f(x) \ge 2$이다.
+\end{framed}
+
+\begin{framed}
+\noindent\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{ㄱ.}}$\displaystyle f(1)=2$
+
+\noindent\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{ㄴ.}}$\displaystyle f$는 연속이다.
+
+\noindent\hangindent=2.5em\hangafter=1\makebox[2.5em][l]{\textbf{ㄷ.}}[그림3]을 참고하라.
+\end{framed}
+
+\begin{center}
+\includegraphics[width=270pt]{figures/fig-1-gray.png}
+\end{center}
+
+\noindent\begin{tabularx}{\linewidth}{@{}*{5}{X}@{}}
+①\ $\displaystyle 1$ & ②\ $\displaystyle \sqrt{3}$ & ③\ $\displaystyle \dfrac{3}{8}$ & ⑤\ $\displaystyle -\dfrac{3\sqrt{10}}{10}$ & 
+\end{tabularx}
+
+\subsection*{풀이}
+
+\subsubsection*{STEP 1}
+
+\begin{equation*}
+f(x) = x + \frac{1}{x}
+\tag*{(1)}
+\end{equation*}
+
+산술·기하평균에 의하여 $\displaystyle f(x) \ge 2$이다.\hfill\mbox{(2)}
+
+\noindent\textbf{C1.\ $\displaystyle x>0$인 경우}\par
+
+\begin{equation*}
+\begin{cases} x+1 & (x<1) \\ x^2 & (x \ge 1) \end{cases}
+\end{equation*}
+
+\par\begin{center}\includegraphics[width=225pt]{figures/fig-1.png}\end{center}\par 
+
+이어서 \textbf{C1}에서 구한 값을 (1)에 대입한다.
+
+\noindent\textbf{C1a.\ $\displaystyle x=1$일 때}\par
+
+값은 $\displaystyle \text{(2)}$와 같다.
+
+\begin{leftbar}
+\textbf{Tip}\par
+$\displaystyle x>0$ 조건을 빠뜨리지 말 것.
+\end{leftbar}
+
+\begin{adjustwidth}{2em}{0pt}
+$\displaystyle a=1$
+
+$\displaystyle b=2$
+
+$\displaystyle c=3$
+\end{adjustwidth}
+
+\begin{equation*}
+\begin{array}{l}
+\displaystyle a = 1 \\
+\displaystyle b = 2
+\end{array}
+\end{equation*}
+
+\begin{center}
+\begin{tabular}{|l|c|r|}
+\hline
+\textbf{$\displaystyle x$} & \textbf{1} & \textbf{2} \\ \hline
+$\displaystyle P(X=x)$ & $\displaystyle \frac{1}{3}$ & $\displaystyle \frac{2}{3}$ \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{center}
+\fbox{GeoGebra — 화면에서 확인}
+\end{center}
+
+\begin{center}
+\includegraphics[height=180pt,width=\linewidth,keepaspectratio]{figures/fig-2.png}
+\end{center}
+
+\begin{center}
+\fbox{GeoGebra — 화면에서 확인}
+\end{center}
+
+\subsubsection*{STEP 2}
+
+\noindent\textbf{C1.\ 새 구간의 첫 경우}\par
+
+미래의 블록
+
+\begin{itemize}
+\item 첫째
+\item 둘째
+\end{itemize}
+
+\noindent\hangindent=3em\hangafter=1\hspace*{1em}\makebox[2em][l]{\textbf{①}}하나
+
+\noindent\hangindent=3em\hangafter=1\hspace*{1em}\makebox[2em][l]{\textbf{②}}둘
+
+\end{document}

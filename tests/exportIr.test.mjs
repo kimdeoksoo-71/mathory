@@ -181,7 +181,7 @@ test('S3 표본 — 그림 등록(같은 URL 한 번) · 폭·회색·svg 높이
   const img = doc.tabs[0].blocks[3];
   assert.deepEqual(img, { kind: 'figure', variant: 'image', ref: 'fig-1', widthPx: 360, frame: false, gray: true });
   const inlineImg = doc.tabs[1].blocks[3].body[0].inline[0];
-  assert.deepEqual(inlineImg, { t: 'img', ref: 'fig-1' });
+  assert.deepEqual(inlineImg, { t: 'img', ref: 'fig-1', widthPx: 300 });
   const [svg, ggb] = doc.tabs[1].blocks.filter((b) => b.kind === 'figure');
   assert.deepEqual(svg, { kind: 'figure', variant: 'svg', ref: 'fig-2', heightPx: 240 });
   assert.deepEqual(ggb, { kind: 'figure', variant: 'ggb' });

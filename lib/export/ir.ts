@@ -85,7 +85,7 @@ export type Inline =
   | { t: 'code'; text: string }
   | { t: 'br' }
   | { t: 'caseRef'; text: string }
-  | { t: 'img'; ref: string };
+  | { t: 'img'; ref: string; widthPx?: number };   // widthPx = <img width="N"> 속성(없으면 직렬화기 기본값)
 
 export interface ExportInputBlock {
   id: string;
@@ -296,7 +296,8 @@ class Builder {
     for (const m of trimmed.matchAll(IMG_SRC_RE)) {
       const before = stripTags(trimmed.slice(last, m.index));
       if (before.trim()) out.push({ t: 'text', text: before });
-      out.push({ t: 'img', ref: this.registerFigure(m[1]) });
+      const w = /\bwidth\s*=\s*"(\d+)"/i.exec(m[0]);
+      out.push(w ? { t: 'img', ref: this.registerFigure(m[1]), widthPx: parseInt(w[1], 10) } : { t: 'img', ref: this.registerFigure(m[1]) });
       last = (m.index ?? 0) + m[0].length;
     }
     const rest = stripTags(trimmed.slice(last));
