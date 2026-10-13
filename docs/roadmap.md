@@ -2171,6 +2171,27 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 70: 내보내기 1단계(IR · LaTeX · Typst · 인쇄 엔진 교체) ✅ 구현 (2026-10-13) · 70a·70b · 로직 테스트 내보내기 5종 60 · headless CDP 16/16 · Stage 0 P0-1 시트+덤프 6,507문항 · 수식 203,969 · 실패 문항 0.1% · **덕수 Overleaf·다이얼로그·멤버 탭 확인** · 70b 실물 검수 대기
+
+계획서: `docs/phasedocs/Phase70 내보내기 1단계(IR·LaTeX·Typst) v4 착수판.md` (§11 구현 기록 · 70a 커밋 1~8 · 70b 커밋 1~5) · Stage 0 `docs/phaseSketch/phase70-stage0.md`
+(계보: 타당성 검토 v1 web → 이슈 문서 → 결정 D1~D6 → v1 web → v2 CLI(레포·Typst 실측) → v3 web → v4 CLI 착수판(판정 P1′~Q21 · N1~N8 · N3′ 전부 확정) → 구현)
+
+| 항목 | 70 뒤 |
+|---|---|
+| 진입 | 문항 ⋮ **'내보내기…'** 하나(옛 PDF·MD 두 항목) — 형식 PDF·Markdown + '추가 형식'(LaTeX .tex · Overleaf에서 열기 · Typst .typ) · 마지막 형식 기억 · **선택 탭 = 가시 탭만**(멤버 숨김 탭 누출 닫힘) |
+| 구조 | IR(`lib/export/ir.ts` — 렌더와 같은 remark 파서 주입) + 직렬화기 둘(latex A4 1단 · typst A3 2단 = 옛 인쇄 규격) · 블록 kind 매핑표(17 type → 8 kind) |
+| PDF | **브라우저 Typst 컴파일**(typst.ts 0.7.0 = Typst 0.14.2 · mitex 0.2.7) → 파일 다운로드 · 글꼴 3종(Noto Serif KR R/B · NewCMMath) SHA-256 고정 · 변환 못 한 수식만 원문 상자(D28) |
+| 레거시 | `lib/pdfPrint.tsx` · `components/print/`(PrintableContent·PrintStyles·PdfDownloadButton) · `--font-print` **철거** — 렌더 사이트 5 → 4 |
+
+**서버 0 · Firestore 규칙 0 · Storage 규칙 0 · 스키마 0 · raw_text 0 · 저장 경로 0.** 의존성 +3(`fflate` · `@myriaddreamin/typst.ts` · `typst-ts-web-compiler`) · devDependency +1(`typst-ts-node-compiler` — 테스트가 실제 컴파일) · 정적 자산 mitex 벤더링 · wasm은 `export:assets`(gitignore) · 글꼴은 jsDelivr(레포 무커밋).
+
+- **계획서 왕복이 잡은 것**: IR 자체 스캐너의 근거 둘이 사실과 달랐다 → 렌더 파서 주입 · mitex `\tag` 무음 삭제 · `calc.min(길이, %)` 오류 · Overleaf 글꼴 이름 · **mitex 미지원 명령 하나가 문서 전체를 죽인다** · v2 display 정렬 규칙이 가운데로 섰다(진단 0만 봤다)
+- **구현이 잡은 것**: 인라인 `#식` 뒤 `(가)`를 호출로 읽음(`;`) · `[4점]`이 끊김(어절 전체 regex) · Mathory 행 환경 13종을 mitex가 모름(동치 환경) · 빈 수식·빈 행이 문서를 죽임 · typst.ts 루트 import가 렌더러 peer를 끌고 옴 · 패키지 레지스트리가 동기 XHR
+- **수능 시험지 템플릿 참고본**: `docs/reference/suneung-typst-v1/`(시험지 조립 Phase의 출발점)
+- 남은 일: 70b 실물 검수 ⑤~⑪ · 배포 환경 wasm 전송 크기 · prelaunch 9(렌더 `\[` 뒤돌아보기)·10(사이드바 MD 추가 탭)
+
+---
+
 ## Phase 69: iPad 필기 보조 입력(`/ink`) ✅ 구현 (2026-10-10) · 규칙 테스트 73/73 · test:ink 22(압축본 포함) · headless CDP 캔버스 18/18 · 카드 22/22 · 규칙 배포·push 완료 · **덕수 iPad 실물 확인("잘 작동")**
 
 계획서: `docs/phasedocs/Phase69 iPad 필기 보조 입력(ink) v4 착수판.md` (§13 구현 기록 · 커밋 S1~S7)
