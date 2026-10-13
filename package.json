@@ -44,7 +44,7 @@
     "test:exportkinds": "tsc lib/export/blockKinds.ts lib/export/layout.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportKinds.test.mjs",
     "test:exportir": "tsc lib/export/ir.ts lib/preprocess.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportIr.test.mjs",
     "test:exportlatex": "tsc lib/export/ir.ts lib/export/latex.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportLatex.test.mjs",
-    "test:exporttypst": "tsc lib/export/ir.ts lib/export/typst.ts lib/mathInput.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportTypst.test.mjs",
+    "test:exporttypst": "tsc lib/export/ir.ts lib/export/typst.ts lib/export/isolate.ts lib/mathInput.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/exportTypst.test.mjs",
     "test:exportassets": "tsc lib/export/ir.ts lib/export/assets.ts lib/export/overleaf.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck --lib es2022,dom && node --test tests/exportAssets.test.mjs",
     "test:ink": "tsc lib/ink/strokes.ts lib/ink/view.ts lib/ink/payload.ts lib/ink/presence.ts --outDir .test-build --rootDir . --module commonjs --target es2022 --moduleResolution node --skipLibCheck && node --test tests/ink.test.mjs"
   },

@@ -160,3 +160,31 @@ test('Y10 빈 수식·빈 행 — 문서 전체를 죽이지 않는다(Stage 0 �
   assert.ok(out.source.includes(R`\\displaystyle {}`), '빈 행은 {}');
   assert.deepEqual(compile(out.source).errors, []);
 });
+
+test('Y11 D28 격리 — 이분 탐색이 실패 수식만 정확히 찾는다(실제 컴파일)', { skip: skipNoFonts }, async () => {
+  const { findFailingFormulas, probeSource } = await import('../.test-build/lib/export/isolate.js');
+  const raw = R`$a$ $\textcircled{1}$ $b$ $c$ $d$ $\foo{x}$ $e$ $f$ $g$`;
+  const out = typ({ title: 't', tabs: [{ id: 'question', label: '문제', blocks: [{ id: 'x', type: 'text', raw_text: raw }] }] });
+  assert.equal(out.formulas.length, 9);
+  let probes = 0;
+  const res = await findFailingFormulas(out.formulas, async (subset) => {
+    probes += 1;
+    return compile(probeSource(subset, MITEX, typStr)).errors.length > 0;
+  });
+  assert.deepEqual(res.failed.map((f) => f.latex), [R`\displaystyle \textcircled{1}`, R`\displaystyle \foo{x}`]);
+  assert.equal(res.probes, probes);
+  assert.ok(probes <= 1 + 2 * 2 * Math.ceil(Math.log2(9)), `프로브 ${probes}회`);
+  const fixed = typ({ title: 't', tabs: [{ id: 'question', label: '문제', blocks: [{ id: 'x', type: 'text', raw_text: raw }] }] },
+    { failedMath: new Set(res.failed.map((f) => f.id)) });
+  assert.deepEqual(compile(fixed.source).errors, []);
+});
+
+test('Y12 compile.ts 상수 — wasm 버전 = 설치본 · 글꼴 해시 = 테스트 글꼴(같은 고정 커밋)', async () => {
+  const src = readFileSync(new URL('../lib/export/compile.ts', import.meta.url), 'utf8');
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(/TYPST_TS_VERSION = '([^']+)'/.exec(src)[1], pkg.dependencies['@myriaddreamin/typst-ts-web-compiler']);
+  assert.equal(pkg.dependencies['@myriaddreamin/typst.ts'], pkg.devDependencies['@myriaddreamin/typst-ts-node-compiler'], '브라우저·테스트 엔진 같은 판');
+  const { NOTO_COMMIT, NOTO_FILES } = await import('./helpers/exportFonts.mjs');
+  assert.ok(src.includes(NOTO_COMMIT));
+  for (const h of Object.values(NOTO_FILES)) assert.ok(src.includes(h), h);
+});
