@@ -518,7 +518,8 @@ ProblemView ⋮ '내보내기…' 하나로 PDF·Markdown·LaTeX(.tex)·Overleaf
 - **계획서 왕복이 잡은 것**: v1 IR 자체 스캐너의 근거 둘(ESM 하니스·`mathRegions`)이 사실과 달랐다 → 렌더와 같은 파서 주입 · `calc.min(길이, %)` 컴파일 오류 · mitex `\tag` 무음 삭제 · Overleaf 글꼴 이름 · amsmath 옵션 충돌 · mitex 미지원 명령 하나가 문서 전체를 죽인다(v4) · v2의 display 정렬 규칙이 가운데로 섰다(v4 — 진단 0만 보고 모양을 안 봤다)
 - **구현이 잡은 것(v4 §11 기록 대상)**: ① 인라인 `#식` 뒤 괄호가 호출로 읽힌다 → `;` ② `[\p{Hangul}]+`가 `[4점]`을 끊었다 → 어절 전체 regex ③ mitex가 Mathory 행 환경 13종을 모른다 → `normalizeEnvsForMitex` ④ Data_DS 시트는 0행(처리 후 비움) → 프로브 기본 Stack ⑤ `PdfDialog`는 70a에서 즉시 죽은 코드 → 삭제(계획은 70b) ⑥ mitex 벤더링을 70b-1에서 70a-4로(컴파일 테스트) ⑦ 표본 fixture를 JSON 대신 `String.raw` .mjs ⑧ 본문 `<img width>` 폭을 IR이 버리고 있었다
 - 알고 두는 것: .tex는 코칭 아이콘·경우 dot 없음(PDF 전용 장식) · dcases 칸 display 꼴·별표 행렬 열 정렬 인수 손실 · 70a의 .typ는 실패 수식 검증이 없다(70b부터 같은 격리 경로)
-- ⚠ 남은 일: **(나) Mathory 덤프**(덕수 — 임시 페이지 `app/dev70-dump`에서 내려받기 → `npm run probe:export`) · **P0-7 Overleaf**(덕수 — 앱의 '내보내기… → Overleaf에서 열기') · 70a 실물 검수 ①~④ · 70b
+- **Stage 0 · 실물(2026-10-13)**: (나) Mathory 덤프 761문항 · 대표 13문항 전부 실패 0(빈 수식·빈 행 처리 후속 `1360e54`) · **P0-7 Overleaf 깨끗하게 컴파일 · 어절 단위 줄바꿈 정상**(덕수) · 실물 ③ 형식 기억·접힘 · ④ 멤버에게 공유된 탭만 내보내기 — 정상(덕수)
+- ⚠ 남은 일: 70b(브라우저 Typst 컴파일 · 폰트 · PDF 교체 · 레거시 인쇄 철거) · push(덕수)
 
 ### 이전: **Phase 69 — iPad 필기 보조 입력(`/ink`)** — 구현 완료(2026-10-10) · S1~S7 + 실물 후속 3 · 규칙 테스트 **73/73** · `test:ink` **22**(압축본 포함) · headless CDP 캔버스 **18/18** · 카드 **22/22** · 프로덕션 빌드 통과 · **규칙 배포·push 완료(덕수)** · **덕수 iPad 실물 확인(2026-10-10 — "잘 작동", 입력·핀치 정상 · 구분선 15% "딱 좋아")**
 
