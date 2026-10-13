@@ -77,6 +77,8 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5",
     "viem": "^2.48.8"
   },
   "devDependencies": {
@@ -86,9 +88,7 @@
     "@types/node": "^20.0.0",
     "@types/react": "^18.0.0",
     "@types/react-dom": "^18.0.0",
-    "remark-parse": "^11.0.0",
     "remark-rehype": "^11.1.2",
-    "typescript": "^5.0.0",
-    "unified": "^11.0.5"
+    "typescript": "^5.0.0"
   }
 }

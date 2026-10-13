@@ -10,7 +10,7 @@ import {
   FONT_SIZE_KEY, FONT_SIZE_DEFAULT, FONT_SIZE_MIN, FONT_SIZE_MAX, FONT_SIZE_STEP,
 } from '../../lib/constants';
 import TabBody, { LABEL_GAP_EM, CARD_PAD_L_EM, CARD_PAD_R_EM, CARD_RADIUS_QUESTION } from './TabBody';
-import PdfDialog from './PdfDialog';
+import ExportDialog from '../export/ExportDialog';
 import CopyrightPanel from './CopyrightPanel';
 import BlockchainBadge from '../ui/BlockchainBadge';
 import useAuth from '../../hooks/useAuth';
@@ -177,7 +177,8 @@ export default function ProblemView({
   /** Phase 61b: 리포트 지적 → 블록 스크롤 대상 */
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const [copiedTab, setCopiedTab] = useState<string | null>(null);
-  const [pdfOpen, setPdfOpen] = useState(false);
+  /* Phase 70a — 'PDF 다운로드'·'MD 다운로드' 두 항목을 '내보내기…' 하나로(D17′) */
+  const [exportOpen, setExportOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   // Phase 40: 폴더 라벨 hover 시 상위 폴더 경로 펼침
   // 레이아웃 폭은 절대 불변(라벨 박스 7em 고정) → 제목은 transform 슬라이드, 경로는 absolute 오버레이.
@@ -242,7 +243,6 @@ export default function ProblemView({
     [allComments, commentSessionId],
   );
   const agentCount = useMemo(() => countAgentSessions(sessions), [sessions]);
-  const [isPrinting, setIsPrinting] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
   /* Phase 62 D16(결정 2) — 댓글·agent 패널이 열려 있는 동안 우측 단은 존재하지 않는다.
      패널(min 360)이 단(max 360)을 완전히 덮어, 남겨 두면 보이지 않는 열과 그 위에 뜨는
@@ -494,10 +494,12 @@ export default function ProblemView({
     }
   };
 
-  /* ─── MD 다운로드 ─── */
-  const handleDownloadMarkdown = () => {
+  /* ─── MD 다운로드 ───
+     Phase 70a Q15 — 내보내기 다이얼로그가 넘긴 탭(멤버 가시성 필터 뒤의 선택 탭)만. 옛 동작은 problem.tabs
+     전체를 돌아 멤버에게 숨긴 탭까지 내보냈다. */
+  const handleDownloadMarkdown = (selectedTabIds: string[]) => {
     if (!problem) return;
-    const tabs = problem.tabs || DEFAULT_TABS;
+    const tabs = (problem.tabs || DEFAULT_TABS).filter((t) => selectedTabIds.includes(t.id));
     let md = `# ${problem.title}\n\n`;
     for (const tab of tabs) {
       const blocks = problem.tabBlocks[tab.id] || [];
@@ -521,7 +523,6 @@ export default function ProblemView({
   /* ─── PDF ─── */
   const handlePdfConfirm = async (selectedTabIds: string[]) => {
     if (!problem) return;
-    setIsPrinting(true);
     try {
       const tabs = problem.tabs || DEFAULT_TABS;
       const printTabs: PdfPrintTab[] = tabs
@@ -541,8 +542,7 @@ export default function ProblemView({
       console.error('PDF 생성 오류:', e);
       await alertDialog('PDF 생성 중 오류가 발생했습니다.');
     } finally {
-      setTimeout(() => setIsPrinting(false), 1200);
-      setPdfOpen(false);
+      setExportOpen(false);
     }
   };
 
@@ -611,15 +611,13 @@ export default function ProblemView({
   const menuItems: MenuItem[] = isOwnerView ? [
     { label: '편집', icon: <IconEdit size={14} />, action: () => onEdit?.(problem) },
     { label: '사본 만들기', icon: <IconCopy size={14} />, action: () => onDuplicate?.(problem) },
-    { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
-    { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
+    { label: '내보내기…', icon: <IconDownload size={14} />, action: () => setExportOpen(true) },
     { label: '휴지통', icon: <IconTrash size={14} />, action: () => onTrash?.(problem), danger: true },
     { label: 'spacer', icon: null, action: () => {}, kind: 'spacer' },
     { label: '공유', icon: <IconShare size={14} />, action: () => setShareOpen((v) => !v), kind: 'share' },
   ] : [
     // 멤버 / 공유받은 사용자: 편집 관련 메뉴 제거. 다운로드는 허용.
-    { label: 'PDF 다운로드', icon: <IconDownload size={14} />, action: () => setPdfOpen(true) },
-    { label: 'MD 다운로드', icon: <IconDownload size={14} />, action: handleDownloadMarkdown },
+    { label: '내보내기…', icon: <IconDownload size={14} />, action: () => setExportOpen(true) },
   ];
 
 
@@ -1264,12 +1262,14 @@ export default function ProblemView({
       </div>}
       </div>
 
-      <PdfDialog
-        open={pdfOpen}
-        onClose={() => setPdfOpen(false)}
+      <ExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        title={problem.title}
         tabs={tabs}
-        onConfirm={handlePdfConfirm}
-        isPrinting={isPrinting}
+        tabBlocks={problem.tabBlocks}
+        onPdf={handlePdfConfirm}
+        onMarkdown={handleDownloadMarkdown}
       />
 
       {/* 댓글/agent 패널 — 우측 슬라이드 */}
