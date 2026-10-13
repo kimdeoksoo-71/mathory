@@ -31,3 +31,6 @@ docs/phaseSketch/_archive/
 
 # Phase 70 N3′ — 수능 템플릿 원본 판(실제 수능 문항 sample·KICE 지면 캡처 compare-*.png 포함). 참고본은 docs/reference/suneung-typst-v1/
 docs/phaseSketch/suneung-template-v1/
+
+# Phase 70 Stage 0 — 덕수 문항 원문 덤프(임시 덤프 페이지 산출물). 커밋 금지
+docs/phaseSketch/mathory-dump.json

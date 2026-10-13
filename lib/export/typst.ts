@@ -174,8 +174,10 @@ class TypstWriter {
     return { id, failed: !!this.opts.failedMath?.has(id) };
   }
 
-  /** 수식 하나 → mitex 호출(또는 실패 상자) */
-  private mathCall(latex: string, display: boolean): string {
+  /** 수식 하나 → mitex 호출(또는 실패 상자). 내용이 비면 null — mitex는 `\\displaystyle`뿐인 수식에서
+   *  "cannot calculate sum of empty array"로 문서 전체를 죽인다(Stage 0 덤프 실측). 화면 KaTeX도 아무것도 안 그린다 */
+  private mathCall(latex: string, display: boolean): string | null {
+    if (!latex.replace(/\\displaystyle/g, '').trim()) return null;
     const src = quadCases(normalizeEnvsForMitex(latex));
     const { failed } = this.nextMath(src, display);
     if (failed) return display ? `math-fail(${typStr(latex)}, block: true)` : `math-fail(${typStr(latex)})`;
@@ -261,8 +263,11 @@ class TypstWriter {
         return `#heading(level: ${lv}, outlined: false)[${body}]`;
       }
       case 'display': {
-        const latex = f.rows ? `\\begin{array}{l}${f.rows.map((r) => `\\displaystyle ${r}`).join(' \\\\ ')}\\end{array}` : f.latex;
-        const call = `#${this.mathCall(latex, true)}`;
+        // 빈 행(`\\\\ \\\\`)은 `{}`로 — 행은 화면처럼 남기되 mitex의 빈 행 오류를 피한다(Stage 0 덤프 실측)
+        const latex = f.rows ? `\\begin{array}{l}${f.rows.map((r) => `\\displaystyle ${r.trim() || '{}'}`).join(' \\\\ ')}\\end{array}` : f.latex;
+        const m = this.mathCall(latex, true);
+        if (!m) return f.tag ? this.tagged('', f.tag) : '';
+        const call = `#${m}`;
         return f.tag ? this.tagged(call, f.tag) : call;
       }
       case 'ul':
@@ -295,7 +300,7 @@ class TypstWriter {
       switch (x.t) {
         case 'text': return escTyp(x.text);
         // ⚠ 인라인 `#식` 끝의 `;`는 식을 닫는다 — 없으면 뒤 글자 `(가)`·`[`·`.`을 Typst가 호출·인자·필드로 이어 읽는다
-        case 'math': return `#${this.mathCall(inlineLatex(x.latex, x.textStyle), false)};`;
+        case 'math': { const m = this.mathCall(inlineLatex(x.latex, x.textStyle), false); return m ? `#${m};` : ''; }
         case 'strong': return `#strong[${this.inline(x.inline)}];`;
         case 'em': return `#emph[${this.inline(x.inline)}];`;
         case 'code': return `#raw(${typStr(x.text)});`;

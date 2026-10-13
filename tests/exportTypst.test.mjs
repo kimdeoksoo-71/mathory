@@ -149,3 +149,14 @@ test('Y9 Mathory 행 환경(ROW_ENVS) 전부가 mitex를 통과한다 — 모르
   assert.equal(normalizeEnvsForMitex(R`\begin{Vmatrix} a \end{Vmatrix}`), R`\left\| \begin{matrix} a \end{matrix} \right\|`);
   assert.equal(normalizeEnvsForMitex(R`\begin{pmatrix*}[r] 1 \end{pmatrix*}`), R`\begin{pmatrix} 1 \end{pmatrix}`);
 });
+
+test('Y10 빈 수식·빈 행 — 문서 전체를 죽이지 않는다(Stage 0 덤프 실측)', { skip: skipNoFonts }, () => {
+  const out = typ({ title: 't', tabs: [{ id: 'question', label: '문제', blocks: [
+    { id: 'a', type: 'text', raw_text: '빈 인라인 $ $ 와 정상 $x$' },
+    { id: 'b', type: 'text', raw_text: '$$\na = 1 \\\\\\\\\nb = 2\n$$' },
+    { id: 'c', type: 'text', raw_text: '$$\n\\tag{3}\n$$' },
+  ] }] });
+  assert.ok(!out.source.includes('#mi("\\\\displaystyle ");'), '빈 인라인은 내지 않는다');
+  assert.ok(out.source.includes(R`\\displaystyle {}`), '빈 행은 {}');
+  assert.deepEqual(compile(out.source).errors, []);
+});
