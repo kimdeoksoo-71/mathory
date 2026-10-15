@@ -244,13 +244,16 @@ class Writer {
       }
       case 'table': {
         const cols = Math.max(f.head.length, ...f.rows.map((r) => r.length), 1);
-        const total = Math.round(ctx.width * (ctx.inBox ? 0.85 : 0.9));
-        const w = Math.floor(total / cols);
-        const cellCtx: Ctx = { ...ctx, place: 'Normal', marker: 'Normal', lead: false, width: w };
+        const cap = Math.round(ctx.width * (ctx.inBox ? 0.85 : 0.9));
+        const cellCtx: Ctx = { ...ctx, place: 'Normal', marker: 'Normal', lead: false, width: Math.floor(cap / cols) };
         const cell = (c: Inline[] | undefined, head: boolean) => [this.para('Normal', this.runs(c ?? [], 'Normal', cellCtx, head ? { bold: true } : {}))];
         const rows = [f.head.map((c) => cell(c, true)), ...f.rows.map((r) => Array.from({ length: cols }, (_, i) => cell(r[i], false)))];
         if (rows[0].length < cols) rows[0].push(...Array.from({ length: cols - rows[0].length }, () => cell([], true)));
-        const tbl: Item = { k: 'tbl', rows, colWidths: Array(cols).fill(w), outerFill: this.hb.borderFill('outer'), cellFill: this.hb.borderFill('cell'), headRows: 1 };
+        // 열 폭 = 그 열에서 가장 넓은 칸의 내용 + 셀 안쪽 여백(510 × 2) + 여유 — 단 폭 90%를 넘을 때만 비율대로 줄인다(덕수 2026-10-15)
+        const need = Array.from({ length: cols }, (_, c) => Math.max(...rows.map((r) => paraWidth(r[c]?.[0])), 600) + 1020 + 400);
+        const sum = need.reduce((x, y) => x + y, 0);
+        const colWidths = sum > cap ? need.map((n) => Math.floor((n * cap) / sum)) : need;
+        const tbl: Item = { k: 'tbl', rows, colWidths, outerFill: this.hb.borderFill('outer'), cellFill: this.hb.borderFill('cell'), headRows: 1 };
         const key = ctx.place;
         return [this.para(key, [{ charPr: this.sid(key).charPr, items: [tbl] }])];
       }
@@ -370,6 +373,23 @@ class Writer {
 }
 
 const isChoicePara = (p: Para) => p.style === STYLE_IDS.MTQCh5.id || p.style === STYLE_IDS.MTQCh3.id;
+
+/**
+ * 문단 내용 폭 어림(HWPUNIT) — 표 열 폭 맞춤용. 본문 글꼴 11.5pt(1150) · 장평 95%를 따른다:
+ * 한글 ≈ 1.0em · 영숫자·기호 ≈ 0.5em · 공백 ≈ 0.25em · 수식 = 상자 폭(hwpLayout) · 탭 ≈ 1em
+ */
+export function paraWidth(p: Para | undefined): number {
+  if (!p) return 0;
+  const EM = 1150 * 0.95;
+  let w = 0;
+  for (const it of p.runs.flatMap((r) => r.items)) {
+    if (it.k === 'text') for (const ch of it.s) w += ch === ' ' ? 0.25 * EM : /[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3\u2460-\u24ff\u3200-\u32ff\u4e00-\u9fff]/.test(ch) ? EM : 0.5 * EM;
+    else if (it.k === 'eq') w += it.size?.w ?? 0;
+    else if (it.k === 'tab') w += EM;
+    else if (it.k === 'pic') w += it.width;
+  }
+  return Math.round(w);
+}
 
 /** 문단의 글자(수식 제외) — 미리보기·미주 자리 찾기 */
 export function paraText(p: Para): string {

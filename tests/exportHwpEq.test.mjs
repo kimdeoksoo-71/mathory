@@ -25,7 +25,7 @@ test('Q2 근호 · 극한 · 집합 괄호 · cases — md2hwp와 같다', () =>
   assert.equal(eq(R`\sqrt[3]{x}`), 'root {3} of {x}');
   assert.equal(eq(R`\lim_{n \to \infty} \frac{1}{n}`), 'lim _{n `->` inf} {1} over {n}');
   assert.equal(eq(R`\left\{ x \mid x > 0 \right\}`), 'left lbrace x ~ vert ~ x > 0 right rbrace');
-  assert.equal(eq(R`\begin{cases} x+1 & (x<0) \\ x^2 & (x \ge 0) \end{cases}`), 'cases{x+1 & (x<0) # x^2 & (x geq 0)}');
+  assert.equal(eq(R`\begin{cases} x+1 & (x<0) \\ x^2 & (x \ge 0) \end{cases}`), 'cases{x+1 & ~~ (x<0) # x^2 & ~~ (x geq 0)}');
 });
 
 test('Q3 미분 기호 — 백틱 1 + 아포스트로피 N(md2hwp 규칙)', () => {
@@ -56,9 +56,9 @@ test('D3 환경 — aligned → eqalign · gathered → pile · 한 열 array �
   assert.equal(eq(R`\begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix}`), 'left ( matrix{1 & 2 # 3 & 4} right )');
   assert.equal(eq(R`\begin{vmatrix} a & b \\ c & d \end{vmatrix}`), 'left | matrix{a & b # c & d} right |');
   // 중첩 — 안쪽부터
-  assert.equal(eq(R`\begin{cases} \begin{aligned} a \\ b \end{aligned} & x \\ c & y \end{cases}`), 'cases{eqalign{a # b} & x # c & y}');
+  assert.equal(eq(R`\begin{cases} \begin{aligned} a \\ b \end{aligned} & x \\ c & y \end{cases}`), 'cases{eqalign{a # b} & ~~ x # c & ~~ y}');
   // cases 빈 칸 패딩(md2hwp)
-  assert.equal(eq(R`\begin{cases} a & b \\ c \end{cases}`), 'cases{a & b # c &}');
+  assert.equal(eq(R`\begin{cases} a & b \\ c \end{cases}`), 'cases{a & ~~ b # c & ~~}');
 });
 
 test('D4 크기 명령 삭제 · 큰 연산자 · 가는 공백', () => {

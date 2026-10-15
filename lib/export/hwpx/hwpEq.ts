@@ -189,7 +189,8 @@ function envToHwp(env: string, arg: string | null, body: string): string {
       const n = (row.match(/&/g) ?? []).length;
       return n < amps ? `${row}${' &'.repeat(amps - n)}` : row;
     });
-    const inner = padded.join(' # ');
+    // 칸 사이 1em(`~~`) — LaTeX cases의 `@{\quad}`와 같다(PDF는 typst quadCases). 없으면 식과 조건이 붙는다(덕수 실물 2026-10-15)
+    const inner = padded.map((row) => row.replace(/&/g, '& ~~')).join(' # ');
     return base.startsWith('r') || base.startsWith('dr') ? ` left none matrix{${inner}} right rbrace ` : ` cases{${inner}} `;
   }
   if (['aligned', 'align', 'alignat', 'alignedat', 'split', 'eqnarray', 'flalign'].includes(base)) {

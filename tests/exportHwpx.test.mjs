@@ -192,6 +192,17 @@ test('M5 빈칸 \\boxed{\\text{(가)}} → box{"(가)"} · 표 · ggb 자리표�
   assert.ok(section.includes('[GeoGebra 그래프 — 화면에서 확인]'));
 });
 
+
+test('M6 표 열 폭 = 내용 폭(덕수 2026-10-15 — 단 폭에 꽉 채우지 않는다) · 넘치면 단 폭 90%로 줄인다', () => {
+  const { section } = hwpx([single([blk('text', 'a'), blk('text', '| $z$ | $\\mathrm{P}(0 \\le Z \\le z)$ |\n|---|---|\n| $0.5$ | $0.191$ |')])]);
+  const widths = [...section.matchAll(/<hp:tc [^>]*>[\s\S]*?<hp:cellSz width="(\d+)"/g)].slice(0, 2).map((m) => +m[1]);
+  assert.ok(widths[0] < widths[1], JSON.stringify(widths));
+  assert.ok(widths[0] + widths[1] < 31649 * 0.6, `합 ${widths[0] + widths[1]}`);
+  const wide = hwpx([single([blk('text', 'a'), blk('text', `| ${'아주 긴 머리 칸 '.repeat(6)} | ${'또 다른 긴 칸 '.repeat(6)} |\n|---|---|\n| 1 | 2 |`)])]).section;
+  const ws = [...wide.matchAll(/<hp:cellSz width="(\d+)"/g)].slice(0, 2).map((m) => +m[1]);
+  assert.ok(ws[0] + ws[1] <= Math.round(31649 * 0.9), `상한 ${ws}`);
+});
+
 /* ═══ 배치 ═══ */
 
 test('B1 옵션 A — 둘째 문항 쪽 나눔 · 풀이 첫 문단 단 나눔 · 풀이가 비면 단 나눔 없음(G11)', () => {
