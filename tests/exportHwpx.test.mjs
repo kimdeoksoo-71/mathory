@@ -234,13 +234,15 @@ test('B1 옵션 A — 둘째 문항 쪽 나눔 · 풀이 첫 문단 단 나눔 �
   assert.equal(ps.filter((p) => p.includes('columnBreak="1"')).length, 1);
 });
 
-test('B2 옵션 B — 문항마다 단 나눔 · 미주는 [N점] 문단 끝 · 미주 첫 문단 "N번" + autoNum · 끝 쪽 나눔', () => {
+test('B2 옵션 B — 문항마다 단 나눔 · 미주는 [N점] 문단 끝 · 미주 첫 문단 해설-본문 "1) N번"(autoNum + 공백 + N번) · 끝 쪽 나눔', () => {
   const { section } = hwpx([
     two([blk('text', '문제1 [3점]'), blk('choices', '① 1\n② 2\n③ 3\n④ 4\n⑤ 5')], [blk('text', '풀이1')], '1번'),
     two([blk('text', '문제2')], [blk('text', '풀이2')], '2번'),
   ], { placement: 'endnote' });
   assert.match(section, /\[3점\]<\/hp:t><hp:ctrl><hp:endNote number="1" suffixChar="41"/);
-  assert.match(section, /<hp:endNote number="1"[\s\S]*?<hp:ctrl><hp:autoNum num="1" numType="ENDNOTE">[\s\S]*?<hp:t>1번<\/hp:t>/);
+  assert.match(section, /<hp:endNote number="1"[\s\S]*?<hp:ctrl><hp:autoNum num="1" numType="ENDNOTE">[\s\S]*?<hp:t> 1번<\/hp:t>/);
+  // 미주 머리는 해설-본문(해설-제목 아님)
+  assert.match(section, new RegExp(`<hp:endNote number="1"[^>]*><hp:subList[^>]*>\\s*<hp:p [^>]*styleIDRef="${STYLE_IDS.MTSBody.id}"`));
   assert.match(section, /<hp:endNote number="2"/);
   const top = section.replace(/<hp:endNote[\s\S]*?<\/hp:endNote>/g, '');
   const ps = [...top.matchAll(/<hp:p id="0" [^>]*>/g)].map((m) => m[0]);

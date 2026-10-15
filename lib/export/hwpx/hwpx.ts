@@ -449,7 +449,8 @@ export function serializeHwpx(input: HwpxInput): HwpxResult {
       if (i > 0) q[0] = { ...q[0], columnBreak: true };
       if (s.length) {
         noteNum += 1;
-        const head = n !== null ? [w.para('MTSH1', [{ charPr: STYLE_IDS.MTSH1.charPr, items: [T(`${n}번`)] }])] : [];
+        // 미주 머리 = `1) 16번`(자동 번호 + 공백 1 + 문제 번호) · 해설-본문(덕수 2026-10-15 — 해설-제목이면 본문 제목과 겹쳐 보여 주목을 빼앗는다)
+        const head = n !== null ? [w.para('MTSBody', [{ charPr: STYLE_IDS.MTSBody.charPr, items: [T(` ${n}번`)] }])] : [];
         const at = endnoteAnchor(q);
         const anchor = q[at];
         const runs = [...anchor.runs];
