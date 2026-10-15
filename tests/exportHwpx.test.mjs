@@ -153,16 +153,16 @@ test('M1 선택지 — 4~5개 한 줄 선지-5 · 긴 항목 3+2 선지-3 두 �
   assert.equal(isLongChoices([[{ t: 'text', s: 'ㄱ, ㄴ, ㄷ' }]]), false);
 });
 
-test('M2 경우 — 해설-단계1/2 · ( i ) + 탭 · 이어짓기는 선행 탭 · 본문 C1 → ( i ) · 굵게 없음', () => {
+test('M2 경우 — 해설-단계1/2 · (ⅰ) + 탭 · 이어짓기는 선행 탭 · 본문 C1 → (ⅰ) · 굵게 없음', () => {
   const { section } = hwpx([two([blk('text', '문제')], [
     blk('case', '$x>0$인 경우\n본문'),
     blk('case', '\n이어서 C1을 쓴다.'),
     blk('subcase', '$x=1$일 때\n값'),
   ])]);
   assert.ok(section.includes(`styleIDRef="${STYLE_IDS.MTSStep1.id}"`));
-  assert.match(section, /<hp:t>\( i \)<hp:tab\/><\/hp:t>/);
-  assert.match(section, /<hp:t>\( i - 1 \)<hp:tab\/><\/hp:t>/);
-  assert.match(section, /<hp:t><hp:tab\/>이어서 \( i \)을 쓴다\.<\/hp:t>/);
+  assert.match(section, /<hp:t>\(\u2170\)<hp:tab\/><\/hp:t>/);
+  assert.match(section, /<hp:t>\(\u2170-1\)<hp:tab\/><\/hp:t>/);
+  assert.match(section, /<hp:t><hp:tab\/>이어서 \(\u2170\)을 쓴다\.<\/hp:t>/);
 });
 
 test('M3 행 끝 \\tag·\\ref → ⋯⋯⋯ ㉠ · display는 cdots ×3 + 수식 밖 ㉠ · 수식 안 \\ref → "㉡"', () => {

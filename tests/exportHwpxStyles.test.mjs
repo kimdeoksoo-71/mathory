@@ -57,13 +57,15 @@ test('H5 쪽 규격 — A3 297×420 · 2단 · 열 폭 31649(템플릿 lineseg 3
   assert.equal(PAGE.colWidth, 31649);
 });
 
-test('H6 경우 라벨 — C1 ( i ) · C3 ( iii ) · C1a ( i - 1 ) · C2b ( ii - 2 ) · 모양 아니면 null', () => {
-  assert.equal(caseLabelHwp('C1'), '( i )');
-  assert.equal(caseLabelHwp('C3'), '( iii )');
-  assert.equal(caseLabelHwp('C4'), '( iv )');
-  assert.equal(caseLabelHwp('C1a'), '( i - 1 )');
-  assert.equal(caseLabelHwp('C2b'), '( ii - 2 )');
-  assert.equal(caseLabelHwp('C1.'), '( i )');
+test('H6 경우 라벨 — 유니코드 소문자 로마 숫자 · 공백 없음(덕수 실물 2026-10-15) · 모양 아니면 null', () => {
+  assert.equal(caseLabelHwp('C1'), '(\u2170)');
+  assert.equal(caseLabelHwp('C3'), '(\u2172)');
+  assert.equal(caseLabelHwp('C4'), '(\u2173)');
+  assert.equal(caseLabelHwp('C12'), '(\u217B)');
+  assert.equal(caseLabelHwp('C14'), '(\u2179\u2170\u2174)');
+  assert.equal(caseLabelHwp('C1a'), '(\u2170-1)');
+  assert.equal(caseLabelHwp('C2b'), '(\u2171-2)');
+  assert.equal(caseLabelHwp('C1.'), '(\u2170)');
   assert.equal(caseLabelHwp('가'), null);
   assert.equal(toRoman(14), 'xiv');
 });
