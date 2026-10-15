@@ -20,6 +20,8 @@ export interface PackageInput {
   /** 미리보기 평문(탐색기 미리보기·검색). 템플릿 형식: CRLF · ~2KB */
   prvText: string;
   ids?: Ids;
+  /** 진단용(scripts/hwpxEqProbe.mjs) — section0.xml을 통째로 바꿔 넣는다 */
+  sectionOverride?: string;
 }
 
 const MEDIA: Record<BinItem['ext'], string> = { png: 'image/png', jpg: 'image/jpg' };
@@ -53,7 +55,7 @@ export function previewText(text: string, maxChars = 1000): string {
 export function buildPackage(input: PackageInput): Uint8Array {
   const ids = input.ids ?? new Ids();
   if (!input.paras.length || !input.paras[0].secPr) throw new Error('첫 문단에 secPr이 있어야 한다(G5)');
-  const section = sectionXml(input.paras, ids);
+  const section = input.sectionOverride ?? sectionXml(input.paras, ids);
   return zipHwpx([
     ['mimetype', 'application/hwp+zip'],
     ['version.xml', P.VERSION_XML],
