@@ -24,7 +24,8 @@ import { buildExportDoc } from '../.test-build/lib/export/ir.js';
 import { serializeHwpx, problemNumber, endnoteAnchor } from '../.test-build/lib/export/hwpx/hwpx.js';
 import { isLongChoices } from '../.test-build/lib/export/hwpx/choices.js';
 import { imageSize } from '../.test-build/lib/export/hwpx/imageSize.js';
-import { sizeFromEm, estimateSize } from '../.test-build/lib/export/hwpx/eqSize.js';
+import { hwpEqSize, layoutHwp } from '../.test-build/lib/export/hwpx/hwpLayout.js';
+const CAL = JSON.parse(readFileSync('tests/fixtures/export/hwpEqCalibration.json', 'utf8')).items;
 import { STYLE_IDS } from '../.test-build/lib/export/hwpx/skeleton/ids.js';
 import { sampleProblem } from './fixtures/export/sampleProblem.mjs';
 
@@ -239,25 +240,27 @@ test('U2 imageSize — PNG IHDR · JPEG SOF', () => {
 });
 
 
-test('E1 수식 크기 — 한글은 열 때 다시 재지 않는다 · 글자 수식은 최소 위 0.87em·아래 0.153em(템플릿 `1` = 1125 · baseLine 85)', () => {
-  assert.deepEqual(sizeFromEm(0.5, 0.6444, 0), { w: 561, h: 1125, base: 85 });
-  const frac = estimateSize(String.raw`\displaystyle \frac{1}{2}`);
-  assert.ok(frac.h > 2000 && frac.base < 70, JSON.stringify(frac));        // 분수는 위아래로 크고 기준선이 가운데 쪽
-  const { section } = hwpx([single([blk('text', '값 $1$ 과 $\\frac{1}{2}$')])]);
-  const sz = [...section.matchAll(/<hp:equation [^>]*baseLine="(\d+)"[^>]*><hp:sz width="(\d+)" widthRelTo="ABSOLUTE" height="(\d+)"/g)].map((m) => m.slice(1).map(Number));
-  assert.equal(sz.length, 2);
-  assert.deepEqual(sz[0].slice(0, 1).concat(sz[0][2]), [85, 1125]);         // `1`
-  assert.ok(sz[1][2] > 2000, '분수 높이');
-  assert.ok(!section.includes('height="2750"'), '옛 자리값(2.5em)이 남지 않는다');
+test('E1 수식 크기 = 한글 규칙 모델 — 한글 실측 40개(덕수 2026-10-15)를 폭 RMS 3% · 위아래 0.06em 안에서 재현', () => {
+  let sw = 0;
+  for (const c of CAL) {
+    const A = (c.h * c.base) / 100 / 1100;
+    const b = layoutHwp(c.script);
+    const rw = (b.w - c.w / 1100) / (c.w / 1100);
+    sw += rw * rw;
+    assert.ok(Math.abs(rw) < 0.08, `폭 ${c.script} ${(rw * 100).toFixed(1)}%`);
+    assert.ok(Math.abs(b.a - A) < 0.06, `위 ${c.script} ${(b.a - A).toFixed(3)}`);
+    assert.ok(Math.abs(b.d - (c.h / 1100 - A)) < 0.06, `아래 ${c.script}`);
+  }
+  assert.ok(Math.sqrt(sw / CAL.length) < 0.03, `폭 RMS ${Math.sqrt(sw / CAL.length)}`);
 });
 
-test('E2 측정기를 넘기면 그 값을 쓴다 · 인라인은 \\displaystyle로 잰다 · 인용 표지는 ㉠ 글자로', () => {
-  const seen = [];
-  const r = serializeHwpx({ title: 't', sources: [sourceOf(two([blk('text', '$x$')], [blk('text', '$\\ref{1}$')]))], bins: [],
-    options: { numbering: 'title', placement: 'column' }, measure: (l) => { seen.push(l); return { w: 777, h: 1234, base: 80 }; } });
-  const section = strFromU8(unzipSync(r.bytes)['Contents/section0.xml']);
-  assert.deepEqual(seen, [R`\displaystyle x`, R`\displaystyle \text{㉠}`]);
-  assert.match(section, /baseLine="80"[^>]*><hp:sz width="777" widthRelTo="ABSOLUTE" height="1234"/);
+test('E2 sz·baseLine이 모델 값으로 들어간다 · 옛 자리값(2.5em) 없음', () => {
+  const { section } = hwpx([single([blk('text', '값 $1$ 과 $\\frac{1}{2}$')])]);
+  const sz = [...section.matchAll(/<hp:equation [^>]*baseLine="(\d+)"[^>]*><hp:sz width="(\d+)" widthRelTo="ABSOLUTE" height="(\d+)"/g)].map((m) => m.slice(1).map(Number));
+  assert.deepEqual(sz.map(([base, w, h]) => ({ w, h, base })), [hwpEqSize('1'), hwpEqSize('{1} over {2}')]);
+  const half = hwpEqSize('{1} over {2}');                                         // 한글 실측 1100 × 2580 · 65
+  assert.ok(Math.abs(half.w - 1100) / 1100 < 0.03 && Math.abs(half.h - 2580) < 30 && half.base === 65, JSON.stringify(half));
+  assert.ok(!section.includes('height="2750"'));
 });
 
 /* ═══ 스냅샷 ═══ */

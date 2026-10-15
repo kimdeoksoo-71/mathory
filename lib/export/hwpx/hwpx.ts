@@ -19,7 +19,7 @@ import { latexToHwp, rowsToHwp, refMark, type HwpEqResult } from './hwpEq';
 import { caseLabelHwp } from './roman';
 import { isLongChoices, type ChoicePiece } from './choices';
 import { buildPackage, type BinItem } from './package';
-import { estimateSize, type EqSize } from './eqSize';
+import { hwpEqSize } from './hwpLayout';
 
 export interface HwpxOptions {
   /** N14 — 제목 끝 번호(1~30) / 앞에서부터 1, 2, … */
@@ -41,8 +41,6 @@ export interface HwpxInput {
   sources: HwpxSource[];
   bins: BinItem[];
   options: HwpxOptions;
-  /** 수식 크기 측정(브라우저 KaTeX — measure.ts). 없거나 null이면 구조 추정(estimateSize) */
-  measure?: (latex: string) => EqSize | null;
 }
 
 export interface HwpxResult {
@@ -92,13 +90,14 @@ class Writer {
   readonly reserved = new Set<string>();
   missingFigures = 0;
 
-  constructor(private opts: HwpxOptions, private measureFn?: (latex: string) => EqSize | null) {}
+  constructor(private opts: HwpxOptions) {}
 
-  /** 한글 수식 개체 — 크기는 같은 LaTeX를 KaTeX로 잰 값(인라인도 \\displaystyle — 덕수 원칙) */
-  eqItem(script: string, measureLatex: string): Item {
-    const src = measureLatex.replace(/\\mathoryref\{(\d+)\}/g, (_, n: string) => `\\text{${refMark(n)}}`);
-    const size = this.measureFn?.(src) ?? estimateSize(src);
-    return { k: 'eq', script, size };
+  /**
+   * 한글 수식 개체 — 크기는 **한글 규칙 모델**(hwpLayout.ts — 한글 실측 40개에 맞춘 상수)로 스크립트를 조판한 값.
+   * ⚠ 한글 2022는 열 때 sz를 다시 재지 않는다. 남는 오차는 한글 스크립트 매크로(docs/hwp-macro)가 바로잡는다.
+   */
+  eqItem(script: string): Item {
+    return { k: 'eq', script, size: hwpEqSize(script) };
   }
 
   /* ═══ 공통 ═══ */
@@ -136,7 +135,7 @@ class Writer {
           case 'ref': push(cp, T(refMark(x.n))); break;                           // R2
           case 'math': {
             const s = this.eq(latexToHwp(x.latex));
-            if (s) push(cp, this.eqItem(s, x.textStyle ? x.latex : `\\displaystyle ${x.latex}`));
+            if (s) push(cp, this.eqItem(s));
             break;
           }
           case 'strong': walk(x.inline, { ...f, bold: true }); break;
@@ -211,8 +210,7 @@ class Writer {
         let script = this.eq(r);
         if (!script.replace(/[{}\s]/g, '')) return f.tag ? [this.para(key, this.tagRuns([], f.tag, key))] : [];
         if (f.tag) script += ` cdots cdots cdots`;
-        const body = f.rows ? `\\begin{array}{l}${f.rows.map((r) => `\\displaystyle ${r.trim() || '{}'}`).join(' \\\\ ')}\\end{array}` : `\\displaystyle ${f.latex}`;
-        const items: Item[] = [this.eqItem(script, f.tag ? `${body} \\cdots\\cdots\\cdots` : body)];
+        const items: Item[] = [this.eqItem(script)];
         if (f.tag) items.push(T(` ${refMark(f.tag)}`));
         return [this.para(key, [{ charPr: this.sid(key).charPr, items }])];
       }
@@ -386,7 +384,7 @@ export function endnoteAnchor(paras: Para[]): number {
 }
 
 export function serializeHwpx(input: HwpxInput): HwpxResult {
-  const w = new Writer(input.options, input.measure);
+  const w = new Writer(input.options);
   const notices: string[] = [];
   const unnumbered: string[] = [];
   const body: Para[] = [];

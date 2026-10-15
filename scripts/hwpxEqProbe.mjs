@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Phase 71 — 수식 크기 탐침(한글 2022는 hwpx를 열 때 수식 sz를 다시 재지 않는다 — eqSize.ts).
+ * Phase 71 — 수식 크기 탐침(한글 2022는 hwpx를 열 때 수식 sz를 다시 재지 않는다 — hwpLayout.ts).
  *
  *   node scripts/hwpxEqProbe.mjs     → docs/phaseSketch/phase71-stage0/수식탐침/ (로컬 — 커밋하지 않는다)
  *   node scripts/hwpxEqProbe.mjs --read <한글이 저장한 C-보정.hwpx>   → 실측 sz·baseLine을 JSON으로(보정 입력)
@@ -26,13 +26,13 @@ if (process.argv[2] === '--read') {
   process.exit(0);
 }
 
-execFileSync('npx', ['tsc', 'lib/export/hwpx/package.ts', 'lib/export/hwpx/xml.ts', 'lib/export/hwpx/hwpEq.ts', 'lib/export/hwpx/eqSize.ts', 'lib/export/hwpx/zip.ts',
+execFileSync('npx', ['tsc', 'lib/export/hwpx/package.ts', 'lib/export/hwpx/xml.ts', 'lib/export/hwpx/hwpEq.ts', 'lib/export/hwpx/hwpLayout.ts', 'lib/export/hwpx/zip.ts',
   'lib/export/hwpx/skeleton/parts.ts', 'lib/export/hwpx/skeleton/ids.ts', '--outDir', '.test-build', '--rootDir', '.', '--module', 'commonjs', '--target', 'es2022',
   '--moduleResolution', 'node', '--skipLibCheck'], { cwd: ROOT, stdio: 'inherit' });
 const B = (p) => import(join(ROOT, '.test-build/lib/export/hwpx', p));
 const { buildPackage } = await B('package.js');
 const { latexToHwp } = await B('hwpEq.js');
-const { estimateSize } = await B('eqSize.js');
+const { hwpEqSize } = await B('hwpLayout.js');
 const P = await B('skeleton/parts.js');
 const { STYLE_IDS: S } = await B('skeleton/ids.js');
 
@@ -43,8 +43,8 @@ const T = (s) => ({ k: 'text', s });
 const run = (key, ...items) => ({ charPr: S[key].charPr, items });
 const para = (key, runs, extra = {}) => ({ style: S[key].id, paraPr: S[key].paraPr, runs, ...extra });
 const eq = (latex, display = false) => {
-  const src = display ? `\\displaystyle ${latex}` : `\\displaystyle ${latex}`;
-  return { k: 'eq', script: latexToHwp(latex).script, size: estimateSize(src) };
+  const script = latexToHwp(latex).script;
+  return { k: 'eq', script, size: hwpEqSize(script) };
 };
 const first = (p) => ({ ...p, secPr: P.SEC_PR, secPrCharPr: S.MTQBody.charPr });
 function write(dir, name, paras, mutate = (x) => x) {

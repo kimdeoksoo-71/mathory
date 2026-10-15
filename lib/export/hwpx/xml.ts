@@ -15,7 +15,7 @@ export type Item =
   | { k: 'text'; s: string }
   | { k: 'tab' }
   | { k: 'br' }
-  /** size = 한글 수식 상자(sz 폭·높이 · baseLine %) — 한글은 열 때 다시 재지 않는다(eqSize.ts). 없으면 자리값 */
+  /** size = 한글 수식 상자(sz 폭·높이 · baseLine %) — 한글은 열 때 다시 재지 않는다(hwpLayout.ts). 없으면 자리값 */
   | { k: 'eq'; script: string; size?: { w: number; h: number; base: number } }
   | { k: 'rect'; paras: Para[]; width: number }
   | { k: 'pic'; bin: string; pxW: number; pxH: number; width: number; height: number; frame?: boolean }
@@ -139,7 +139,7 @@ function objectXml(it: Item, ids: Ids): string {
 /**
  * 수식 — python-hwpx add_equation의 real-Hancom 모양.
  * ⚠ sz·baseLine은 **실제 크기여야 한다** — 한글 2022는 열 때 다시 재지 않고 상자 왼쪽 위에 수식을 그린다(2026-10-15 실물).
- *   크기는 호출자가 잰다(브라우저 KaTeX 측정 · Node 추정 — eqSize.ts). 없을 때의 자리값은 옛 python-hwpx 식(테스트 전용).
+ *   크기는 호출자가 낸다(hwpLayout.ts 한글 규칙 모델). 없을 때의 자리값은 옛 python-hwpx 식(테스트 전용).
  */
 export function equationXml(script: string, ids: Ids, baseUnit = 1100, size?: { w: number; h: number; base: number }): string {
   const s = script.trim();
