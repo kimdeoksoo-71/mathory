@@ -19,7 +19,7 @@ import { latexToHwp, splitDisplayRows, refMark, type HwpEqResult, type DisplaySp
 import { caseLabelHwp } from './roman';
 import { isLongChoices, type ChoicePiece } from './choices';
 import { buildPackage, type BinItem } from './package';
-import { hwpEqSize, hwpPad } from './hwpLayout';
+import { hwpEqSize } from './hwpLayout';
 
 export interface HwpxOptions {
   /** N14 — 제목 끝 번호(1~30) / 앞에서부터 1, 2, … */
@@ -110,39 +110,28 @@ class Writer {
   }
 
   /**
-   * 여러 줄 수식 → 행마다 문단(문제-수식·해설-수식) 하나. 두 스타일은 왼쪽 맞춤이라 행 **앞**에 한글 수식 공백을 채워
-   * `&` 자리(align)·행 가운데(center)를 맞춘다 — 폭은 hwpLayout 모델 값이라 근사다. 행 끝 번호는 마지막 행에.
+   * 여러 줄 수식 → 행마다 문단(문제-수식·해설-수식) 하나. **정렬하지 않는다**(덕수 2026-10-15 — `&` 자리를 수식 공백으로
+   * 맞추는 근사는 폐기) · 환경 앞 조각은 첫 행 앞, 뒤 조각과 행 끝 번호는 마지막 행에.
    */
   displayRows(split: DisplaySplit, tag: string | undefined, key: StyleKey): Para[] {
-    const conv = split.rows.map((r) => ({
-      left: r.left.trim() ? this.eq(latexToHwp(r.left)) : '',
-      right: r.right.trim() ? this.eq(latexToHwp(r.right)) : '',
-    }));
-    const width = (s: string) => (s.replace(/[{}\s]/g, '') ? hwpEqSize(s).w : 0);
-    const lw = conv.map((c) => width(c.left));
-    const rw = conv.map((c) => width(c.right));
-    const maxL = Math.max(...lw);
-    const maxR = Math.max(...rw);
-    // 환경 앞 조각은 첫 행 앞에 · 나머지 행은 그 폭만큼 더 들인다 / 뒤 조각은 마지막 행 끝에
-    const prefix = split.prefix ? this.eq(latexToHwp(split.prefix)) : '';
-    const suffix = split.suffix ? this.eq(latexToHwp(split.suffix)) : '';
-    const wP = width(prefix);
+    const blank = (x: string) => !x.replace(/[{}\s]/g, '');
+    const rows = split.rows.map((r, i) => {
+      const last = i === split.rows.length - 1;
+      return [i === 0 ? split.prefix : '', r, last ? split.suffix : ''].filter(Boolean).join(' ');
+    });
     const out: Para[] = [];
-    conv.forEach((c, i) => {
-      const inner = split.mode === 'align' ? maxL - lw[i] : split.mode === 'center' ? (maxR - rw[i]) / 2 : 0;
-      const last = i === conv.length - 1;
-      const body = [c.left, c.right, last ? suffix : ''].filter((x) => x.replace(/[{}\s]/g, '')).join(' ');
-      if (!body) return;
-      const lead = i === 0 ? [prefix, hwpPad(inner)] : [hwpPad(wP + inner)];
-      let script = [...lead, body].filter(Boolean).join(' ');
+    rows.forEach((latex, i) => {
+      const last = i === rows.length - 1;
+      let script = this.eq(latexToHwp(latex));
+      if (blank(script)) {
+        if (last && tag) out.push(this.para(key, this.tagRuns([], tag, key)));
+        return;
+      }
       if (last && tag) script += ' cdots cdots cdots';
       const items: Item[] = [this.eqItem(script)];
       if (last && tag) items.push(T(` ${refMark(tag)}`));
       out.push(this.para(key, [{ charPr: this.sid(key).charPr, items }]));
     });
-    if (tag && out.length && !conv[conv.length - 1].left && !conv[conv.length - 1].right) {
-      out.push(this.para(key, this.tagRuns([], tag, key)));
-    }
     return out;
   }
 
@@ -245,7 +234,7 @@ class Writer {
         const key = this.eqKey(ctx);
         // 여러 줄(맨 `\\` 행 · aligned·gathered 계열 환경 하나) → 행마다 수식 문단 하나(덕수 2026-10-15)
         const split: DisplaySplit | null = f.rows
-          ? { mode: 'left', rows: f.rows.map((r) => ({ left: '', right: r })) }
+          ? { rows: f.rows }
           : splitDisplayRows(f.latex);
         if (split && split.rows.length > 1) return this.displayRows(split, f.tag, key);
         let script = this.eq(latexToHwp(f.latex));

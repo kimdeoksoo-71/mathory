@@ -172,17 +172,14 @@ export function splitRows(body: string): string[] {
 
 /* ═══ 여러 줄 display → 행마다 수식 하나(덕수 2026-10-15) ═══ */
 
-export interface DisplayRow {
-  /** 정렬 기준 `&` 앞(정렬하지 않는 행은 '') */
-  left: string;
-  /** `&` 뒤(나머지 `&`는 정리됨) — 정렬하지 않는 행은 행 전체 */
-  right: string;
-}
+/**
+ * 정렬은 하지 않는다(덕수 2026-10-15 — `&` 자리를 공백으로 맞추는 근사는 폐기). 행마다 문제-수식·해설-수식 문단이고
+ * 모두 그 스타일의 왼쪽 여백에서 시작한다.
+ */
 export interface DisplaySplit {
-  rows: DisplayRow[];
-  /** align = 첫 `&`에 맞춘다 · center = 행 가운데 맞춤(gathered) · left = 왼쪽 맞춤(맨 `\\` 행 — 앱은 array{l}) */
-  mode: 'align' | 'center' | 'left';
-  /** 환경 앞 조각(`\text{ - }` 글머리 등) — 첫 행 앞에 붙고 나머지 행은 그 폭만큼 들인다 */
+  /** 행 LaTeX(`&`는 지웠다 — 칸 쌍 사이만 `\quad`) */
+  rows: string[];
+  /** 환경 앞 조각(`\text{ - }` 글머리 등) — 첫 행 앞에 붙는다 */
   prefix?: string;
   /** 환경 뒤 조각(마침표 등) — 마지막 행 끝에 붙는다 */
   suffix?: string;
@@ -242,7 +239,7 @@ function isFlatPiece(x: string): boolean {
 
 /**
  * display 수식이 `aligned`·`gathered` 계열 환경 **하나**(+ 앞뒤 평평한 조각)면 행으로 나눈다 — 아니면 null(한 수식 그대로).
- * 정렬 칸이 여럿인 행(`a &= b & c &= d`)은 첫 `&`에만 맞추고 나머지 칸 사이는 `\quad`(eqnarray `&=&`는 붙여 쓴다).
+ * `&`는 지운다 — 칸 쌍 사이(`a &= b & c &= d`의 b·c 사이)만 `\quad`(eqnarray `&=&`는 붙여 쓴다). 정렬은 하지 않는다.
  */
 export function splitDisplayRows(latex: string): DisplaySplit | null {
   const t = latex.trim();
@@ -276,17 +273,16 @@ export function splitDisplayRows(latex: string): DisplaySplit | null {
     .map((cs) => cs.map((c) => c.trim()))
     .filter((cs) => cs.some((c) => c !== ''));
   if (cells.length === 0) return null;
-  if (!align) return { mode: 'center', rows: cells.map((cs) => ({ left: '', right: cs.join(' ') })), ...extra };
-  const rows = cells.map((cs): DisplayRow => {
-    if (cs.length === 1) return { left: cs[0], right: '' };       // `&` 없는 행 — LaTeX는 정렬점에서 끝나게(왼쪽 칸) 둔다
-    const rest = cs.slice(1).reduce((acc, c, k) => {
+  const rows = cells.map((cs) => {
+    if (!align) return cs.join(' ');
+    return cs.reduce((acc, c, k) => {
       if (k === 0) return c;
-      const sep = base !== 'eqnarray' && k % 2 === 1 ? ' \\quad ' : ' ';  // 칸 쌍(r&l) 사이만 띄운다(`a &= b & c &= d`의 b·c 사이)
+      // 첫 `&`(정렬점)는 그냥 붙이고, 칸 쌍(r&l) 사이(`a &= b & c &= d`의 b·c 사이)만 띄운다 · eqnarray `&=&`는 붙여 쓴다
+      const sep = base !== 'eqnarray' && k % 2 === 0 ? ' \\quad ' : ' ';
       return acc + sep + c;
-    }, '');
-    return { left: cs[0], right: rest };
+    }, '').trim();
   });
-  return { mode: 'align', rows, ...extra };
+  return { rows, ...extra };
 }
 
 const MATRIX_FENCE: Record<string, [string, string]> = {

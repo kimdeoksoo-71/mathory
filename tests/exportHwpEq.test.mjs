@@ -88,20 +88,19 @@ test('R3 splitRows는 깊이 0 \\\\만 · 꼬리 빈 행 버림', () => {
   assert.deepEqual(splitRows(R`a \\[4pt] {b \\ c} \\ `), ['a', R`{b \\ c}`]);
 });
 
-test('R3′ 여러 줄 display → 행(덕수 2026-10-15) — aligned 계열만 · 환경 안 \\\\·& 보존 · 칸 쌍 사이 \\quad', () => {
-  assert.deepEqual(splitDisplayRows(R`\begin{aligned} f(x) &= a \\[2pt] &= b \\ \end{aligned}`), {
-    mode: 'align', rows: [{ left: 'f(x)', right: '= a' }, { left: '', right: '= b' }],
-  });
-  // 행 안의 cases는 쪼개지 않는다 · & 없는 행은 왼쪽 칸
+test('R3′ 여러 줄 display → 행(덕수 2026-10-15 — 정렬 없음) — aligned 계열만 · 환경 안 \\·& 보존 · & 지움 · 칸 쌍 사이 \quad', () => {
+  assert.deepEqual(splitDisplayRows(R`\begin{aligned} f(x) &= a \\[2pt] &= b \\ \end{aligned}`), { rows: ['f(x) = a', '= b'] });
+  // 행 안의 cases는 쪼개지 않는다
   assert.deepEqual(splitDisplayRows(R`\begin{align*} y &= \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases} \\ z \end{align*}`).rows, [
-    { left: 'y', right: R`= \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases}` }, { left: 'z', right: '' },
+    R`y = \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases}`, 'z',
   ]);
-  assert.deepEqual(splitDisplayRows(R`\begin{aligned}[t] a &= 1 & b &= 2 \end{aligned}`).rows, [{ left: 'a', right: R`= 1 \quad b = 2` }]);
-  assert.deepEqual(splitDisplayRows(R`\begin{alignedat}{2} a &= 1 \\ b &= 2 \end{alignedat}`).rows.map((r) => r.left), ['a', 'b']);
-  assert.deepEqual(splitDisplayRows(R`\begin{gathered} a \\ bb \end{gathered}`), { mode: 'center', rows: [{ left: '', right: 'a' }, { left: '', right: 'bb' }] });
+  assert.deepEqual(splitDisplayRows(R`\begin{aligned}[t] a &= 1 & b &= 2 \end{aligned}`).rows, [R`a = 1 \quad b = 2`]);
+  assert.deepEqual(splitDisplayRows(R`\begin{eqnarray} a &=& 1 \\ b &=& 2 \end{eqnarray}`).rows, ['a = 1', 'b = 2']);
+  assert.deepEqual(splitDisplayRows(R`\begin{alignedat}{2} a &= 1 \\ b &= 2 \end{alignedat}`).rows, ['a = 1', 'b = 2']);
+  assert.deepEqual(splitDisplayRows(R`\begin{gathered} a \\ bb \end{gathered}`), { rows: ['a', 'bb'] });
   // 앞뒤 평평한 조각은 prefix·suffix로 / 행을 가로지르는 것(\left\{ · 바깥 환경 · 감싼 중괄호)이 붙으면 그대로(한 수식)
   assert.deepEqual(splitDisplayRows(R`\text { - } \begin{aligned} a &= 1 \\ &= 2 \end{aligned}.`), {
-    mode: 'align', rows: [{ left: 'a', right: '= 1' }, { left: '', right: '= 2' }], prefix: R`\text { - }`, suffix: '.',
+    rows: ['a = 1', '= 2'], prefix: R`\text { - }`, suffix: '.',
   });
   assert.equal(splitDisplayRows(R`\left\{ \begin{aligned} a \\ b \end{aligned} \right.`), null);
   assert.equal(splitDisplayRows(R`\begin{array}{l} x \\ \begin{aligned} a \\ b \end{aligned} \end{array}`), null);

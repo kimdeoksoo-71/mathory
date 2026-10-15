@@ -297,16 +297,3 @@ export function hwpEqSize(script: string, baseUnit = 1100, P: Params = PARAMS): 
   const h = Math.round((b.a + b.d) * baseUnit);
   return { w: Math.max(1, Math.round(b.w * baseUnit)), h, base: Math.round((b.a / (b.a + b.d)) * 100) };
 }
-
-/**
- * 한글 수식 공백으로 폭 `w`(HWPUNIT)를 채우는 스크립트 — `~`(PARAMS.tilde) 위주, 나머지는 `` ` ``(PARAMS.quarter)로 반올림.
- * 여러 줄 수식을 행마다 나눌 때 `&` 자리를 맞추는 데 쓴다(근사 — 오차는 `` ` `` 반 칸 이하).
- */
-export function hwpPad(w: number, baseUnit = 1100, P: Params = PARAMS): string {
-  if (!(w > 0)) return '';
-  const tw = P.tilde * baseUnit;
-  const qw = P.quarter * baseUnit;
-  const n = Math.floor(w / tw);
-  const q = Math.round((w - n * tw) / qw);
-  return '~'.repeat(n) + '`'.repeat(q);
-}

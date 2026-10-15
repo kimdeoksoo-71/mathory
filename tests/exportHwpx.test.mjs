@@ -24,7 +24,7 @@ import { buildExportDoc } from '../.test-build/lib/export/ir.js';
 import { serializeHwpx, problemNumber, endnoteAnchor } from '../.test-build/lib/export/hwpx/hwpx.js';
 import { isLongChoices } from '../.test-build/lib/export/hwpx/choices.js';
 import { imageSize } from '../.test-build/lib/export/hwpx/imageSize.js';
-import { hwpEqSize, layoutHwp, hwpPad } from '../.test-build/lib/export/hwpx/hwpLayout.js';
+import { hwpEqSize, layoutHwp } from '../.test-build/lib/export/hwpx/hwpLayout.js';
 const CAL = JSON.parse(readFileSync('tests/fixtures/export/hwpEqCalibration.json', 'utf8')).items;
 import { STYLE_IDS } from '../.test-build/lib/export/hwpx/skeleton/ids.js';
 import { sampleProblem } from './fixtures/export/sampleProblem.mjs';
@@ -203,28 +203,22 @@ test('M6 표 열 폭 = 내용 폭(덕수 2026-10-15 — 단 폭에 꽉 채우지
   assert.ok(ws[0] + ws[1] <= Math.round(31649 * 0.9), `상한 ${ws}`);
 });
 
-test('M7 여러 줄 수식 → 행마다 문단(덕수 2026-10-15) — aligned는 빈칸으로 & 자리 맞춤 · 번호는 마지막 행 · 맨 \\ 행은 왼쪽 맞춤', () => {
+test('M7 여러 줄 수식 → 행마다 문단(덕수 2026-10-15) — 정렬 없음(앞 공백 없음) · 번호는 마지막 행 · 맨 \\ 행도 행마다', () => {
   const md = '$$\n\\begin{aligned}\nf(x) &= (x+1)^2 \\\\\n&= x^2+2x+1 \\tag{1}\n\\end{aligned}\n$$';
   const { section } = hwpx([two([blk('text', '문제')], [blk('text', md)])]);
   const eqParas = [...section.matchAll(new RegExp(`<hp:p [^>]*styleIDRef="${STYLE_IDS.MTSEq.id}"[^>]*>[\\s\\S]*?</hp:p>`, 'g'))].map((m) => m[0]);
   assert.equal(eqParas.length, 2);
   const scripts = eqParas.map((l) => /<hp:script>([^<]*)/.exec(l)[1]);
   assert.equal(scripts[0], 'f(x) = (x+1)^2');
-  // 둘째 행 앞 공백 폭 ≈ `f(x)` 폭(반 칸 오차)
-  const pad = /^([~`]+) = x\^2\+2x\+1 cdots cdots cdots$/.exec(scripts[1]);
-  assert.ok(pad, scripts[1]);
-  assert.equal(pad[1], hwpPad(hwpEqSize('f(x)').w));
-  assert.ok(Math.abs(hwpEqSize(pad[1]).w - hwpEqSize('f(x)').w) <= 0.23 * 1100 / 2 + 1, pad[1]);
+  assert.equal(scripts[1], '= x^2+2x+1 cdots cdots cdots');   // 정렬 공백 없음
   assert.ok(!eqParas[0].includes('㉠') && eqParas[1].includes('㉠'));
   assert.ok(!section.includes('eqalign'));
   // 맨 \\ 행 — 정렬 없이 행마다
   const rows = hwpx([two([blk('text', '$$\na = 1 \\\\\nbb = 22\n$$')], [])]).section;
   assert.deepEqual([...rows.matchAll(/<hp:script>([^<]*)/g)].map((m) => m[1]), ['a = 1', 'bb = 22']);
-  // 환경 앞 조각 — 첫 행 앞에 붙고 다음 행은 그 폭만큼 들인다
+  // 환경 앞 조각 — 첫 행 앞에만(다음 행은 들이지 않는다)
   const pre = hwpx([two([blk('text', '$$\ny = \\begin{aligned} a \\\\ b \\end{aligned}\n$$')], [])]).section;
-  const ps = [...pre.matchAll(/<hp:script>([^<]*)/g)].map((m) => m[1]);
-  assert.equal(ps[0], 'y = a');
-  assert.equal(ps[1], `${hwpPad(hwpEqSize('y =').w + hwpEqSize('a').w - hwpEqSize('b').w)} b`);
+  assert.deepEqual([...pre.matchAll(/<hp:script>([^<]*)/g)].map((m) => m[1]), ['y = a', 'b']);
   // 행을 가로지르는 \left\{는 한 수식 그대로(eqalign)
   const whole = hwpx([two([blk('text', '$$\n\\left\\{ \\begin{aligned} a \\\\ b \\end{aligned} \\right.\n$$')], [])]).section;
   assert.match(whole, /<hp:script>left lbrace eqalign\{a # b\} right none<\/hp:script>/);
