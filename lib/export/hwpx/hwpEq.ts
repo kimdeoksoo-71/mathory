@@ -251,7 +251,8 @@ export function latexToHwp(latex: string): HwpEqResult {
 
   // ⑤ 인용 표지 · ② 글자 보호
   s = s.replace(/\\mathoryref\{(\d+)\}/g, (_, n: string) => keep(`"${refMark(n)}"`));
-  s = replaceMacro(s, [...TEXT_CMDS], 1, ([t]) => keep(`"${t.replace(/"/g, "''").replace(/\$/g, '')}"`));
+  // `~`(LaTeX 붙은 공백)는 한글 따옴표 안에서 글자 그대로 찍힌다 → 공백으로(따옴표 안 공백은 한글이 보존한다)
+  s = replaceMacro(s, [...TEXT_CMDS], 1, ([t]) => keep(`"${t.replace(/"/g, "''").replace(/\$/g, '').replace(/~|\\[ ,;:]/g, ' ')}"`));
   // ⑥ 크기·장식 명령
   s = s.replace(/\\([a-zA-Z]+)(?![a-zA-Z])/g, (m, name: string) => (DROP.has(name) ? ' ' : m));
   s = replaceMacro(s, [...DROP_ARG], 1, () => ' ');

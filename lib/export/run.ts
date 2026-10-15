@@ -148,12 +148,21 @@ export async function runHwpxExport(sources: ExportSource[], opts: HwpxRunOption
   }
   if (warnings.length) console.warn('[Phase71 HWPX]', warnings);
 
-  const { bytes, notices, warnings: hw2 } = hw.serializeHwpx({
-    title: opts.fileName,
-    sources: hwpxSources,
-    bins,
-    options: { numbering: opts.numbering, placement: opts.placement },
-  });
+  // 수식 크기는 우리가 잰다 — 한글 2022는 열 때 다시 재지 않는다(hwpx/eqSize.ts). 측정 실패면 구조 추정
+  const meter = await import('./hwpx/measure').then((m) => m.createKatexMeasurer()).catch((e) => { console.warn('[Phase71 HWPX] 수식 측정기 실패 — 추정으로', e); return null; });
+  let out;
+  try {
+    out = hw.serializeHwpx({
+      title: opts.fileName,
+      sources: hwpxSources,
+      bins,
+      options: { numbering: opts.numbering, placement: opts.placement },
+      measure: meter?.measure,
+    });
+  } finally {
+    meter?.dispose();
+  }
+  const { bytes, notices, warnings: hw2 } = out;
   if (hw2.length) console.warn('[Phase71 HWPX]', hw2);
   if (failed) console.warn('[Phase71 HWPX] 그림 실패', failed);
   assets.downloadFile(bytes, `${assets.safeFileName(opts.fileName)}.hwpx`, 'application/hwp+zip');

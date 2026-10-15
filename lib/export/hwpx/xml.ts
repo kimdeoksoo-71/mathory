@@ -15,7 +15,8 @@ export type Item =
   | { k: 'text'; s: string }
   | { k: 'tab' }
   | { k: 'br' }
-  | { k: 'eq'; script: string }
+  /** size = 한글 수식 상자(sz 폭·높이 · baseLine %) — 한글은 열 때 다시 재지 않는다(eqSize.ts). 없으면 자리값 */
+  | { k: 'eq'; script: string; size?: { w: number; h: number; base: number } }
   | { k: 'rect'; paras: Para[]; width: number }
   | { k: 'pic'; bin: string; pxW: number; pxH: number; width: number; height: number; frame?: boolean }
   | { k: 'tbl'; rows: Para[][][]; colWidths: number[]; outerFill: number; cellFill: number; headRows: number }
@@ -126,7 +127,7 @@ function runXml(r: Run, ids: Ids): string {
 
 function objectXml(it: Item, ids: Ids): string {
   switch (it.k) {
-    case 'eq': return equationXml(it.script, ids);
+    case 'eq': return equationXml(it.script, ids, 1100, it.size);
     case 'rect': return rectXml(it.paras, it.width, ids);
     case 'pic': return picXml(it, ids);
     case 'tbl': return tblXml(it, ids);
@@ -135,14 +136,19 @@ function objectXml(it: Item, ids: Ids): string {
   }
 }
 
-/** 수식 — python-hwpx add_equation의 real-Hancom 모양. sz는 자리값(한글이 열 때 다시 잰다) */
-export function equationXml(script: string, ids: Ids, baseUnit = 1100): string {
+/**
+ * 수식 — python-hwpx add_equation의 real-Hancom 모양.
+ * ⚠ sz·baseLine은 **실제 크기여야 한다** — 한글 2022는 열 때 다시 재지 않고 상자 왼쪽 위에 수식을 그린다(2026-10-15 실물).
+ *   크기는 호출자가 잰다(브라우저 KaTeX 측정 · Node 추정 — eqSize.ts). 없을 때의 자리값은 옛 python-hwpx 식(테스트 전용).
+ */
+export function equationXml(script: string, ids: Ids, baseUnit = 1100, size?: { w: number; h: number; base: number }): string {
   const s = script.trim();
   const visible = s.replace(/[{}\s]/g, '').length;
-  const w = Math.round(baseUnit * 0.45 * Math.max(6, visible));
-  const h = Math.round(baseUnit * 2.5);
+  const w = size?.w ?? Math.round(baseUnit * 0.45 * Math.max(6, visible));
+  const h = size?.h ?? Math.round(baseUnit * 2.5);
+  const base = size?.base ?? 85;
   return (
-    `<hp:equation id="${ids.nextObj()}" zOrder="${ids.nextZ()}" numberingType="EQUATION" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" version="Equation Version 60" baseLine="85" textColor="#000000" baseUnit="${baseUnit}" lineMode="CHAR" font="HYhwpEQ">` +
+    `<hp:equation id="${ids.nextObj()}" zOrder="${ids.nextZ()}" numberingType="EQUATION" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" version="Equation Version 60" baseLine="${base}" textColor="#000000" baseUnit="${baseUnit}" lineMode="CHAR" font="HYhwpEQ">` +
     `<hp:sz width="${w}" widthRelTo="ABSOLUTE" height="${h}" heightRelTo="ABSOLUTE" protect="0"/>` +
     `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>` +
     `<hp:outMargin ${ZERO_MARGIN}/>` +

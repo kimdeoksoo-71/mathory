@@ -19,6 +19,7 @@ import { latexToHwp, rowsToHwp, refMark, type HwpEqResult } from './hwpEq';
 import { caseLabelHwp } from './roman';
 import { isLongChoices, type ChoicePiece } from './choices';
 import { buildPackage, type BinItem } from './package';
+import { estimateSize, type EqSize } from './eqSize';
 
 export interface HwpxOptions {
   /** N14 — 제목 끝 번호(1~30) / 앞에서부터 1, 2, … */
@@ -40,6 +41,8 @@ export interface HwpxInput {
   sources: HwpxSource[];
   bins: BinItem[];
   options: HwpxOptions;
+  /** 수식 크기 측정(브라우저 KaTeX — measure.ts). 없거나 null이면 구조 추정(estimateSize) */
+  measure?: (latex: string) => EqSize | null;
 }
 
 export interface HwpxResult {
@@ -89,7 +92,14 @@ class Writer {
   readonly reserved = new Set<string>();
   missingFigures = 0;
 
-  constructor(private opts: HwpxOptions) {}
+  constructor(private opts: HwpxOptions, private measureFn?: (latex: string) => EqSize | null) {}
+
+  /** 한글 수식 개체 — 크기는 같은 LaTeX를 KaTeX로 잰 값(인라인도 \\displaystyle — 덕수 원칙) */
+  eqItem(script: string, measureLatex: string): Item {
+    const src = measureLatex.replace(/\\mathoryref\{(\d+)\}/g, (_, n: string) => `\\text{${refMark(n)}}`);
+    const size = this.measureFn?.(src) ?? estimateSize(src);
+    return { k: 'eq', script, size };
+  }
 
   /* ═══ 공통 ═══ */
 
@@ -126,7 +136,7 @@ class Writer {
           case 'ref': push(cp, T(refMark(x.n))); break;                           // R2
           case 'math': {
             const s = this.eq(latexToHwp(x.latex));
-            if (s) push(cp, { k: 'eq', script: s });
+            if (s) push(cp, this.eqItem(s, x.textStyle ? x.latex : `\\displaystyle ${x.latex}`));
             break;
           }
           case 'strong': walk(x.inline, { ...f, bold: true }); break;
@@ -201,7 +211,8 @@ class Writer {
         let script = this.eq(r);
         if (!script.replace(/[{}\s]/g, '')) return f.tag ? [this.para(key, this.tagRuns([], f.tag, key))] : [];
         if (f.tag) script += ` cdots cdots cdots`;
-        const items: Item[] = [{ k: 'eq', script }];
+        const body = f.rows ? `\\begin{array}{l}${f.rows.map((r) => `\\displaystyle ${r.trim() || '{}'}`).join(' \\\\ ')}\\end{array}` : `\\displaystyle ${f.latex}`;
+        const items: Item[] = [this.eqItem(script, f.tag ? `${body} \\cdots\\cdots\\cdots` : body)];
         if (f.tag) items.push(T(` ${refMark(f.tag)}`));
         return [this.para(key, [{ charPr: this.sid(key).charPr, items }])];
       }
@@ -375,7 +386,7 @@ export function endnoteAnchor(paras: Para[]): number {
 }
 
 export function serializeHwpx(input: HwpxInput): HwpxResult {
-  const w = new Writer(input.options);
+  const w = new Writer(input.options, input.measure);
   const notices: string[] = [];
   const unnumbered: string[] = [];
   const body: Para[] = [];

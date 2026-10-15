@@ -44,6 +44,8 @@ test('D1 명령 이름 단위 치환 — \\left\\langle의 \\le를 먹지 않는
 test('D2 \\text 보호 — 따옴표 문자열, 안의 공백·기호 보존', () => {
   assert.equal(eq(R`a_n = \text{이 홀수인 경우}`), 'a_n = "이 홀수인 경우"');
   assert.equal(eq(R`\text{f'(x)는 \le}`), `"f'(x)는 \\le"`);
+  // `~`는 한글 따옴표 안에서 글자로 찍힌다 → 공백(실데이터 QULUP.26FS02 26번 `\text{~또는~}`)
+  assert.equal(eq(R`a \text{~또는~} b`), 'a " 또는 " b');
 });
 
 test('D3 환경 — aligned → eqalign · gathered → pile · 한 열 array → lpile/pile/rpile · 행렬 & #', () => {

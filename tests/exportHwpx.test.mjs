@@ -24,6 +24,7 @@ import { buildExportDoc } from '../.test-build/lib/export/ir.js';
 import { serializeHwpx, problemNumber, endnoteAnchor } from '../.test-build/lib/export/hwpx/hwpx.js';
 import { isLongChoices } from '../.test-build/lib/export/hwpx/choices.js';
 import { imageSize } from '../.test-build/lib/export/hwpx/imageSize.js';
+import { sizeFromEm, estimateSize } from '../.test-build/lib/export/hwpx/eqSize.js';
 import { STYLE_IDS } from '../.test-build/lib/export/hwpx/skeleton/ids.js';
 import { sampleProblem } from './fixtures/export/sampleProblem.mjs';
 
@@ -235,6 +236,28 @@ test('U2 imageSize — PNG IHDR · JPEG SOF', () => {
   assert.deepEqual(imageSize(png), { w: 530, h: 100 });
   const jpg = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 4, 0, 0, 0xff, 0xc0, 0, 11, 8, 0, 0x32, 0, 0x64, 3, 0, 0, 0]);
   assert.deepEqual(imageSize(jpg), { w: 100, h: 50 });
+});
+
+
+test('E1 수식 크기 — 한글은 열 때 다시 재지 않는다 · 글자 수식은 최소 위 0.87em·아래 0.153em(템플릿 `1` = 1125 · baseLine 85)', () => {
+  assert.deepEqual(sizeFromEm(0.5, 0.6444, 0), { w: 561, h: 1125, base: 85 });
+  const frac = estimateSize(String.raw`\displaystyle \frac{1}{2}`);
+  assert.ok(frac.h > 2000 && frac.base < 70, JSON.stringify(frac));        // 분수는 위아래로 크고 기준선이 가운데 쪽
+  const { section } = hwpx([single([blk('text', '값 $1$ 과 $\\frac{1}{2}$')])]);
+  const sz = [...section.matchAll(/<hp:equation [^>]*baseLine="(\d+)"[^>]*><hp:sz width="(\d+)" widthRelTo="ABSOLUTE" height="(\d+)"/g)].map((m) => m.slice(1).map(Number));
+  assert.equal(sz.length, 2);
+  assert.deepEqual(sz[0].slice(0, 1).concat(sz[0][2]), [85, 1125]);         // `1`
+  assert.ok(sz[1][2] > 2000, '분수 높이');
+  assert.ok(!section.includes('height="2750"'), '옛 자리값(2.5em)이 남지 않는다');
+});
+
+test('E2 측정기를 넘기면 그 값을 쓴다 · 인라인은 \\displaystyle로 잰다 · 인용 표지는 ㉠ 글자로', () => {
+  const seen = [];
+  const r = serializeHwpx({ title: 't', sources: [sourceOf(two([blk('text', '$x$')], [blk('text', '$\\ref{1}$')]))], bins: [],
+    options: { numbering: 'title', placement: 'column' }, measure: (l) => { seen.push(l); return { w: 777, h: 1234, base: 80 }; } });
+  const section = strFromU8(unzipSync(r.bytes)['Contents/section0.xml']);
+  assert.deepEqual(seen, [R`\displaystyle x`, R`\displaystyle \text{㉠}`]);
+  assert.match(section, /baseLine="80"[^>]*><hp:sz width="777" widthRelTo="ABSOLUTE" height="1234"/);
 });
 
 /* ═══ 스냅샷 ═══ */
