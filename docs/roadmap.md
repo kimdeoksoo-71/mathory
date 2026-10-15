@@ -2171,6 +2171,27 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 71: HWPX 내보내기 ✅ 구현 (2026-10-15) · 커밋 0~6 · 로직 테스트 HWPX 3종 36 · 70 테스트 무변화 · headless CDP 12/12 · 덤프 수식 31,006 미대응 명령 없음 99.96% · 덕수 실물(Stage 0) 대기
+
+계획서: `docs/phasedocs/Phase71 HWPX 내보내기 v5 착수판.md` (§11 구현 기록) · Stage 0 `docs/phaseSketch/phase71-stage0.md`
+(계보: v1·v2 web → v3 CLI 교차검토 + 검증 턴 → v4·v4.1·v4.2 web(템플릿 2~6차) → v5 착수판 → 구현)
+
+| 항목 | 71 뒤 |
+|---|---|
+| 형식 | 내보내기 다이얼로그에 **HWPX (한글)** — 문제·풀이 탭만 · 번호(제목 끝 1~30 / 순차) · 풀이 위치(좌단 문제·우단 풀이 / 미주) |
+| 일괄 | FolderView 리스트 선택 바 **'내보내기…'** — 문항 N개를 한 파일로(화면 정렬 순서 · 한 단에 한 문항) |
+| 구조 | IR → `lib/export/hwpx/` 직렬화기(셋째 벌) · 모양은 **템플릿 hwpx**(`docs/phasedocs/Mathory_tmp.hwpx` → `scripts/hwpxSkeleton.mjs` → skeleton) · 스타일 15종은 이름으로 찾는다 |
+| 수식 | LaTeX → 한글 수식(md2hwp 이식 + 이름 단위 치환 · eqalign · lpile · box) |
+| 표기 | 경우 `( i )`·`( i - 1 )` · 행 끝 번호 `⋯⋯⋯ ㉠` · 빈칸 `box{}` · 긴 선택지 3+2 |
+
+**서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 렌더 사이트 0 · 폰 0.** IR 인용 표지 1건(typst·latex 출력 바이트 불변 — 단독 커밋) · devDependency +1(`@xmldom/xmldom`).
+
+- **계획서 왕복이 잡은 것**(v3 교차검토 + 검증 턴): 템플릿 쪽 틀의 손으로 쓴 "20" · 해설-Tip이 번호 글자 모양 · 선지-3의 실제 용도(3+2) · 두 자리 번호의 탭 2개 · 글상자 curSz가 실제 높이의 음수(자동 확장 정황) · 일괄 그림 id 충돌 · mimetype 압축·mtime 비결정 · 리스트 순서 ≠ 카드 순서
+- **구현이 잡은 것**: md2hwp가 `\left\langle`의 `\le`를 leq로 먹는다(맥 실행 확인 → 이름 단위 치환) · 합답형 `ㄱ, ㄴ, ㄷ`이 수식 임계로는 3+2로 넘어간다(글자뿐 임계 따로) · 미주는 첫 문단 autoNum이 있어야 한글이 그린다(python-hwpx 계약)
+- 남은 일: 덕수 실물(S-1·S-12·S-3·S-5′·S-6·S-10′·S-4·S-7 · 일괄) · push
+
+---
+
 ## Phase 70: 내보내기 1단계(IR · LaTeX · Typst · 인쇄 엔진 교체) ✅ 구현 (2026-10-13) · 70a·70b · 로직 테스트 내보내기 5종 60 · headless CDP 16/16 · Stage 0 P0-1 시트+덤프 6,507문항 · 수식 203,969 · 실패 문항 0.1% · **덕수 Overleaf·다이얼로그·멤버 탭 확인** · 70b 실물 종결 · **70c 수능 시험지 양식** · 70c 실물 검수 대기
 
 계획서: `docs/phasedocs/Phase70 내보내기 1단계(IR·LaTeX·Typst) v4 착수판.md` (§11 구현 기록 · 70a 커밋 1~8 · 70b 커밋 1~5 · 70c §11-7) · Stage 0 `docs/phaseSketch/phase70-stage0.md`
