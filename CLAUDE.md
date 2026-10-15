@@ -101,7 +101,7 @@ lib/export/               — 내보내기(Phase 70a). blockKinds(D2 type→kind
                             compile(70b — 브라우저 Typst PDF, 동적 import 전용) · isolate(D28 실패 수식 이분 탐색, import 0)
 scripts/exportAssets.mjs  — Typst 웹 컴파일러 wasm → public/typst/(버전 붙은 이름 · gitignore · predev·build) (Phase 70b)
 lib/export/hwpx/          — HWPX 직렬화기(Phase 71 — 직렬화기 셋째 벌). styles(스타일 표 — 한글 이름이 정본) · skeleton/(템플릿 추출 **생성 파일** — parts·ids) ·
-                            xml(OWPML 빌더·HeaderBuilder) · hwpEq(LaTeX → 한글 수식) · choices(긴 선택지 판정) · roman(`( i )` 라벨) · imageSize · zip · package ·
+                            xml(OWPML 빌더·HeaderBuilder) · hwpEq(LaTeX → 한글 수식) · choices(긴 선택지 판정) · roman(`(ⅰ)`·`(ⅰ-1)` 라벨 — 유니코드 U+2170~ · 공백 없음, 옛 `( i )`는 탭 자리를 넘겼다) · imageSize · zip · package ·
                             hwpx(IR → .hwpx) — 이상 Node 테스트 가능 · batch(브라우저 일괄 로더)
 scripts/hwpxSkeleton.mjs  — 템플릿 hwpx → lib/export/hwpx/skeleton/ (`--scrub` 개인 정보 제거 · `--check` 드리프트) (Phase 71)
 scripts/hwpxStage0.mjs    — Stage 0 시험 파일(S-1·S-12·구조) → docs/phaseSketch/phase71-stage0/(로컬) (Phase 71)
