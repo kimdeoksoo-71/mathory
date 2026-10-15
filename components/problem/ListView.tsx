@@ -9,7 +9,7 @@
  *   주면 첫·끝 트랙이 부모와 어긋난다 — buildGridTemplate 주석 참조).
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Problem, Folder, UserProfile, MemberRole } from '../../types/problem';
 import { updateMemberRole, removeMember } from '../../lib/membership';
 import VerifyBadge from '../ui/VerifyBadge';
@@ -119,6 +119,8 @@ interface ListViewProps {
   onView: (p: Problem) => void;
   onProblemAction: (action: string, p: Problem) => void;
   onChanged: () => void;
+  /** Phase 71 N16 — 화면 정렬 순서(문항 id). 일괄 내보내기가 이 순서를 쓴다(FolderView의 folderProblems는 카드 정렬) */
+  onOrderChange?: (ids: string[]) => void;
 }
 
 function fmtDate(d?: Date): string {
@@ -162,7 +164,7 @@ function UpdatedCell({ d }: { d?: Date }) {
 export default function ListView({
   problems, scopeKey, mode, prefs, bodyGridRef, folderRows = [], onSelectFolder, dragUid = null,
   selectedIds, onSelectionChange, selectable = false,
-  recipientUid, profiles, onView, onProblemAction, onChanged,
+  recipientUid, profiles, onView, onProblemAction, onChanged, onOrderChange,
 }: ListViewProps) {
   const { commentCounts, agentCounts } = useCommentCounts(problems, scopeKey);
   const [menu, setMenu] = useState<{ x: number; y: number; problem: Problem } | null>(null);
@@ -209,6 +211,10 @@ export default function ListView({
     // D10 — 동률은 제목 오름차순 tie-break(서열 칼럼이 사실상 무순서가 되는 것 방지)
     return mul * v || byTitle(a, b);
   });
+
+  // Phase 71 N16 — 정렬 순서가 바뀔 때만 올린다(문자열 키 — 매 렌더 새 배열로 부모를 흔들지 않게)
+  const orderKey = sorted.map((p) => p.id).join('|');
+  useEffect(() => { onOrderChange?.(orderKey ? orderKey.split('|') : []); }, [orderKey, onOrderChange]);
 
   // Phase 63 D14 — 폴더 정렬은 폴더끼리만(문항과 섞이지 않는다). title·updated에만 반응.
   const sortedFolders = [...folderRows].sort((a, b) => {

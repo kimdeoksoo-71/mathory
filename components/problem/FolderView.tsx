@@ -34,6 +34,7 @@ import { getChildren, getFolderPath } from '../../lib/folder-tree';
 import CoachBlock from '../ui/CoachBlock';
 import { isCoachBlock } from '../../lib/coachBlock';
 import BatchVerifyDialog from './BatchVerifyDialog';
+import ExportDialog from '../export/ExportDialog';
 import { isImeKey } from '../../lib/imeKey';
 
 const FONT_SIZE_KEY = 'mathory-content-font-size';
@@ -306,7 +307,11 @@ export default function FolderView({
   }, []);
   const lastCardPointerRef = useRef<string>('mouse');
   const [batchMoveOpen, setBatchMoveOpen] = useState(false);
-  useEffect(() => { setSelectedIds(new Set()); setBatchMoveOpen(false); }, [folder.id]);
+  // Phase 71 — 일괄 HWPX 내보내기. 순서는 리스트 화면 순서(ListView onOrderChange — N16)
+  const [exportIds, setExportIds] = useState<string[] | null>(null);
+  const listOrderRef = useRef<string[]>([]);
+  const onListOrder = useCallback((ids: string[]) => { listOrderRef.current = ids; }, []);
+  useEffect(() => { setSelectedIds(new Set()); setBatchMoveOpen(false); setExportIds(null); }, [folder.id]);
   // 목록 갱신 시 사라진 문항을 선택에서 정리 — 이동·삭제 완료 해제가 여기서 성립한다
   useEffect(() => {
     setSelectedIds((prev) => {
@@ -646,6 +651,13 @@ export default function FolderView({
                 </>
               ) : (
                 <>
+                  <button
+                    onClick={() => {
+                      const order = listOrderRef.current.length ? listOrderRef.current : folderProblems.map((p) => p.id);
+                      setExportIds(order.filter((id) => selectedIds.has(id)));
+                    }}
+                    style={selectionBarBtn}
+                  >내보내기…</button>
                   <button onClick={() => setBatchMoveOpen(true)} style={selectionBarBtn}>폴더 변경…</button>
                   <button onClick={runBatchTrash} style={{ ...selectionBarBtn, color: 'var(--accent-danger)' }}>휴지통</button>
                 </>
@@ -797,6 +809,7 @@ export default function FolderView({
             profiles={listContext?.profiles}
             onView={onView}
             onProblemAction={onProblemAction}
+            onOrderChange={onListOrder}
             onChanged={() => onUpdated?.()}
           />
         )}
@@ -965,6 +978,14 @@ export default function FolderView({
           onPick={runBatchMove}
         />
       )}
+
+      {/* Phase 71 — 일괄 HWPX 내보내기(선택 바 '내보내기…') */}
+      <ExportDialog
+        open={exportIds !== null}
+        onClose={() => setExportIds(null)}
+        title={folder.name}
+        batch={exportIds ? { problemIds: exportIds } : undefined}
+      />
 
       {/* Phase 61d: 일괄 검증. ⚠ 전체 뷰포트 모달이라 이 위치에 두어도 사이드바까지 덮는다
           (main은 z-index 없는 position:relative라 스태킹 컨텍스트를 만들지 않는다) */}

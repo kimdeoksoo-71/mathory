@@ -1,0 +1,51 @@
+'use client';
+// Phase 71 임시 라우트 — app/dev71/page.tsx로 복사해 쓰고 검증 뒤 지운다(68b·68c·70 선례). 커밋하지 않는다.
+// 하니스: docs/phaseSketch/phase71-cdp-harness.mjs
+import { useEffect, useState } from 'react';
+import ExportDialog from '../../components/export/ExportDialog';
+import type { Block, TabMeta } from '../../types/problem';
+
+const R = String.raw;
+const b = (id: string, type: string, raw_text: string, extra: Partial<Block> = {}) => ({ id, type, raw_text, order: 0, ...extra } as unknown as Block);
+
+const tabs: TabMeta[] = [
+  { id: 'question', label: '문제' } as TabMeta,
+  { id: 'solution', label: '풀이' } as TabMeta,
+  { id: 'extra_0', label: 'AI 풀이' } as TabMeta,
+];
+const tabBlocks: Record<string, Block[]> = {
+  question: [
+    b('q1', 'text', R`함수 $f(x)=\frac{x^2+1}{x}$에 대하여 빈칸 $\boxed{~\text{(가)}~}$를 구하시오. [4점]`),
+    b('q2', 'gana', R`(가) $\lim_{x \to 0+} f(x) = \infty$
+(나) 모든 실수 $x$에 대하여 $f(x) \ge 2$이다.`),
+    b('q3', 'image', '<img src="/og-default.png" alt="" width="400" />', { imageWidth: 360, imageGray: true } as Partial<Block>),
+    b('q4', 'choices', R`① $18+15\sqrt{3}$
+② $24+20\sqrt{3}$
+③ $30+25\sqrt{3}$
+④ $36+30\sqrt{3}$
+⑤ $42+35\sqrt{3}$`),
+  ],
+  solution: [
+    b('s1', 'case', R`$x>0$인 경우
+$$
+\begin{cases} x+1 & (x<1) \\ x^2 & (x \ge 1) \end{cases} \tag{1}
+$$`),
+    b('s2', 'svg', '/icons/phosphor/2.1.1/regular/acorn.svg', { svg_height: 120 } as Partial<Block>),
+    b('s3', 'text', '<img src="/does-not-exist.png" width="200" />'),
+    b('s4', 'text', R`\ref{1}에서 $\overset{a}{b}$ 끝`),
+  ],
+  extra_0: [b('x1', 'text', 'AI 풀이 — 내보내지 않는다')],
+};
+
+declare global { interface Window { __h71: { ready: boolean } } }
+
+export default function Dev71() {
+  const [open, setOpen] = useState(true);
+  useEffect(() => { window.__h71 = { ready: true }; }, []);
+  return (
+    <div style={{ padding: 20 }}>
+      <button id="reopen" onClick={() => setOpen(true)}>열기</button>
+      <ExportDialog open={open} onClose={() => setOpen(false)} title="표본 문항 21" tabs={tabs} tabBlocks={tabBlocks} onMarkdown={() => {}} />
+    </div>
+  );
+}

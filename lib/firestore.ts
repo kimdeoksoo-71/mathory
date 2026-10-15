@@ -267,6 +267,34 @@ export async function getProblemWithBlocks(problemId: string): Promise<ProblemWi
   };
 }
 
+/**
+ * Phase 71 G12 — HWPX 일괄 내보내기용: 문항 doc + **문제·풀이 두 탭만**(D18 — 추가 탭은 읽지 않는다).
+ * 읽기 실패 탭은 빈 배열 + `tabLoadErrors`(getProblemWithBlocks와 같은 규약).
+ */
+export async function getProblemExportBlocks(problemId: string): Promise<{
+  title: string;
+  tabs: { id: string; label: string; blocks: Block[] }[];
+  tabLoadErrors: Record<string, string>;
+} | null> {
+  const problem = await getProblem(problemId);
+  if (!problem) return null;
+  const meta = problem.tabs || DEFAULT_TABS;
+  const tabLoadErrors: Record<string, string> = {};
+  const tabs: { id: string; label: string; blocks: Block[] }[] = [];
+  for (const id of ['question', 'solution']) {
+    const m = meta.find((t) => t.id === id);
+    if (!m) continue;
+    try {
+      const snap = await getDocs(query(collection(db, 'problems', problemId, tabSubcollection(id)), orderBy('order')));
+      tabs.push({ id, label: m.label, blocks: snap.docs.map((d) => ({ id: d.id, ...d.data() } as Block)) });
+    } catch (err: any) {
+      tabs.push({ id, label: m.label, blocks: [] });
+      tabLoadErrors[id] = err?.code || err?.message || 'unknown';
+    }
+  }
+  return { title: problem.title, tabs, tabLoadErrors };
+}
+
 /** 문제의 question 탭 블록만 경량 로딩 (FolderView 미리보기용) */
 export async function getQuestionBlocks(problemId: string): Promise<Block[]> {
   const subcol = tabSubcollection('question');
