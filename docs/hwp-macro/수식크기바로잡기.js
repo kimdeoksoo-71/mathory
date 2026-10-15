@@ -2,40 +2,62 @@
 // Mathory — 수식 크기 바로잡기 (한글 2022 스크립트 매크로)
 //
 // 왜: Mathory가 내보낸 .hwpx를 한글 2022(12.0.0.4426)는 열 때 수식 크기를 다시 재지 않는다.
-//     Mathory는 한글 규칙 모델(lib/export/hwpx/hwpLayout.ts)로 크기를 미리 계산해 넣지만 오차가 남는다
-//     (실측 대비 폭 ±2~6% · 세로 ±0.02em). 수식 편집기에 들어갔다 나오면 한글이 정확히 다시 잰다 —
-//     이 매크로가 문서의 모든 수식에 그 일을 한 번에 한다(글자 크기를 한 단계 바꿨다 되돌린다).
+//     Mathory는 한글 규칙 모델(lib/export/hwpx/hwpLayout.ts)로 크기를 미리 계산해 넣지만 오차가 남는다.
+//     수식 편집기에 들어갔다 나오면 한글이 정확히 다시 잰다 — 이 매크로가 문서의 모든 수식에 그 일을 한 번에 한다
+//     (글자 크기를 한 단계 바꿨다 되돌린다).
+//
+// ⚠ 한글은 매크로 이름이 X면 함수 `OnScriptMacro_X`를 부른다(2026-10-15 실물: 이름 "수식출입"으로 등록하자
+//   "OnScriptMacro_수식출입 … Function 개체가 아닙니다"). 그래서 아래에 이름 둘을 걸어 두었다 —
+//   다른 이름으로 등록했다면 맨 아래 연결 함수를 하나 더 만들어 그 이름으로 바꾸면 된다.
 //
 // 쓰는 법(한 번만 등록):
-//   1. 한글 2022 → [도구] → [매크로] → [스크립트 매크로] → [매크로 정의](또는 편집)
-//   2. 새 매크로를 만들고 아래 function 전체를 붙여 넣어 저장
-//   3. Mathory에서 받은 .hwpx를 열 때마다 [도구] → [매크로] → [스크립트 매크로] → [실행]에서
-//      "수식크기바로잡기"를 실행(단축키를 붙여 두면 편하다)
+//   1. 한글 2022 → [도구] → [매크로] → [스크립트 매크로]에서 새 매크로(이름: 수식출입 또는 수식크기바로잡기)
+//   2. 이 파일 전체를 붙여 넣어 저장
+//   3. Mathory에서 받은 .hwpx를 열 때마다 그 매크로를 실행(단축키를 붙여 두면 편하다)
 //
-// 한계(확인 필요): 본문의 수식은 확실히 고친다. 글상자·표·미주 안의 수식까지 고쳐지는지는 덕수 실물로 확인한다 —
-//   남는 수식이 있으면 그 위치를 알려 주면 다음 판에서 그쪽 순회를 더한다.
+// 한계(확인 필요): 본문의 수식은 고친다. 글상자·표·미주 안의 수식까지 고쳐지는지는 실물로 확인한다.
 // ═══════════════════════════════════════════════════════════════════════════
 
-function OnScriptMacro_수식크기바로잡기()
+function Mathory_수식크기바로잡기()
 {
+    var ctrl;
+    try {
+        ctrl = HeadCtrl;
+    } catch (e) {
+        Mathory_알림("HeadCtrl을 읽지 못했습니다 — 이 한글 판의 스크립트 매크로가 문서 개체를 내주지 않습니다.\n" + e.message);
+        return;
+    }
     var count = 0;
-    var ctrl = HeadCtrl;
+    var failed = 0;
     while (ctrl != null) {
         if (ctrl.CtrlID == "eqed") {
-            var set = ctrl.Properties;
-            var unit = set.Item("BaseUnit");
-            // 크기를 바꿨다 되돌리면 한글이 수식을 다시 조판하며 상자 크기·기준선을 새로 잰다
-            set.SetItem("BaseUnit", unit + 100);
-            ctrl.Properties = set;
-            set.SetItem("BaseUnit", unit);
-            ctrl.Properties = set;
-            count++;
+            try {
+                var set = ctrl.Properties;
+                var unit = set.Item("BaseUnit");
+                // 크기를 바꿨다 되돌리면 한글이 수식을 다시 조판하며 상자 크기·기준선을 새로 잰다
+                set.SetItem("BaseUnit", unit + 100);
+                ctrl.Properties = set;
+                set.SetItem("BaseUnit", unit);
+                ctrl.Properties = set;
+                count++;
+            } catch (e) {
+                failed++;
+            }
         }
         ctrl = ctrl.Next;
     }
+    Mathory_알림("수식 " + count + "개의 크기를 바로잡았습니다." + (failed ? "\n(실패 " + failed + "개)" : ""));
+}
+
+function Mathory_알림(text)
+{
     try {
-        MessageBox("수식 " + count + "개의 크기를 바로잡았습니다.");
+        MessageBox(text);
     } catch (e) {
         // 메시지 상자를 지원하지 않는 판 — 조용히 끝낸다
     }
 }
+
+// ── 매크로 이름 연결: 등록한 이름에 맞는 것이 불린다 ──
+function OnScriptMacro_수식출입() { Mathory_수식크기바로잡기(); }
+function OnScriptMacro_수식크기바로잡기() { Mathory_수식크기바로잡기(); }
