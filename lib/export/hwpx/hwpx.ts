@@ -81,6 +81,17 @@ interface Ctx {
 }
 
 const T = (s: string): Item => ({ k: 'text', s });
+
+/**
+ * 해설 본문 글자의 `(1)`·`(2)`… → `㉠`·`㉡`…(덕수 2026-10-16 — 해설의 `\tag{n}`이 `⋯⋯⋯ ㉠`이 되므로 뒤에서 인용하는
+ * `(n)`도 같은 글자로. 해설에서 `(n)`이 다른 뜻으로 쓰일 일은 없다). 1~14만(㉠~㉭) — 그 밖은 그대로. 수식 안은 대상 아님
+ */
+export function solutionRefText(text: string): string {
+  return text.replace(/\((\d{1,2})\)/g, (m, n: string) => {
+    const r = refMark(n);
+    return r === n ? m : r;
+  });
+}
 const TAB: Item = { k: 'tab' };
 
 class Writer {
@@ -152,7 +163,7 @@ class Writer {
       const cp = this.hb.charPr(base, f);
       for (const x of list) {
         switch (x.t) {
-          case 'text': push(cp, T(x.text)); break;
+          case 'text': push(cp, T(ctx.tone === 'solution' ? solutionRefText(x.text) : x.text)); break;
           case 'code': push(cp, T(x.text)); break;
           case 'br': push(cp, { k: 'br' }); break;
           case 'caseRef': push(cp, T(caseLabelHwp(x.text) ?? x.text)); break;   // R10 — 굵게 없음

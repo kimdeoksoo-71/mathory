@@ -21,7 +21,7 @@ import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 
 import { buildExportDoc } from '../.test-build/lib/export/ir.js';
-import { serializeHwpx, problemNumber, endnoteAnchor } from '../.test-build/lib/export/hwpx/hwpx.js';
+import { serializeHwpx, problemNumber, endnoteAnchor, solutionRefText } from '../.test-build/lib/export/hwpx/hwpx.js';
 import { isLongChoices } from '../.test-build/lib/export/hwpx/choices.js';
 import { imageSize } from '../.test-build/lib/export/hwpx/imageSize.js';
 import { hwpEqSize, layoutHwp } from '../.test-build/lib/export/hwpx/hwpLayout.js';
@@ -220,9 +220,18 @@ test('M7 여러 줄 수식 → 행마다 문단(덕수 2026-10-15) — 정렬 �
   // 환경 앞 조각 — 첫 행 앞에만(다음 행은 들이지 않는다)
   const pre = hwpx([two([blk('text', '$$\ny = \\begin{aligned} a \\\\ b \\end{aligned}\n$$')], [])]).section;
   assert.deepEqual([...pre.matchAll(/<hp:script>([^<]*)/g)].map((m) => m[1]), ['y = a', 'b']);
-  // 행을 가로지르는 \left\{는 한 수식 그대로(eqalign)
+  // 행을 가로지르는 \left\{ … \right.는 나누지 않고 한 수식 cases(2026-10-16 — 옛 left lbrace … right none은 한글에서 깨졌다)
   const whole = hwpx([two([blk('text', '$$\n\\left\\{ \\begin{aligned} a \\\\ b \\end{aligned} \\right.\n$$')], [])]).section;
-  assert.match(whole, /<hp:script>left lbrace eqalign\{a # b\} right none<\/hp:script>/);
+  assert.match(whole, /<hp:script>cases\{a # b\}<\/hp:script>/);
+});
+
+test('M8 해설 글자의 (n) → ㉠(덕수 2026-10-16) — 1~14만 · 문제 탭·수식 안은 그대로', () => {
+  assert.equal(solutionRefText('식 (1)과 (2)에서, (15)는 그대로'), '식 ㉠과 ㉡에서, (15)는 그대로');
+  assert.equal(solutionRefText('(1, 2)와 (가)'), '(1, 2)와 (가)');
+  const { section } = hwpx([two([blk('text', '문제에서 (1)은 그대로')], [blk('text', '따라서 (1)에 의해 $f(1)=2$이다.')])]);
+  assert.ok(section.includes('문제에서 (1)은 그대로'));
+  assert.ok(section.includes('따라서 ㉠에 의해 '));
+  assert.ok(section.includes('<hp:script>f(1)=2</hp:script>'));
 });
 
 /* ═══ 배치 ═══ */

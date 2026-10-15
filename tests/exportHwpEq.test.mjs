@@ -109,6 +109,17 @@ test('R3′ 여러 줄 display → 행(덕수 2026-10-15 — 정렬 없음) — 
   assert.equal(splitDisplayRows(R`a + b`), null);
 });
 
+test('R5 \\left\\{ 환경 \\right. → cases(덕수 실물 2026-10-16 — S-7: 옛 left lbrace matrix right none이 깨졌다)', () => {
+  assert.equal(eq(R`a_{n+1} = \left\{\begin{array}{ll} a_n+3 & (a_n \le 0) \\ \frac{1}{a_n}-3 & (a_n>0) \end{array}\right.`),
+    'a_{n+1} = cases{a_n+3 & ~~ (a_n leq 0) # {1} over {a_n} -3 & ~~ (a_n>0)}');
+  assert.equal(eq(R`f(x)=\left\{ \begin{aligned} -x & (x<0) \\ x & (x \geq 0) \end{aligned} \right.`),
+    'f(x)= cases{-x & ~~ (x<0) # x & ~~ (x geq 0)}');
+  // 한 열 array도 cases · 짝이 \right.가 아니면 그대로
+  assert.equal(eq(R`\left\{\begin{array}{l} p \\ q \end{array}\right.`), 'cases{p # q}');
+  assert.ok(eq(R`\left\{\begin{array}{l} p \\ q \end{array}\right\}`).includes('right rbrace'));
+  assert.ok(!eq(R`\left\{\begin{array}{ll} a & b \\ c & d \end{array}\right.`).includes('none'));
+});
+
 test('R4 HWP 특수 문자 이스케이프 — \\# \\& \\_ 는 따옴표', () => {
   assert.equal(eq(R`a \# b \& c \_ d \%`), 'a "#" b "&" c "_" d %');
 });

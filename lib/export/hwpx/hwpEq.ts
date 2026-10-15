@@ -326,6 +326,45 @@ function envToHwp(env: string, arg: string | null, body: string): string {
   return ` ${rows.join(' ')} `;
 }
 
+/**
+ * `\left\{ \begin{array|aligned|…} … \end{…} \right.` → `\begin{cases} … \end{cases}`(덕수 실물 2026-10-16 — S-7).
+ * 옛 판은 `left lbrace matrix{…} right none`을 냈고 한글이 `right none`을 못 읽어 수식이 깨졌다(`‖ one`).
+ * 덤프에서 이 꼴이 107개(array 105 · aligned 2) — 한글 `cases{}`가 같은 모양을 그린다.
+ */
+const BRACE_CASE_ENVS = ['array', 'darray', 'aligned', 'alignedat', 'matrix', 'smallmatrix', 'gathered', 'split'];
+function leftBraceToCases(s: string): string {
+  const openRe = /\\left\s*(?:\\\{|\\lbrace)\s*\\begin\s*\{([a-zA-Z]+)\*?\}/g;
+  let out = '';
+  let from = 0;
+  for (let m = openRe.exec(s); m; m = openRe.exec(s)) {
+    if (!BRACE_CASE_ENVS.includes(m[1])) continue;
+    // 여는 환경의 짝 \end
+    const tokRe = /\\(begin|end)\s*\{[a-zA-Z]+\*?\}/g;
+    tokRe.lastIndex = m.index + m[0].length;
+    let depth = 1;
+    let endAt = -1;
+    let endLen = 0;
+    for (let t = tokRe.exec(s); t; t = tokRe.exec(s)) {
+      depth += t[1] === 'begin' ? 1 : -1;
+      if (depth === 0) { endAt = t.index; endLen = t[0].length; break; }
+    }
+    if (endAt < 0) continue;
+    const close = /^\s*\\right\s*\./.exec(s.slice(endAt + endLen));
+    if (!close) continue;
+    let body = s.slice(m.index + m[0].length, endAt);
+    const opt = /^\s*\[[^\]]*\]/.exec(body);                       // aligned[t]
+    if (opt) body = body.slice(opt[0].length);
+    if (/^(array|darray|alignedat)$/.test(m[1])) {                  // 열 지정 {ll}·{2}
+      const r = readArg(body, 0);
+      if (r && /^\s*\{/.test(body)) body = body.slice(r.end);
+    }
+    out += s.slice(from, m.index) + `\\begin{cases}${body}\\end{cases}`;
+    from = endAt + endLen + close[0].length;
+    openRe.lastIndex = from;
+  }
+  return out + s.slice(from);
+}
+
 function convertEnvs(s: string): string {
   // 안쪽 환경부터(본문에 다른 \begin이 없는 것)
   const re = /\\begin\s*\{([a-zA-Z]+\*?)\}((?:(?!\\begin\s*\{)[\s\S])*?)\\end\s*\{\1\}/;
@@ -379,7 +418,8 @@ export function latexToHwp(latex: string): HwpEqResult {
   s = s.replace(/\^\s*('+)/g, (_, p: string) => '`' + p);
   s = s.replace(/(?<![`'])('+)/g, (_, p: string) => '`' + p);
 
-  // 환경(행렬·cases·eqalign·pile)
+  // 환경(행렬·cases·eqalign·pile) — `\left\{ 환경 \right.`은 먼저 cases로
+  s = leftBraceToCases(s);
   s = convertEnvs(s);
 
   // 분수·근호·상자·이항
