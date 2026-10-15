@@ -170,6 +170,125 @@ export function splitRows(body: string): string[] {
   return out;
 }
 
+/* ═══ 여러 줄 display → 행마다 수식 하나(덕수 2026-10-15) ═══ */
+
+export interface DisplayRow {
+  /** 정렬 기준 `&` 앞(정렬하지 않는 행은 '') */
+  left: string;
+  /** `&` 뒤(나머지 `&`는 정리됨) — 정렬하지 않는 행은 행 전체 */
+  right: string;
+}
+export interface DisplaySplit {
+  rows: DisplayRow[];
+  /** align = 첫 `&`에 맞춘다 · center = 행 가운데 맞춤(gathered) · left = 왼쪽 맞춤(맨 `\\` 행 — 앱은 array{l}) */
+  mode: 'align' | 'center' | 'left';
+  /** 환경 앞 조각(`\text{ - }` 글머리 등) — 첫 행 앞에 붙고 나머지 행은 그 폭만큼 들인다 */
+  prefix?: string;
+  /** 환경 뒤 조각(마침표 등) — 마지막 행 끝에 붙는다 */
+  suffix?: string;
+}
+
+const ALIGN_ENVS = ['aligned', 'align', 'alignat', 'alignedat', 'split', 'eqnarray', 'flalign'];
+const GATHER_ENVS = ['gathered', 'gather', 'multline'];
+
+/**
+ * 깊이 0(중괄호 밖 · 다른 환경 밖)에서 `\\` → 행, `&` → 칸. `\\[4pt]`의 크기 인수는 버린다.
+ * splitRows와 달리 **환경 깊이도 센다** — 행 안의 `\begin{cases} a \\ b \end{cases}`를 쪼개지 않는다.
+ */
+function scanCells(body: string): string[][] {
+  const rows: string[][] = [[]];
+  let cur = '';
+  let depth = 0;
+  let envDepth = 0;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '\\') {
+      const rest = body.slice(i);
+      const env = /^\\(begin|end)\s*\{[a-zA-Z]+\*?\}/.exec(rest);
+      if (env) { envDepth += env[1] === 'begin' ? 1 : -1; cur += env[0]; i += env[0].length - 1; continue; }
+      if (body[i + 1] === '\\' && depth === 0 && envDepth === 0) {
+        rows[rows.length - 1].push(cur);
+        rows.push([]);
+        cur = '';
+        i += 1;
+        const opt = /^\s*\[[^\]]*\]/.exec(body.slice(i + 1));
+        if (opt) i += opt[0].length;
+        continue;
+      }
+      cur += ch + (body[i + 1] ?? '');
+      i += 1;
+      continue;
+    }
+    if (ch === '{') depth++;
+    if (ch === '}') depth--;
+    if (ch === '&' && depth === 0 && envDepth === 0) { rows[rows.length - 1].push(cur); cur = ''; continue; }
+    cur += ch;
+  }
+  rows[rows.length - 1].push(cur);
+  return rows;
+}
+
+/** 환경 앞뒤 조각으로 받아도 되는가 — 행을 가로지르는 것(`\left\{`·다른 환경·`&`·`\\`)이 없고 중괄호가 맞을 때만 */
+function isFlatPiece(x: string): boolean {
+  if (/\\(left|right|begin|end)(?![a-zA-Z])|&|\\\\/.test(x.replace(/\\&/g, ''))) return false;
+  let d = 0;
+  for (let i = 0; i < x.length; i++) {
+    if (x[i] === '\\') { i++; continue; }
+    if (x[i] === '{') d++;
+    if (x[i] === '}' && --d < 0) return false;
+  }
+  return d === 0;
+}
+
+/**
+ * display 수식이 `aligned`·`gathered` 계열 환경 **하나**(+ 앞뒤 평평한 조각)면 행으로 나눈다 — 아니면 null(한 수식 그대로).
+ * 정렬 칸이 여럿인 행(`a &= b & c &= d`)은 첫 `&`에만 맞추고 나머지 칸 사이는 `\quad`(eqnarray `&=&`는 붙여 쓴다).
+ */
+export function splitDisplayRows(latex: string): DisplaySplit | null {
+  const t = latex.trim();
+  const first = /\\begin\s*\{([a-zA-Z]+)(\*?)\}/.exec(t);
+  if (!first) return null;
+  const prefix = t.slice(0, first.index).trim();
+  if (prefix && !isFlatPiece(prefix)) return null;
+  const s = t.slice(first.index);
+  const base = first[1];
+  const align = ALIGN_ENVS.includes(base);
+  if (!align && !GATHER_ENVS.includes(base)) return null;
+  // 여는 환경의 짝 \end — 그 뒤는 suffix
+  const tokRe = /\\(begin|end)\s*\{[a-zA-Z]+\*?\}/g;
+  let depth = 0;
+  let closeAt = -1;
+  let suffix = '';
+  for (let m = tokRe.exec(s); m; m = tokRe.exec(s)) {
+    depth += m[1] === 'begin' ? 1 : -1;
+    if (depth === 0) { closeAt = m.index; suffix = s.slice(tokRe.lastIndex).trim(); break; }
+  }
+  if (closeAt < 0 || (suffix && !isFlatPiece(suffix))) return null;
+  const extra = { ...(prefix ? { prefix } : {}), ...(suffix ? { suffix } : {}) };
+  let body = s.slice(first[0].length, closeAt);
+  const opt = /^\s*\[[^\]]*\]/.exec(body);                       // aligned[t]
+  if (opt) body = body.slice(opt[0].length);
+  if (base === 'alignat' || base === 'alignedat') {               // {열 수}
+    const n = /^\s*\{[^{}]*\}/.exec(body);
+    if (n) body = body.slice(n[0].length);
+  }
+  const cells = scanCells(body)
+    .map((cs) => cs.map((c) => c.trim()))
+    .filter((cs) => cs.some((c) => c !== ''));
+  if (cells.length === 0) return null;
+  if (!align) return { mode: 'center', rows: cells.map((cs) => ({ left: '', right: cs.join(' ') })), ...extra };
+  const rows = cells.map((cs): DisplayRow => {
+    if (cs.length === 1) return { left: cs[0], right: '' };       // `&` 없는 행 — LaTeX는 정렬점에서 끝나게(왼쪽 칸) 둔다
+    const rest = cs.slice(1).reduce((acc, c, k) => {
+      if (k === 0) return c;
+      const sep = base !== 'eqnarray' && k % 2 === 1 ? ' \\quad ' : ' ';  // 칸 쌍(r&l) 사이만 띄운다(`a &= b & c &= d`의 b·c 사이)
+      return acc + sep + c;
+    }, '');
+    return { left: cs[0], right: rest };
+  });
+  return { mode: 'align', rows, ...extra };
+}
+
 const MATRIX_FENCE: Record<string, [string, string]> = {
   pmatrix: [' left ( ', ' right ) '], bmatrix: [' left [ ', ' right ] '], Bmatrix: [' left lbrace ', ' right rbrace '],
   vmatrix: [' left | ', ' right | '], Vmatrix: [' left || ', ' right || '], matrix: ['', ''], smallmatrix: ['', ''],
@@ -309,14 +428,4 @@ export function latexToHwp(latex: string): HwpEqResult {
   s = s.replace(/\{\s+/g, '{').replace(/\s+\}/g, '}').replace(/\s+/g, ' ').trim();
   s = s.replace(/\u0001(\d+)\u0002/g, (_, i: string) => texts[parseInt(i, 10)]);
   return { script: s, unknown: [...unknown], reserved };
-}
-
-/** IR `display.rows`(맨 `\\` 행) → 왼쪽 정렬 쌓기(앱은 `array{l}`로 그린다 — v3 E18) */
-export function rowsToHwp(rows: string[]): HwpEqResult {
-  const parts = rows.map((r) => latexToHwp(r.trim() || '{}'));
-  return {
-    script: `lpile{${parts.map((p) => p.script).join(' # ')}}`,
-    unknown: [...new Set(parts.flatMap((p) => p.unknown))],
-    reserved: [...new Set(parts.flatMap((p) => p.reserved))],
-  };
 }

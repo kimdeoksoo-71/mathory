@@ -9,7 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { latexToHwp, rowsToHwp, refMark, splitRows } from '../.test-build/lib/export/hwpx/hwpEq.js';
+import { latexToHwp, splitDisplayRows, refMark, splitRows } from '../.test-build/lib/export/hwpx/hwpEq.js';
 
 const R = String.raw;
 const eq = (latex) => latexToHwp(latex).script;
@@ -84,9 +84,30 @@ test('R2 모르는 명령은 낱말로 남기고 알린다 · 예약어 경고(G
   assert.deepEqual(latexToHwp(R`\begin{cases} a \end{cases}`).reserved, []);
 });
 
-test('R3 rows → lpile · splitRows는 깊이 0 \\\\만 · 꼬리 빈 행 버림', () => {
-  assert.equal(rowsToHwp(['a=1', 'b=\\frac{1}{2}']).script, 'lpile{a=1 # b= {1} over {2}}');
+test('R3 splitRows는 깊이 0 \\\\만 · 꼬리 빈 행 버림', () => {
   assert.deepEqual(splitRows(R`a \\[4pt] {b \\ c} \\ `), ['a', R`{b \\ c}`]);
+});
+
+test('R3′ 여러 줄 display → 행(덕수 2026-10-15) — aligned 계열만 · 환경 안 \\\\·& 보존 · 칸 쌍 사이 \\quad', () => {
+  assert.deepEqual(splitDisplayRows(R`\begin{aligned} f(x) &= a \\[2pt] &= b \\ \end{aligned}`), {
+    mode: 'align', rows: [{ left: 'f(x)', right: '= a' }, { left: '', right: '= b' }],
+  });
+  // 행 안의 cases는 쪼개지 않는다 · & 없는 행은 왼쪽 칸
+  assert.deepEqual(splitDisplayRows(R`\begin{align*} y &= \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases} \\ z \end{align*}`).rows, [
+    { left: 'y', right: R`= \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases}` }, { left: 'z', right: '' },
+  ]);
+  assert.deepEqual(splitDisplayRows(R`\begin{aligned}[t] a &= 1 & b &= 2 \end{aligned}`).rows, [{ left: 'a', right: R`= 1 \quad b = 2` }]);
+  assert.deepEqual(splitDisplayRows(R`\begin{alignedat}{2} a &= 1 \\ b &= 2 \end{alignedat}`).rows.map((r) => r.left), ['a', 'b']);
+  assert.deepEqual(splitDisplayRows(R`\begin{gathered} a \\ bb \end{gathered}`), { mode: 'center', rows: [{ left: '', right: 'a' }, { left: '', right: 'bb' }] });
+  // 앞뒤 평평한 조각은 prefix·suffix로 / 행을 가로지르는 것(\left\{ · 바깥 환경 · 감싼 중괄호)이 붙으면 그대로(한 수식)
+  assert.deepEqual(splitDisplayRows(R`\text { - } \begin{aligned} a &= 1 \\ &= 2 \end{aligned}.`), {
+    mode: 'align', rows: [{ left: 'a', right: '= 1' }, { left: '', right: '= 2' }], prefix: R`\text { - }`, suffix: '.',
+  });
+  assert.equal(splitDisplayRows(R`\left\{ \begin{aligned} a \\ b \end{aligned} \right.`), null);
+  assert.equal(splitDisplayRows(R`\begin{array}{l} x \\ \begin{aligned} a \\ b \end{aligned} \end{array}`), null);
+  assert.equal(splitDisplayRows(R`\boxed{\begin{aligned} a \\ b \end{aligned}}`), null);
+  assert.equal(splitDisplayRows(R`\begin{cases} a \\ b \end{cases}`), null);
+  assert.equal(splitDisplayRows(R`a + b`), null);
 });
 
 test('R4 HWP 특수 문자 이스케이프 — \\# \\& \\_ 는 따옴표', () => {
