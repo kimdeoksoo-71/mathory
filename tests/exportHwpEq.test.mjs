@@ -9,7 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { latexToHwp, splitDisplayRows, refMark, splitRows } from '../.test-build/lib/export/hwpx/hwpEq.js';
+import { latexToHwp, splitDisplayRows, refMark, splitRows, circleRefs } from '../.test-build/lib/export/hwpx/hwpEq.js';
 
 const R = String.raw;
 const eq = (latex) => latexToHwp(latex).script;
@@ -88,7 +88,7 @@ test('R3 splitRows는 깊이 0 \\\\만 · 꼬리 빈 행 버림', () => {
   assert.deepEqual(splitRows(R`a \\[4pt] {b \\ c} \\ `), ['a', R`{b \\ c}`]);
 });
 
-test('R3′ 여러 줄 display → 행(덕수 2026-10-15 — 정렬 없음) — aligned 계열만 · 환경 안 \\·& 보존 · & 지움 · 칸 쌍 사이 \quad', () => {
+test('R3′ 여러 줄 display → 행(덕수 2026-10-15 — 정렬 없음) — aligned 계열·한 열 array · 환경 안 \\·& 보존 · & 지움 · 칸 쌍 사이 \quad', () => {
   assert.deepEqual(splitDisplayRows(R`\begin{aligned} f(x) &= a \\[2pt] &= b \\ \end{aligned}`), { rows: ['f(x) = a', '= b'] });
   // 행 안의 cases는 쪼개지 않는다
   assert.deepEqual(splitDisplayRows(R`\begin{align*} y &= \begin{cases} 1 & x>0 \\ 0 & x \le 0 \end{cases} \\ z \end{align*}`).rows, [
@@ -98,12 +98,16 @@ test('R3′ 여러 줄 display → 행(덕수 2026-10-15 — 정렬 없음) — 
   assert.deepEqual(splitDisplayRows(R`\begin{eqnarray} a &=& 1 \\ b &=& 2 \end{eqnarray}`).rows, ['a = 1', 'b = 2']);
   assert.deepEqual(splitDisplayRows(R`\begin{alignedat}{2} a &= 1 \\ b &= 2 \end{alignedat}`).rows, ['a = 1', 'b = 2']);
   assert.deepEqual(splitDisplayRows(R`\begin{gathered} a \\ bb \end{gathered}`), { rows: ['a', 'bb'] });
+  // 한 열 array{l}도 행으로(덕수 2026-10-16 — \Rightarrow\left[ … \right. 행 포함) · 여러 열 array는 표라 그대로
+  assert.deepEqual(splitDisplayRows(R`\begin{array}{l} S=1 \\ \Rightarrow\left[\begin{array}{l} a \\ b \end{array}\right. \end{array}`).rows,
+    ['S=1', R`\Rightarrow\left[\begin{array}{l} a \\ b \end{array}\right.`]);
+  assert.equal(splitDisplayRows(R`\begin{array}{ll} a & b \\ c & d \end{array}`), null);
   // 앞뒤 평평한 조각은 prefix·suffix로 / 행을 가로지르는 것(\left\{ · 바깥 환경 · 감싼 중괄호)이 붙으면 그대로(한 수식)
   assert.deepEqual(splitDisplayRows(R`\text { - } \begin{aligned} a &= 1 \\ &= 2 \end{aligned}.`), {
     rows: ['a = 1', '= 2'], prefix: R`\text { - }`, suffix: '.',
   });
   assert.equal(splitDisplayRows(R`\left\{ \begin{aligned} a \\ b \end{aligned} \right.`), null);
-  assert.equal(splitDisplayRows(R`\begin{array}{l} x \\ \begin{aligned} a \\ b \end{aligned} \end{array}`), null);
+  assert.deepEqual(splitDisplayRows(R`\begin{array}{l} x \\ \begin{aligned} a \\ b \end{aligned} \end{array}`).rows, ['x', R`\begin{aligned} a \\ b \end{aligned}`]);
   assert.equal(splitDisplayRows(R`\boxed{\begin{aligned} a \\ b \end{aligned}}`), null);
   assert.equal(splitDisplayRows(R`\begin{cases} a \\ b \end{cases}`), null);
   assert.equal(splitDisplayRows(R`a + b`), null);
@@ -118,6 +122,20 @@ test('R5 \\left\\{ 환경 \\right. → cases(덕수 실물 2026-10-16 — S-7: �
   assert.equal(eq(R`\left\{\begin{array}{l} p \\ q \end{array}\right.`), 'cases{p # q}');
   assert.ok(eq(R`\left\{\begin{array}{l} p \\ q \end{array}\right\}`).includes('right rbrace'));
   assert.ok(!eq(R`\left\{\begin{array}{ll} a & b \\ c & d \end{array}\right.`).includes('none'));
+});
+
+test('R6 \\right. → 아무것도 내지 않는다(덕수 2026-10-16 — right none은 한글에서 깨진다 · left [ 만 두면 왼쪽 괄호로 묶는다)', () => {
+  assert.equal(eq(R`\Rightarrow\left[\begin{array}{l} \bullet a \\ \bullet b \end{array}\right.`), '`Rightarrow` left [ lpile{bullet a # bullet b}');
+  assert.equal(eq(R`\left( a+b \right.`), 'left ( a+b');
+  assert.ok(!eq(R`\left[ x \right.`).includes('none'));
+});
+
+test('R7 해설 수식의 (n) → ㉠ — \\text{…(n)…}·\\because (n)만(맨 (n)은 f(2) 같은 인자라 그대로) · refs 없으면 그대로', () => {
+  assert.equal(latexToHwp(R`9(\because \text { (1) })`, { refs: true }).script, '9( because " ㉠ ")');
+  assert.equal(latexToHwp(R`r \neq 0 \; (\because (2))`, { refs: true }).script, 'r neq 0 ~ ( because "㉡")');
+  assert.equal(latexToHwp(R`f(2)=3 \text{ (15) }`, { refs: true }).script, 'f(2)=3 " (15) "');
+  assert.equal(latexToHwp(R`9(\because \text { (1) })`).script, '9( because " (1) ")');
+  assert.equal(circleRefs('(1)과 (14), (15)'), '㉠과 ㉭, (15)');
 });
 
 test('R4 HWP 특수 문자 이스케이프 — \\# \\& \\_ 는 따옴표', () => {

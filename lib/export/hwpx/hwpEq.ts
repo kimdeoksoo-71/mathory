@@ -36,6 +36,17 @@ export function refMark(n: string): string {
   return n;
 }
 
+/**
+ * 해설의 `(1)`·`(2)`… → `㉠`·`㉡`…(덕수 2026-10-16 — 해설의 `\tag{n}`이 `⋯⋯⋯ ㉠`이 되므로 인용하는 `(n)`도 같은 글자로.
+ * 해설에서 `(n)`이 다른 뜻으로 쓰일 일은 없다). 1~14만 — 그 밖은 그대로. 글자 문단과 수식 안 `\text{…}`가 쓴다
+ */
+export function circleRefs(text: string): string {
+  return text.replace(/\((\d{1,2})\)/g, (m, n: string) => {
+    const r = refMark(n);
+    return r === n ? m : r;
+  });
+}
+
 /* ═══ 표 ═══ */
 
 const GREEK = [
@@ -250,7 +261,8 @@ export function splitDisplayRows(latex: string): DisplaySplit | null {
   const s = t.slice(first.index);
   const base = first[1];
   const align = ALIGN_ENVS.includes(base);
-  if (!align && !GATHER_ENVS.includes(base)) return null;
+  const single = base === 'array' || base === 'darray';            // 한 열 array{l}(덕수 2026-10-16 — `$$\begin{array}{l} … \\ \Rightarrow … \end{array}$$`)
+  if (!align && !GATHER_ENVS.includes(base) && !single) return null;
   // 여는 환경의 짝 \end — 그 뒤는 suffix
   const tokRe = /\\(begin|end)\s*\{[a-zA-Z]+\*?\}/g;
   let depth = 0;
@@ -268,6 +280,11 @@ export function splitDisplayRows(latex: string): DisplaySplit | null {
   if (base === 'alignat' || base === 'alignedat') {               // {열 수}
     const n = /^\s*\{[^{}]*\}/.exec(body);
     if (n) body = body.slice(n[0].length);
+  }
+  if (single) {                                                     // 열 지정이 한 열(l·c·r 하나)일 때만 — 여러 열이면 표다
+    const n = /^\s*\{((?:[^{}]|\{[^{}]*\})*)\}/.exec(body);
+    if (!n || n[1].replace(/[^lcr]/g, '').length !== 1) return null;
+    body = body.slice(n[0].length);
   }
   const cells = scanCells(body)
     .map((cs) => cs.map((c) => c.trim()))
@@ -394,7 +411,8 @@ const DELIM: Record<string, string> = {
   '\\lfloor': 'lfloor', '\\rfloor': 'rfloor', '\\lceil': 'lceil', '\\rceil': 'rceil',
 };
 
-export function latexToHwp(latex: string): HwpEqResult {
+/** `refs` = 해설 수식 — `\text{…(n)…}`·`\because (n)`의 `(n)`을 `㉠`으로(맨 `(n)`은 `f(2)` 같은 인자와 섞여 건드리지 않는다) */
+export function latexToHwp(latex: string, opts: { refs?: boolean } = {}): HwpEqResult {
   const unknown = new Set<string>();
   const texts: string[] = [];
   const keep = (s: string) => { texts.push(s); return `\u0001${texts.length - 1}\u0002`; };
@@ -405,9 +423,10 @@ export function latexToHwp(latex: string): HwpEqResult {
   const reserved = [...new Set([...bare.matchAll(/[A-Za-z]+/g)].map((m) => m[0]).filter((w) => w.length > 1 && RESERVED.has(w.toLowerCase())))];
 
   // ⑤ 인용 표지 · ② 글자 보호
+  if (opts.refs) s = s.replace(/\\because\s*\((\d{1,2})\)/g, (m, n: string) => (refMark(n) === n ? m : `\\because \\mathoryref{${n}}`));
   s = s.replace(/\\mathoryref\{(\d+)\}/g, (_, n: string) => keep(`"${refMark(n)}"`));
   // `~`(LaTeX 붙은 공백)는 한글 따옴표 안에서 글자 그대로 찍힌다 → 공백으로(따옴표 안 공백은 한글이 보존한다)
-  s = replaceMacro(s, [...TEXT_CMDS], 1, ([t]) => keep(`"${t.replace(/"/g, "''").replace(/\$/g, '').replace(/~|\\[ ,;:]/g, ' ')}"`));
+  s = replaceMacro(s, [...TEXT_CMDS], 1, ([t]) => keep(`"${(opts.refs ? circleRefs(t) : t).replace(/"/g, "''").replace(/\$/g, '').replace(/~|\\[ ,;:]/g, ' ')}"`));
   // ⑥ 크기·장식 명령
   s = s.replace(/\\([a-zA-Z]+)(?![a-zA-Z])/g, (m, name: string) => (DROP.has(name) ? ' ' : m));
   s = replaceMacro(s, [...DROP_ARG], 1, () => ' ');
@@ -439,6 +458,9 @@ export function latexToHwp(latex: string): HwpEqResult {
 
   // 괄호
   s = s.replace(/\\(left|right)\s*(\\[a-zA-Z]+|\\[{}|]|[()[\]|./<>])/g, (_, side: string, d: string) => {
+    // `\right.` → 아무것도 내지 않는다(덕수 2026-10-16 — 한글은 `right none`을 못 읽어 `‖ one`으로 그렸고,
+    // `left [ …`만 두면 왼쪽 괄호 하나로 여러 행을 묶는 모양을 그린다). `\left.`은 탐침(D-보이지않는괄호) 결과 대기
+    if (side === 'right' && d === '.') return ' ';
     const hwp = DELIM[d] ?? d.replace(/^\\/, '');
     return ` ${side} ${hwp} `;
   });

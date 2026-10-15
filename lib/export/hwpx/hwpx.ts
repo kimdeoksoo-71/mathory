@@ -15,7 +15,7 @@ import { STYLE_IDS, PAGE } from './skeleton/ids';
 import * as SK from './skeleton/parts';
 import type { StyleKey } from './styles';
 import { HeaderBuilder, Ids, type Para, type Run, type Item } from './xml';
-import { latexToHwp, splitDisplayRows, refMark, type HwpEqResult, type DisplaySplit } from './hwpEq';
+import { latexToHwp, splitDisplayRows, refMark, circleRefs, type HwpEqResult, type DisplaySplit } from './hwpEq';
 import { caseLabelHwp } from './roman';
 import { isLongChoices, type ChoicePiece } from './choices';
 import { buildPackage, type BinItem } from './package';
@@ -82,16 +82,8 @@ interface Ctx {
 
 const T = (s: string): Item => ({ k: 'text', s });
 
-/**
- * 해설 본문 글자의 `(1)`·`(2)`… → `㉠`·`㉡`…(덕수 2026-10-16 — 해설의 `\tag{n}`이 `⋯⋯⋯ ㉠`이 되므로 뒤에서 인용하는
- * `(n)`도 같은 글자로. 해설에서 `(n)`이 다른 뜻으로 쓰일 일은 없다). 1~14만(㉠~㉭) — 그 밖은 그대로. 수식 안은 대상 아님
- */
-export function solutionRefText(text: string): string {
-  return text.replace(/\((\d{1,2})\)/g, (m, n: string) => {
-    const r = refMark(n);
-    return r === n ? m : r;
-  });
-}
+/** 해설 글자의 `(n)` → `㉠`(규칙은 hwpEq `circleRefs` — 수식 안 `\text{}`와 한 벌) */
+export const solutionRefText = circleRefs;
 const TAB: Item = { k: 'tab' };
 
 class Writer {
@@ -133,7 +125,7 @@ class Writer {
     const out: Para[] = [];
     rows.forEach((latex, i) => {
       const last = i === rows.length - 1;
-      const script = this.eq(latexToHwp(latex));
+      const script = this.eq(latexToHwp(latex, { refs: key === 'MTSEq' }));
       if (blank(script)) {
         if (last && tag) out.push(this.para(key, this.tagRuns([], tag, key)));
         return;
@@ -169,7 +161,7 @@ class Writer {
           case 'caseRef': push(cp, T(caseLabelHwp(x.text) ?? x.text)); break;   // R10 — 굵게 없음
           case 'ref': push(cp, T(refMark(x.n))); break;                           // R2
           case 'math': {
-            const s = this.eq(latexToHwp(x.latex));
+            const s = this.eq(latexToHwp(x.latex, { refs: ctx.tone === 'solution' }));
             if (s) push(cp, this.eqItem(s));
             break;
           }
@@ -246,7 +238,7 @@ class Writer {
           ? { rows: f.rows }
           : splitDisplayRows(f.latex);
         if (split && split.rows.length > 1) return this.displayRows(split, f.tag, key);
-        const script = this.eq(latexToHwp(f.latex));
+        const script = this.eq(latexToHwp(f.latex, { refs: ctx.tone === 'solution' }));
         if (!script.replace(/[{}\s]/g, '')) return f.tag ? [this.para(key, this.tagRuns([], f.tag, key))] : [];
         // 번호 = 수식 **밖** 글자 ` ⋯⋯⋯ ㉠`(덕수 2026-10-15 — 옛 판은 수식 끝 `cdots ×3` + 밖 ㉠이었다)
         return [this.para(key, this.tagRuns([{ charPr: this.sid(key).charPr, items: [this.eqItem(script)] }], f.tag, key))];
