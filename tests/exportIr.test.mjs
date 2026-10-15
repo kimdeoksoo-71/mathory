@@ -16,7 +16,7 @@ import remarkParse from 'remark-parse';
 import remarkMath from 'remark-math';
 import remarkGfm from 'remark-gfm';
 
-import { buildExportDoc, parseChoices } from '../.test-build/lib/export/ir.js';
+import { buildExportDoc, parseChoices, expandMathRefs } from '../.test-build/lib/export/ir.js';
 import { prepareMarkdown } from '../.test-build/lib/export/prepare.js';
 import { preprocess } from '../.test-build/lib/preprocess.js';
 import { sampleProblem } from './fixtures/export/sampleProblem.mjs';
@@ -80,10 +80,13 @@ test('I7 \\( \\) → 인라인 $ · 행바꿈 \\\\[4pt]는 수식 구분자로 �
   assert.deepEqual(d.rows, ['a', 'b']);
 });
 
-test('I8 \\ref{n} — 텍스트는 "(n)", 수식 안은 \\text{(n)}', () => {
+test('I8 \\ref{n} — 텍스트는 Inline ref, 수식 안은 내부 표지(Phase 71 R1) · expandMathRefs는 70 표기로', () => {
   const [p] = body(R`식 \ref{1}에 $\ref{2}+1$을 대입`);
-  assert.equal(p.inline[0].text, '식 (1)에 ');
-  assert.equal(p.inline[1].latex, R`\text{(2)}+1`);
+  assert.deepEqual(p.inline.slice(0, 3), [{ t: 'text', text: '식 ' }, { t: 'ref', n: '1' }, { t: 'text', text: '에 ' }]);
+  assert.equal(p.inline[3].latex, R`\mathoryref{2}+1`);
+  assert.equal(expandMathRefs(p.inline[3].latex), R`\text{(2)}+1`);
+  const [d] = body('$$\nx = \\ref{3}\n$$');
+  assert.equal(expandMathRefs(d.latex), R`x = \text{(3)}`);
 });
 
 test('I9 인라인 수식 안 \\tag는 빼고 경고', () => {

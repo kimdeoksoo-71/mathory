@@ -12,7 +12,7 @@
  */
 
 import { kindOf } from './blockKinds';
-import { prepareMarkdown, TAG_MARK_RE, type ExportLocale } from './prepare';
+import { prepareMarkdown, TAG_MARK_RE, REF_MARK_RE, type ExportLocale } from './prepare';
 import { IMAGE_DEFAULT_PX, SVG_DEFAULT_HEIGHT_PX } from './layout';
 import { GANA_LITERAL_RE, GIYEOK_LITERAL_RE, CIRCLED_NUM_LINE_RE } from '../locale';
 import { buildCaseLabels, blockKeyOf, splitCaseTitle, CASE_REF_RE } from '../caseBlock';
@@ -85,6 +85,8 @@ export type Inline =
   | { t: 'code'; text: string }
   | { t: 'br' }
   | { t: 'caseRef'; text: string }
+  /** Phase 71 R1 — 텍스트 `\ref{n}`. typst·latex는 `(n)`, HWPX는 ㉠ */
+  | { t: 'ref'; n: string }
   | { t: 'img'; ref: string; widthPx?: number };   // widthPx = <img width="N"> 속성(없으면 직렬화기 기본값)
 
 export interface ExportInputBlock {
@@ -116,6 +118,12 @@ const HAS_ENV_RE = /\\begin\s*\{/;
 const DISPLAY_TAG_RE = /\\tag(\*?)\s*\{([^{}]*)\}/g;     // replace 전용(/g) — .test()에는 HAS_TAG_RE
 const HAS_TAG_RE = /\\tag\*?\s*\{[^{}]*\}/;
 const MATH_REF_RE = /\\ref\{(\d+)\}/g;
+/** Phase 71 R1 — 수식 안 `\ref{n}`의 내부 표지. 직렬화기 밖으로 새지 않는다(typst·latex는 `expandMathRefs`, HWPX는 ㉠) */
+export const MATH_REF_MARK_RE = /\\mathoryref\{(\d+)\}/g;
+/** typst·latex용 — 표지를 Phase 70의 표기 `\text{(n)}`로 되돌린다(출력 바이트 불변) */
+export function expandMathRefs(latex: string): string {
+  return latex.replace(MATH_REF_MARK_RE, (_, n: string) => `\\text{(${n})}`);
+}
 const IMG_SRC_RE = /<img\b[^>]*?\bsrc\s*=\s*"([^"]+)"[^>]*>/gi;
 const BR_RE = /^<br\s*\/?>$/i;
 
@@ -271,7 +279,7 @@ class Builder {
       return '';
     });
     if (tags > 1) this.warn('한 수식에 \\tag가 둘 이상 — 첫 번호만 내보낸다');
-    latex = latex.replace(MATH_REF_RE, (_, n: string) => `\\text{(${n})}`).trim();
+    latex = latex.replace(MATH_REF_RE, (_, n: string) => `\\mathoryref{${n}}`).trim();
     const out: Flow = { t: 'display', latex, ...(tag !== undefined ? { tag } : {}) };
     if (HAS_LINE_BREAK_RE.test(latex) && !HAS_ENV_RE.test(latex)) {
       const rows = latex.split(ROW_BREAK_RE).map((r) => r.trim());
@@ -313,12 +321,12 @@ class Builder {
     for (const n of nodes) {
       switch (n.type) {
         case 'text':
-          out.push(...splitCaseRefs(n.value ?? ''));
+          out.push(...splitRefs(n.value ?? ''));
           break;
         case 'inlineMath': {
           const at = n.position?.start.offset;
           const dbl = typeof at === 'number' && src.startsWith('$$', at);
-          let latex = (n.value ?? '').replace(MATH_REF_RE, (_, k: string) => `\\text{(${k})}`);
+          let latex = (n.value ?? '').replace(MATH_REF_RE, (_, k: string) => `\\mathoryref{${k}}`);
           if (HAS_TAG_RE.test(latex)) {
             this.warn('인라인 수식 안의 \\tag는 내보내기에서 뺀다(화면 KaTeX도 거부한다)');
             latex = latex.replace(DISPLAY_TAG_RE, '');
@@ -418,6 +426,21 @@ export function parseChoices(raw: string): { label: string; content: string }[] 
     out.push({ label: m[1], content: c });
     if (out.length >= 5) break;
   }
+  return out;
+}
+
+/** 텍스트 → ref 표지(⟦REF:n⟧)를 Inline `ref`로 · 나머지는 caseRef 분리 (Phase 71 R1) */
+function splitRefs(text: string): Inline[] {
+  const re = new RegExp(REF_MARK_RE.source, 'g');
+  const out: Inline[] = [];
+  let last = 0;
+  for (const m of text.matchAll(re)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push(...splitCaseRefs(text.slice(last, at)));
+    out.push({ t: 'ref', n: m[1] });
+    last = at + m[0].length;
+  }
+  if (last < text.length) out.push(...splitCaseRefs(text.slice(last)));
   return out;
 }
 

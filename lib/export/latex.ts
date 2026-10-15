@@ -14,6 +14,7 @@
 
 import { imageWidthPt, choiceColumns, PX_TO_PT, INDENT_EM, STROKE_MM, FRAMED_INSET_MM, tabTitle } from './layout';
 import type { ExportDoc, ExportBlock, Flow, Inline } from './ir';
+import { expandMathRefs } from './ir';
 
 export interface LatexOptions {
   /** 그림 id → zip 안 경로(`figures/fig-1.png`). 못 받은 그림은 null → 빈 상자 */
@@ -146,8 +147,8 @@ class LatexWriter {
       }
       case 'display': {
         const body = f.rows
-          ? `\\begin{array}{l}\n${f.rows.map((r) => `\\displaystyle ${r}`).join(' \\\\\n')}\n\\end{array}`
-          : f.latex;
+          ? `\\begin{array}{l}\n${f.rows.map((r) => `\\displaystyle ${expandMathRefs(r)}`).join(' \\\\\n')}\n\\end{array}`
+          : expandMathRefs(f.latex);
         return `\\begin{equation*}\n${body}${f.tag ? `\n\\tag*{${escTex(f.tag)}}` : ''}\n\\end{equation*}`;
       }
       case 'ul':
@@ -190,12 +191,13 @@ class LatexWriter {
     return xs.map((x) => {
       switch (x.t) {
         case 'text': return escTex(x.text);
-        case 'math': return inlineMathTex(x.latex, x.textStyle);
+        case 'math': return inlineMathTex(expandMathRefs(x.latex), x.textStyle);
         case 'strong': return `\\textbf{${this.inline(x.inline)}}`;
         case 'em': return `\\emph{${this.inline(x.inline)}}`;
         case 'code': return `\\texttt{${escTex(x.text)}}`;
         case 'br': return '\\newline ';
         case 'caseRef': return `\\textbf{${escTex(x.text)}}`;
+        case 'ref': return escTex(`(${x.n})`);   // Phase 71 R1 — 70의 글자 `(n)` 그대로
         case 'img': {
           const path = this.opts.figurePath(x.ref, { gray: false });
           return path ? `\\par\\begin{center}\\includegraphics[width=${PT(imageWidthPt(x.widthPx, 'latex'))}]{${path}}\\end{center}\\par ` : '\\fbox{그림}';

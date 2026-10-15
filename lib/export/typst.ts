@@ -19,6 +19,7 @@ import {
   SUNEUNG_PAGE, TRACKING_EM, WORD_SPACING_PCT, TYPST_TOP_EDGE, TYPST_BOTTOM_EDGE, imageWidthPt, PX_TO_PT, HEADING_ABOVE_EM,
 } from './layout';
 import type { ExportDoc, ExportBlock, Flow, Inline } from './ir';
+import { expandMathRefs } from './ir';
 import { PH } from '../../components/ui/phosphorPaths';
 
 export interface TypstOptions {
@@ -202,7 +203,8 @@ class TypstWriter {
 
   /** 수식 하나 → mitex 호출(또는 실패 상자). 내용이 비면 null — mitex는 `\\displaystyle`뿐인 수식에서
    *  "cannot calculate sum of empty array"로 문서 전체를 죽인다(Stage 0 덤프 실측). 화면 KaTeX도 아무것도 안 그린다 */
-  private mathCall(latex: string, display: boolean): string | null {
+  private mathCall(rawLatex: string, display: boolean): string | null {
+    const latex = expandMathRefs(rawLatex);   // Phase 71 R1 — 수식 안 인용 표지 → `\text{(n)}`(70 출력 불변)
     if (!latex.replace(/\\displaystyle/g, '').trim()) return null;
     const src = quadCases(normalizeEnvsForMitex(latex));
     const { failed } = this.nextMath(src, display);
@@ -329,6 +331,7 @@ class TypstWriter {
         case 'code': return `#raw(${typStr(x.text)});`;
         case 'br': return '#linebreak();';
         case 'caseRef': return `#text(weight: ${WEIGHT.caseRef})[${escTyp(x.text)}];`;
+        case 'ref': return escTyp(`(${x.n})`);   // Phase 71 R1 — 70의 글자 `(n)` 그대로
         case 'img': {
           const path = this.opts.figurePath(x.ref, { gray: false });
           return path ? `#box(image(${typStr(path)}, width: ${pt(imageWidthPt(x.widthPx ?? null, 'typst'))}));` : '#box[⚠그림];';

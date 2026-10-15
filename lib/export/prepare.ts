@@ -14,7 +14,7 @@
  *   ① `\[`·`\(` 정규화는 `(?<!\\)` 뒤돌아보기가 있는 판(chatExtract)이다. 렌더 사본 두 벌엔 없다
  *     (행바꿈 `\\[4pt]`의 `\[`를 여는 구분자로 먹는 잠복 버그 — v4 R10, prelaunch 후보). 갈리면 화면이 틀린 것
  *   ② Fig/Table 라벨은 인쇄 쪽 `convertFigureLabels`(`Figure 3`·대소문자 무시)를 쓴다(화면은 `Fig.3`만)
- * ⚠ 표지(⟦TAG:…⟧)는 파서를 그대로 통과해 텍스트 노드에 남는다 — ir.ts가 떼어 문단 속성으로 옮긴다.
+ * ⚠ 표지(⟦TAG:…⟧·⟦REF:…⟧)는 파서를 그대로 통과해 텍스트 노드에 남는다 — ir.ts가 떼어 문단 속성·Inline `ref`로 옮긴다.
  */
 
 import { insertMarkerLineBreaks, normalizeCaseBoundaries, protectMath, restoreMath, convertFigureLabels, convertTableLabels } from '../locale';
@@ -28,6 +28,10 @@ export type ExportLocale = 'ko' | 'international';
 export const TAG_MARK_OPEN = '⟦TAG:';
 export const TAG_MARK_CLOSE = '⟧';
 export const TAG_MARK_RE = /⟦TAG:([^⟧]*)⟧/g;
+
+/** Phase 71 R1 — 텍스트 `\ref{n}` 표지. ir.ts가 Inline `ref`로 떼어 낸다(typst·latex는 `(n)`으로 펼쳐 출력 불변 · HWPX는 ㉠) */
+export const REF_MARK_OPEN = '⟦REF:';
+export const REF_MARK_RE = /⟦REF:(\d+)⟧/g;
 
 /** 코드펜스 보호 — EditorPreview.protectFences와 같은 정규식(``` 만; ~~~는 remark가 안다) */
 function protectFences(text: string): { text: string; fences: string[] } {
@@ -51,8 +55,8 @@ function textStage(text: string, locale: ExportLocale): string {
     t = normalizeCaseBoundaries(t);
     // ⚠ `\s*$` 금지 — 개행을 삼켜 뒤 빈 줄을 먹는다(Phase 57 · M1 규약)
     t = t.replace(/\\tag\{(\d+)\}[ \t]*$/gm, (_, n) => `${TAG_MARK_OPEN}(${n})${TAG_MARK_CLOSE}`);
-    // 텍스트 `\ref{n}` → `(n)` (렌더는 ref-marker span — 말풍선용 장식이라 내보내기엔 글자만)
-    t = t.replace(/\\ref\{(\d+)\}/g, (_, n) => `(${n})`);
+    // 텍스트 `\ref{n}` → 표지 (렌더는 ref-marker span — 말풍선용 장식이라 내보내기엔 글자만. 표기는 직렬화기 몫 — Phase 71 R1)
+    t = t.replace(/\\ref\{(\d+)\}/g, (_, n) => `${REF_MARK_OPEN}${n}${TAG_MARK_CLOSE}`);
     t = convertFigureLabels(t);
     t = convertTableLabels(t);
   }
