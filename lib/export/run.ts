@@ -95,3 +95,67 @@ export async function runFileExport(
   openInOverleaf(assets.zipFiles({ 'main.tex': tex, ...figs.files }), opts.overleafTarget);
   return { notices };
 }
+
+/* ═══ Phase 71 — HWPX(단일·일괄 공용) ═══ */
+
+export interface HwpxRunOptions {
+  numbering: 'title' | 'sequential';
+  placement: 'column' | 'endnote';
+  /** 파일 이름(확장자 없이) — 단일은 문항 제목, 일괄은 폴더 이름 */
+  fileName: string;
+  onProgress?: (done: number, total: number) => void;
+}
+
+/**
+ * 문항 N개 → `.hwpx` 하나. 탭은 **문제·풀이 둘만**(D18 — 다른 탭은 넘겨받아도 버린다).
+ * ⚠ FileFormat·runFileExport에 넣지 않는다 — 그쪽은 pdf·typ 아니면 전부 latex 경로로 보낸다(run.ts 위).
+ * 그림은 latex 집합으로 받는다(svg·gif·webp → png — 한글 그림 개체의 svg 지원은 미확인) · 이름은 전역 image{n}, 같은 URL·변형은 한 번.
+ */
+export async function runHwpxExport(sources: ExportSource[], opts: HwpxRunOptions): Promise<ExportResult> {
+  const [parse, ir, assets, hw, { imageSize }] = await Promise.all([
+    getParser(), import('./ir'), import('./assets'), import('./hwpx/hwpx'), import('./hwpx/imageSize'),
+  ]);
+  const warnings: string[] = [];
+  const bins: import('./hwpx/package').BinItem[] = [];
+  const binByKey = new Map<string, { bin: string; pxW: number; pxH: number } | null>();
+  const hwpxSources: import('./hwpx/hwpx').HwpxSource[] = [];
+  let failed = 0;
+
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    const tabs = src.tabs.filter((t) => t.id === 'question' || t.id === 'solution');
+    const doc = ir.buildExportDoc({ title: src.title, locale: 'ko', tabs }, { parse, warn: (m) => warnings.push(m) });
+    const figs = await assets.collectFigures(doc, 'latex');
+    failed += figs.failed.length;
+    const urlOf = new Map(doc.figures.map((f) => [f.id, f.url]));
+    hwpxSources.push({
+      doc,
+      figure: (figId, gray) => {
+        const key = `${urlOf.get(figId) ?? figId}|${gray ? 1 : 0}`;
+        if (binByKey.has(key)) return binByKey.get(key) ?? null;
+        const path = figs.pathOf(figId, { gray }) ?? (gray ? figs.pathOf(figId, { gray: false }) : null);
+        const data = path ? figs.files[path] : undefined;
+        const size = data ? imageSize(data) : null;
+        if (!path || !data || !size) { binByKey.set(key, null); return null; }
+        const bin = `image${bins.length + 1}`;
+        bins.push({ id: bin, ext: /\.jpe?g$/i.test(path) ? 'jpg' : 'png', data });
+        const hit = { bin, pxW: size.w, pxH: size.h };
+        binByKey.set(key, hit);
+        return hit;
+      },
+    });
+    opts.onProgress?.(i + 1, sources.length);
+  }
+  if (warnings.length) console.warn('[Phase71 HWPX]', warnings);
+
+  const { bytes, notices, warnings: hw2 } = hw.serializeHwpx({
+    title: opts.fileName,
+    sources: hwpxSources,
+    bins,
+    options: { numbering: opts.numbering, placement: opts.placement },
+  });
+  if (hw2.length) console.warn('[Phase71 HWPX]', hw2);
+  if (failed) console.warn('[Phase71 HWPX] 그림 실패', failed);
+  assets.downloadFile(bytes, `${assets.safeFileName(opts.fileName)}.hwpx`, 'application/hwp+zip');
+  return { notices };
+}

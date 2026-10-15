@@ -35,6 +35,8 @@ export interface Para {
   columnBreak?: boolean;
   /** 섹션 첫 문단에만 — secPr + colPr 런(템플릿 그대로) */
   secPr?: string;
+  /** secPr 런의 글자 모양 — 템플릿처럼 문단 스타일의 charPr */
+  secPrCharPr?: number;
   runs: Run[];
 }
 
@@ -49,10 +51,26 @@ export function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c === '"' ? '&quot;' : '&apos;'));
 }
 
+/** 요소 내용(글자 노드) — `& < >`만. 따옴표는 속성값에서만 이스케이프한다 */
+export function escNode(s: string): string {
+  return s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
+}
+
 /** 본문 글자 — 제어 문자는 버리고(탭은 `<hp:tab/>`로 따로 온다) 이스케이프 */
 export function escText(s: string): string {
   // eslint-disable-next-line no-control-regex
-  return esc(s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\t\r\n]/g, ''));
+  return escNode(s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\t\r\n]/g, ''));
+}
+
+/** 같은 글자 모양(글자 스타일 없음)의 이웃 런을 합친다 — 한글 산출물처럼 */
+export function mergeRuns(runs: Run[]): Run[] {
+  const out: Run[] = [];
+  for (const r of runs) {
+    const last = out[out.length - 1];
+    if (last && last.charPr === r.charPr && last.charStyle === undefined && r.charStyle === undefined) last.items = [...last.items, ...r.items];
+    else out.push({ ...r, items: [...r.items] });
+  }
+  return out;
 }
 
 /* ═══ id ═══ */
@@ -79,8 +97,8 @@ const round5 = (n: number) => Math.round(n * 100000) / 100000;
 
 export function paraXml(p: Para, ids: Ids): string {
   const head = `<hp:p id="0" paraPrIDRef="${p.paraPr}" styleIDRef="${p.style}" pageBreak="${p.pageBreak ? 1 : 0}" columnBreak="${p.columnBreak ? 1 : 0}" merged="0">`;
-  const sec = p.secPr ? `<hp:run charPrIDRef="${p.runs[0]?.charPr ?? 0}">${p.secPr}</hp:run>` : '';
-  const runs = p.runs.length ? p.runs.map((r) => runXml(r, ids)).join('') : `<hp:run charPrIDRef="0"><hp:t/></hp:run>`;
+  const sec = p.secPr ? `<hp:run charPrIDRef="${p.secPrCharPr ?? p.runs[0]?.charPr ?? 0}">${p.secPr}</hp:run>` : '';
+  const runs = p.runs.length ? mergeRuns(p.runs).map((r) => runXml(r, ids)).join('') : `<hp:run charPrIDRef="0"><hp:t/></hp:run>`;
   return head + sec + runs + '</hp:p>';
 }
 
@@ -129,7 +147,7 @@ export function equationXml(script: string, ids: Ids, baseUnit = 1100): string {
     `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>` +
     `<hp:outMargin ${ZERO_MARGIN}/>` +
     `<hp:shapeComment>수식입니다.</hp:shapeComment>` +
-    `<hp:script>${esc(s)}</hp:script>` +
+    `<hp:script>${escNode(s)}</hp:script>` +
     `</hp:equation>`
   );
 }

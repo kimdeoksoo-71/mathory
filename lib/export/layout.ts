@@ -169,8 +169,12 @@ export function latexTextWidthMm(): number {
  * ⚠ Typst `calc.min(길이, 90%)`는 "cannot compare ratio and length" 컴파일 오류 — 숫자로 계산해 넘긴다.
  */
 export function imageWidthPt(widthPx: number | null | undefined, target: 'typst' | 'latex'): number {
+  return imageWidthPtForColumn(widthPx, target === 'typst' ? typstColumnWidthMm() : latexTextWidthMm());
+}
+
+/** 같은 규칙, 열 폭(mm)을 직접 받는다 — Phase 71 HWPX(열 폭은 템플릿 secPr에서 계산 — G6) */
+export function imageWidthPtForColumn(widthPx: number | null | undefined, colMm: number): number {
   const px = Math.min(widthPx && widthPx > 0 ? widthPx : IMAGE_DEFAULT_PX, IMAGE_MAX_PX);
-  const colMm = target === 'typst' ? typstColumnWidthMm() : latexTextWidthMm();
   const capPt = colMm * MM_TO_PT * IMAGE_MAX_RATIO;
   return round2(Math.min(px * PX_TO_PT, capPt));
 }
