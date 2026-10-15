@@ -165,12 +165,12 @@ test('M2 경우 — 해설-단계1/2 · (ⅰ) + 탭 · 이어짓기는 선행 �
   assert.match(section, /<hp:t><hp:tab\/>이어서 \(\u2170\)을 쓴다\.<\/hp:t>/);
 });
 
-test('M3 행 끝 \\tag·\\ref → ⋯⋯⋯ ㉠ · display는 cdots ×3 + 수식 밖 ㉠ · 수식 안 \\ref → "㉡"', () => {
+test('M3 행 끝 \\tag·\\ref → ⋯⋯⋯ ㉠ · display도 수식 밖 글자 ⋯⋯⋯ ㉠(수식 안 cdots 없음) · 수식 안 \\ref → "㉡"', () => {
   const { section } = hwpx([two([blk('text', '문제')], [
     blk('text', '$$\nf(x) = 1 \\tag{1}\n$$\n\n따라서 성립한다. \\tag{2}'),
     blk('text', '식 \\ref{1}과 $\\ref{2}$'),
   ])]);
-  assert.match(section, /<hp:script>f\(x\) = 1 cdots cdots cdots<\/hp:script><\/hp:equation><hp:t> ㉠<\/hp:t>/);
+  assert.match(section, /<hp:script>f\(x\) = 1<\/hp:script><\/hp:equation><hp:t> ⋯⋯⋯ ㉠<\/hp:t>/);
   assert.ok(section.includes('따라서 성립한다. ⋯⋯⋯ ㉡'));
   assert.ok(section.includes('식 ㉠과 '));
   assert.ok(section.includes('<hp:script>"㉡"</hp:script>'));
@@ -210,7 +210,8 @@ test('M7 여러 줄 수식 → 행마다 문단(덕수 2026-10-15) — 정렬 �
   assert.equal(eqParas.length, 2);
   const scripts = eqParas.map((l) => /<hp:script>([^<]*)/.exec(l)[1]);
   assert.equal(scripts[0], 'f(x) = (x+1)^2');
-  assert.equal(scripts[1], '= x^2+2x+1 cdots cdots cdots');   // 정렬 공백 없음
+  assert.equal(scripts[1], '= x^2+2x+1');   // 정렬 공백 없음 · 번호 점은 수식 밖
+  assert.ok(eqParas[1].includes('</hp:equation><hp:t> ⋯⋯⋯ ㉠</hp:t>'));
   assert.ok(!eqParas[0].includes('㉠') && eqParas[1].includes('㉠'));
   assert.ok(!section.includes('eqalign'));
   // 맨 \\ 행 — 정렬 없이 행마다

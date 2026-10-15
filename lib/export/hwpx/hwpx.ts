@@ -122,15 +122,13 @@ class Writer {
     const out: Para[] = [];
     rows.forEach((latex, i) => {
       const last = i === rows.length - 1;
-      let script = this.eq(latexToHwp(latex));
+      const script = this.eq(latexToHwp(latex));
       if (blank(script)) {
         if (last && tag) out.push(this.para(key, this.tagRuns([], tag, key)));
         return;
       }
-      if (last && tag) script += ' cdots cdots cdots';
-      const items: Item[] = [this.eqItem(script)];
-      if (last && tag) items.push(T(` ${refMark(tag)}`));
-      out.push(this.para(key, [{ charPr: this.sid(key).charPr, items }]));
+      const runs: Run[] = [{ charPr: this.sid(key).charPr, items: [this.eqItem(script)] }];
+      out.push(this.para(key, last ? this.tagRuns(runs, tag, key) : runs));
     });
     return out;
   }
@@ -237,12 +235,10 @@ class Writer {
           ? { rows: f.rows }
           : splitDisplayRows(f.latex);
         if (split && split.rows.length > 1) return this.displayRows(split, f.tag, key);
-        let script = this.eq(latexToHwp(f.latex));
+        const script = this.eq(latexToHwp(f.latex));
         if (!script.replace(/[{}\s]/g, '')) return f.tag ? [this.para(key, this.tagRuns([], f.tag, key))] : [];
-        if (f.tag) script += ` cdots cdots cdots`;
-        const items: Item[] = [this.eqItem(script)];
-        if (f.tag) items.push(T(` ${refMark(f.tag)}`));
-        return [this.para(key, [{ charPr: this.sid(key).charPr, items }])];
+        // 번호 = 수식 **밖** 글자 ` ⋯⋯⋯ ㉠`(덕수 2026-10-15 — 옛 판은 수식 끝 `cdots ×3` + 밖 ㉠이었다)
+        return [this.para(key, this.tagRuns([{ charPr: this.sid(key).charPr, items: [this.eqItem(script)] }], f.tag, key))];
       }
       case 'ul':
       case 'ol': {
