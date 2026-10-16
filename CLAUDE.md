@@ -514,7 +514,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 71 — HWPX 내보내기** — **구현 완료(2026-10-15)** · 커밋 0~6(`da961f5` refactor IR 인용 표지 · `9c7f5e8` · `6a4f30e` · `bba2766` · `cfa656a`) + **실물 후속**(수식 크기 모델·매크로 · 표 · 라벨 · 여러 줄 수식 · 번호 점 · 미주 머리) · 로직 테스트 `test:exporthwpxstyles` 6 · `test:exporthwpeq` 12 · `test:exporthwpx` 23 · 70 테스트 무변화 · headless CDP **12/12** · 덤프 수식 31,006 미대응 명령 없음 **99.96%** · **덕수 실물 1차 반영 완료 — "아주 만족"(2026-10-15)**
+## 현재 Phase: **Phase 71 — HWPX 내보내기** — **구현 완료(2026-10-15)** · 커밋 0~6(`da961f5` refactor IR 인용 표지 · `9c7f5e8` · `6a4f30e` · `bba2766` · `cfa656a`) + **실물 후속**(수식 크기 모델·매크로 · 표 · 라벨 · 여러 줄 수식 · 번호 점 · 미주 머리) · 로직 테스트 `test:exporthwpxstyles` 6 · `test:exporthwpeq` 15 · `test:exporthwpx` 24 · 70 테스트 무변화 · headless CDP **12/12** · 덤프 수식 31,006 미대응 명령 없음 **99.96%** · **덕수 실물 1차 반영 완료 — "아주 만족"(2026-10-15)**
 
 문서: `docs/phasedocs/Phase71 HWPX 내보내기 v5 착수판.md`(§11 구현 기록) · Stage 0 `docs/phaseSketch/phase71-stage0.md`(S-1 절차 · 시험 파일 `docs/phaseSketch/phase71-stage0/`)
 (계보: v1·v2 web → v3 CLI 교차검토 + 검증 턴(정정 25 · 보완 14 · 판정 N7~N17) → v4·v4.1·v4.2 web(템플릿 2~6차) → **v5 착수판**(판정 전부 확정) → 구현)
