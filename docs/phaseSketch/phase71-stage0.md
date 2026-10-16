@@ -1,6 +1,8 @@
 # Phase 71 Stage 0 — HWPX 실측 기록
 
-시험 파일: `docs/phaseSketch/phase71-stage0/`(로컬 — 커밋하지 않는다). 다시 만들기: `node scripts/hwpxStage0.mjs`.
+시험 파일·탐침: 마감 뒤 `docs/phaseSketch/_archive/Phase71/phase71-stage0/`로 옮겼다(로컬 — 커밋하지 않는다). 다시 만들기: `node scripts/hwpxStage0.mjs` · `node scripts/hwpxEqProbe.mjs`(`docs/phaseSketch/phase71-stage0/`에 새로 만든다).
+
+**마감(2026-10-16)**: 일괄 내보내기 실물 정상(덕수 — 여러 차례) · 전항 종결.
 
 ## 1. CLI가 끝낸 것 (2026-10-15)
 

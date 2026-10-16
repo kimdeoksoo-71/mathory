@@ -312,10 +312,11 @@ md2hwp `convert` 순서 이식 + `\boxed`·`\fbox` → `box{}` · `\text{…}` �
 - S-7 자동분: 덤프 761문항 수식 **31,006개 · 미대응 명령 없는 수식 99.96%**(미대응 11: `\nrightarrow` 3 · `\square` 3 · `\underbrace` 2 · `\bigcirc` · `\oplus` · `\hline`) · 예약어 충돌 0
 - Stage 0 기록: `docs/phaseSketch/phase71-stage0.md`(S-1 절차 포함)
 
-### 11-4. 알고 두는 것 · 남은 일
-- 일괄 내보내기는 Firestore 로그인이 필요해 하니스로 돌리지 않았다 — 실물 ④
-- 덕수 실물: Stage 0 S-1·S-12·S-3·S-5′·S-6·S-10′·S-4·S-7(한글 화면) · §7 실물 ①~⑫
-- 다음 판에서 뺄 수 있는 것: S-10′ 결과에 따라 renderingInfo·curSz·shapeComment
+### 11-4. 알고 두는 것 · 마감
+- **마감(2026-10-16)**: 덕수 실물 전항 종결 — Stage 0 S-1·S-12·S-3·S-5′·S-6·S-4(옵션 A·B)·S-7 · 일괄 내보내기(여러 차례 — 하니스 밖, 로그인 필요) · 실물 후속 I14~I21 · 탐침 D. 작업물은 `docs/phaseSketch/_archive/Phase71/`(로컬)
+- S-10′: `S-최소`는 한글을 꺼뜨린다 → renderingInfo·curSz·shapeComment는 **계속 넣는다**(빼지 말 것)
+- 수식 크기는 한글 규칙 모델의 근사다 — 정확한 마무리는 한글 매크로 `docs/hwp-macro/수식크기바로잡기.js`(파일마다 1회)
+- 미대응 명령 11개(`\nrightarrow`·`\square`·`\underbrace`·`\bigcirc`·`\oplus`·`\hline` — 낱말 + 안내 1줄) · `\left\{`로 감싼 여러 줄 수식 등 33개는 한 수식(eqalign) · 해설 수식의 맨 `(n)`(행 머리 인용, 1~2건)은 ㉠으로 안 바뀐다
 
 ---
 

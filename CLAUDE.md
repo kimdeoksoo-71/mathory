@@ -514,9 +514,9 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 71 — HWPX 내보내기** — **구현 완료(2026-10-15)** · 커밋 0~6(`da961f5` refactor IR 인용 표지 · `9c7f5e8` · `6a4f30e` · `bba2766` · `cfa656a`) + **실물 후속**(수식 크기 모델·매크로 · 표 · 라벨 · 여러 줄 수식 · 번호 점 · 미주 머리) · 로직 테스트 `test:exporthwpxstyles` 6 · `test:exporthwpeq` 15 · `test:exporthwpx` 24 · 70 테스트 무변화 · headless CDP **12/12** · 덤프 수식 31,006 미대응 명령 없음 **99.96%** · **덕수 실물 1차 반영 완료 — "아주 만족"(2026-10-15)**
+## 현재 Phase: **Phase 71 — HWPX 내보내기** — **완료(2026-10-16)** · 커밋 0~6(`da961f5` refactor IR 인용 표지 · `9c7f5e8` · `6a4f30e` · `bba2766` · `cfa656a`) + **실물 후속 1~3차·탐침 D** · 로직 테스트 `test:exporthwpxstyles` 6 · `test:exporthwpeq` 15 · `test:exporthwpx` 24 · 70 테스트 무변화 · headless CDP **12/12** · 덤프 수식 31,006 미대응 명령 없음 **99.96%** · 덤프 `none` 0 · **덕수 실물 전항 종결 — 단일·일괄·옵션 A·B(2026-10-16, "짧은 시간에 프로젝트 성공")**
 
-문서: `docs/phasedocs/Phase71 HWPX 내보내기 v5 착수판.md`(§11 구현 기록) · Stage 0 `docs/phaseSketch/phase71-stage0.md`(S-1 절차 · 시험 파일 `docs/phaseSketch/phase71-stage0/`)
+문서: `docs/phasedocs/Phase71 HWPX 내보내기 v5 착수판.md`(§11 구현 기록) · Stage 0 `docs/phaseSketch/phase71-stage0.md`(시험 절차·실물 결과 · 시험 파일·탐침은 로컬 `_archive/Phase71/phase71-stage0/` — 스크립트를 다시 돌리면 `docs/phaseSketch/phase71-stage0/`에 새로 만든다)
 (계보: v1·v2 web → v3 CLI 교차검토 + 검증 턴(정정 25 · 보완 14 · 판정 N7~N17) → v4·v4.1·v4.2 web(템플릿 2~6차) → **v5 착수판**(판정 전부 확정) → 구현)
 
 문항 1개·여러 개 → `.hwpx`. **서버 0 · 규칙 0 · 스키마 0 · raw_text 0 · 렌더 사이트 0 · 폰 0.** IR 변경은 인용 표지 1건(70 출력 바이트 불변 — 단독 커밋). 런타임 의존성 0 · devDependency +1(`@xmldom/xmldom`). **규약은 「핵심 패턴」 맨 앞의 HWPX 절이 소유한다.**
@@ -526,7 +526,8 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **실물 2차(2026-10-16, 덕수)**: 오늘 바꾼 넷 정상 · 옵션 A 정상 · **S-10′ `S-최소`는 한글이 꺼진다**(renderingInfo·curSz·shapeComment는 계속 넣는다) · 템플릿 해설-단계 탭 T-B 반영(CLI가 XML 수정 — tabPr 6은 해설-단계1·2 전용) · S-7 `\left\{ array \right.` → cases · 해설 `(n)` → ㉠
 - **실물 3차(2026-10-16, 덕수)**: cases 해결 확인 · 글상자 안 `(1)`이 안 바뀐다 → 수식 안 `\text{(n)}`·`\because (n)`도 ㉠ · `left [ … right none` → `\right.`은 출력 안 함 · `\Rightarrow` 행이 든 여러 줄 수식이 안 나뉜다 → 원인은 바깥 `array{l}`(행 나누기가 aligned·gathered만 받았다)
 - **탐침 D(2026-10-16, 덕수)**: 보이지 않는 괄호 = `.`(V1 `right .`·V4 `left .`·V7 적분 막대 정상 · V2·V5 `none`은 글자로 찍힘) → `DELIM['.']`·rcases를 `.`로, `\right.` 생략 갈래는 되돌림(짝 맞춤)
-- ⚠ 남은 일: 일괄 실물 · 마감(확정본 §11·roadmap 완료·`_archive/Phase71/`) · push(덕수)
+- **마감(2026-10-16)**: 일괄 내보내기 실물 여러 차례 정상(덕수) · 작업물(계획서 v1~v5 · 메모·피드백 · 원본 템플릿 · 시험 파일)은 `docs/phaseSketch/_archive/Phase71/`(로컬) · phaseSketch에는 하니스 2종·Stage 0 기록만
+- 알고 두는 것: 수식 크기는 근사(마무리 = 한글 매크로 `docs/hwp-macro/수식크기바로잡기.js`) · 미대응 명령 11개(`\underbrace`·`\square` 등 — 낱말 + 안내) · `\left\{`로 감싼 여러 줄 수식 등 33개는 한 수식(eqalign) · 해설 수식의 맨 `(n)`(행 머리 인용)은 ㉠으로 안 바뀐다(1~2건)
 
 ### 이전: **Phase 70 — 내보내기 1단계(IR · LaTeX · Typst · 인쇄 엔진 교체)** — **70a 구현 완료(2026-10-13)** · 커밋 1~8 · 로직 테스트 `test:exportkinds` 9 · `test:exportir` 24 · `test:exportlatex` 10 · `test:exporttypst` 9(실제 컴파일) · `test:exportassets` 5 · headless CDP **13/13** · Stage 0 P0-1 Stack **99.99%** · **70b 구현 완료(2026-10-13)** · 레거시 인쇄 철거 · **70b 실물 검수 종결(덕수)** · **70c 수능 시험지 양식 구현 완료(2026-10-13)** · 70c 실물 검수 대기
 
