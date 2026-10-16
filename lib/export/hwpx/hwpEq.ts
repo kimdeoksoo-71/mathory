@@ -323,7 +323,7 @@ function envToHwp(env: string, arg: string | null, body: string): string {
     });
     // 칸 사이 1em(`~~`) — LaTeX cases의 `@{\quad}`와 같다(PDF는 typst quadCases). 없으면 식과 조건이 붙는다(덕수 실물 2026-10-15)
     const inner = padded.map((row) => row.replace(/&/g, '& ~~')).join(' # ');
-    return base.startsWith('r') || base.startsWith('dr') ? ` left none matrix{${inner}} right rbrace ` : ` cases{${inner}} `;
+    return base.startsWith('r') || base.startsWith('dr') ? ` left . matrix{${inner}} right rbrace ` : ` cases{${inner}} `;
   }
   if (['aligned', 'align', 'alignat', 'alignedat', 'split', 'eqnarray', 'flalign'].includes(base)) {
     return ` eqalign{${rows.join(' # ')}} `;
@@ -345,7 +345,7 @@ function envToHwp(env: string, arg: string | null, body: string): string {
 
 /**
  * `\left\{ \begin{array|aligned|…} … \end{…} \right.` → `\begin{cases} … \end{cases}`(덕수 실물 2026-10-16 — S-7).
- * 옛 판은 `left lbrace matrix{…} right none`을 냈고 한글이 `right none`을 못 읽어 수식이 깨졌다(`‖ one`).
+ * 옛 판은 `left lbrace matrix{…} right none`을 냈고 한글이 `none`을 글자로 찍어 수식이 깨졌다(`‖ one`) — 보이지 않는 괄호는 `.`이다.
  * 덤프에서 이 꼴이 107개(array 105 · aligned 2) — 한글 `cases{}`가 같은 모양을 그린다.
  */
 const BRACE_CASE_ENVS = ['array', 'darray', 'aligned', 'alignedat', 'matrix', 'smallmatrix', 'gathered', 'split'];
@@ -405,7 +405,8 @@ function convertEnvs(s: string): string {
 /* ═══ 본체 ═══ */
 
 const DELIM: Record<string, string> = {
-  '(': '(', ')': ')', '[': '[', ']': ']', '|': '|', '.': 'none', '/': '/', '<': 'langle', '>': 'rangle',
+  // `.` = 보이지 않는 괄호 — 한글도 `.`(탐침 D V1·V4·V7 실물 2026-10-16 · md2hwp의 `none`은 글자로 찍힌다)
+  '(': '(', ')': ')', '[': '[', ']': ']', '|': '|', '.': '.', '/': '/', '<': 'langle', '>': 'rangle',
   '\\{': 'lbrace', '\\}': 'rbrace', '\\lbrace': 'lbrace', '\\rbrace': 'rbrace', '\\langle': 'langle', '\\rangle': 'rangle',
   '\\lvert': '|', '\\rvert': '|', '\\vert': '|', '\\|': '||', '\\lVert': '||', '\\rVert': '||', '\\Vert': '||',
   '\\lfloor': 'lfloor', '\\rfloor': 'rfloor', '\\lceil': 'lceil', '\\rceil': 'rceil',
@@ -458,9 +459,6 @@ export function latexToHwp(latex: string, opts: { refs?: boolean } = {}): HwpEqR
 
   // 괄호
   s = s.replace(/\\(left|right)\s*(\\[a-zA-Z]+|\\[{}|]|[()[\]|./<>])/g, (_, side: string, d: string) => {
-    // `\right.` → 아무것도 내지 않는다(덕수 2026-10-16 — 한글은 `right none`을 못 읽어 `‖ one`으로 그렸고,
-    // `left [ …`만 두면 왼쪽 괄호 하나로 여러 행을 묶는 모양을 그린다). `\left.`은 탐침(D-보이지않는괄호) 결과 대기
-    if (side === 'right' && d === '.') return ' ';
     const hwp = DELIM[d] ?? d.replace(/^\\/, '');
     return ` ${side} ${hwp} `;
   });

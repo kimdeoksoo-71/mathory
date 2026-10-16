@@ -124,10 +124,12 @@ test('R5 \\left\\{ 환경 \\right. → cases(덕수 실물 2026-10-16 — S-7: �
   assert.ok(!eq(R`\left\{\begin{array}{ll} a & b \\ c & d \end{array}\right.`).includes('none'));
 });
 
-test('R6 \\right. → 아무것도 내지 않는다(덕수 2026-10-16 — right none은 한글에서 깨진다 · left [ 만 두면 왼쪽 괄호로 묶는다)', () => {
-  assert.equal(eq(R`\Rightarrow\left[\begin{array}{l} \bullet a \\ \bullet b \end{array}\right.`), '`Rightarrow` left [ lpile{bullet a # bullet b}');
-  assert.equal(eq(R`\left( a+b \right.`), 'left ( a+b');
-  assert.ok(!eq(R`\left[ x \right.`).includes('none'));
+test('R6 보이지 않는 괄호 = `.`(탐침 D 실물 2026-10-16 — `none`은 한글이 글자로 찍는다)', () => {
+  assert.equal(eq(R`\Rightarrow\left[\begin{array}{l} \bullet a \\ \bullet b \end{array}\right.`), '`Rightarrow` left [ lpile{bullet a # bullet b} right .');
+  assert.equal(eq(R`\left( a+b \right.`), 'left ( a+b right .');
+  assert.equal(eq(R`\left. x^2 \right|_{0}^{1}`), 'left . x^2 right | _{0}^{1}');
+  assert.equal(eq(R`\begin{rcases} a \\ b \end{rcases}`), 'left . matrix{a # b} right rbrace');
+  assert.ok(!/\bnone\b/.test(eq(R`\left. \begin{array}{l} p \\ q \end{array} \right\}`)));
 });
 
 test('R7 해설 수식의 (n) → ㉠ — \\text{…(n)…}·\\because (n)만(맨 (n)은 f(2) 같은 인자라 그대로) · refs 없으면 그대로', () => {
