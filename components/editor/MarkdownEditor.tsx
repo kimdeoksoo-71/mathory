@@ -31,9 +31,10 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 /* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
 import {
   insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, createMathKeys, createMathInput, createMathAscii,
-  commitComposition, runAfterComposition, createMathPaste,
+  commitComposition, runAfterComposition, createMathPaste, flushMathAscii,
 } from '../../lib/math-editor-extensions';
 import { slotsField, insertWithSlots, setSlots } from '../../lib/mathSlots';
+import { edgeChanges } from '../../lib/blockEdges';
 /* Phase 68a — 수식 영역 자동 영문 입력의 CM 배선(keydown capture · 보류 삽입 큐 · reconcile 끊기→지우기→재생)은
    lib/math-editor-extensions `createMathAscii`가 소유한다(댓글·agent 입력창과 한 벌 — 2026-10-09). 판정은 lib/mathAscii. */
 
@@ -184,6 +185,10 @@ export interface MarkdownEditorHandle {
   getCursorPosition: () => number;
   getContent: () => string;
   setContent: (text: string) => void;
+  /** M10 J(D27·D28) — 블록 앞뒤 빈 줄을 지운다(lib/blockEdges — case 이어짓기 보호에 `type`). 앞·뒤 **두 구간 삭제**라
+   *  통째 교체가 아니다(커서·Tab 자리·CM undo 보존). **포커스를 가진 뷰는 건드리지 않는다**(타자 중 보호) — false 반환.
+   *  반환 = 실제로 지웠는가. onChange가 부모 state·dirty를 갱신한다 */
+  trimEdges: (type?: string) => boolean;
   setSelection: (from: number, to: number) => void;
   clearSelection: () => void;
   replaceRange: (from: number, to: number, text: string) => void;
@@ -384,6 +389,15 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         const view = viewRef.current;
         if (!view) return '';
         return view.state.doc.toString();
+      },
+      trimEdges(type?: string) {
+        const view = viewRef.current;
+        if (!view || view.hasFocus) return false;
+        flushMathAscii(view);
+        const changes = edgeChanges(view.state.doc.toString(), type);
+        if (!changes.length) return false;
+        view.dispatch({ changes, effects: setSlots.of(null) });
+        return true;
       },
       setContent(text: string) {
         const view = viewRef.current;

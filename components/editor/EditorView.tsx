@@ -32,6 +32,7 @@ import { tidyBlocks } from '../../lib/blockTidy';
 import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { stripInvisibles, isInvisibleTarget } from '../../lib/invisibles';
+import { trimBlockEdges, trimLeadingBlankLines, trimTrailingBlankLines } from '../../lib/blockEdges';
 import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib/blockClipboard';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
@@ -1240,6 +1241,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   // 찾기/바꾸기 패널
   const [searchOpen, setSearchOpen] = useState(false);
+  const searchOpenRef = useRef(false);   // M10 D27 ②′ — 이탈 trim이 찾기 패널의 블록별 오프셋을 어긋내지 않게
+  searchOpenRef.current = searchOpen;
 
   // 교정 결과: tabId → blockId → 결과
   const [proofreadResults, setProofreadResults] = useState<Record<string, Record<string, ProofreadBoxData>>>({});
@@ -1384,7 +1387,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
             const type = normalizeBlockType(b.type);
             // M9 D24-1′·Q12 — 로드 시 정규화. 저장은 로컬을 서버본으로 교체하지 않으므로(M7 D11) 저장 시점에만
             //   정규화하면 같은 세션의 미리보기가 계속 깨져 보인다. 비dirty — 다음 편집 저장이 서버본을 고친다.
-            const raw_text = isInvisibleTarget(type) ? stripInvisibles(b.raw_text) : b.raw_text;
+            const stripped = isInvisibleTarget(type) ? stripInvisibles(b.raw_text) : b.raw_text;
+            // M10 D25 — 앞뒤 빈 줄도 로드에서(저장 정규화와 같은 lib/blockEdges · case 이어짓기 보호). 옛 문항의 빈 줄이
+            //   첫 이탈 trim(D27)에서 헛 dirty를 만들지 않게. 비dirty(로드 배치)
+            const raw_text = trimBlockEdges(stripped, type);
             return { ...b, raw_text, block_key: b.block_key || nanoid(), type, collapsed: false, title: b.title || '' };
           });
 
@@ -2043,8 +2049,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     const cursor = ref.getCursorPosition();
     const content = ref.getContent();
 
-    const before = content.slice(0, cursor);
-    const after = content.slice(cursor);
+    /* M10 D26 — 분할면의 빈 줄을 떼어 낸다(행 끝에서 ⌘B면 아랫블록 첫 줄이 빈 줄이었다). 수식행 분할과 대칭.
+       아랫블록은 text 타입이라 이어짓기 예외가 없다. 원 블록의 앞쪽은 건드리지 않는다(이탈 때 D27이 타입 인지로) */
+    const before = trimTrailingBlankLines(content.slice(0, cursor));
+    const after = trimLeadingBlankLines(content.slice(cursor), 'text');
 
     // 원본 블록의 CodeMirror 내용을 즉시 갱신 (before만 남김).
     // 커서가 끝이면 내용이 그대로이므로 불필요한 문서 전체 교체를 건너뛴다.
@@ -2742,6 +2750,43 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }
   }, [activeBlockId]);
 
+  /* ─── M10 D27 — 블록 이탈: 떠난 블록의 앞뒤 빈 줄을 지운다(lib/blockEdges) ───
+     ⚠ DOM blur는 이탈 신호가 아니다(68a 끊기·commitComposition이 같은 블록 안에서 blur를 낸다) → activeBlockId 변화로.
+     ① 직전 블록이 **현재 탭**에 있을 때만. 탭 전환은 switchTab이 전환 **전에** 처리한다(D28) — 탭 전환 effect가
+        다음 커밋에 activeBlockId를 바꾸므로 여기서는 activeTab이 이미 새 탭이라 옛 탭 블록은 찾지 못한다(무동작이 맞다)
+     ② 포커스를 아직 가진 CM은 건드리지 않는다(trimEdges가 거른다 — 타자 중 보호)
+     ②′ 찾기·바꾸기 패널이 열려 있으면 건너뛴다 — 패널은 블록별 절대 오프셋을 들고 있다(FindReplacePanel)
+     ②″ P31 — 떠난 블록이 새 블록보다 **위**면 줄어든 높이만큼 scrollTop을 보정한다(본문이 당겨지는 튐 방지). CM은 dispatch
+        안에서 DOM을 동기 갱신하므로 전후 높이 차가 곧 Δ다. 중앙 정렬(handleBlockFocus의 scrollEditorTo*Center)은
+        setTimeout 50 뒤 그때 레이아웃으로 목표를 계산하므로 보정 뒤 좌표를 읽는다
+     ③ CM이 없으면(접힘) state만 — 높이가 안 바뀌어 보정 없음 */
+  const prevActiveBlockRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevActiveBlockRef.current;
+    prevActiveBlockRef.current = activeBlockId;
+    if (!prev || prev === activeBlockId || searchOpenRef.current) return;
+    const list = allBlocks[activeTab] || [];
+    const b = list.find((x) => x.id === prev);
+    if (!b || !TEXT_BASED_TYPES.has(b.type)) return;
+    const ref = editorRefs.current[prev];
+    if (ref) {
+      const container = editorPanelRef.current;
+      const above = list.findIndex((x) => x.id === prev) < list.findIndex((x) => x.id === activeBlockId);
+      const el = above && container
+        ? container.querySelector(`[data-editor-block-id="${prev}"]`) as HTMLElement | null : null;
+      const h0 = el ? el.getBoundingClientRect().height : 0;
+      if (ref.trimEdges(b.type) && el && container) {      // onChange → handleBlockChange가 state·dirty를 갱신
+        const d = h0 - el.getBoundingClientRect().height;
+        if (d > 0) container.scrollTop -= d;
+      }
+      return;
+    }
+    const t = trimBlockEdges(b.raw_text, b.type);
+    if (t !== b.raw_text) {
+      setAllBlocks((p) => ({ ...p, [activeTab]: (p[activeTab] || []).map((x) => (x.id === prev ? { ...x, raw_text: t } : x)) }));
+    }
+  }, [activeBlockId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ─── 불변식 감시(트립와이어): [data-noscroll] 컨테이너는 세로로 스크롤되면 안 된다 ───
      이들은 overflow:hidden 이라 사용자가 되돌릴 수 없다. 즉시 0으로 복원하고,
      개발 중엔 경고를 남긴다. 정상 상태에서는 scroll 이벤트가 한 번도 발생하지 않으므로
@@ -3167,11 +3212,30 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user, snapshotCurrent]);
 
   /* ─── 자동저장: 탭 전환 시 ─── */
+  /* M10 D28 — 탭 전환 전에 그 탭 블록 전부의 앞뒤 빈 줄을 지운다(마운트된 CM은 trimEdges — 포커스 가진 것은 거른다 ·
+     접힌 블록은 state). 저장은 **렌더 뒤**(아래 saveAfterTabSwitch effect) — 같은 틱에 handleSave를 부르면 seq0를 잡은 뒤
+     dirty effect가 editSeqRef++를 해 저장이 끝나도 dirty가 남는다(저장 아이콘이 빨간 채). */
+  const [tabSwitchSaveSeq, setTabSwitchSaveSeq] = useState(0);
+  const trimAllBlocksOf = useCallback((tabId: string) => {
+    const list = allBlocks[tabId] || [];
+    const patch: Record<string, string> = {};
+    for (const b of list) {
+      if (!TEXT_BASED_TYPES.has(b.type)) continue;
+      const ref = editorRefs.current[b.id];
+      if (ref) { ref.trimEdges(b.type); continue; }
+      const t = trimBlockEdges(b.raw_text, b.type);
+      if (t !== b.raw_text) patch[b.id] = t;
+    }
+    if (Object.keys(patch).length) {
+      setAllBlocks((p) => ({ ...p, [tabId]: (p[tabId] || []).map((x) => (x.id in patch ? { ...x, raw_text: patch[x.id] } : x)) }));
+    }
+  }, [allBlocks]);
   const switchTab = useCallback((nextTabId: string) => {
     if (nextTabId === activeTab) return;
-    handleSave(true);
+    trimAllBlocksOf(activeTab);
     setActiveTab(nextTabId);
-  }, [activeTab, handleSave]);
+    setTabSwitchSaveSeq((n) => n + 1);
+  }, [activeTab, trimAllBlocksOf]);
 
   /* ─── AI 경로 공용: "보내기 전에 저장본을 맞춘다" (Phase 66a D12″ · Q5) ───
      소비처 둘 — 61b 검증 칩(handleRunVerify)과 66a 문답 전송(CommentPanel onBeforeAskSend).
@@ -3189,6 +3253,11 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           못 막는다 — `dirtyRef.current`를 대기 뒤에 읽어야 한다. 그래서 deps가 []다. */
   const handleSaveRef = useRef(handleSave);
   useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+  /* M10 D28 — 탭 전환 저장. ⚠ **선언 순서가 기전이다**: dirty effect(editSeqRef++)와 위 handleSaveRef 갱신 effect보다
+     **뒤**에 둔다 — 같은 커밋의 effect는 선언 순으로 돌아, seq가 먼저 오르고 최신 handleSave가 그 seq를 seq0로 잡는다 */
+  useEffect(() => {
+    if (tabSwitchSaveSeq) handleSaveRef.current(true);
+  }, [tabSwitchSaveSeq]);
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
