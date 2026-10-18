@@ -1879,9 +1879,30 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     });
   }, [setCurrentBlocks, activeTab]);
 
+  /* M10 D23(H) — 새 블록·빈 블록 프리셋 전환 뒤 곧바로 타자할 수 있게: 포커스 + 커서를 **첫 줄 끝**(`## |` · `(가) |` · `- |`).
+     ref는 다음 커밋에 등록되므로 50ms 뒤(handleSplitBlock과 같은 패턴). focus() **뒤** setSelection(D3′ 게이트).
+     CM이 없는 타입(그림·SVG·GGB)은 ref가 없어 조용히 무동작 */
+  const focusBlockStart = useCallback((blockId: string, text: string) => {
+    const nl = text.indexOf('\n');
+    const p = nl === -1 ? text.length : nl;
+    setTimeout(() => {
+      const r = editorRefs.current[blockId];
+      if (!r) return;
+      r.focus();
+      r.setSelection(p, p);
+    }, 50);
+  }, []);
+
   const handleBlockTypeChange = useCallback((blockId: string, type: Block['type']) => {
     const _cur = currentBlocks.find((b) => b.id === blockId);
     if (_cur && _cur.type !== type) pushUndo();   // C3: 실제 타입 변경일 때만
+    /* M10 D23·P24 — 빈 텍스트 계열 블록을 제목·프리셋 타입으로 바꿀 때만 포커스를 옮긴다(아래 updater의 두 갈래와 같은 조건).
+       내용 있는 블록의 제목 전환은 현행(포커스 이동 없음). ⚠ updater 밖에서 부른다(StrictMode가 updater를 두 번 돌린다) */
+    let focusText: string | null = null;
+    if (_cur && _cur.type !== type && TEXT_BASED_TYPES.has(_cur.type) && type !== 'choices' && !_cur.raw_text.trim()) {
+      if (type === 'heading') focusText = '## ';
+      else if (BLOCK_PRESETS[type]) focusText = BLOCK_PRESETS[type];
+    }
     setCurrentBlocks((prev) =>
       prev.map((b) => {
         if (b.id !== blockId) return b;
@@ -1949,7 +1970,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         return { ...b, type, raw_text };
       })
     );
-  }, [setCurrentBlocks, currentBlocks, pushUndo]);
+    if (focusText !== null) focusBlockStart(blockId, focusText);   // microtask setContent 뒤(50ms)
+  }, [setCurrentBlocks, currentBlocks, pushUndo, focusBlockStart]);
 
   const handleBlockTitleChange = useCallback((blockId: string, title: string) => {
     setCurrentBlocks((prev) =>
@@ -2005,7 +2027,8 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       return updated;
     });
     setActiveBlockId(newBlock.id);
-  }, [activeBlockId, setCurrentBlocks, pushUndo]);
+    focusBlockStart(newBlock.id, newBlock.raw_text);   // M10 D23
+  }, [activeBlockId, setCurrentBlocks, pushUndo, focusBlockStart]);
 
   /** 이미지 크기 변경 */
   const handleImageWidthChange = useCallback((blockId: string, width: number) => {
