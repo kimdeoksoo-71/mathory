@@ -527,7 +527,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **개선묶음 M10 — 각종 편의 기능 개선·버그 수정** — **구현 완료(2026-10-18)** · 커밋 S0~S9 12개(`0e94b7c`~`c1d34ca`) + docs · 단위 테스트 39종 **775건** 전부 통과(신설 `test:edges` 4 · `test:sessions` 4 · `test:activity` 5 · `test:favicon` 2 · `test:tidy` 21→28) · 68b CDP 하니스 **195/195**(M10 신규 20) · M3·M5 headless 실측 · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · **덕수 실물 검수 대기** · push 대기
+## 현재 Phase: **개선묶음 M10 — 각종 편의 기능 개선·버그 수정** — **완료(2026-10-18)** · 커밋 S0~S9 12개(`0e94b7c`~`c1d34ca`) + docs · 단위 테스트 39종 **775건** 전부 통과(신설 `test:edges` 4 · `test:sessions` 4 · `test:activity` 5 · `test:favicon` 2 · `test:tidy` 21→28) · 68b CDP 하니스 **195/195**(M10 신규 20) · M3·M5 headless 실측 · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · 배포 완료 · **덕수 실물 검수 전항 종결(2026-10-18)**
 
 문서: `docs/phasedocs/개선묶음 M10 각종 편의 기능 개선·버그 수정 v5 실행판.md`(§9 구현 기록 · 부록 G = v2 본문 — "v2 그대로" 항목의 정본)
 (계보: 덕수 스케치 → v1 web → 판정 P1~P18 → v2 web → v3 CLI 교차검토 + 독립 검증 턴(데이터 손상 1건 포함 정정 6 · 보완 9) → 판정 P19~P31 → v4 web → **v5 CLI 착수판** → 구현)
@@ -537,7 +537,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **스케치를 뒤집은 것**: A는 지연이 아니라 **갱신 없음**(사이드바로 나가면 아무도 `loadData`를 안 불렀다) · F는 `r` 대신 **`"`**(영문 글자는 한글 IME 조합 키라 선택을 지킬 수 없다 — 덕수 판정) · J ③(편집창 → 열람·폴더뷰)은 이미 충족(서버본이 trim)
 - **계획 왕복이 잡은 값비싼 것**: ① 언마운트 저장 대기가 **블록 두 벌**을 만들 뻔했다(`handleSave`의 `origBlockIds` 클로저 — 독립 검증 턴) → ref ② `<EditorView>` key 부재 = 편집창→편집창 전환 **유실** ③ **경우 이어짓기를 저장 정규화가 이미 파괴하고 있었다**(잠복) ④ MathToolbar는 앱 화면에 없었다 ⑤ enumerate `1. `은 정돈 R2가 지운다 → `1) `
 - **구현이 잡은 것(실행판 §9)**: `normalizeDisplayMathSpacing`이 맨 앞 `$$` 앞 공백을 지워 이어짓기 판정을 그 전에 · itemize 한 줄 출력의 줄 가르기가 이중 줄바꿈을 냈다(결과 문자열 기준 판정) · **M3: Worker 타이머는 숨긴 탭에서도 100ms**(메인 1000ms) → 파비콘 박자를 Worker로(P4 대안) · dev 서버가 파일 삭제 뒤 정적 청크 404 — `rm -rf .next` 재시작
-- ⚠ 남은 일: **덕수 실물 검수**(실행판 §9-4 체크리스트 — A 제목 즉시 반영 · B 탭 아이콘(실제 탭 표시는 headless로 못 본다 = M5 실물) · C · D(M4 아이콘 시각) · E · F(~~Windows 11~~ **2벌식·3벌식 통과 2026-10-18**) · G · H · I · J) · Vercel `AI_PROVIDER`·`AI_MODEL` 삭제(M2) · push
+- **덕수 실물 검수 종결(2026-10-18)** — 실행판 §9-4 전항 통과(B-1 실제 탭 아이콘 · D-1 아이콘 무게 · F-2 Windows 11 2벌식·3벌식 포함) · Vercel `AI_PROVIDER`·`AI_MODEL` 삭제 완료 · 작업물은 `docs/phaseSketch/_archive/M10/`(로컬). ⚠ F-2 첫 시험이 실패로 보였던 것은 **push 전 배포본**(옛 코드)이었다 — 실물 검수 전에 배포본이 그 커밋을 담았는지부터
 
 ### 이전: **Phase 71 — HWPX 내보내기** — **완료(2026-10-16)** · 커밋 0~6(`da961f5` refactor IR 인용 표지 · `9c7f5e8` · `6a4f30e` · `bba2766` · `cfa656a`) + **실물 후속 1~3차·탐침 D** · 로직 테스트 `test:exporthwpxstyles` 6 · `test:exporthwpeq` 15 · `test:exporthwpx` 24 · 70 테스트 무변화 · headless CDP **12/12** · 덤프 수식 31,006 미대응 명령 없음 **99.96%** · 덤프 `none` 0 · **덕수 실물 전항 종결 — 단일·일괄·옵션 A·B(2026-10-16, "짧은 시간에 프로젝트 성공")**
 
