@@ -153,6 +153,39 @@ test('R4(M10 P26): case·subcase 이어짓기의 빈 첫 줄은 하나 남긴다
   assert.deepEqual(shape(T('조건\n본문\n\n', 'solution', 'case')), ['case:"조건\\n본문"']);
 });
 
+/* ═══ R0b itemize 벗기기 (M10 D24·P25·P30) ═══ */
+test('R0b: 환경 줄 삭제 · 마커로 시작하는 맨 \item은 \item만 · 비마커는 글머리', () => {
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item ㄱ. 첫째\n\\item ㄴ. 둘째\n\\end{itemize}')), ['text:"ㄱ. 첫째\\nㄴ. 둘째"']);
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item 첫째 조건\n\\item 둘째 조건\n\\end{itemize}')), ['text:"- 첫째 조건\\n- 둘째 조건"']);
+});
+test('R0b: \item[] 빈 라벨은 맨 \item과 같이 · 마커 라벨은 라벨 · 비마커 라벨은 글머리 + 라벨', () => {
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item[] ① a\n\\item[(가)] b\n\\item[(1)] c\n\\end{itemize}')), ['text:"① a\\n(가) b\\n- (1) c"']);
+});
+test('R0b: enumerate 맨 \item → 1) 2) — 탭 첫 블록이어도 R2-Q·R2가 번호를 지우지 않는다', () => {
+  for (const tab of ['question', 'solution']) {
+    assert.deepEqual(shape(T('\\begin{enumerate}\n\\item a\n\\item b\n\\end{enumerate}', tab)), ['text:"1) a\\n2) b"'], tab);
+  }
+  assert.deepEqual(shape(T('\\begin{enumerate}[label=(\\arabic*)]\n\\item a\n\\end{enumerate}')), ['text:"1) a"']);
+});
+test('R0b: 한 줄 출력(Mathpix)도 줄을 갈라 처리 · 앞뒤 본문 보존', () => {
+  assert.deepEqual(shape(T('다음 중 옳은 것은? \\begin{itemize}\\item ㄱ. a \\item ㄴ. b\\end{itemize} 뒤')), ['text:"다음 중 옳은 것은?\\nㄱ. a\\nㄴ. b\\n뒤"']);
+});
+test('R0b: 수식·코드 안은 무접촉 · \items 같은 매크로 무접촉 · stats.fixed · 멱등', () => {
+  const keep = '$\\text{\\item}$ 와 `\\begin{itemize}` 그리고 \\itemsep';
+  const r0 = T(keep);
+  assert.deepEqual(shape(r0), [`text:${JSON.stringify(keep)}`]);
+  assert.equal(r0.stats.fixed, 0);
+  const r = T('\\begin{itemize}\n\\item 첫째\n\\end{itemize}');
+  assert.ok(r.stats.fixed > 0);
+  const again = tidyBlocks(r.blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab: 'solution', autoFix: false });
+  assert.deepEqual(shape(again), shape(r));
+  assert.equal(again.stats.fixed, 0);
+});
+test('R0b: choices·image는 무접촉(SPLITTABLE 밖)', () => {
+  const src = '\\begin{itemize}\n\\item a\n\\end{itemize}';
+  assert.deepEqual(shape(T(src, 'solution', 'choices')), [`choices:${JSON.stringify(src)}`]);
+});
+
 test('origin: 여러 입력 블록의 조각이 각자 입력 인덱스를 가리킨다', () => {
   const r = tidyBlocks([{ type: 'text', raw_text: 'a\n(i) b인 경우' }, { type: 'text', raw_text: 'c' }], { tab: 'question', autoFix: false });
   assert.deepEqual(r.blocks.map((b) => b.origin), [0, 0, 1]);

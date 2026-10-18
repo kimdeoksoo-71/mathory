@@ -8,6 +8,7 @@
 
 import { readGroup, skipEnvArgs } from './latexScan';
 import { scanMathRegions } from './mathRegions';
+import { MARKER_LINE_RE } from './locale';   // M10 D24 — 마커 판정 단일 원천(locale·caseBlock 둘 다 외부 import 0)
 
 export type ProofreadIssueKind = 'spelling' | 'spacing' | 'josa-space' | 'latex-brace' | 'latex-comma' | 'other';
 
@@ -611,6 +612,91 @@ export function unwrapSectionCommands(text: string): { fixed: string; count: num
     fixed = fixed.slice(0, e.from) + e.insert + fixed.slice(e.to);
   }
   return { fixed, count: edits.length };
+}
+
+/* ─── M10 D24: itemize·enumerate·description 벗기기 (정돈 R0b) ─── */
+const LIST_ENV_NAMES = 'itemize|enumerate|description';
+/** 줄 전체가 환경 토큰 하나(선택 인자 `[label=…]` 허용) */
+const ENV_LINE_RE = new RegExp(`^[ \\t]*\\\\(begin|end)\\{(${LIST_ENV_NAMES})\\}(?:\\[[^\\]\\n]*\\])?[ \\t]*$`);
+/** 행머리 `\item` · `\item[]` · `\item[라벨]` */
+const ITEM_HEAD_RE = /^[ \t]*\\item(?![A-Za-z])(?:\[([^\]\n]*)\])?[ \t]*/;
+/** 줄을 갈라야 하는 토큰(줄 중간 `\item` · 환경 토큰) */
+const LIST_TOKEN_RE = new RegExp(`\\\\item(?![A-Za-z])|\\\\(?:begin|end)\\{(?:${LIST_ENV_NAMES})\\}(?:\\[[^\\]\\n]*\\])?`, 'g');
+
+/**
+ * Mathpix·시트가 남기는 LaTeX 목록 환경을 Mathory 표기로 벗긴다(정돈 R0b — `blockTidy`가 R0 직후·분할 앞에서 부른다).
+ * - `\begin{…}`·`\end{…}`(itemize·enumerate·description, 선택 인자 포함) → 줄째 삭제
+ * - enumerate의 라벨 없는 `\item` → `1) `·`2) `…(환경마다 1부터 — M10 P25). ⚠ `1. `은 쓰지 않는다: 정돈 R2-Q·R2의
+ *   문제번호 정규식(`^\d{1,2}\.`)이 첫 블록에서 지운다. `(1)` 꼴은 HWPX 해설의 `(n)` → ㉠ 변환에 걸린다
+ * - 마커 라벨(`\item[(가)]`·`\item[ㄱ.]`·`\item[①]` — `MARKER_LINE_RE`) → `라벨 `
+ * - 비마커 라벨(`\item[(1)]` 등) → `- 라벨 ` / 라벨 없음·빈 라벨: 내용이 마커로 시작하면 `\item`만 지우고 아니면 `- `(M10 P30)
+ *   — 그냥 지우면 렌더에 `remark-breaks`가 없어 항목들이 한 문단으로 합쳐진다
+ * - 줄 중간 토큰(Mathpix 한 줄 출력 `\begin{itemize}\item a \item b\end{itemize}`)은 먼저 줄을 가른다
+ * - 수식·코드 범위 안은 무접촉 · 결과는 평평하다(들여쓰기를 버린다 — 4칸 이상이면 코드 블록이 된다) · 멱등
+ * ⚠ 결정적 세트(`autoFixDeterministicIssues`)에 넣지 말 것 — OCR(`lib/ocr.ts`)이 공유하고 P-2가 제어열 불변을 고정한다.
+ */
+export function unwrapItemize(text: string): { fixed: string; count: number } {
+  if (!/\\item(?![A-Za-z])|\\(?:begin|end)\{(?:itemize|enumerate|description)\}/.test(text)) return { fixed: text, count: 0 };
+
+  // ① 줄 가르기 — 토큰 앞(같은 줄 앞에 글자가 있으면)·환경 토큰 뒤(같은 줄 뒤에 글자가 있으면)에 줄바꿈
+  const skip0 = [...collectMathRanges(text), ...collectCodeRanges(text)];
+  const inSkip0 = (pos: number) => skip0.some(([s, e]) => pos >= s && pos < e);
+  let src = '';
+  let last = 0;
+  LIST_TOKEN_RE.lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = LIST_TOKEN_RE.exec(text)) !== null) {
+    if (inSkip0(m.index)) continue;
+    src += text.slice(last, m.index);
+    // 이미 가른 줄을 다시 가르지 않게 **만든 결과**의 마지막 줄로 판정한다
+    if (src.slice(src.lastIndexOf('\n') + 1).trim()) src = src.replace(/[ \t]+$/, '') + '\n';
+    src += m[0];
+    last = m.index + m[0].length;
+    if (m[0][1] !== 'i') {                                   // \begin·\end — 뒤에 글자가 남으면 줄을 가른다
+      const lineEnd = text.indexOf('\n', last);
+      const after = text.slice(last, lineEnd === -1 ? text.length : lineEnd);
+      if (after.trim()) { src += '\n'; while (text[last] === ' ' || text[last] === '\t') last++; }
+    }
+  }
+  src += text.slice(last);
+
+  // ② 줄 단위 — 환경 스택(enumerate 번호)과 함께
+  const skip = [...collectMathRanges(src), ...collectCodeRanges(src)];
+  const inSkip = (pos: number) => skip.some(([s, e]) => pos >= s && pos < e);
+  const stack: Array<{ kind: string; n: number }> = [];
+  const out: string[] = [];
+  let count = 0;
+  let offset = 0;
+  for (const line of src.split('\n')) {
+    const at = offset + (line.length - line.trimStart().length);
+    offset += line.length + 1;
+    if (inSkip(at)) { out.push(line); continue; }
+    const env = line.match(ENV_LINE_RE);
+    if (env) {
+      if (env[1] === 'begin') stack.push({ kind: env[2], n: 0 });
+      else stack.pop();
+      count++;
+      continue;
+    }
+    const item = line.match(ITEM_HEAD_RE);
+    if (!item) { out.push(line); continue; }
+    count++;
+    const label = item[1];
+    const rest = line.slice(item[0].length);
+    const top = stack[stack.length - 1];
+    let prefix: string;
+    if (label !== undefined && label.trim()) {
+      prefix = MARKER_LINE_RE.test(label.trim()) ? `${label.trim()} ` : `- ${label.trim()} `;
+    } else if (label === undefined && top?.kind === 'enumerate') {
+      prefix = `${++top.n}) `;
+    } else {
+      prefix = MARKER_LINE_RE.test(rest) ? '' : '- ';
+    }
+    if (!rest.trim() && (prefix === '' || prefix === '- ')) continue;   // 내용 없는 \item 줄
+    out.push(prefix + rest);
+  }
+  const fixed = out.join('\n');
+  return { fixed, count: fixed === text ? 0 : count };
 }
 
 /* ─── M9 D27: 번분수 → `\dfrac` ─── */

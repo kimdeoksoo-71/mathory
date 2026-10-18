@@ -1,5 +1,5 @@
 /**
- * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`·`./mathInput`·`./blockEdges`뿐(`npm run test:tidy`가 단독 컴파일).
+ * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`(→ `./locale`·`./caseBlock`)·`./invisibles`·`./mathInput`·`./blockEdges`뿐(`npm run test:tidy`가 단독 컴파일).
  *
  * 취지: 시트 가져오기·OCR로 들어온 "한 덩어리" 텍스트를 Mathory의 블록 체계에 맞게 **분할**하고,
  * 가능한 경우 **타입**(경우·하위 경우·제목)을 부여하며, 편집 스타일의 **결정적 정형화**를 한 번에 태운다.
@@ -31,7 +31,7 @@
  */
 
 import { scanMathRegions } from './mathRegions';
-import { autoFixDeterministicIssues, unwrapSectionCommands } from './proofread';
+import { autoFixDeterministicIssues, unwrapSectionCommands, unwrapItemize } from './proofread';
 import { stripInvisibles, isInvisibleTarget } from './invisibles';
 import { ROW_ENV_RE, layoutRowEnvs } from './mathInput';
 import { trimBlockEdges } from './blockEdges';
@@ -126,6 +126,16 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
   blocks = blocks.map((b) => {
     if (!SPLITTABLE.has(b.type)) return b;
     const r = unwrapSectionCommands(b.raw_text);
+    if (!r.count) return b;
+    stats.fixed += r.count;
+    return { ...b, raw_text: r.fixed };
+  });
+
+  // R0b (M10 D24) — itemize·enumerate·description 벗기기. R0처럼 분할 앞·autoFix 무관.
+  //   ⚠ 결정적 세트(R3)에 넣지 말 것 — OCR이 그 세트를 공유하고 test:proofread P-2가 제어열 불변을 고정한다
+  blocks = blocks.map((b) => {
+    if (!SPLITTABLE.has(b.type)) return b;
+    const r = unwrapItemize(b.raw_text);
     if (!r.count) return b;
     stats.fixed += r.count;
     return { ...b, raw_text: r.fixed };
