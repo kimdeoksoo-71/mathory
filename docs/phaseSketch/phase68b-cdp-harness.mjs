@@ -224,7 +224,7 @@ for (const w of ['ed', 'cm']) {
   await check(`통일 ${tag} _ → _{}`, w, 'a $x|$ b', [typeStr('_')], 'a $x_{|}$ b');
   await check(`통일 ${tag} (a+b)/ → \\frac{a+b}{}`, w, 'a $ |$ b', [typeStr('(a+b)/')], 'a $ \\frac{a+b}{|}$ b');
   await check(`통일 ${tag} f(x)/ → 무변환`, w, 'a $f|$ b', [typeStr('(x)/')], 'a $f(x)/|$ b');
-  await check(`통일 ${tag} 선택 + ( → \\left(…\\right)`, w, 'a $|x+1|$ b', [typeStr('(')], 'a $[\\left(x+1\\right)]$ b');
+  await check(`통일 ${tag} 선택 + ( → \\left(…\\right) · 커서는 닫는 괄호 뒤(M10 D22)`, w, 'a $|x+1|$ b', [typeStr('(')], 'a $\\left(x+1\\right)|$ b');
   await check(`통일 ${tag} \\left 뒤 ( → \\right) 짝`, w, 'a $\\left|$ b', [typeStr('(')], 'a $\\left(|\\right)$ b');
   await check(`통일 ${tag} 수식 밖 ( → 짝 없음`, w, 'ab|', [typeStr('(')], 'ab(|');
   await check(`통일 ${tag} 수식 안 공백 앞 ( → 짝`, w, 'a $x | y$ b', [typeStr('(')], 'a $x (|) y$ b');

@@ -686,9 +686,12 @@ const mathInputHandler = Prec.highest(EditorView.inputHandler.of((view, from, to
           const [open, close] = text === '(' ? ['\\left(', '\\right)']
             : text === '[' ? ['\\left[', '\\right]'] : ['\\left\\{', '\\right\\}'];
           const wrapped = open + doc.slice(from, to) + close;
+          /* M10 D22 — 감싼 뒤 커서는 닫는 구분자 뒤(선택 해제). 옛 코드는 감싼 전체를 선택으로 남겨 다음 글자(Space 등)가
+             감싼 내용을 통째로 대체했다. ⌘Z 1회 = 감싸기 전(선택 복원 — CM history가 startSelection을 되살린다) */
           view.dispatch({
             changes: { from, to, insert: wrapped },
-            selection: { anchor: from, head: from + wrapped.length }, userEvent: 'input.type',
+            selection: { anchor: from + wrapped.length }, userEvent: 'input.type',
+            annotations: isolateHistory.of('full'),
           });
           return true;
         }
