@@ -107,6 +107,9 @@ const ICONS = {
   keyboard: ['keyboard', 'regular'],                       // MathAsciiIcon — Row 2 토글(줄바꿈 왼쪽). 상태는 박스(active)가 나른다
   scribble: ['scribble', 'regular'],                       // InkAttachmentsIcon — Row 2 필기 첨부 (Phase 69 D14)
   // ⚠ listChecks(교정)를 재사용하지 말 것 — EditorView는 Row 2 툴바와 agent 드로어가 동시에 보인다.
+  // ── M10 D13 (FolderView 보기 토글) — `list`는 세 줄 햄버거라 메뉴로 읽혀 `list-bullets`(P21) · `rows`는 수식행 분할이 점유 ──
+  listView: ['list-bullets', 'regular'],                   // IconListView — FolderView 리스트 보기
+  cardView: ['squares-four', 'regular'],                   // IconCardView — FolderView 카드 보기
 };
 
 const assetFile = (name, w) =>
@@ -194,6 +197,7 @@ function buildSheet(PH_) {
     ['IconDocLines', 'fileText'], ['IconTag', 'tag'], ['IconCoachImportant *', 'chatCenteredText'],
     ['IconExit(sign-out)', 'exit'],
     ['IconSortAsc (M6)', 'arrowUp'], ['IconSortDesc (M6)', 'arrowDown'], ['IconSave ✓ (M6)', 'cloudCheck'], ['IconSave ↑ (M6)', 'cloudArrowUp'],
+    ['IconListView (M10)', 'listView'], ['IconCardView (M10)', 'cardView'],
   ];
   const SIZES = [12, 14, 16, 18, 20];
 

@@ -28,7 +28,9 @@ import ContextMenu, { ContextMenuAction } from '../ui/ContextMenu';
 import {
   IconTrash, IconCopy, IconInbox, IconDotsVertical, IconShare, IconComment, IconFolderMove, IconAgent,
   IconSortAsc, IconSortDesc,
+  IconListView, IconCardView,
 } from '../ui/Icons';
+import { useHoverTip } from '../ui/HoverTip';
 import FolderGlyph from '../ui/FolderGlyph';
 import { getChildren, getFolderPath } from '../../lib/folder-tree';
 import CoachBlock from '../ui/CoachBlock';
@@ -1013,18 +1015,28 @@ const selectionBarBtn: React.CSSProperties = {
   fontFamily: 'var(--font-ui)', padding: 0,
 };
 
-/* ═══ 카드/리스트 토글 (Phase 49) ═══ */
+/* ═══ 카드/리스트 토글 (Phase 49 → M10 D13 아이콘화) ═══
+   Phosphor `squares-four`(카드) · `list-bullets`(리스트) 16px. 켜짐 = 배경 `--bg-active` + `--text-primary`(행 1 규격 —
+   IconButton 박스를 쓰지 않는다, D14). ⚠ 네이티브 `title` 금지 — useHoverTip 말풍선과 이중 툴팁이 된다(M6 D5′). */
 function ViewModeToggle({ mode, onChange }: { mode: 'card' | 'list'; onChange: (m: 'card' | 'list') => void }) {
+  const card = useHoverTip('카드 보기');
+  const list = useHoverTip('리스트 보기');
   const btn = (active: boolean): React.CSSProperties => ({
-    border: 'none', cursor: 'pointer', fontSize: 12, padding: '3px 8px', borderRadius: 6,
-    fontFamily: 'var(--font-ui)', fontWeight: active ? 600 : 400,
+    width: 24, height: 24, padding: 0, border: 'none', borderRadius: 6, cursor: 'pointer',
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
     background: active ? 'var(--bg-active)' : 'transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
   });
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, marginRight: 6 }}>
-      <button onClick={() => onChange('card')} style={btn(mode === 'card')} title="카드 보기">카드</button>
-      <button onClick={() => onChange('list')} style={btn(mode === 'list')} title="리스트 보기">리스트</button>
+      <button {...card.bind} aria-label="카드 보기" aria-pressed={mode === 'card'} onClick={() => onChange('card')} style={btn(mode === 'card')}>
+        <IconCardView size={16} />
+      </button>
+      {card.tip}
+      <button {...list.bind} aria-label="리스트 보기" aria-pressed={mode === 'list'} onClick={() => onChange('list')} style={btn(mode === 'list')}>
+        <IconListView size={16} />
+      </button>
+      {list.tip}
     </div>
   );
 }

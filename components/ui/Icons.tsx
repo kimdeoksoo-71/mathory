@@ -117,6 +117,9 @@ export const IconSortDesc = phIcon(PH.arrowDown, 12);
 /** Phase 66a — agent 탭 문답 검증 질문 목록. ⚠ listChecks(교정)와 도안을 공유하지 말 것:
  *  EditorView는 Row 2 툴바(교정)와 agent 드로어(질문)가 동시에 화면에 있다. */
 export const IconQuestionList = phIcon(PH.listDashes, 16);
+/** M10 D13 — FolderView 보기 토글(행 1). 16px · 켜짐은 배경(`--bg-active`) */
+export const IconListView = phIcon(PH.listView, 16);
+export const IconCardView = phIcon(PH.cardView, 16);
 
 /** 로딩 스피너 — circle-notch 회전. animateTransform은 회전 대상(<path>)의 자식이어야 한다(D14). */
 export function IconLoader({ size = 14, color = 'currentColor', className }: IconProps) {
