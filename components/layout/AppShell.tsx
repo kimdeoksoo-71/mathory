@@ -41,6 +41,7 @@ import SearchOverlay from '../layout/SearchOverlay';
 import FolderView from '../problem/FolderView';
 import ProblemView from '../problem/ProblemView';
 import EditorView, { type SavedMeta } from '../editor/EditorView';
+import FaviconController from './FaviconController';
 import FolderPickerDialog from '../ui/FolderPickerDialog';
 import { alertDialog, confirmDialog, promptDialog } from '../../lib/dialogs';
 import { parseDeepLink } from '../../lib/deepLink';
@@ -1110,6 +1111,8 @@ export default function AppShell() {
         </div>
       ) : null}
     </DragOverlay>
+    {/* M10 B — 탭 아이콘(정밀 검증 맥박·완료 점). DOM 없음 */}
+    <FaviconController />
     </DragKindContext.Provider>
     </DndContext>
   );

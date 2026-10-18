@@ -27,6 +27,7 @@ import {
 /** 배치 리포트가 쌓이는 agent 세션 이름. ⚠ 댓글 세션에 넣으면 공개 문항에서 비로그인까지 읽는다.
  *  M10 E — 정본은 lib/sessionName(import 0 — 자동 세션 이름이 이것을 내지 않음을 테스트가 고정한다) */
 import { BATCH_SESSION_NAME } from './sessionName';
+import { beginActivity, markDone, isTabHidden } from './activityStore';
 export { BATCH_SESSION_NAME };
 
 export interface BatchItem {
@@ -135,6 +136,18 @@ export async function runBatchVerify(args: {
   stopRef: { current: boolean };
   callbacks?: BatchCallbacks;
 }): Promise<BatchResult> {
+  /* M10 B — 배치 전체를 한 번의 "바쁨"으로(문항 사이 공백에 맥박이 끊기지 않게). 조기 return이 7곳이라 본문 전체를 감싼다.
+     끝(완료·중단·실패 모두 — P20)에 탭이 비활성이면 완료 점 */
+  const end = beginActivity();
+  try {
+    return await runBatchVerifyBody(args);
+  } finally {
+    end();
+    markDone(isTabHidden());
+  }
+}
+
+async function runBatchVerifyBody(args: Parameters<typeof runBatchVerify>[0]): Promise<BatchResult> {
   const { items, uid, getIdToken, buildMarkdown, stopRef, callbacks } = args;
 
   /* ─── 행 테이블 (문항×종류) ─── */

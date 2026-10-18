@@ -17,6 +17,7 @@ import { blockKeyOf, buildCaseLabels } from './caseBlock';
 import { FIG_PLACEHOLDER, imageSrcOf } from './verify/figures';
 import { collectCurrentContent } from './version/adapter';
 import { hashPerTab, sha256 } from './version/hash';
+import { beginActivity, markDone, isTabHidden } from './activityStore';
 
 /** 검증에 넘길 블록 (Phase 61f).
  *
@@ -119,6 +120,18 @@ export async function runVerifyFlow(args: {
   /** M9 D25-4′ — 일괄 검증만 true(batchVerify.ts 한 곳). 단건 요청 바디에는 키가 없다 */
   batch?: boolean;
 }): Promise<{ report: VerifyReport; usage: VerifyUsage; commentId: string }> {
+  /* M10 B — 탭 아이콘 맥박(activityStore). 일괄 안의 문항 호출(batch)은 완료 점을 켜지 않는다 — runBatchVerify가 배치 끝에 한 번.
+     성공·실패 모두 끝(P20) */
+  const end = beginActivity();
+  try {
+    return await runVerifyFlowBody(args);
+  } finally {
+    end();
+    if (!args.batch) markDone(isTabHidden());
+  }
+}
+
+async function runVerifyFlowBody(args: Parameters<typeof runVerifyFlow>[0]): Promise<{ report: VerifyReport; usage: VerifyUsage; commentId: string }> {
   const question = args.blocksByTab['question'] || [];
   const solution = args.blocksByTab['solution'] || [];
 
