@@ -1066,8 +1066,12 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const [tabs, setTabs] = useState<TabMeta[]>(DEFAULT_TABS);
   const [activeTab, setActiveTab] = useState('question');
   const [allBlocks, setAllBlocks] = useState<Record<string, LocalBlock[]>>({});
-  const [origBlockIds, setOrigBlockIds] = useState<Record<string, string[]>>({});
-  const [origTabs, setOrigTabs] = useState<TabMeta[]>(DEFAULT_TABS);
+  /* M10 D3 — 서버 쪽 블록 id·탭 목록은 **ref**다(옛 state). 저장을 기다렸다 다시 부르는 경로(언마운트 · '보기' ·
+     AI 전 저장)는 언마운트 뒤나 재렌더 전에 handleSave를 부른다 — state 클로저면 직전 커밋 **전**의 id로 delete→set을
+     돌려 블록이 두 벌이 된다(commitProblemSave는 oldIds만 지운다). ref는 커밋 직후 **동기로** 갱신한다.
+     ⚠ state로 되돌리지 말 것. 화면에 그리는 곳은 없다 */
+  const origBlockIdsRef = useRef<Record<string, string[]>>({});
+  const origTabsRef = useRef<TabMeta[]>(DEFAULT_TABS);
 
   // 탭 이름 편집
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
@@ -1377,7 +1381,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
         const loadedTabs = data.tabs || DEFAULT_TABS;
         setTabs(loadedTabs);
-        setOrigTabs(loadedTabs);
+        origTabsRef.current = loadedTabs;
 
         const toLocal = (blocks: Block[]): LocalBlock[] =>
           blocks.map((b) => {
@@ -1402,7 +1406,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           origIds[tab.id] = blocks.map((b) => b.id);
         }
         setAllBlocks(blocksMap);
-        setOrigBlockIds(origIds);
+        origBlockIdsRef.current = origIds;
 
         // Phase 55 계층1: 크래시 복구 감지 — localStorage 드래프트가 서버본과 다르면 배너
         try {
@@ -3059,13 +3063,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       const saved = await commitProblemSave({
         problemId: problem.id,
         meta: updateData,
-        removedTabIds: origTabs.filter((o) => !tabs.find((t) => t.id === o.id)).map((o) => o.id),
+        removedTabIds: origTabsRef.current.filter((o) => !tabs.find((t) => t.id === o.id)).map((o) => o.id),
         tabs: tabs.map((tab) => ({
           tabId: tab.id,
-          oldIds: origBlockIds[tab.id] || [],
+          oldIds: origBlockIdsRef.current[tab.id] || [],
           blocks: (allBlocks[tab.id] || []).map((b, i) => toPersistedBlock(b, i) as unknown as Record<string, unknown>),
         })),
-        onTabCommitted: (tabId, ids) => setOrigBlockIds((prev) => ({ ...prev, [tabId]: ids })),
+        onTabCommitted: (tabId, ids) => { origBlockIdsRef.current = { ...origBlockIdsRef.current, [tabId]: ids }; },
       });
 
       // 저장 후 리프레시
@@ -3093,7 +3097,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         tabLoadErrorsRef.current = refreshed.tabLoadErrors || {};   // Phase 55(F7)
         const loadedTabs = refreshed.tabs || DEFAULT_TABS;
         setTabs(loadedTabs);
-        setOrigTabs(loadedTabs);
+        origTabsRef.current = loadedTabs;
 
         /* M7 D11 — **로컬 블록을 서버본으로 교체하지 않는다.** 옛 코드는 여기서 `setAllBlocks(서버본)`을
            해 모든 블록 id가 새 doc id로 바뀌었고, React key가 block.id라 **모든 CodeMirror가 리마운트**되어
@@ -3101,7 +3105,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
            내내 유지되고 서버 id는 `origBlockIds`(다음 저장의 delete-all 대상)만 안다.
            ⚠ `setAllBlocks(refreshed…)`를 되살리지 말 것. undo·redo·복원의 세대 id 재생성은 별개(의도). */
         // M9 D23-1′ — 서버 재조회가 아니라 커밋이 돌려준 id가 진실이다(읽기 실패 탭이 `[]`로 와 다음 저장이 중복을 만들던 경로 차단)
-        setOrigBlockIds(saved);
+        origBlockIdsRef.current = saved;
         // 교정 결과는 저장 시점 텍스트 기준이라 초기화(안전, 종전과 같다)
         setProofreadResults({});
 
@@ -3161,7 +3165,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       savingRef.current = false;
       setSaving(false);
     }
-  }, [problem, tabs, origTabs, origBlockIds, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user, snapshotCurrent]);
+  }, [problem, tabs, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user, snapshotCurrent]);
 
   /* ─── 자동저장: 탭 전환 시 ─── */
   /* M10 D28 — 탭 전환 전에 그 탭 블록 전부의 앞뒤 빈 줄을 지운다(마운트된 CM은 trimEdges — 포커스 가진 것은 거른다 ·
