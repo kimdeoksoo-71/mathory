@@ -4,8 +4,7 @@
  * Phase 25 — Unified Toolbar
  *
  * 컨텍스트 가시화(수식 안/밖) + 단일 진입점.
- * Step 2 (현재): 골격 + 기존 MathToolbar 분류 풀다운을 수식 안 상태에서만 노출.
- * Step 3 이후: MathToolbar 의존 제거 → 커스터마이징 가능한 그룹 시스템으로 교체.
+ * (옛 MathToolbar 분류 풀다운은 Σ 팔레트 MathSymbolPalette로 대체됐고 M10에서 파일째 삭제됐다)
  */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -666,7 +665,7 @@ export default function UnifiedToolbar({
   const leftRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(0);
 
-  // 좌측 폭 측정 — cursorInMath / MathToolbar 펼침 등 변화 모두 감지
+  // 좌측 폭 측정 — cursorInMath 등 변화 모두 감지
   useLayoutEffect(() => {
     if (!leftRef.current) return;
     const el = leftRef.current;

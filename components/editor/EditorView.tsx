@@ -21,7 +21,6 @@ import {
 import MarkdownEditor, { MarkdownEditorHandle, CursorActivityInfo } from '../editor/MarkdownEditor';
 import ChoicesBlock from '../editor/ChoicesBlock';
 import EditorPreview from '../editor/EditorPreview';
-import MathToolbar from '../editor/MathToolbar';
 import UnifiedToolbar from '../editor/UnifiedToolbar';
 import BlockBottomToolbar from '../editor/BlockBottomToolbar';
 import FolderPathBar from '../editor/FolderPathBar';
@@ -2525,7 +2524,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const canCopyBlocks = selectedBlockIds.size > 0 || !!activeBlockId;
   const canPasteBlocks = collapseMode && clipboardSize() > 0 && clipTick >= 0;
 
-  /* ─── MathToolbar ─── */
+  /* ─── 수식 템플릿 삽입(Σ 팔레트 · 상용구 — MarkdownEditor.insertText) ─── */
   const handleInsert = (template: string, cursorOffset: number) => {
     if (activeBlockId && editorRefs.current[activeBlockId]) {
       editorRefs.current[activeBlockId]?.insertText(template, cursorOffset);

@@ -31,7 +31,7 @@ import { computeRevealScrollLeft, computeCenterScrollLeft } from '../../lib/edit
 /* Phase 68b — 수식 단축키·삽입·나오기의 단일 원천(댓글 편집기와 공유). MarkdownEditor에 사본을 두지 말 것 */
 import {
   insertInlineMathIn, insertDisplayMathBlock, createMathShortcuts, createMathKeys, createMathInput, createMathAscii,
-  commitComposition, runAfterComposition, createMathPaste, flushMathAscii,
+  commitComposition, runAfterComposition, createMathPaste, flushMathAscii, isMathrmTemplate, wrapMathrmAt,
 } from '../../lib/math-editor-extensions';
 import { slotsField, insertWithSlots, setSlots } from '../../lib/mathSlots';
 import { edgeChanges } from '../../lib/blockEdges';
@@ -326,6 +326,10 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
         commitComposition(view);   // Phase 68c D3 — 삽입 핸들 여섯은 머리에서 조합을 확정한다
 
         const { from, to } = view.state.selection.main;
+        /* M10 D21 — Σ 팔레트 '로만체'(`\mathrm{}`)는 수식 안 선택이 있으면 감싼다(키 `"`와 같은 wrapMathrmAt).
+           판정에 실패하면(수식 밖·\text 인자 안·양끝이 다른 영역) 현행 = 선택 대체. 댓글 입력창 팔레트는 `$\mathrm{}$`를
+           넣는 별개 규칙이라 템플릿이 달라 여기 걸리지 않는다(알고 두는 차이) */
+        if (from !== to && isMathrmTemplate(text) && wrapMathrmAt(view, from, to)) { view.focus(); return; }
 
         view.dispatch({
           changes: { from, to, insert: text },

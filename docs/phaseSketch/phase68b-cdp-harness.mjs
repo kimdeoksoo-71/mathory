@@ -341,6 +341,12 @@ const layoutDirect = (w, key, code, keyCode, shift) => () => ev(`(() => {
   return 1;
 })()`).then(() => sleep(60));
 const J = JSON.stringify;
+const layoutKeyOnly = (w, key, code, keyCode, shift) => () => ev(`(() => {
+  const c = window.__h.view(${J(w)}).contentDOM;
+  const k = new KeyboardEvent('keydown', { key: ${J(key)}, code: ${J(code)}, shiftKey: ${shift}, bubbles: true, cancelable: true });
+  Object.defineProperty(k, 'keyCode', { get: () => ${keyCode} });
+  return c.dispatchEvent(k) ? 1 : 0;   // M10 — keydown만(분류 경로 확인용). 글자는 뒤따르는 Input.insertText가 넣는다
+})()`).then(() => sleep(30));
 for (const w of ['ed', 'cm']) {
   const tag = w === 'ed' ? '편집창' : '댓글';
   await check(`390 ${tag} 수식 안 Shift+M("1") → M`, w, 'a $|$ b', [layoutDirect(w, '1', 'KeyM', 49, true)], 'a $M|$ b');
@@ -353,6 +359,21 @@ for (const w of ['ed', 'cm']) {
 }
 await check('390 토글 끔이면 숫자 그대로(댓글 — 편집창은 Row 2 토글 ref라 localStorage를 직접 안 읽는다, 68a와 같다)', 'cm', 'a $|$ b', [() => setPref('off'), layoutDirect('cm', '1', 'KeyM', 49, true)], 'a $1|$ b');
 await setPref('on');
+
+// ── M10 F — 수식 안 선택 + " → \mathrm{…}(두 편집기 · D19′) · 편집창 Σ 팔레트 '로만체'(D21) ──
+for (const w of ['ed', 'cm']) {
+  const tag = w === 'ed' ? '편집창' : '댓글';
+  await check(`M10 ${tag} 수식 안 선택 + " → \\mathrm{} · 커서 } 뒤`, w, 'a $|sin| x$ b', [typeStr('"')], 'a $\\mathrm{sin}| x$ b');
+  await check(`M10 ${tag} 감싼 뒤 ⌘Z 1회 → 선택 복원`, w, 'a $|sin| x$ b', [typeStr('"'), cmdZ], 'a $[sin] x$ b');
+  await check(`M10 ${tag} 감싼 뒤 Space → 감싼 내용 유지`, w, 'a $|sin| x$ b', [typeStr('" ')], 'a $\\mathrm{sin} | x$ b');
+  await check(`M10 ${tag} \\text 인자 안 선택 + " → closeBrackets("sin")`, w, 'a $\\text{|sin|}$ b', [typeStr('"')], 'a $\\text{"[sin]"}$ b');
+  await check(`M10 ${tag} 수식 밖 선택 + " → "sel"(현행)`, w, '|ab| c', [typeStr('"')], '"[ab]" c');
+  await check(`M10 ${tag} 한글 IME 상태 · 조합 없는 " keydown(222) + 입력 → 감싸기`, w, 'a $|sin| x$ b', [layoutKeyOnly(w, '"', 'Quote', 222, true), typeStr('"')], 'a $\\mathrm{sin}| x$ b');
+  await check(`M10 ${tag} 390 모사(Shift+Quote가 "4") → direct → 감싸기`, w, 'a $|sin| x$ b', [layoutDirect(w, '4', 'Quote', 222, true)], 'a $\\mathrm{sin}| x$ b');
+  await check(`M10 ${tag} 선택 없음 " → 짝 따옴표(현행)`, w, 'a $|x$ b', [typeStr('"')], 'a $"|x$ b');
+}
+await check('M10 편집창 Σ 팔레트 로만체 + 선택 → \\mathrm{sin}', 'ed', 'a $|sin| x$ b', [() => ev(`window.__h.ed.insertText('\\\\mathrm{}', 8); 1`)], 'a $\\mathrm{sin}| x$ b');
+await check('M10 편집창 Σ 팔레트 로만체 · 선택 없음 → 현행(\\mathrm{|})', 'ed', 'a $|x$ b', [() => ev(`window.__h.ed.insertText('\\\\mathrm{}', 8); 1`)], 'a $\\mathrm{|}x$ b');
 
 const fails = results.filter((r) => !r.ok).length;
 console.log(`\n== ${results.length - fails}/${results.length} pass`);

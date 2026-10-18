@@ -669,6 +669,26 @@ export function createMathAscii(enabled: () => boolean): Extension {
    ⚠ inputHandler는 **IME 조합 중에도 불린다**(view dist 4257) — 변환은 `view.composing` 가드 안에서만.
    ⚠ closeBrackets는 편집창에선 basicSetup에도 있다 — `closeBrackets()`는 모듈 상수라 중복 등록이 하나로 합쳐진다.
    ⚠ 댓글 입력창의 `markdown()` 언어는 closeBrackets 설정을 바꾸지 않는다(languageData는 commentTokens뿐 — 확인함). */
+/* ── M10 F(D19′·D21) — 선택을 `\mathrm{…}`로 감싼다. 트리거는 키 `"`(아래 inputHandler)와 편집창 Σ 팔레트 '로만체'(insertText).
+   ⚠ 영문 글자(`r` 등)를 트리거로 쓰지 말 것 — 한글 IME가 조합하는 키라 선택이 `ㄱ`으로 먼저 대체돼 inputHandler·keymap·
+     keydown 어디서도 못 잡는다(M10 v1 §1-F3). 기호 키(`(`·`[`·`{`·`"`)는 조합 없이 ASCII로 와서 두 IME 모드가 같다.
+   조건: 양끝이 **같은** 수식 영역 · 양끝 모두 `\text` 계열 인자 밖 · 선택이 비어 있지 않음. 커서는 닫는 `}` 뒤,
+   ⌘Z 1회 = 감싸기 전(선택 복원). 수식 밖·인자 안의 선택 + `"`는 현행(closeBrackets가 `"sel"`로 감싼다). */
+export const isMathrmTemplate = (t: string) => t === '\\mathrm{}';
+export function wrapMathrmAt(view: EditorView, from: number, to: number): boolean {
+  if (from === to) return false;
+  const doc = view.state.doc.toString();
+  const regions = scanMathRegions(doc);
+  const a = mathRegionAt(regions, from);
+  if (!a || a !== mathRegionAt(regions, to) || isInTextArg(doc, from, a) || isInTextArg(doc, to, a)) return false;
+  const ins = '\\mathrm{' + doc.slice(from, to) + '}';
+  view.dispatch({
+    changes: { from, to, insert: ins }, selection: { anchor: from + ins.length },
+    userEvent: 'input.type', annotations: isolateHistory.of('full'),
+  });
+  return true;
+}
+
 const mathInputHandler = Prec.highest(EditorView.inputHandler.of((view, from, to, text, insert) => {
     const doc = view.state.doc.toString();
     const inMath = isInsideMath(doc, from);
@@ -678,6 +698,8 @@ const mathInputHandler = Prec.highest(EditorView.inputHandler.of((view, from, to
        변환은 "친 글자 그대로"(`insert()` — CM 기본 타자와 같은 userEvent·scrollIntoView라 M7 D5 가로 중앙 추적이 그대로
        발화) 다음 **별도 트랜잭션**(isolateHistory 'before') → ⌘Z 1회면 변환만 풀리고 친 글자는 남는다. */
     if (!view.composing) {
+      // M10 D19′ — 선택 + `"` → `\mathrm{…}`(closeBrackets의 `"` 감싸기보다 먼저 — 이 핸들러가 Prec.highest)
+      if (from !== to && text === '"' && wrapMathrmAt(view, from, to)) return true;
       // D22 선택 감싸기 — 양끝이 **같은** 수식 영역 안일 때만. 밖은 현행(선택 대체)
       if (from !== to && (text === '(' || text === '[' || text === '{')) {
         const regions = scanMathRegions(doc);
