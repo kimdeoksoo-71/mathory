@@ -108,7 +108,7 @@ test('resolveMaxToolTurns — 기본 3, 0 허용, 음수/비수치는 기본값'
 /* ═══ Phase 61f — user content 3종 빌더 ═══
  *
  * D10이 이 파일의 존재 이유와 같은 원칙이다: **images가 비면 입력 문자열과 `===`.**
- * proofread·ai-complete·그림 없는 토론·그림 없는 검증이 전부 이 세 스냅샷 뒤에 있다. */
+ * proofread·그림 없는 토론·그림 없는 검증이 전부 이 세 스냅샷 뒤에 있다. */
 
 const IMG1 = { mimeType: 'image/jpeg', data: 'QUFB' };
 const IMG2 = { mimeType: 'image/png', data: 'QkJC' };

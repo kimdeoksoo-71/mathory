@@ -4,7 +4,7 @@
  * 우선순위(CLAUDE.md M9 절):
  *   - 토론 계열(ai_models 문서가 있는 모델) = Firestore `ai_models` 문서(1순위) → 이 표(fallback + warn)
  *   - 정밀 검증(env 고정 모델) = env `VERIFY_*_COST_IN/OUT`(override) → 이 표 → warn + 0
- *   - 교정·AI 자동완성 = 이 표 → warn + 0
+ *   - 교정 = 이 표 → warn + 0 (AI 자동완성은 M10에서 삭제)
  * ⚠ 라우트에 단가 리터럴을 다시 적지 말 것 — 모델을 바꾸면 옛 단가가 남는다(옛 verify 5/25 리터럴).
  * ⚠ 사본: `scripts/verifyProbe.mjs`(raw fetch 프로브라 이 모듈을 못 읽는다)의 5/25 — 바꿀 때 함께.
  *
@@ -23,7 +23,7 @@ export const PRICES: Record<string, Price> = {
   'gemini-3.5-flash':       { in: 1.5, out: 9 },
   'gpt-5.4-2026-03-05':     { in: 2.5, out: 15 },
   'grok-4.3':               { in: 1.25, out: 2.5 },
-  // Google 공시: AI 자동완성 기본값·운영 AI_MODEL
+  // Google 공시: 옛 AI 자동완성 기본값(M10 삭제) — ai_models 문서의 대체값으로 남긴다
   'gemini-2.5-flash': { in: 0.3, out: 2.5 },
   'gemini-2.5-pro':   { in: 1.25, out: 10 },        // ≤200K
 };

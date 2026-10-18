@@ -10,7 +10,7 @@
  * ⚠ 카드는 **포커스를 가져가지 않는다**(블록에서 한글 조합 중이면 조합이 깨진다 — 68c가 막은 종류). 고치려면 카드 편집창을 누른다.
  * ⚠ **transform 금지** — 카드 안 CM 자동완성 툴팁은 position:fixed라 transform 조상 밑에서 좌표를 잃는다(가운데 정렬은 margin auto).
  * ⚠ z 10300 = 블록 CM 툴팁 호스트(10200) 위 · 말풍선(10400)·confirmDialog(10500) 아래.
- * ⚠ 루트의 `data-ink-card` — EditorView window 단축키(⌘B 분할·⌘J …)가 카드 안 키를 건너뛰는 표식(D12′). 지우지 말 것.
+ * ⚠ 루트의 `data-ink-card` — EditorView window 단축키(⌘B 분할·⌘⇧L …)가 카드 안 키를 건너뛰는 표식(D12′). 지우지 말 것.
  * ⚠ `viewing` 같은 중간 상태를 두지 않는다 — 카드가 열린 채 새로고침·kick이 나면 job이 영영 안 뜬다(v2 E3).
  */
 

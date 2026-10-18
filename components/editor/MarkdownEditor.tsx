@@ -178,7 +178,7 @@ export interface MarkdownEditorHandle {
   insertInlineMath: () => void;
   /** Phase 68b Q1 — `$$` 버튼. Ctrl+Shift+M과 같은 `insertDisplayMathBlock`(상하 빈 줄 1개 · 선택은 블록 안 · undo 1스텝) */
   insertBlockMath: () => void;
-  /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 커서 점프가 없다(AI 완성·OCR도 이쪽 — Phase 68 D23) */
+  /** Phase 61c: 채팅→편집창 삽입 전용. `insertText`와 달리 `{}` 커서 점프가 없다(OCR·필기도 이쪽 — Phase 68 D23) */
   insertPlainText: (text: string) => void;
   /** Phase 68: 수식 단축어 삽입 — `▢` 자리(없으면 빈 괄호)를 Tab으로 순회한다. 메뉴 클릭·약어 Tab이 같은 엔진(lib/mathSlots) */
   insertMathSnippet: (content: string) => void;
@@ -350,7 +350,7 @@ const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(
       },
       /* ⚠️ 삽입 3분 규약(Phase 61c → Phase 68 D23): 위 `insertText`는 **툴바 템플릿·단축키 상용구 전용**이다 —
             텍스트에 `{}`가 있으면 커서를 그 안으로 점프시킨다(Phase 68 D14로 탭스톱 "무장"은 사라졌고, 그 뒤 Tab은
-            lib/mathInput.nextSlot이 맡는다). AI 대화문·AI 완성·OCR 결과에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
+            lib/mathInput.nextSlot이 맡는다). AI 대화문·OCR 결과에는 `x^{}`·`\left\{\right\}`가 실제로 섞이므로
             그쪽은 아래 `insertPlainText`(선택 대체 + 커서 이동 + 포커스만). 수식 단축어는 `insertMathSnippet`(자리 순회). */
       insertInlineMath() {
         const view = viewRef.current;

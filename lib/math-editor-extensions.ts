@@ -331,7 +331,7 @@ function codeBasedMathKeys(enter: (kind: MathKeyKind) => (view: EditorView) => b
 }
 
 /* ── Phase 68c G2 · Q11 — "조합이 끝난 뒤 실행"의 공용 헬퍼. composingRescue(68b)의 tick 로직을 일반화했다 ──
-   소비처: ① composingRescue(편집기 capture keydown — 조합 중 Ctrl+M 계열) ② EditorView window 단축키(⌘B·⌘J·⌘⇧L — 핸들 `whenSettled`).
+   소비처: ① composingRescue(편집기 capture keydown — 조합 중 Ctrl+M 계열) ② EditorView window 단축키(⌘B·⌘⇧L — 핸들 `whenSettled`).
    · 조합 중이 아니고 키도 조합 키가 아니면 **즉시**(동기) — 그 전에 flushMathAscii(68a 보류 치환을 끝낸 문서를 보게)
    · 아니면 20ms 폴링으로 `!composing && !compositionStarted`를 기다린다. 맥 순서(keydown → compositionend)는 그동안 `compositionStarted`가 참.
      윈도우 순서(compositionend가 keydown보다 먼저 — 키는 229로만 남는다)는 RESCUE_END_GRACE_MS 뒤 확정 신호 없이 실행.
@@ -478,7 +478,7 @@ export function flushMathAscii(view: EditorView): void {
   mathAsciiInstances.get(view)?.flush();
 }
 
-/* ── Phase 68c D3 — 프로그램 호출 삽입(AI 완성·OCR·61c 삽입·툴바) 직전의 조합 **확정** ──
+/* ── Phase 68c D3 — 프로그램 호출 삽입(OCR·61c 삽입·툴바·필기) 직전의 조합 **확정** ──
    조합 중이면 68a 끊기와 같은 경로(contentDOM.blur → focus{preventScroll})로 브라우저가 조합을 확정하게 하고, 이어서 flushMathAscii
    (확정 직후 삽입이 68a 치환 전 문서를 보지 않게 — 68b 윈도우 검수의 `liㅡ` 경합과 같은 자리).
    ⚠ 68a 억제(breaking) 밖이라 CM이 blur를 본다 → 자동완성이 닫히고 끔 모드에선 옛 scrollLeft가 복원될 수 있다 — 삽입 직전이라 무해(P3).

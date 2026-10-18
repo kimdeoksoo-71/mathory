@@ -36,7 +36,7 @@ import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
 import CoachBlock from '../ui/CoachBlock';
-import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock, caseLabelPrefix } from '../../lib/caseBlock';
+import { blockKeyOf, buildCaseGapKeys, buildCaseLabels, caseClassName, caseGapClassName, injectCaseLabel, isCaseBlock } from '../../lib/caseBlock';
 import { buildMathIndex, findMathIdAtCursor } from '../../lib/mathIndex';
 import { collectCurrentContent, VersionLoadError, versionContentToLocal } from '../../lib/version/adapter';
 import { createSnapshot, setCachedLastHash } from '../../lib/version/snapshot';
@@ -1256,8 +1256,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   // 미리보기 활성 수식 인덱스
   const [activeMathId, setActiveMathId] = useState<number>(-1);
 
-  const [aiLoadingBlockId, setAiLoadingBlockId] = useState<string | null>(null);
-
   const editorRefs = useRef<Record<string, MarkdownEditorHandle | null>>({});
   // 자동 정정 중에는 handleBlockChange의 이슈 자동 제거 필터를 건너뛰기 위한 플래그
   const autoFixInProgressRef = useRef<boolean>(false);
@@ -1461,69 +1459,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       [activeTab]: typeof updater === 'function' ? updater(prev[activeTab] || []) : updater,
     }));
   }, [activeTab]);
-
-  /* ─── AI 자동완성 ─── */
-  const collectAIContext = useCallback((blockId: string) => {
-    /* M7 D20 — 경우 블록엔 화면과 같은 라벨(C1. )을 접두해 모델이 "C1에 의하여" 인용을 알아보게 한다 */
-    const withLabel = (list: LocalBlock[]) => {
-      const labels = buildCaseLabels(list);
-      return list.map((b) => { const l = labels.get(blockKeyOf(b)); return (l ? caseLabelPrefix(l) : '') + b.raw_text; });
-    };
-    const questionBlocks = allBlocks['question'] || [];
-    const questionContext = withLabel(questionBlocks).filter(Boolean).join('\n');
-
-    const blocks = allBlocks[activeTab] || [];
-    const activeIdx = blocks.findIndex((b) => b.id === blockId);
-    const previousBlocks = activeIdx > 0
-      ? withLabel(blocks.slice(0, activeIdx)).filter(Boolean)
-      : [];
-
-    const ref = editorRefs.current[blockId];
-    const fullText = ref?.getContent() || '';
-    const cursorPos = ref?.getCursorPosition() ?? fullText.length;
-    const currentText = fullText.slice(0, cursorPos);
-
-    return { questionContext, previousBlocks, currentText };
-  }, [allBlocks, activeTab]);
-
-  const handleAIComplete = useCallback(async (blockId?: string) => {
-    const targetId = blockId || activeBlockId;
-    if (!targetId || aiLoadingBlockId) return;
-
-    const { questionContext, previousBlocks, currentText } = collectAIContext(targetId);
-    if (!currentText.trim()) return;
-
-    setAiLoadingBlockId(targetId);
-    try {
-      const res = await fetch('/api/ai-complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ questionContext, previousBlocks, currentText }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-      const { completion, usage } = await res.json();
-      // M9 D16′ — 비용은 요청 1회에 status 한 줄(저장 없음)
-      if (usage && typeof usage.costUsd === 'number') {
-        setStatus(`AI 완성 $${usage.costUsd.toFixed(4)} · 입력 ${usage.inputTokens} · 출력 ${usage.outputTokens} 토큰`);
-        setTimeout(() => setStatus(''), 4000);
-      }
-      if (completion) {
-        const editor = editorRefs.current[targetId];
-        if (editor) {
-          // Phase 68 D23 — insertText가 아니라 insertPlainText: 완성문의 `{}`로 커서가 튀지 않게(3분 규약)
-          editor.insertPlainText(completion);
-        }
-      }
-    } catch (e: any) {
-      console.error('[AI Complete] Error:', e);
-      setStatus(`AI 오류: ${e.message}`);
-    } finally {
-      setAiLoadingBlockId(null);
-    }
-  }, [activeBlockId, aiLoadingBlockId, collectAIContext]);
 
   /* ─── 교정 (Phase 27) ─── */
   // 자동 수정 대상에서 제외할 타입 (image는 텍스트 없음)
@@ -2892,14 +2827,14 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
 
   /* Phase 68c H2 — window 단축키의 지연 실행(조합 끝난 뒤)은 keydown 때 잡은 옛 클로저를 부를 수 있다
      (그 사이 compositionend → handleBlockChange → 재렌더). 매 렌더 최신 핸들러·활성 블록을 ref로 든다 */
-  const latestShortcutRef = useRef({ handleSplitBlock, handleAIComplete, handleSplitMathLines, activeBlockId });
-  latestShortcutRef.current = { handleSplitBlock, handleAIComplete, handleSplitMathLines, activeBlockId };
+  const latestShortcutRef = useRef({ handleSplitBlock, handleSplitMathLines, activeBlockId });
+  latestShortcutRef.current = { handleSplitBlock, handleSplitMathLines, activeBlockId };
 
-  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+J AI 완성 · Cmd+Z 블록 undo/redo · ⌥Z 줄바꿈 ──
+  // ── Ctrl+F 찾기/바꾸기 · Cmd+B 블록 분할 · Cmd+Z 블록 undo/redo · ⌥Z 줄바꿈 (M10 C — ⌘J AI 완성은 삭제) ──
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       /* Phase 69 D12′ — iPad 필기 카드(InkInbox, body 포털) 안의 키는 아래 단축키를 하나도 타지 않는다.
-         ⌘B·⌘J·⌘⇧L은 포커스를 보지 않고 **활성 블록**에 작용해, 카드 편집창의 ⌘B가 뒤의 블록을 분할했다.
+         ⌘B·⌘⇧L은 포커스를 보지 않고 **활성 블록**에 작용해, 카드 편집창의 ⌘B가 뒤의 블록을 분할했다.
          CM 자체 keymap(⌘Enter 확인·Ctrl+M·Tab …)은 contentDOM에서 먼저 처리되므로 무영향 */
       if ((e.target as Element | null)?.closest?.('[data-ink-card]')) return;
       /* Phase 65 D10 — ⌥Z(Windows Alt+Z) 줄바꿈 토글. VS Code와 같은 키다.
@@ -2948,10 +2883,10 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         }
         return;
       }
-      /* Phase 68c D2″ — F·B·J도 e.code(C5 — 나머지 넷과 통일 · Windows 한글 IME는 Ctrl 조합에서 key가 'Process'·229로 올 수 있다).
+      /* Phase 68c D2″ — F·B도 e.code(C5 — 나머지 넷과 통일 · Windows 한글 IME는 Ctrl 조합에서 key가 'Process'·229로 올 수 있다).
          `plain`(!shift·!alt·!repeat — Q10): 옛 `e.key === 'b'`는 Shift면 'B'라 ⌘⇧B(Chrome 북마크 바)를 암묵 배제했다 → 명시 배제.
-         문서를 바꾸는 셋(⌘B·⌘J·⌘⇧L)은 **항상** 핸들 `whenSettled`를 거친다 — 조합 중이면 확정 뒤(지연 — IME가 그 키로 확정 중이다),
-         아니면 즉시(그 전에 flushMathAscii). preventDefault는 keydown에서 그대로(Windows Ctrl+J = 다운로드 · 229 keydown의 preventDefault는
+         문서를 바꾸는 둘(⌘B·⌘⇧L)은 **항상** 핸들 `whenSettled`를 거친다 — 조합 중이면 확정 뒤(지연 — IME가 그 키로 확정 중이다),
+         아니면 즉시(그 전에 flushMathAscii). preventDefault는 keydown에서 그대로(229 keydown의 preventDefault는
          IME 확정에 영향이 없다 — 68a 실험 1). ⌘F는 패널 열기뿐이라 지연 없음. */
       const plain = !e.shiftKey && !e.altKey && !e.repeat;
       const settled = (run: () => void) => {
@@ -2968,11 +2903,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
         e.preventDefault();
         settled(() => latestShortcutRef.current.handleSplitBlock());
       }
-      if ((e.ctrlKey || e.metaKey) && plain && e.code === 'KeyJ') {
-        e.preventDefault();
-        const id = latestShortcutRef.current.activeBlockId;           // R11 — 지연 중 블록을 옮겨도 키를 누른 블록에
-        settled(() => latestShortcutRef.current.handleAIComplete(id ?? undefined));
-      }
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.repeat && e.code === 'KeyL') {
         e.preventDefault();
         const id = latestShortcutRef.current.activeBlockId;
@@ -2981,7 +2911,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [undoBlocks, redoBlocks, toggleLineWrap, handleCopyBlocks, handlePasteBlocks]);   // F·B·J·L은 latestShortcutRef(68c H2)
+  }, [undoBlocks, redoBlocks, toggleLineWrap, handleCopyBlocks, handlePasteBlocks]);   // F·B·L은 latestShortcutRef(68c H2)
 
   /* ═══ 탭 추가 ═══ */
   const handleAddTab = () => {
@@ -3938,8 +3868,6 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           onTidyBlocks={handleTidyBlocks}
           ocrLoading={ocrLoading}
           onOcrClick={handleOcrClick}
-          onAIComplete={() => handleAIComplete()}
-          aiLoading={aiLoadingBlockId !== null}
           collapseMode={collapseMode}
           onToggleCollapseAll={handleToggleCollapseAll}
           onCopyBlocks={handleCopyBlocks}

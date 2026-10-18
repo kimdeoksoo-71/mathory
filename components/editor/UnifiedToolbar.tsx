@@ -133,10 +133,6 @@ function KeySentenceIcon() {
   return <PhIcon d={PH.highlighter} size={ICON_SIZE} />;
 }
 
-function AiMathGenIcon() {
-  return <PhIcon d={PH.sparkle} size={ICON_SIZE} />;
-}
-
 // ═══════════════════════════════════════════════
 // 특수문자 그룹 (원문자 등) — Step 5에서 사용자 커스터마이징 지원 예정
 // ═══════════════════════════════════════════════
@@ -212,9 +208,7 @@ interface UnifiedToolbarProps {
   onTidyBlocks: () => void;
   ocrLoading: boolean;
   onOcrClick: () => void;
-  // 블록 영역 — AI 완성은 맞춤법 검사 우측, 전체 접기 토글은 신설
-  onAIComplete: () => void;
-  aiLoading: boolean;
+  // 블록 영역 — 전체 접기 토글(M10 C — AI 완성은 삭제)
   collapseMode: boolean;
   onToggleCollapseAll: () => void;
   /** M7 D18 — 블록 복사·붙여넣기(⌘C/⌘V와 같은 동작). 붙여넣기는 접힘 모드 + 클립보드 비어 있지 않을 때만 */
@@ -628,8 +622,6 @@ export default function UnifiedToolbar({
   onTidyBlocks,
   ocrLoading,
   onOcrClick,
-  onAIComplete,
-  aiLoading,
   collapseMode,
   onToggleCollapseAll,
   onCopyBlocks,
@@ -681,7 +673,7 @@ export default function UnifiedToolbar({
     <div key={key} style={{ width: 1, height: 20, backgroundColor: 'var(--border-light)', margin: '0 6px' }} />
   );
 
-  /* M7 후속(덕수 2026-09-12) — 게이트를 항목별로: **블록에 넣는 것**(강조·스니펫·특수문자·표·AI 완성)만
+  /* M7 후속(덕수 2026-09-12) — 게이트를 항목별로: **블록에 넣는 것**(강조·스니펫·특수문자·표)만
      활성 텍스트 블록이 필요하고, **탭 단위 동작**(정돈·교정·찾기·전체 접기·블록 복사/붙여넣기·줄바꿈)은
      활성 블록이 그림이거나 없어도 눌려야 한다. 옛 루트 전체 게이트는 시트로 가져온 문항(첫 블록이 그림)에서
      정돈 버튼까지 흐리게 만들었다. 좌측 컨텍스트 영역($·$$·팔레트)은 여전히 블록 게이트다. */
@@ -762,14 +754,6 @@ export default function UnifiedToolbar({
       node: (
         <IconButton title="맞춤법 검사 (현재 탭)" onClick={onRunProofread} disabled={proofreading}>
           {proofreading ? <IconLoader size={14} /> : <ProofreadIcon />}
-        </IconButton>
-      ),
-    },
-    {
-      key: 'ai', blockScoped: true,
-      node: (
-        <IconButton title="AI 완성 (⌘J)" onClick={onAIComplete} disabled={aiLoading}>
-          {aiLoading ? <IconLoader size={14} /> : <AiMathGenIcon />}
         </IconButton>
       ),
     },

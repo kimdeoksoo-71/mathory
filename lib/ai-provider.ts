@@ -78,7 +78,7 @@ export interface AIProvider {
   ): Promise<AIProviderResult>;
 }
 
-// ═══ 기존 단일 모델 호환 (Phase 23 AI 풀이 자동완성에서 사용) ═══
+// ═══ Provider 구현 (토론 getProviderForModel · 검증 getVerifyProviders — M10에서 AI 완성 전용 getAIProvider는 삭제) ═══
 
 class GeminiProvider implements AIProvider {
   private genAI: GoogleGenerativeAI;
@@ -602,32 +602,4 @@ export function getVerifyProviders(models: { gemini: string; claude: string }): 
     first: new GeminiProvider(geminiKey, models.gemini, false),
     judge: new ClaudeProvider(claudeKey, models.claude, false),
   };
-}
-
-// ═══ Phase 23 호환: 기본 단일 provider 반환 ═══
-
-/** M9 D16′ — `getAIProvider`가 쓰는 모델명(단가 조회용). 해석 규칙은 getAIProvider와 같다 */
-export function resolveAIProviderModel(): { provider: string; model: string } {
-  const provider = process.env.AI_PROVIDER || 'gemini';
-  const model = process.env.AI_MODEL || (provider === 'claude' ? 'claude-opus-5' : 'gemini-2.5-flash');
-  return { provider, model };
-}
-
-/** 레거시 호환: AI 풀이 자동완성 등에서 사용. 단일 provider 환경변수 기반 */
-export function getAIProvider(): AIProvider {
-  const { provider, model } = resolveAIProviderModel();
-
-  if (provider === 'gemini') {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error('GEMINI_API_KEY 환경변수가 설정되지 않았습니다');
-    return new GeminiProvider(apiKey, model);
-  }
-
-  if (provider === 'claude') {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error('ANTHROPIC_API_KEY 환경변수가 설정되지 않았습니다');
-    return new ClaudeProvider(apiKey, model);
-  }
-
-  throw new Error(`Unknown AI provider: ${provider}`);
 }
