@@ -21,6 +21,7 @@ import {
 import {
   listSessions, createNormalSession, renameSession, deleteSession, ensureCommentSession,
 } from '../../lib/discussion-sessions';
+import { nextSessionName } from '../../lib/sessionName';
 import { getProblem, setCommentsVisible, setCommentsWritable } from '../../lib/firestore';
 import { FIG_PLACEHOLDER, imageSrcOf, scanImgTags, countPlaceholders } from '../../lib/verify/figures';
 import { buildCaseLabels, blockKeyOf, caseLabelPrefix } from '../../lib/caseBlock';
@@ -194,8 +195,6 @@ export default function CommentPanel({
   const pendingAI = panel.pending;           // 응답 대기 중 — 언마운트 뒤에도 완료·실패가 기록된다
   const setPendingAI = useCallback((u: PendingAI[] | ((prev: PendingAI[]) => PendingAI[])) =>
     updatePanel(pKey, (s) => ({ pending: typeof u === 'function' ? u(s.pending) : u })), [pKey]);
-  const [creatingSession, setCreatingSession] = useState(false);
-  const [newSessionName, setNewSessionName] = useState('');
   const [renamingSessionId, setRenamingSessionId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const sessionSubmittingRef = useRef(false); // 한글 IME / blur 이중 호출 방지
@@ -500,19 +499,14 @@ export default function CommentPanel({
   // 답글은 메인 입력창의 handleSendMessage가 replyingTo를 보고 처리한다.
 
   // ─── 세션 CRUD ───
+  /* M10 E(D15) — `+ 새 토론`은 이름을 묻지 않고 곧바로 만든다(`새 토론` · `새 토론 2` … — lib/sessionName).
+     이름은 활성 알약을 다시 클릭하거나 더블클릭해 바꾼다. 연타는 sessionSubmittingRef가 막는다 */
   const handleCreateSession = async () => {
     if (sessionSubmittingRef.current) return;
-    const trimmed = newSessionName.trim();
-    if (!trimmed) {
-      setCreatingSession(false);
-      setNewSessionName('');
-      return;
-    }
     sessionSubmittingRef.current = true;
     try {
-      const id = await createNormalSession(problemId, trimmed, currentUid);
-      setNewSessionName('');
-      setCreatingSession(false);
+      const name = nextSessionName(normalSessions.map((s) => s.name));
+      const id = await createNormalSession(problemId, name, currentUid);
       await refreshSessions();
       setActiveSessionId(id);
     } catch (e) {
@@ -1140,15 +1134,10 @@ export default function CommentPanel({
         activeSessionId={activeSessionId}
         currentUid={currentUid}
         isOwner={isOwner}
-        creatingSession={creatingSession}
-        newSessionName={newSessionName}
         renamingSessionId={renamingSessionId}
         renameDraft={renameDraft}
         onSelect={setActiveSessionId}
-        onStartCreate={() => { setCreatingSession(true); setNewSessionName(''); }}
-        onCancelCreate={() => { setCreatingSession(false); setNewSessionName(''); }}
-        onChangeNewName={setNewSessionName}
-        onSubmitCreate={handleCreateSession}
+        onCreate={handleCreateSession}
         onStartRename={(s) => { setRenamingSessionId(s.id); setRenameDraft(s.name); }}
         onCancelRename={() => setRenamingSessionId(null)}
         onChangeRenameDraft={setRenameDraft}
@@ -1342,23 +1331,18 @@ export default function CommentPanel({
 /* ═══════════════════════════════════════════════════════ */
 function SessionTabBar({
   sessions, activeSessionId, currentUid, isOwner,
-  creatingSession, newSessionName, renamingSessionId, renameDraft,
-  onSelect, onStartCreate, onCancelCreate, onChangeNewName, onSubmitCreate,
+  renamingSessionId, renameDraft,
+  onSelect, onCreate,
   onStartRename, onCancelRename, onChangeRenameDraft, onSubmitRename, onDelete,
 }: {
   sessions: DiscussionSession[];
   activeSessionId: string;
   currentUid: string;
   isOwner: boolean;
-  creatingSession: boolean;
-  newSessionName: string;
   renamingSessionId: string | null;
   renameDraft: string;
   onSelect: (id: string) => void;
-  onStartCreate: () => void;
-  onCancelCreate: () => void;
-  onChangeNewName: (s: string) => void;
-  onSubmitCreate: () => void;
+  onCreate: () => void;
   onStartRename: (s: DiscussionSession) => void;
   onCancelRename: () => void;
   onChangeRenameDraft: (s: string) => void;
@@ -1411,38 +1395,23 @@ function SessionTabBar({
             key={s.id}
             label={s.name}
             active={isActive}
-            onClick={() => onSelect(s.id)}
+            /* M10 D17 — 활성 알약 재클릭 = 이름 변경(Finder 문법). 판정은 e.detail(M9 A — 타이머 금지):
+               비활성 알약 더블클릭은 첫 클릭이 선택 → 둘째 클릭은 detail 2라 선택 갈래(무동작) → dblclick이 이름 변경 */
+            onClick={(e) => {
+              if (isActive && e.detail === 1 && canManage) onStartRename(s);
+              else onSelect(s.id);
+            }}
             onDoubleClick={canManage ? () => onStartRename(s) : undefined}
             onDelete={canManage ? () => onDelete(s) : undefined}
           />
         );
       })}
 
-      {creatingSession ? (
-        <input
-          autoFocus
-          value={newSessionName}
-          onChange={(e) => onChangeNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (isImeKey(e)) return; // 한글 IME 조합 중 무시(Safari 꼬리 keydown 229 포함 — lib/imeKey)
-            if (e.key === 'Enter') onSubmitCreate();
-            else if (e.key === 'Escape') onCancelCreate();
-          }}
-          onBlur={onSubmitCreate}
-          placeholder="새 세션 이름"
-          style={{
-            padding: '4px 10px', fontSize: 12,
-            border: '1px solid var(--accent-primary, #B8845C)',
-            borderRadius: 14,
-            outline: 'none',
-            fontFamily: 'var(--font-ui)',
-            minWidth: 110,
-          }}
-        />
-      ) : (
+      {/* M10 D18 — 오너만(normal 세션 생성은 규칙이 오너로 제한한다 — 멤버에게 보이면 눌러도 저장에서 실패했다) */}
+      {isOwner && (
         <button
-          onClick={onStartCreate}
-          title="새 토론 세션 만들기"
+          onClick={onCreate}
+          title="새 토론 세션 만들기 (이름은 자동 — 알약을 다시 클릭해 바꾼다)"
           style={{
             border: '1px dashed var(--border-light)',
             background: 'transparent',
@@ -1467,7 +1436,7 @@ function SessionPill({
 }: {
   label: string;
   active: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   onDoubleClick?: () => void;
   onDelete?: () => void;
 }) {
@@ -1484,7 +1453,7 @@ function SessionPill({
       <button
         onClick={onClick}
         onDoubleClick={onDoubleClick}
-        title={onDoubleClick ? `${label} (더블클릭: 이름 변경)` : label}
+        title={onDoubleClick ? `${label} (${active ? '클릭' : '더블클릭'}: 이름 변경)` : label}
         style={{
           border: 'none',
           background: active ? 'var(--text-primary)' : 'transparent',

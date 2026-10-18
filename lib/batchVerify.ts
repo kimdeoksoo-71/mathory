@@ -24,8 +24,10 @@ import {
   type RowOutcome, type SkipReason,
 } from './verify/batchPlan';
 
-/** 배치 리포트가 쌓이는 agent 세션 이름. ⚠ 댓글 세션에 넣으면 공개 문항에서 비로그인까지 읽는다 */
-export const BATCH_SESSION_NAME = '일괄 검증';
+/** 배치 리포트가 쌓이는 agent 세션 이름. ⚠ 댓글 세션에 넣으면 공개 문항에서 비로그인까지 읽는다.
+ *  M10 E — 정본은 lib/sessionName(import 0 — 자동 세션 이름이 이것을 내지 않음을 테스트가 고정한다) */
+import { BATCH_SESSION_NAME } from './sessionName';
+export { BATCH_SESSION_NAME };
 
 export interface BatchItem {
   problemId: string;
