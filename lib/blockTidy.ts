@@ -1,5 +1,5 @@
 /**
- * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`·`./mathInput`뿐(`npm run test:tidy`가 단독 컴파일).
+ * M7 D19 — 블록 정돈(broom). 순수 모듈 — import는 `./mathRegions`·`./proofread`·`./invisibles`·`./mathInput`·`./blockEdges`뿐(`npm run test:tidy`가 단독 컴파일).
  *
  * 취지: 시트 가져오기·OCR로 들어온 "한 덩어리" 텍스트를 Mathory의 블록 체계에 맞게 **분할**하고,
  * 가능한 경우 **타입**(경우·하위 경우·제목)을 부여하며, 편집 스타일의 **결정적 정형화**를 한 번에 태운다.
@@ -34,6 +34,7 @@ import { scanMathRegions } from './mathRegions';
 import { autoFixDeterministicIssues, unwrapSectionCommands } from './proofread';
 import { stripInvisibles, isInvisibleTarget } from './invisibles';
 import { ROW_ENV_RE, layoutRowEnvs } from './mathInput';
+import { trimBlockEdges } from './blockEdges';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
@@ -113,7 +114,6 @@ function splitBlock(text: string): Piece[] | null {
   return split ? pieces : null;
 }
 
-const trimBlock = (t: string) => t.replace(/^\s*\n/, '').replace(/\n\s*$/, '');
 
 export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyOut[]; stats: TidyStats } {
   const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0 };
@@ -192,7 +192,7 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
     if (SPLITTABLE.has(o.type)) {
       const r5 = layoutRowEnvs(o.raw_text);                       // R5 (Phase 68 D17)
       if (r5.changed) { o.raw_text = r5.text; stats.fixed++; }
-      o.raw_text = trimBlock(o.raw_text);                           // R4
+      o.raw_text = trimBlockEdges(o.raw_text, o.type);              // R4 — M10: 타입을 넘긴다(case 이어짓기 보호 · lib/blockEdges)
     }
   }
   return { blocks: out, stats };

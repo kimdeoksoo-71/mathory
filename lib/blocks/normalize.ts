@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import type { Block, SvgInitialView, GgbInitialCoords } from '../../types/problem';
 import { normalizeDisplayMathSpacing } from '../preprocess';
 import { stripInvisibles, isInvisibleTarget } from '../invisibles';
+import { trimBlockEdges, isContinuationLead } from '../blockEdges';
 
 /**
  * Phase 55 — 블록의 "저장될 형태(persisted form)".
@@ -31,9 +32,12 @@ export function toPersistedBlock(b: Block, index: number): PersistedBlockData {
   // $$ ... $$ 독립수식 앞·뒤 빈 줄 정규화 → 위아래 빈 줄 제거 (handleSave와 동일)
   // M9 D24-1′ — 비가시·단독 초성 정규화(안전망 — 로드·붙여넣기·정돈·OCR이 먼저 거친다). 텍스트 계열만
   const text = isInvisibleTarget(b.type) ? stripInvisibles(b.raw_text) : b.raw_text;
-  const trimmed = normalizeDisplayMathSpacing(text)
-    .replace(/^\s*\n/, '')
-    .replace(/\n\s*$/, '');
+  /* M10 J·P26 — 앞뒤 빈 줄 규칙의 단일 원천은 lib/blockEdges. 타입을 넘긴다: case·subcase의 빈 첫 줄은 '이어짓기'라
+     하나를 남긴다(M10 이전엔 여기서 지워 저장하면 본문 첫 줄이 제목행이 됐다 — 잠복 결함). */
+  //   ⚠ `normalizeDisplayMathSpacing`은 맨 앞 `$$` 앞 공백을 지운다 → 이어짓기 판정은 그 **전에** 하고 `\n`을 되붙인다
+  const cont = isContinuationLead(text, b.type);
+  const body = trimBlockEdges(normalizeDisplayMathSpacing(cont ? text.replace(/^\s*\n/, '') : text), b.type);
+  const trimmed = cont && body ? '\n' + body : body;
   const out: PersistedBlockData = {
     block_key: b.block_key || nanoid(),   // lazy backfill (Phase55 F1)
     order: index,

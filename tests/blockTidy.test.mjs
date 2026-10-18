@@ -147,6 +147,12 @@ test('R4: 앞뒤 빈 줄 trim(저장 정규화와 동일)', () => {
   assert.deepEqual(shape(T('\n\n본문\n\n', 'question')), ['text:"본문"']);
 });
 
+test('R4(M10 P26): case·subcase 이어짓기의 빈 첫 줄은 하나 남긴다 — 정돈이 이어짓기를 제목 있는 경우로 바꾸지 않는다', () => {
+  assert.deepEqual(shape(T('\n\n본문\n\n', 'solution', 'case')), ['case:"\\n본문"']);
+  assert.deepEqual(shape(T('\n본문', 'solution', 'subcase')), ['subcase:"\\n본문"']);
+  assert.deepEqual(shape(T('조건\n본문\n\n', 'solution', 'case')), ['case:"조건\\n본문"']);
+});
+
 test('origin: 여러 입력 블록의 조각이 각자 입력 인덱스를 가리킨다', () => {
   const r = tidyBlocks([{ type: 'text', raw_text: 'a\n(i) b인 경우' }, { type: 'text', raw_text: 'c' }], { tab: 'question', autoFix: false });
   assert.deepEqual(r.blocks.map((b) => b.origin), [0, 0, 1]);
