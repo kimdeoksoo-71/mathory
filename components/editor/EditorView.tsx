@@ -32,6 +32,7 @@ import { nanoid } from 'nanoid';
 import { toPersistedBlock } from '../../lib/blocks/normalize';
 import { stripInvisibles, isInvisibleTarget } from '../../lib/invisibles';
 import { trimBlockEdges, trimLeadingBlankLines, trimTrailingBlankLines } from '../../lib/blockEdges';
+import { registerPending, whenIdle } from '../../lib/pendingSaves';
 import { toClipBlock, copyBlocks, readClipboard, clipboardSize } from '../../lib/blockClipboard';
 import { isToneScoped, toneClass } from '../../lib/keyTone';
 import { isCoachBlock } from '../../lib/coachBlock';
@@ -1049,15 +1050,22 @@ function SortableEditorBlock({
 
 /* ═══ EditorViewProps ═══ */
 
+/** M10 D1 — 저장 커밋 직후 AppShell 목록에 제자리 반영할 메타(실제 updateData와 같은 필드 — tabs 제외) */
+export type SavedMeta = Pick<Problem, 'title' | 'source' | 'exam_type' | 'category' | 'subject' | 'difficulty' | 'answer' | 'folder_id'>;
+
 interface EditorViewProps {
   problemId: string;
   folders: Folder[];
   onBack: () => void;
+  /** M10 D1 — 저장 커밋이 끝날 때마다(언마운트 뒤 저장 포함). 목록은 구독이 아니라 이것이 없으면 사이드바로 나간 뒤 옛 제목이 남는다 */
+  onSaved?: (problemId: string, meta: SavedMeta) => void;
 }
 
 /* ═══ 메인 EditorView ═══ */
 
-export default function EditorView({ problemId, folders, onBack }: EditorViewProps) {
+export default function EditorView({ problemId, folders, onBack, onSaved }: EditorViewProps) {
+  const onSavedRef = useRef(onSaved);   // 언마운트 뒤 저장에서도 부를 수 있게(M10 D1)
+  onSavedRef.current = onSaved;
   const { user } = useAuth();
   const [problem, setProblem] = useState<ProblemWithBlocks | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1364,6 +1372,9 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   useEffect(() => {
     const load = async () => {
       setLoading(true);
+      /* M10 P29 — 같은 문항의 진행 중 저장(직전 편집창의 언마운트 저장 사슬 포함)이 끝난 뒤 읽는다. 아니면 커밋 전·후 어느 쪽인지
+         모를 블록 id를 읽어 다음 저장이 블록을 두 벌로 만든다. 덤: 드래프트 복구 비교도 커밋 뒤 서버본을 본다 */
+      await whenIdle(problemId);
       const data = await getProblemWithBlocks(problemId);
       if (data) {
         setProblem(data);
@@ -3037,7 +3048,7 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const savingRef = useRef(false);
   /** Phase 61b: 직전 저장의 성공 여부. setSaveError는 state라 같은 tick에 못 읽는다. */
   const lastSaveOkRef = useRef(true);
-  const handleSave = useCallback(async (silent = false) => {
+  const handleSaveInner = useCallback(async (silent = false) => {
     if (!problem) return;
     if (savingRef.current) return;
     savingRef.current = true;
@@ -3070,6 +3081,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
           blocks: (allBlocks[tab.id] || []).map((b, i) => toPersistedBlock(b, i) as unknown as Record<string, unknown>),
         })),
         onTabCommitted: (tabId, ids) => { origBlockIdsRef.current = { ...origBlockIdsRef.current, [tabId]: ids }; },
+      });
+
+      /* M10 D1 — 커밋이 끝났다 = 서버 메타가 바뀌었다. AppShell 목록(폴더뷰·최근·보낸 공유)에 곧바로 반영한다.
+         lastSaveOkRef는 뒤(refresh·stale 계산 뒤)에서 세워지므로 보지 않는다. ref 경유 — 언마운트 뒤 저장에서도 불린다 */
+      onSavedRef.current?.(problem.id, {
+        title: editTitle, source: editSource, exam_type: editSource, category: editCategory, subject: editCategory,
+        difficulty: editDifficulty, answer: editAnswer, folder_id: editFolderId || undefined,
       });
 
       // 저장 후 리프레시
@@ -3166,6 +3184,15 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
       setSaving(false);
     }
   }, [problem, tabs, allBlocks, activeTab, editTitle, editSource, editCategory, editDifficulty, editAnswer, editFolderId, user, snapshotCurrent]);
+  /* M10 P29 — 저장 구간을 문항별 레지스트리에 등록한다(같은 문항의 새 편집창 로드가 기다린다). async 함수는 자기 Promise를
+     가리킬 수 없어 바깥에서 감싼다. ⚠ 가드(진행 중 저장)에서 즉시 반환한 호출은 등록하지 않는다 — 진행 중 저장의 등록을
+     이미 끝난 Promise로 덮으면 기다림이 사라진다 */
+  const handleSave = useCallback((silent = false) => {
+    const wasSaving = savingRef.current;
+    const p = handleSaveInner(silent);
+    if (problem && !wasSaving && savingRef.current) registerPending(problem.id, p);
+    return p;
+  }, [handleSaveInner, problem]);
 
   /* ─── 자동저장: 탭 전환 시 ─── */
   /* M10 D28 — 탭 전환 전에 그 탭 블록 전부의 앞뒤 빈 줄을 지운다(마운트된 CM은 trimEdges — 포커스 가진 것은 거른다 ·
@@ -3217,17 +3244,23 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
 
-  const ensureSavedForAI = useCallback(async () => {
-    // 진행 중 저장이 가라앉을 때까지. 상한이 없으면 네트워크가 죽었을 때 영원히 걸린다
+  /** 진행 중 저장이 가라앉을 때까지(50ms × 300 = 15초 상한 — 상한이 없으면 네트워크가 죽었을 때 영원히 걸린다). 반환 = 가라앉았나.
+   *  소비처: ensureSavedForAI · '보기' · 언마운트 저장(M10 D3). 그 뒤 부르는 저장은 origBlockIdsRef(S8a) 덕에 직전 커밋의 id를 본다 */
+  const waitSaveSettled = useCallback(async () => {
     for (let i = 0; savingRef.current; i++) {
-      if (i >= 300) throw new Error('저장이 끝나지 않아 중단했습니다');   // 50ms × 300 = 15초
+      if (i >= 300) return false;
       await new Promise((r) => setTimeout(r, 50));
     }
+    return true;
+  }, []);
+
+  const ensureSavedForAI = useCallback(async () => {
+    if (!(await waitSaveSettled())) throw new Error('저장이 끝나지 않아 중단했습니다');
     if (dirtyRef.current) {
       await handleSaveRef.current(true);
       if (!lastSaveOkRef.current) throw new Error('저장에 실패해 중단했습니다');
     }
-  }, []);
+  }, [waitSaveSettled]);
 
   /* ═══ Phase 61b: 정밀 검증 ═══ */
 
@@ -3340,10 +3373,13 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
   const skipUnmountSaveRef = useRef<boolean>(false);
   const handleBackWithSave = useCallback(async () => {
     skipUnmountSaveRef.current = true; // 명시적 저장 후 언마운트 중복 저장 방지
-    await handleSave(true);
+    /* M10 P28 — 진행 중 저장(탭 전환·자동 저장)이 있으면 가라앉은 뒤 저장한다. 옛 코드는 handleSave 가드가 즉시 반환해
+       그 뒤의 편집이 저장되지 않은 채 나갔다. 대기 뒤에는 최신 클로저(handleSaveRef)로 */
+    await waitSaveSettled();
+    await handleSaveRef.current(true);
     await snapshotCurrent('editor_exit'); // Phase 55 D5: 제어된 이탈 스냅샷(dedup으로 무변경은 no-op)
     onBack();
-  }, [handleSave, onBack, snapshotCurrent]);
+  }, [waitSaveSettled, onBack, snapshotCurrent]);
 
 
   /* ─── M7 D12·D13 — 30분 자동 저장 (Phase 55 D2 "Firestore 상시 저장은 하지 않는다"의 개정) ───
@@ -3367,12 +3403,18 @@ export default function EditorView({ problemId, folders, onBack }: EditorViewPro
     }, AUTOSAVE_MS);
     return () => clearInterval(h);
   }, [problem?.id, lastSavedAt]);   // lastSavedAt이 바뀔 때마다 30분을 다시 센다
+  /* 언마운트 저장 — M10 D3·P19: 종전처럼 **무조건** 저장하되 진행 중 저장이 가라앉은 뒤에(옛 코드는 가드가 즉시 반환해 사이드바로
+     나가며 친 제목이 유실될 수 있었다). "대기 + 저장" 사슬 **전체**를 레지스트리에 등록한다(P29 — 같은 문항을 곧바로 다시 열면
+     새 편집창 로드가 기다린다). ⚠ dirtyRef로 거르지 말 것 — 언마운트 뒤에는 렌더가 없어 갱신되지 않는다.
+     problemId는 key(AppShell)로 인스턴스 수명 내내 같다 */
   useEffect(() => {
     return () => {
       if (skipUnmountSaveRef.current) return;
-      handleSaveRef.current(true);
+      registerPending(problemId, (async () => {
+        if (await waitSaveSettled()) await handleSaveRef.current(true);
+      })());
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Phase 55 계층1: localStorage 드래프트 기록(디바운스 500ms). Firestore 상시 저장 없음(D2).
   useEffect(() => {

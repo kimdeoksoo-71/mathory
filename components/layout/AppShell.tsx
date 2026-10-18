@@ -40,7 +40,7 @@ import DrawerResizeHandle from '../ui/DrawerResizeHandle';
 import SearchOverlay from '../layout/SearchOverlay';
 import FolderView from '../problem/FolderView';
 import ProblemView from '../problem/ProblemView';
-import EditorView from '../editor/EditorView';
+import EditorView, { type SavedMeta } from '../editor/EditorView';
 import FolderPickerDialog from '../ui/FolderPickerDialog';
 import { alertDialog, confirmDialog, promptDialog } from '../../lib/dialogs';
 import { parseDeepLink } from '../../lib/deepLink';
@@ -244,6 +244,34 @@ export default function AppShell() {
   useEffect(() => {
     if (!authLoading) loadData();
   }, [authLoading, loadData]);
+
+  /* ─── M10 D1 — 편집창 저장 커밋을 목록에 제자리 반영 ───
+     목록은 구독이 아니다(getDocs + loadData). 옛 코드는 '보기' 경로만 loadData를 불러, 사이드바로 나가면 저장이 끝나도
+     폴더뷰에 옛 제목이 남았다("몇 분 뒤 바뀐다" = 무관한 다음 동작이 loadData를 부른 시각). 이제 EditorView가 커밋마다
+     onSaved를 부른다(언마운트 뒤 저장 포함). 폴더가 바뀌었으면 카운트·정렬이 함께 움직이므로 재조회, 아니면 패치만.
+     ⚠ 언마운트 뒤 저장이 부르므로 클로저 state를 읽지 말 것 — allProblemsRef·viewRef(렌더 미러).
+     제목을 그리는 배열을 늘리면 여기에 함께 넣는다(받은 공유 sharedProblems는 남의 문항이라 무관) */
+  const allProblemsRef = useRef(allProblems);
+  allProblemsRef.current = allProblems;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const applySavedMeta = useCallback((id: string, meta: SavedMeta) => {
+    const prev = allProblemsRef.current.find((p) => p.id === id);
+    if (!prev || (prev.folder_id || '') !== (meta.folder_id || '')) { void loadData(); return; }
+    const now = new Date();
+    const patch = (list: Problem[]) => list.map((p) => (p.id === id ? { ...p, ...meta, updated_at: now } : p));
+    setAllProblems(patch);
+    setSentProblems(patch);
+    // 최근 문항: 패치 뒤 갱신 시각순 재정렬 · 목록 밖 문항이면 맨 앞에 끼운다(loadData의 top-10과 같은 결과)
+    setRecentProblems((list) => {
+      const next = patch(list);
+      if (!next.some((p) => p.id === id) && prev.folder_id !== TRASH_FOLDER_ID) next.unshift({ ...prev, ...meta, updated_at: now });
+      return next.sort((a, b) => b.updated_at.getTime() - a.updated_at.getTime()).slice(0, 10);
+    });
+    // 나가자마자 같은 문항의 열람뷰를 열었다면 커밋 전 본을 읽었을 수 있다 → 다시 읽게
+    const v = viewRef.current;
+    if (v.type === 'problem' && v.problemId === id) setProblemViewNonce((n) => n + 1);
+  }, [loadData]);
 
   // Phase 48: 로그인 후 닉네임 설정 가드 — 세션당 1회만 자동 노출
   useEffect(() => {
@@ -984,7 +1012,7 @@ export default function AppShell() {
           />
         )}
         {view.type === 'editor' && (
-          <EditorView problemId={view.problemId} folders={folders} onBack={handleEditorBack} />
+          <EditorView key={view.problemId} problemId={view.problemId} folders={folders} onBack={handleEditorBack} onSaved={applySavedMeta} />
         )}
         {view.type === 'public-problem' && (
           <div style={{ flex: 1, minHeight: 0 }}>
