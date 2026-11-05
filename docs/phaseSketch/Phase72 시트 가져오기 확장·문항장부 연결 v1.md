@@ -1,8 +1,9 @@
 # Phase 72 — 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결 구현 계획서 v1
 
-작성일: 2026-11-05 · 작성: CLI v1(레포 실측) · 기준 커밋: **`46e5603`**(mathory main, Phase 67b 종결 직후)
+작성일: 2026-11-05 · 작성: CLI v1(레포 실측) · 기준 커밋: **`4b1228a`**(mathory origin/main 2026-11-05, 「정돈 소폭 개선」 직후 · Phase 번호는 71 다음이라 **72**)
+⚠ 초안은 로컬 `46e5603`(Phase 67b)에서 쓰였고 push 때 원격이 130커밋 앞서 있어 `4b1228a`로 재대조했다 — 범위 안 파일 중 **`SheetImportModal.tsx`만 +20/−10**(M9 D24-1′ 비가시 정규화 · 정돈 R6 원본 줄바꿈 · `isImeKey`)이고 `route.ts`·`sheetImport.ts`·`types/problem.ts`·`figure/route.ts`·`test:sheet`는 **불변**. 아래 행 번호는 전부 `4b1228a` 기준.
 계보: 덕수 질문 1(가져오기가 읽는 열) → 질문 2(원본 확장 3안 → **안 (1) 확정**) → 질문 3(문항장부 연결 가능성 연구 → `2026-11-05 문항장부↔Latex변환 Data_DS 연결 연구.md` §3 3층 권장) → 덕수 2차 결정 4항(§2) → **v1 계획서**
-실측: mathory `46e5603` 작업 트리 전수 · `gas-project-latex-convert` `3cc4694` · `gas-project-audition` · `gas-project-problem-ledger` `90c88cf`(2026-11-05 clasp pull) · 구글시트 xlsx 내보내기 2벌(문항장부 `1hlnZEB-…` · Latex 변환 `1wu8Gdvm…`, 2026-11-05)
+실측: mathory `4b1228a` 작업 트리 전수 · `gas-project-latex-convert` `3cc4694` · `gas-project-audition` · `gas-project-problem-ledger` `90c88cf`(2026-11-05 clasp pull) · 구글시트 xlsx 내보내기 2벌(문항장부 `1hlnZEB-…` · Latex 변환 `1wu8Gdvm…`, 2026-11-05)
 
 > **이 Phase의 성격**: 서버는 여전히 **읽기만** 한다(스코프 `spreadsheets.readonly` 불변). Firestore 스키마는 **선택 필드 2개 추가**(마이그레이션 0). 세 레포(mathory · latex-convert GAS · 문항장부 시트 수식)에 걸치지만 **교차 파일 쓰기는 없다** — 문항장부를 읽는 쪽은 Latex 변환 GAS 하나이고 그것도 `openById` 읽기다.
 > 연결 작업이 모두 끝난 뒤 **색인 누락 1건(`25X모의12_1공통20` = D5008) 보충을 잊지 말 것**(§9-1 · BACKLOG 2026-11-05).
@@ -23,24 +24,24 @@
 
 ## 1. 현행 — 실측
 
-### 1-1. mathory (`46e5603`)
+### 1-1. mathory (`4b1228a`)
 
 | 항목 | 자리 | 현행 |
 |---|---|---|
-| 원본 시트 집합 | `route.ts:30-31` | `SHEETS = ['Data_DS','Stack']` · 범위 `${sheet}!A1:P`(`:86`) · 스프레드시트 ID는 `AUDITION_SPREADSHEET_ID` 하나(`:48`) |
-| 요청 본문 | `route.ts:5` · `:118-120` | `{ sheet, rows?, includePreselected? }` · 둘 다 비면 400(`:126`) |
-| 행 선택 | `route.ts:138-148` | `wantedSet.has(rowIndex) || (includePreselected && M체크)` 합집합 · A·E 둘 다 빈 행 스킵(`:150`) |
-| 응답 | `route.ts:5` | `{ header, headerWarnings, rows:[{rowIndex, cells[16]}] }` · 4MB 상한(`:33`) |
+| 원본 시트 집합 | `route.ts:29` | `SHEETS = ['Data_DS','Stack']` · 범위 `${sheet}!A1:P`(`:95`) · 스프레드시트 ID는 `AUDITION_SPREADSHEET_ID` 하나(`:48`) · `maxDuration 30`(`:27`) |
+| 요청 본문 | `route.ts:5` · `:127` | `{ sheet, rows?, includePreselected? }` · 시트 아니면 400(`:127`) · 둘 다 비면 400(`:132`) |
+| 행 선택 | `route.ts:154` | `wantedSet.has(rowIndex) || (includePreselected && M체크)` 합집합 · A·E 둘 다 빈 행 스킵(`:158`) · 헤더 검사 `:141` |
+| 응답 | `route.ts:5` | `{ header, headerWarnings, rows:[{rowIndex, cells[16]}] }` · 4MB 상한(`:33` · `:170`) |
 | 열 매핑 | `lib/sheetImport.ts:17-35` | 0-based 16열. **K(10)·L(11)·N(13)은 매핑에 없다** → 읽어도 쓰지 않는다 |
 | 헤더 검사 | `:41-55` · `:138` | `EXPECTED_HEADERS` 13키 고정(get·derived_answer·sloution_note 포함) — 없으면 경고 |
 | 초안 변환 | `:423` `rowToDraft` | A→title/source/sourceId · B 그림명 복구 · C/D/E/F~J/O/P |
 | 그림 참조 | `:199-217` | 구형 `\includegraphics{}` + **신형 `![파일명](https://drive.google.com/…)`**(GAS 패치 11) 둘 다 인식 — Latex 변환 Data_DS C열의 Drive 링크 형식과 **이미 호환** |
 | 그림 프록시 | `figure/route.ts:4-5` · `:56` · `:105` | `?name=` → `AUDITION_FIG_FOLDER_ID` 폴더에서 이름 검색(NFC/NFD) · `?url=` Mathpix CDN |
 | 출처 기록 | `types/problem.ts:108-116` | `ImportSource { provider:'audition-sheet', sheet:'Data_DS'\|'Stack', row, source_id, stem_hash, imported_at }` |
-| 중복 키 | `SheetImportModal.tsx:91` | `source_id\|stem_hash` — 파일·시트 무관 |
-| 모달 상태 | `:48` · `:84-87` · `:254-256` | `SheetName` 2종 · `SHEETS` 라벨/힌트 · 기본 `'Stack'` · `includePreselected` 기본 true |
-| 모달 요청·저장 | `:340-343` · `:440-447` | body 3필드 · `importSource.sheet = fetchedSheet` |
-| 설정 화면 | `:640-720` | 원본 버튼 행 · 행 범위 입력 · M체크 체크박스(힌트에 "Data_DS는 M체크까지 비워진다") · 정돈 체크박스 |
+| 중복 키 | `SheetImportModal.tsx:95` | `source_id\|stem_hash` — 파일·시트 무관 |
+| 모달 상태 | `:50` · `:86-89` · `:258-260` · `:269`(fetchedSheet) | `SheetName` 2종 · `SHEETS` 라벨/힌트 · 기본 `'Stack'` · `includePreselected` 기본 true |
+| 모달 요청·저장 | `:344-347` · `:452-459`(`sheet: fetchedSheet` `:456`) | body 3필드 · `importSource.sheet = fetchedSheet` |
+| 설정 화면 | `:652`(FormPane) · M체크 라벨 `:716` | 원본 버튼 행 · 행 범위 입력 · M체크 체크박스(힌트에 "Data_DS는 M체크까지 비워진다") · 정돈 체크박스 |
 | 테스트 | `package.json` `test:sheet` | `lib/sheetImport.ts` **단독 tsc**(import 0 규약) + `tests/sheetImport.test.mjs`(R·N·H 군) |
 
 ### 1-2. 'Latex 변환' 파일 Data_DS (xlsx 2026-11-05 · GAS `3cc4694`)
@@ -84,7 +85,7 @@
 ### D1 — 원본 식별은 `source`(파일) + `sheet`(시트) 두 축 (기본안)
 - API body: `{ source?: 'audition' | 'latex', sheet: 'Data_DS' | 'Stack', rows?, includePreselected?, jangbuIds?: string[] }`. **`source` 생략 = `'audition'`**(옛 호출 호환).
 - 서버 표: `SOURCES = { audition: { envId: 'AUDITION_SPREADSHEET_ID', sheets: ['Data_DS','Stack'] }, latex: { envId: 'LATEX_SPREADSHEET_ID', sheets: ['Data_DS'] } }`. 조합이 표에 없으면 400.
-- `readEnv()`는 **요청된 source의 ID만** 필수로 본다 — `LATEX_SPREADSHEET_ID`가 아직 없는 배포에서 '문제 검토' 가져오기가 500으로 죽지 않게.
+- `readEnv()`는 **요청된 source의 ID만** 필수로 본다(`:48`) — `LATEX_SPREADSHEET_ID`가 아직 없는 배포에서 '문제 검토' 가져오기가 500으로 죽지 않게.
 - 기각: `sheet` 값을 `'Latex:Data_DS'`처럼 합성 — `ImportSource.sheet` 유니온이 더러워지고 Stack/Data_DS 분기 코드(`:150` 빈 행 스킵 등)를 전부 다시 읽어야 한다.
 
 ### D2 — `ImportSource`에 선택 필드 2개, 마이그레이션 0 (확정)
@@ -110,7 +111,7 @@ export interface ImportSource {
 
 ### D4 — 연결 열은 Latex 변환 Data_DS **L열, 머리글 `jangbu_id`** (확정 · 연구 §3 유지)
 - 근거: L은 머리글도 값도 없고(§1-2) Mathory `SHEET_COL`·GAS 어느 쪽도 읽지 않는다. **M(`get`)·N(`ID`)은 쓰지 않는다** — 문제 검토 배치에서 M은 체크박스, **N은 verdict 자리**(`Itemverification.gs:6`, `Pipelineverify.gs:289`)라 같은 `SHEET_COL`을 두 파일에 쓰는 전제가 깨진다. N의 'ID' 머리글은 문제 검토 헤더의 잔재로 본다(값 0건).
-- `SHEET_COL.jangbu_id = 11` 추가. `rowToDraft`는 **읽지 않는다**(초안에 안 싣는다) — 모달이 `cells[11]`을 `ImportSource.jangbu_id`로 옮긴다(§5-6). `sheetImport.ts`의 import 0 규약 유지.
+- `SHEET_COL.jangbu_id = 11` 추가. `rowToDraft`는 **읽지 않는다**(초안에 안 싣는다) — 모달이 `cells[11]`을 `ImportSource.jangbu_id`로 옮긴다(§5-6). `sheetImport.ts`의 import 0 규약 유지. ⚠ 모달은 `rowToDraft` 뒤에 M9 D24-1′ 비가시 정규화·R6 줄바꿈을 **탭 본문에** 적용하는데(`4b1228a` 변경분) `jangbu_id`는 본문이 아니라 무관 — `stemHash`도 그 앞에서 확정되므로 D3 불변.
 - 헤더 검사: `checkHeaders(header, profile)` — `profile: 'audition' | 'latex'`. latex 프로파일은 `jangbu_id`(L)를 **기대**하고 `get`·`derived_answer`·`solution_note`를 **검사하지 않는다**(없는 열을 경고로 띄우면 매번 노이즈). 기본값 `'audition'`이라 기존 테스트 H1 불변.
 
 ### D5 — ID 형식 `^[DS]\d{4}$` · 대소문자·공백 정규화 (덕수 결정 4)
