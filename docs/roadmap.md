@@ -2171,7 +2171,7 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
-## Phase 72: 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결 ✅ 구현 (2026-11-05) · mathory C+D · latex-convert `57488dc`(clasp push·백필 V3·V4 통과 11/06) · problem-ledger `b220051`(onEdit push 완료) · `test:sheet` 78 · `tsc` 통과 · **덕수 작업(백필·시트 수식·Vercel env)·실물 검증 대기**
+## Phase 72: 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결 ✅ 완료 (2026-11-06) · mathory `a13e0eb` · latex-convert `57488dc`(백필 1,444 통과) · problem-ledger `b220051`(onEdit) · `test:sheet` 78 · 배포 완료 · **덕수 실물 검수 전항 종결(백필·2층 수식·자동 해제·실물 1~8)**
 
 계획서: `docs/phasedocs/Phase72 시트 가져오기 확장·문항장부 연결 v4.1 착수판.md` (§10 구현 기록)
 (계보: 덕수 질문 1~3 → 연구 메모 → v1 CLI → v2 web → v3 CLI → v4 web 라이브 재현 → 덕수 "권장안대로" → v4.1 U열 자동 해제 → 구현)
