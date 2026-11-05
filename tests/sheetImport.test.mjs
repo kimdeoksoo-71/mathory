@@ -11,6 +11,7 @@ import {
   SHEET_COL, SHEET_COL_COUNT, EXPECTED_HEADERS,
   parseRowInput, checkHeaders, normalizeText, rowToDraft, isDraftError, stemHash, stripChoiceLabel,
   splitFigures, scanFigureNames, FIG_NAME_RE, isMathpixFigUrl,
+  EXPECTED_HEADERS_LATEX, JANGBU_ID_RE, JANGBU_ID_MAX, parseJangbuIds, buildImportSource,
 } from '../.test-build/lib/sheetImport.js';
 
 /** 16칸 셀 배열을 만든다. `{ id: 'x', problem_stem: 'y' }` 형태로 지정. */
@@ -547,4 +548,65 @@ test('F20 파일명에 반각 공백이 있어도 분할된다 — `[강대모�
   assert.deepEqual(r.blocks.map((b) => b.type), ['text', 'image', 'text']);
   assert.deepEqual(r.figNames, [name]);
   assert.deepEqual(r.warnings, []);
+});
+
+/* ═══ J·HL·I — Phase 72 (원본 파일 2종 · 문항장부 ID) ═══ */
+
+test('J1 parseJangbuIds — 구분자 4종 · 대문자화 · NFC · 중복 제거 · 입력 순서 · invalid', () => {
+  const r = parseJangbuIds(' d5006, D4827;S0001\nD5006\tx9 D5006 ');
+  assert.deepEqual(r.ids, ['D5006', 'D4827', 'S0001']);
+  assert.deepEqual(r.invalid, ['x9']);
+  // NFC: 전각·결합 문자가 섞여도 같은 ID로 모인다 (D + 4자리 ASCII는 NFC 불변 — 결합 꼬리는 형식에 걸린다)
+  assert.deepEqual(parseJangbuIds('D5006'.normalize('NFD')).ids, ['D5006']);
+});
+
+test('J2 빈 입력 · 5자리 허용 · 형식 밖(D123·X9999·D123456)은 invalid', () => {
+  assert.deepEqual(parseJangbuIds(''), { ids: [], invalid: [] });
+  assert.deepEqual(parseJangbuIds(' , ; \n'), { ids: [], invalid: [] });
+  assert.deepEqual(parseJangbuIds('D12345').ids, ['D12345']);
+  const r = parseJangbuIds('D123, X9999, D123456');
+  assert.deepEqual(r.ids, []);
+  assert.deepEqual(r.invalid, ['D123', 'X9999', 'D123456']);
+  assert.equal(JANGBU_ID_MAX, 500);
+  assert.ok(JANGBU_ID_RE.test('S0001') && !JANGBU_ID_RE.test('s0001'));
+});
+
+/** Latex 변환 Data_DS 실측 헤더(2026-11-05): A~K + M `get` · N `ID` · L 없음 */
+const latexHeader = (l = '') => {
+  const h = Array(SHEET_COL_COUNT).fill('');
+  for (const [k, v] of Object.entries(EXPECTED_HEADERS_LATEX)) if (k !== 'jangbu_id') h[SHEET_COL[k]] = v;
+  h[SHEET_COL.jangbu_id] = l;
+  h[SHEET_COL.get] = 'get';
+  h[13] = 'ID';
+  return h;
+};
+
+test('HL1 latex 프로파일 — 백필 전(L 빈칸)은 경고 1건 · 전용 문구 · M·N은 검사하지 않는다 (S1)', () => {
+  const w = checkHeaders(latexHeader(''), 'latex');
+  assert.equal(w.length, 1, w.join('|'));
+  assert.ok(/문항장부 ID 채우기/.test(w[0]) && !/시트 구조가 바뀌었을/.test(w[0]), w[0]);
+});
+
+test('HL2 latex 프로파일 — 백필 후(L `jangbu_id`)는 경고 0건 · 기본 프로파일은 불변', () => {
+  assert.deepEqual(checkHeaders(latexHeader('jangbu_id'), 'latex'), []);
+  // audition 프로파일은 L을 보지 않는다 — latex 헤더를 audition으로 검사하면 O·P 불일치만 걸린다
+  const w = checkHeaders(latexHeader('jangbu_id'));
+  assert.ok(w.every((m) => /^[OP]열/.test(m)), w.join('|'));
+  assert.equal(checkHeaders(latexHeader('jangbu_id'), 'audition').length, w.length);
+});
+
+test('I1 buildImportSource — audition은 file·jangbu_id 키 자체가 없다 · latex는 L이 형식에 맞을 때만 jangbu_id (E8)', () => {
+  const args = { sheet: 'Stack', row: 7, sourceId: 'K', stemHash: 'h', now: 123 };
+  const a = buildImportSource({ ...args, file: 'audition', jangbuCell: 'D5006' });
+  assert.deepEqual(a, { provider: 'audition-sheet', sheet: 'Stack', row: 7, source_id: 'K', stem_hash: 'h', imported_at: 123 });
+  assert.equal('file' in a, false);
+  assert.equal('jangbu_id' in a, false);
+  const l = buildImportSource({ ...args, file: 'latex', sheet: 'Data_DS', jangbuCell: ' d5006 ' });
+  assert.deepEqual(l, { provider: 'audition-sheet', sheet: 'Data_DS', row: 7, source_id: 'K', stem_hash: 'h', imported_at: 123, file: 'latex', jangbu_id: 'D5006' });
+  const bad = buildImportSource({ ...args, file: 'latex', sheet: 'Data_DS', jangbuCell: 'X1' });
+  assert.equal(bad.file, 'latex');
+  assert.equal('jangbu_id' in bad, false);
+  const none = buildImportSource({ ...args, file: 'latex', sheet: 'Data_DS' });
+  assert.equal('jangbu_id' in none, false);
+  assert.equal(Object.values(l).some((v) => v === undefined), false);
 });

@@ -107,11 +107,16 @@ export interface VerifyReport {
  */
 export interface ImportSource {
   provider: 'audition-sheet';
+  /** Phase 72 — 어느 스프레드시트인가. **없으면 문제 검토 파일**(Phase 61a~71 문서 그대로). audition은 키 자체를 두지 않는다.
+   *  조립은 `lib/sheetImport.ts buildImportSource`(같은 모양의 `ImportSourceShape`)가 소유 — 둘을 함께 고칠 것 */
+  file?: 'latex';
   sheet: 'Data_DS' | 'Stack';
   row: number;
   source_id: string;
   /** 정규화된 문제 본문의 해시. `lib/sheetImport.ts`의 `stemHash`가 만든다 */
   stem_hash: string;
+  /** Phase 72 — 문항장부 A열 ID(`D####`·`S####`). `file === 'latex'`이고 L열 값이 형식에 맞을 때만 */
+  jangbu_id?: string;
   imported_at: number;
 }
 

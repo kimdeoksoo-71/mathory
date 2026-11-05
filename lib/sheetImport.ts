@@ -1,5 +1,6 @@
 /**
  * Phase 61a — audition 스프레드시트 행 → Mathory 문항 초안 변환.
+ * Phase 72 — 원본 파일 2종(문제 검토 · Latex 변환) 헤더 프로파일, 문항장부 ID 파싱, `import_source` 조립.
  *
  * ⚠️ 이 파일에 **import 문을 두지 말 것.**
  *    `npm run test:sheet`가 이 파일 하나만 tsc로 단독 컴파일한다(package.json).
@@ -28,6 +29,11 @@ export const SHEET_COL = {
   choice3: 7,        // H
   choice4: 8,        // I
   choice5: 9,        // J
+  /** K  정답 유형(mcq_math·short_int·mcq_combo). Latex 변환 프로파일 헤더 검사용 — 내용으로 쓰지 않는다 (Phase 72) */
+  answer_type: 10,
+  /** L  문항장부 A열 ID(`D####`·`S####`). **'Latex 변환' Data_DS만** — GAS `JangbuId.gs` 백필이 쓴다(Phase 72 D4).
+   *  `rowToDraft`는 읽지 않는다 — 모달이 `cells[11]`을 읽어 `buildImportSource`에 넘긴다. 문제 검토 파일의 L은 빈 열. */
+  jangbu_id: 11,
   get: 12,           // M  사전 선별 체크박스 (내용으로 가져오지 않는다)
   derived_answer: 14,// O  AI가 구한 답
   solution_note: 15, // P  AI가 쓴 풀이
@@ -53,6 +59,26 @@ export const EXPECTED_HEADERS: Partial<Record<keyof typeof SHEET_COL, string>> =
   derived_answer: 'derived_answer',
   solution_note: 'sloution_note',
 };
+
+/** Phase 72 — 'Latex 변환' Data_DS 프로파일(A~K + L `jangbu_id`, 2026-11-05 실측).
+ *  M(`get`)·N(`ID`)·O·P는 검사하지 않는다 — 그 파일에는 값 0인 머리글만 있고 Mathory도 읽지 않는다(D7). */
+export const EXPECTED_HEADERS_LATEX: Partial<Record<keyof typeof SHEET_COL, string>> = {
+  id: 'id',
+  problem: 'problem',
+  given_solution: 'given_solution',
+  given_answer: 'given_answer',
+  problem_stem: 'problem_stem',
+  choice1: 'choice1',
+  choice2: 'choice2',
+  choice3: 'choice3',
+  choice4: 'choice4',
+  choice5: 'choice5',
+  answer_type: 'answer_type',
+  jangbu_id: 'jangbu_id',
+};
+
+/** 헤더 검사 프로파일 = 원본 파일. `audition` = 문제 검토(Data_DS·Stack) · `latex` = Latex 변환 Data_DS */
+export type HeaderProfile = 'audition' | 'latex';
 
 /** 선택지 라벨. `ChoicesBlock.parseChoices`가 이 5개만 인식한다. */
 const CHOICE_LABELS = ['①', '②', '③', '④', '⑤'];
@@ -135,18 +161,98 @@ export function parseRowInput(text: string): number[] {
 
 /* ═══ 헤더 대조 (D2 — 경고만, 가져오기는 막지 않는다) ═══ */
 
-export function checkHeaders(headerRow: string[]): string[] {
+export function checkHeaders(headerRow: string[], profile: HeaderProfile = 'audition'): string[] {
+  const table = profile === 'latex' ? EXPECTED_HEADERS_LATEX : EXPECTED_HEADERS;
   const warnings: string[] = [];
-  for (const key of Object.keys(EXPECTED_HEADERS) as (keyof typeof SHEET_COL)[]) {
-    const expected = EXPECTED_HEADERS[key];
+  for (const key of Object.keys(table) as (keyof typeof SHEET_COL)[]) {
+    const expected = table[key];
     if (!expected) continue;                       // 기대값 미확정 키는 통과 (계획서 Y5)
     const actual = (headerRow[SHEET_COL[key]] ?? '').trim();
     if (actual !== expected) {
       const letter = String.fromCharCode(65 + SHEET_COL[key]);
+      // Phase 72 S1 — latex 프로파일의 L 누락은 "구조가 바뀐 것"이 아니라 백필을 아직 안 돌린 상태다. 오진 문구를 피한다.
+      if (profile === 'latex' && key === 'jangbu_id') {
+        warnings.push(`L열 머리글 \`jangbu_id\`가 없습니다 — Latex 변환 메뉴 '🔗 문항장부 ID 채우기'를 아직 안 돌렸을 수 있습니다`);
+        continue;
+      }
       warnings.push(`${letter}열 헤더가 "${expected}"가 아니라 "${actual}"입니다 — 시트 구조가 바뀌었을 수 있습니다`);
     }
   }
   return warnings;
+}
+
+/* ═══ 문항장부 ID (Phase 72 D5·D2) ═══ */
+
+/** 문항장부 A열 ID 형식. `D####`(기존, `generateIdsInColumnA.gs`) · `S####`(미등록 문항 신규 등록 예정). 5자리까지 여유. */
+export const JANGBU_ID_RE = /^[DS]\d{4,5}$/;
+/** 한 요청에 받는 유효 ID 상한(서버 400 · 2층 X1 경고와 같은 값). */
+export const JANGBU_ID_MAX = 500;
+
+/** 셀·입력값 → 비교용 ID. NFC + trim + 대문자. 형식 검사는 호출부(`JANGBU_ID_RE`). */
+export function normalizeJangbuId(s: string): string {
+  return String(s ?? '').trim().normalize('NFC').toUpperCase();
+}
+
+/**
+ * 문항장부 ID 목록 파싱(문제검색 W1을 붙여 넣은 텍스트). 쉼표·공백·줄바꿈·세미콜론 구분 · 대문자화 · NFC ·
+ * 중복 제거 · **입력 순서 유지**. 형식에 안 맞는 토큰은 `invalid`로 돌려주고 버린다(서버도 같은 함수로 재검증 — B8).
+ */
+export function parseJangbuIds(text: string): { ids: string[]; invalid: string[] } {
+  const ids: string[] = [];
+  const invalid: string[] = [];
+  const seen = new Set<string>();
+  for (const part of String(text ?? '').split(/[,;\s]+/)) {
+    const raw = part.trim();
+    if (!raw) continue;
+    const id = normalizeJangbuId(raw);
+    if (!JANGBU_ID_RE.test(id)) { if (!invalid.includes(raw)) invalid.push(raw); continue; }
+    if (seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+  }
+  return { ids, invalid };
+}
+
+/**
+ * `types/problem.ts`의 `ImportSource`와 **같은 모양**(이 파일은 import 0이라 로컬 사본 — 둘을 함께 고칠 것).
+ * `file` 없음 = 문제 검토 파일(Phase 61a~71 문서). `jangbu_id`는 latex + L열이 형식에 맞을 때만.
+ */
+export interface ImportSourceShape {
+  provider: 'audition-sheet';
+  file?: 'latex';
+  sheet: 'Data_DS' | 'Stack';
+  row: number;
+  source_id: string;
+  stem_hash: string;
+  jangbu_id?: string;
+  imported_at: number;
+}
+
+/**
+ * `import_source` 조립. ⚠ **키 자체를 두지 않는다** — `file: undefined`를 넣으면 `createProblem`(`lib/firestore.ts`)이
+ * 최상위 undefined만 걸러 중첩 객체 안의 undefined로 Firestore 저장이 실패한다(Phase 72 E8). 조건부 스프레드만.
+ */
+export function buildImportSource(args: {
+  file: 'audition' | 'latex';
+  sheet: 'Data_DS' | 'Stack';
+  row: number;
+  sourceId: string;
+  stemHash: string;
+  /** Latex 변환 Data_DS L열 원문. audition이면 무시 */
+  jangbuCell?: string;
+  now: number;
+}): ImportSourceShape {
+  const base: ImportSourceShape = {
+    provider: 'audition-sheet',
+    sheet: args.sheet,
+    row: args.row,
+    source_id: args.sourceId,
+    stem_hash: args.stemHash,
+    imported_at: args.now,
+  };
+  if (args.file !== 'latex') return base;
+  const id = normalizeJangbuId(args.jangbuCell ?? '');
+  return { ...base, file: 'latex', ...(JANGBU_ID_RE.test(id) ? { jangbu_id: id } : {}) };
 }
 
 /* ═══ 텍스트 정규화 (최소주의) ═══ */

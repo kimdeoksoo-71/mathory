@@ -24,6 +24,11 @@
  *    이동(`folder_id = TRASH_FOLDER_ID`)이라 문서가 그대로 남는다. 이를 중복으로 세면
  *    "지웠는데도 다시 가져올 수 없는" 상태가 된다 — 실제로 그렇게 막혔다.
  *    또한 중복이어도 **체크를 막지는 않는다**. 기본만 해제하고 판단은 사용자에게 남긴다.
+ *
+ * ⚠️ **원본은 파일 + 시트 두 축이다(Phase 72 D1).** '문제 검토 : Data_DS' · '문제 검토 : Stack' · 'Latex 변환 : Data_DS'.
+ *    Latex 변환 Data_DS는 M(사전 선별)·O·P가 없어 M체크 UI를 숨기고 요청에는 **파생값** false를 싣는다 — `includePreselected`
+ *    상태는 건드리지 않는다(S3). 대신 **문항장부 ID 목록**(L열 `jangbu_id`)으로 행을 고를 수 있고 행 범위와 합집합이다.
+ *    `import_source` 조립은 `buildImportSource`(lib) 하나 — `file: undefined` 같은 키를 넣으면 Firestore가 거부한다(E8).
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -32,6 +37,7 @@ import type { Block, Folder, ImportSource } from '../../types/problem';
 import {
   rowToDraft, isDraftError,
   type ImportRow, type ProblemDraft, type DraftBlock, isMathpixFigUrl,
+  SHEET_COL, JANGBU_ID_RE, JANGBU_ID_MAX, parseJangbuIds, normalizeJangbuId, buildImportSource,
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
 import { tidyBlocks, preserveSourceLineBreaks } from '../../lib/blockTidy';
@@ -48,11 +54,16 @@ import { promptDialog } from '../../lib/dialogs';
 import { isImeKey } from '../../lib/imeKey';
 
 type SheetName = 'Data_DS' | 'Stack';
+/** Phase 72 D1 — 원본 파일. `audition` = 문제 검토 · `latex` = Latex 변환 */
+type SourceFile = 'audition' | 'latex';
+type SourceKey = 'audition:Data_DS' | 'audition:Stack' | 'latex:Data_DS';
 
 interface ApiResponse {
   header: string[];
   headerWarnings: string[];
   rows: ImportRow[];
+  /** 요청한 문항장부 ID 중 L열에 없던 것(Phase 72 D6′). 옛 응답엔 없을 수 있다 */
+  unmatched?: string[];
 }
 
 /** 한 행의 미리보기 단위. `persisted`가 화면과 저장이 공유하는 단일 진실이다(Y1). */
@@ -67,6 +78,8 @@ interface PreviewItem {
   autoFixCount: number;
   /** none=새 문항 · existing=내 문항에 있음 · inSelection=이번 선택 안 중복 · trashed=휴지통에만 있음 */
   dupe: 'none' | 'existing' | 'inSelection' | 'trashed';
+  /** Phase 72 — Latex 변환 Data_DS L열의 문항장부 ID(형식에 맞을 때만). 배지·저장(`jangbu_id`)이 읽는다 */
+  jangbuId: string | null;
 }
 
 /** 그림 한 장의 상태. 키는 파일명이라 문제·해설이 같은 그림을 가리켜도 **한 번만** 받는다(D17). */
@@ -81,12 +94,15 @@ interface SaveOutcome {
   detail?: string;
 }
 
-/** 61e-2차 D27 — GAS `pv_load_`가 검증 실행마다 Data_DS를 **통째로 비우고 다시 채운다**
- *  (M열 체크박스까지 지워진다 — N8). 그래서 Data_DS는 "마지막 검증 실행분", 누적본은 Stack이다. */
-const SHEETS: { id: SheetName; label: string; hint: string }[] = [
-  { id: 'Data_DS', label: 'Data_DS', hint: '마지막 검증 실행분 (불러올 때마다 교체됨)' },
-  { id: 'Stack', label: 'Stack', hint: '누적 (전체 세트)' },
+/** 61e-2차 D27 — GAS `pv_load_`가 검증 실행마다 **문제 검토** Data_DS를 통째로 비우고 다시 채운다
+ *  (M열 체크박스까지 지워진다 — N8). 그래서 그 Data_DS는 "마지막 검증 실행분", 누적본은 Stack이다.
+ *  Phase 72 — 'Latex 변환' Data_DS는 대량 변환의 누적본(비워지지 않음)이고 문항장부 ID(L열)로 고를 수 있다. */
+const SOURCES: { key: SourceKey; file: SourceFile; sheet: SheetName; label: string; hint: string }[] = [
+  { key: 'audition:Data_DS', file: 'audition', sheet: 'Data_DS', label: '문제 검토 : Data_DS', hint: '마지막 검증 실행분 (불러올 때마다 교체됨)' },
+  { key: 'audition:Stack',   file: 'audition', sheet: 'Stack',   label: '문제 검토 : Stack',   hint: '누적 (전체 세트)' },
+  { key: 'latex:Data_DS',    file: 'latex',    sheet: 'Data_DS', label: 'Latex 변환 : Data_DS', hint: '대량 변환 누적본 · 문항장부 ID로 고를 수 있음' },
 ];
+const sourceOf = (key: SourceKey) => SOURCES.find((s) => s.key === key)!;
 
 /** 저장 동시성. 문항 1건이 문서 1 + 블록 2~5개라 왕복이 많다. 너무 높이면
  *  Firestore 클라이언트가 큐를 쌓고 진행률이 뭉텅이로 뛴다. */
@@ -255,9 +271,13 @@ export default function SheetImportModal({
   onImported: () => void;
 }) {
   const [phase, setPhase] = useState<'form' | 'preview' | 'saving' | 'done'>('form');
-  const [sheet, setSheet] = useState<SheetName>('Stack');
+  const [sourceKey, setSourceKey] = useState<SourceKey>('audition:Stack');
+  const { file, sheet } = sourceOf(sourceKey);
   const [rowsText, setRowsText] = useState('');
+  /** ⚠ 원본을 latex ↔ audition으로 오가도 **상태는 불변**(S3) — 요청·canSubmit은 아래 파생값 `effectivePreselected`만 본다 */
   const [includePreselected, setIncludePreselected] = useState(true);
+  /** Phase 72 — 문항장부 ID 목록(문제검색 W1 붙여넣기). latex에서만 쓴다 */
+  const [jangbuText, setJangbuText] = useState('');
 
   const [folders, setFolders] = useState<Folder[]>(initialFolders);
   const [folderId, setFolderId] = useState<string | null>(null);
@@ -266,7 +286,8 @@ export default function SheetImportModal({
   const [error, setError] = useState<string | null>(null);
   const [headerWarnings, setHeaderWarnings] = useState<string[]>([]);
   const [items, setItems] = useState<PreviewItem[]>([]);
-  const [fetchedSheet, setFetchedSheet] = useState<SheetName>('Stack');
+  /** 미리보기가 실제로 읽은 원본 — 저장의 `import_source`는 이것을 쓴다(설정 화면의 현재 선택이 아니라) */
+  const [fetched, setFetched] = useState<{ file: SourceFile; sheet: SheetName }>({ file: 'audition', sheet: 'Stack' });
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [expanded, setExpanded] = useState<number | null>(null);
 
@@ -309,7 +330,11 @@ export default function SheetImportModal({
     }
   }, [figs, user]);
 
-  const canSubmit = rowsText.trim() !== '' || includePreselected;
+  // Phase 72 D7(S3) — latex에는 M열이 없다. UI를 숨기고 요청에는 파생값 false를 싣는다(상태는 그대로).
+  const effectivePreselected = file === 'audition' && includePreselected;
+  const parsedJangbu = useMemo(() => parseJangbuIds(jangbuText), [jangbuText]);
+  const jangbuIds = file === 'latex' ? parsedJangbu.ids : [];
+  const canSubmit = rowsText.trim() !== '' || effectivePreselected || jangbuIds.length > 0;
   const folderName = folderId ? (folders.find((f) => f.id === folderId)?.name ?? '') : '최상위(미지정)';
 
   /* ── 폴더 새로 만들기 (AppShell 관례와 동일: prompt + order = 형제 수) ── */
@@ -344,7 +369,10 @@ export default function SheetImportModal({
       const res = await fetch('/api/sheet-import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify({ sheet, rows: rowsText.trim(), includePreselected }),
+        body: JSON.stringify({
+          source: file, sheet, rows: rowsText.trim(), includePreselected: effectivePreselected,
+          ...(jangbuIds.length > 0 ? { jangbuIds } : {}),
+        }),
       });
       const json = await res.json();
       if (!res.ok) { setError(json?.error ?? '시트를 가져오지 못했습니다'); return; }
@@ -369,9 +397,12 @@ export default function SheetImportModal({
       const seen = new Set<string>();
       const next: PreviewItem[] = data.rows.map((row) => {
         const d = rowToDraft(row);
+        // Phase 72 — L열 문항장부 ID(latex만 · 형식에 맞을 때만). 저장 시 `buildImportSource`가 다시 같은 판정을 한다.
+        const jangbuCell = file === 'latex' ? normalizeJangbuId(row.cells[SHEET_COL.jangbu_id] ?? '') : '';
+        const jangbuId = JANGBU_ID_RE.test(jangbuCell) ? jangbuCell : null;
         if (isDraftError(d)) {
           return { rowIndex: row.rowIndex, draft: null, error: d.error, persisted: {},
-                   figNames: [], autoFixCount: 0, dupe: 'none' as const };
+                   figNames: [], autoFixCount: 0, dupe: 'none' as const, jangbuId };
         }
         // Y1·Y2·Y3 — 저장형을 여기서 확정하고 화면이 그것을 그린다.
         // 순서가 규칙이다: rowToDraft → splitFigures(라이브러리) → **정돈(tidyDrafts, M7)** → toPersistedBlock.
@@ -406,12 +437,19 @@ export default function SheetImportModal({
           : trashed.has(key) ? 'trashed'          // 휴지통에만 있음 → 가져올 수 있다
           : 'none';
         seen.add(key);
-        return { rowIndex: row.rowIndex, draft: d, error: null, persisted, figNames, autoFixCount, dupe };
+        return { rowIndex: row.rowIndex, draft: d, error: null, persisted, figNames, autoFixCount, dupe, jangbuId };
       });
 
       setItems(next);
-      setFetchedSheet(sheet);
-      setHeaderWarnings(data.headerWarnings ?? []);
+      setFetched({ file, sheet });
+      const warns = [...(data.headerWarnings ?? [])];
+      const unmatched = data.unmatched ?? [];
+      if (unmatched.length > 0) {
+        // Phase 72 C6 — 문항장부에는 있어도 Latex 변환 L열이 비어 있는 ID일 수 있다(색인 누락 · 아직 변환 안 된 S####).
+        warns.push(`문항장부 ID ${unmatched.length}개를 L열에서 찾지 못했습니다: ${unmatched.slice(0, 10).join(', ')}${unmatched.length > 10 ? ' …' : ''}`
+                 + ' — 문항장부에는 있지만 Latex 변환 L열이 비어 있는 ID일 수 있습니다(색인 누락 · 아직 변환 안 된 S####)');
+      }
+      setHeaderWarnings(warns);
       // D3′(D15): 중복은 기본 해제. 다만 **막지는 않는다** — 배지로 알리고 선택은 사용자가 한다.
       //   휴지통에만 있는 것은 사실상 지운 문항이므로 기본 선택에 포함한다.
       setChecked(new Set(
@@ -451,14 +489,12 @@ export default function SheetImportModal({
       let problemId: string | null = null;
       const uploaded: string[] = [];        // D7″ 롤백 대상
       try {
-        const importSource: ImportSource = {
-          provider: 'audition-sheet',
-          sheet: fetchedSheet,
-          row: item.rowIndex,
-          source_id: d.sourceId,
-          stem_hash: d.stemHash,
-          imported_at: Date.now(),
-        };
+        // Phase 72 D2 — 조립은 lib 순수 함수가 소유(audition이면 `file`·`jangbu_id` 키 자체가 없다 — E8)
+        const importSource: ImportSource = buildImportSource({
+          file: fetched.file, sheet: fetched.sheet, row: item.rowIndex,
+          sourceId: d.sourceId, stemHash: d.stemHash,
+          jangbuCell: item.jangbuId ?? undefined, now: Date.now(),
+        });
         problemId = await createProblem({
           title: d.title,
           source: d.source,                        // D4 — A열은 문자 그대로 "문제 출처"
@@ -559,8 +595,9 @@ export default function SheetImportModal({
         <div style={S.body}>
           {phase === 'form' && (
             <FormPane
-              sheet={sheet} setSheet={setSheet}
+              sourceKey={sourceKey} setSourceKey={setSourceKey}
               rowsText={rowsText} setRowsText={setRowsText}
+              jangbuText={jangbuText} setJangbuText={setJangbuText} jangbuInvalid={parsedJangbu.invalid} jangbuCount={parsedJangbu.ids.length}
               includePreselected={includePreselected} setIncludePreselected={setIncludePreselected}
               tidy={tidy} setTidy={setTidy}
               folders={folders} folderId={folderId} setFolderId={setFolderId}
@@ -650,17 +687,20 @@ export default function SheetImportModal({
 /* ═══ 설정 화면 ═══ */
 
 function FormPane({
-  sheet, setSheet, rowsText, setRowsText, includePreselected, setIncludePreselected,
+  sourceKey, setSourceKey, rowsText, setRowsText, jangbuText, setJangbuText, jangbuInvalid, jangbuCount,
+  includePreselected, setIncludePreselected,
   tidy, setTidy, folders, folderId, setFolderId, onNewFolder, onEnter, error,
 }: {
-  sheet: SheetName; setSheet: (s: SheetName) => void;
+  sourceKey: SourceKey; setSourceKey: (s: SourceKey) => void;
   rowsText: string; setRowsText: (s: string) => void;
+  jangbuText: string; setJangbuText: (s: string) => void; jangbuInvalid: string[]; jangbuCount: number;
   includePreselected: boolean; setIncludePreselected: (b: boolean) => void;
   tidy: boolean; setTidy: (b: boolean) => void;
   folders: Folder[]; folderId: string | null; setFolderId: (id: string | null) => void;
   onNewFolder: () => void; onEnter: () => void; error: string | null;
 }) {
   const tree = useMemo(() => flattenVisible(buildFolderTree(folders), new Set()), [folders]);
+  const isLatex = sourceOf(sourceKey).file === 'latex';
 
   const row = (active: boolean, depth: number): React.CSSProperties => ({
     display: 'flex', alignItems: 'center', gap: 6, width: '100%',
@@ -675,17 +715,17 @@ function FormPane({
   return (
     <>
       <div style={{ marginBottom: 18 }}>
-        <div style={S.label}>원본 시트</div>
+        <div style={S.label}>원본</div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {SHEETS.map((s) => (
+          {SOURCES.map((s) => (
             <button
-              key={s.id}
-              onClick={() => setSheet(s.id)}
+              key={s.key}
+              onClick={() => setSourceKey(s.key)}
               style={{
                 flex: 1, padding: '10px 12px', textAlign: 'left', borderRadius: 6, cursor: 'pointer',
                 fontFamily: 'var(--font-ui)',
-                border: `1px solid ${sheet === s.id ? ACCENT : 'var(--border-light, #ddd)'}`,
-                background: sheet === s.id ? 'rgba(188,95,63,0.06)' : 'transparent',
+                border: `1px solid ${sourceKey === s.key ? ACCENT : 'var(--border-light, #ddd)'}`,
+                background: sourceKey === s.key ? 'rgba(188,95,63,0.06)' : 'transparent',
                 color: 'var(--text-primary, #222)',
               }}
             >
@@ -710,16 +750,42 @@ function FormPane({
         </div>
       </div>
 
-      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: 18 }}>
-        <input type="checkbox" checked={includePreselected} onChange={(e) => setIncludePreselected(e.target.checked)} style={{ marginTop: 2 }} />
-        <span style={{ fontSize: 13, color: 'var(--text-primary, #222)' }}>
-          사전 선별(M열 체크 표시)된 문제 포함하기
-          <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 2 }}>
-            행 범위를 비워 두면 사전 선별 문제만 가져옵니다. 둘 다 쓰면 합집합입니다.
-            <br />⚠ Data_DS는 검증을 새로 돌릴 때마다 M열 체크까지 비워집니다 — 체크는 Stack에서 하세요.
+      {isLatex ? (
+        <div style={{ marginBottom: 18 }}>
+          <div style={S.label}>문항장부 ID 목록</div>
+          <textarea
+            style={{ ...S.input, minHeight: 64, resize: 'vertical', fontFamily: 'var(--font-mono, monospace)' }}
+            value={jangbuText}
+            onChange={(e) => setJangbuText(e.target.value)}
+            placeholder="예: D5006, D4827, S0001"
+          />
+          <div style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 6 }}>
+            문항장부 문제검색에서 체크한 뒤 W1 셀을 복사해 붙여 넣으세요 · S#### 가능 · 최대 {JANGBU_ID_MAX}개 · 행 범위와 합집합
+            {jangbuCount > 0 && ` · 유효 ${jangbuCount}개`}
+          </div>
+          {jangbuInvalid.length > 0 && (
+            <div style={{ fontSize: 11, color: ACCENT, marginTop: 4 }}>
+              형식에 안 맞아 빼는 값 {jangbuInvalid.length}개: {jangbuInvalid.slice(0, 10).join(', ')}{jangbuInvalid.length > 10 ? ' …' : ''}
+            </div>
+          )}
+          {jangbuCount > JANGBU_ID_MAX && (
+            <div style={{ fontSize: 11, color: ACCENT, marginTop: 4 }}>ID가 {JANGBU_ID_MAX}개를 넘습니다 — 나눠서 가져오세요</div>
+          )}
+        </div>
+      ) : (
+        <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: 18 }}>
+          <input type="checkbox" checked={includePreselected} onChange={(e) => setIncludePreselected(e.target.checked)} style={{ marginTop: 2 }} />
+          <span style={{ fontSize: 13, color: 'var(--text-primary, #222)' }}>
+            사전 선별(M열 체크 표시)된 문제 포함하기
+            <span style={{ display: 'block', fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 2 }}>
+              행 범위를 비워 두면 사전 선별 문제만 가져옵니다. 둘 다 쓰면 합집합입니다.
+              {sourceKey === 'audition:Data_DS' && (
+                <><br />⚠ Data_DS는 검증을 새로 돌릴 때마다 M열 체크까지 비워집니다 — 체크는 Stack에서 하세요.</>
+              )}
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+      )}
 
       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', marginBottom: 18 }}>
         <input type="checkbox" checked={tidy} onChange={(e) => setTidy(e.target.checked)} style={{ marginTop: 2 }} />
@@ -846,6 +912,7 @@ function PreviewRow({
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             <span style={{ ...badge('muted'), marginRight: 6 }}>{item.rowIndex}행</span>
+            {item.jangbuId && <span style={{ ...badge('muted'), marginRight: 6 }} title="문항장부 ID (L열)">{item.jangbuId}</span>}
             {draft ? draft.title : `가져올 수 없음 — ${error}`}
           </div>
           {draft && (
