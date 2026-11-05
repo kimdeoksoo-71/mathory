@@ -537,7 +537,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 원본을 '문제 검토 : Data_DS' · '문제 검토 : Stack' · **'Latex 변환 : Data_DS'** 셋으로, Latex 변환 Data_DS **L열 `jangbu_id`**를 GAS 메뉴로 백필(색인 ✅ 1,444), 문항장부 문제검색에서 체크한 ID를 W1 한 셀로 모아 Mathory 모달 "문항장부 ID 목록"에 붙여 넣으면 L열로 행을 고른다(행 범위와 합집합). **서버는 읽기만 · Firestore 규칙 0 · 스키마 선택 필드 2(`file?`·`jangbu_id?`) · 중복 판정 0 · 그림 프록시 0.** 규약은 「핵심 패턴」 맨 앞 Phase 72 절이 소유한다.
 
 - **구현이 잡은 것(§10-2)**: 문항장부 라이브 스크립트가 로컬 pull 뒤 11파일 바뀌어 있었다(S#### 지원) — 레포에서 push했으면 덮어썼다 → 재pull·대조 뒤 얹어서 push · latex-convert에는 `.clasp.json`이 없다(덕수가 push해 온 레포) · `SHEET_COL.answer_type: 10` 추가(latex 프로파일 K 검사용, audition 무영향)
-- **덕수 작업(순서대로)**: ① ~~백필~~ **완료(11/06 — 채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0 · 2회 이미 있음 1,444 · 표본 3/3)** ② ~~문제검색 W1·X1·V1 노트·T2~~ **완료(11/06 — V11·V11′ 정상)** ③ Latex 변환 파일에 서비스 계정 **뷰어 공유** + Vercel·`.env.local` `LATEX_SPREADSHEET_ID`(D10) · Vercel `AUDITION_FIG_FOLDER_ID`=`1C1_6NTRHUPR2W1BqN4OrqTNhntsaPixX` · `AUDITION_SPREADSHEET_ID`=`1hrvhHVRCqWHdoCUu6ECBoAWNmoDwDKbGMrpyeOa6XDk` 확인(V1′·C3) ④ 배포 뒤 실물 V5~V10·V12·V14·V15
+- **덕수 작업(순서대로)**: ① ~~백필~~ **완료(11/06 — 채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0 · 2회 이미 있음 1,444 · 표본 3/3)** ② ~~문제검색 W1·X1·V1 노트·T2~~ **완료(11/06 — V11·V11′ 정상)** ③ ~~SA 뷰어 공유 · `LATEX_SPREADSHEET_ID` · Vercel 값 2건~~ **완료(11/06 — 일치)** ④ 배포 뒤 실물 V5~V10·V12·V14·V15
 - ⚠ **작업 종료 후 반드시**: 색인 누락 `25X모의12_1공통20` = D5008 보충 → 백필 재실행 · `S####` 등록 뒤 `cropBuildIndex` → 백필 재실행(§9-1)
 
 ### 이전: **정돈 소폭 개선 — itemize 라벨·글머리 폐지 · 원본 행나눔 보존** — **구현 완료(2026-11-05)** · Mathory `2d4f9ca` · GAS `9705cc3`(push·clasp는 덕수) · 단위 테스트 39종 전부 통과(`test:tidy` 28 → 38) · `tsc` · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · **실물 검수 대기**
