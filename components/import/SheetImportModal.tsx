@@ -34,7 +34,7 @@ import {
   type ImportRow, type ProblemDraft, type DraftBlock, isMathpixFigUrl,
 } from '../../lib/sheetImport';
 import { toPersistedBlock, type PersistedBlockData } from '../../lib/blocks/normalize';
-import { tidyBlocks } from '../../lib/blockTidy';
+import { tidyBlocks, preserveSourceLineBreaks } from '../../lib/blockTidy';
 import { stripInvisibles, isInvisibleTarget } from '../../lib/invisibles';
 import { imageTreatmentStyle } from '../../lib/imageTreatment';
 import { uploadImage, deleteUploadedFile } from '../../lib/storage';
@@ -102,13 +102,15 @@ const dupeKey = (sourceId: string, stemHash: string) => `${sourceId}|${stemHash}
  */
 function tidyDrafts(blocks: DraftBlock[], tabId: string): { blocks: DraftBlock[]; count: number } {
   const tab = tabId === 'question' ? 'question' : tabId === 'solution' ? 'solution' : 'extra';
-  const { blocks: out, stats } = tidyBlocks(blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab });
+  // R6(원본 줄바꿈 → hard break, 2026-11-05)은 문제·풀이 탭만 — AI풀이 탭(O·P열)은 AI 산출물이라 줄바꿈을 넣지 않는다
+  const lineBreaks = tabId === 'question' || tabId === 'solution';
+  const { blocks: out, stats } = tidyBlocks(blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab, lineBreaks });
   return {
     blocks: out.map((o) => {
       const src = blocks[o.origin];
       return src.type === 'image' ? src : { type: o.type as DraftBlock['type'], raw_text: o.raw_text };
     }),
-    count: stats.split + stats.fixed + stats.removed,
+    count: stats.split + stats.fixed + stats.removed + stats.lineBreaks,
   };
 }
 
@@ -387,6 +389,10 @@ export default function SheetImportModal({
             const r = tidyDrafts(d.blocksByTab[tabId], tabId);
             d.blocksByTab[tabId] = r.blocks;
             autoFixCount += r.count;
+          } else if (tabId === 'question' || tabId === 'solution') {
+            // 정돈을 꺼도 원본 줄바꿈은 살린다(정돈 R6과 같은 함수 · 같은 자리). image는 figName째 그대로 통과
+            d.blocksByTab[tabId] = d.blocksByTab[tabId].map((b) =>
+              b.type === 'image' ? b : { ...b, raw_text: preserveSourceLineBreaks(b.raw_text, b.type).fixed });
           }
           persisted[tabId] = d.blocksByTab[tabId].map((b, i) => {
             if (b.type === 'image' && b.figName && !figNames.includes(b.figName)) figNames.push(b.figName);

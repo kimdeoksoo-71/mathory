@@ -623,14 +623,96 @@ const ITEM_HEAD_RE = /^[ \t]*\\item(?![A-Za-z])(?:\[([^\]\n]*)\])?[ \t]*/;
 /** 줄을 갈라야 하는 토큰(줄 중간 `\item` · 환경 토큰) */
 const LIST_TOKEN_RE = new RegExp(`\\\\item(?![A-Za-z])|\\\\(?:begin|end)\\{(?:${LIST_ENV_NAMES})\\}(?:\\[[^\\]\\n]*\\])?`, 'g');
 
+/* ─── 정돈 소폭 개선(2026-11-05): 줄 나눔 판정 — R0b·R6 공용 ─── */
 /**
- * Mathpix·시트가 남기는 LaTeX 목록 환경을 Mathory 표기로 벗긴다(정돈 R0b — `blockTidy`가 R0 직후·분할 앞에서 부른다).
+ * 렌더에 `remark-breaks`가 없어 한 줄 바꿈은 공백으로 합쳐진다. 원본의 줄을 살리려면 앞 줄 끝에 공백 두 칸(hard break)을,
+ * `\tag{n}` 줄이면 빈 줄(문단 나눔 — `.tag-marker`는 문단 세로 중앙에 서고 IR은 문단당 `\tag` 하나만 낸다)을 넣는다.
+ * ⚠ 위치가 proofread인 이유: R0b(`unwrapItemize`, 여기)와 R6(`blockTidy.preserveSourceLineBreaks`)이 함께 쓰는데
+ *   import 방향이 blockTidy → proofread 하나뿐이다(blockTidy에 두면 순환).
+ */
+export type BreakKind = 'none' | 'spaces' | 'paragraph';
+const BREAK_FENCE_RE = /^ {0,3}(`{3,}|~{3,})/;
+/** 렌더 세 사본(EditorPreview · locale.convertTextTags · export/prepare)과 같은 꼴 — 이 줄 끝 공백은 렌더가 먹는다 */
+const BREAK_TAG_END_RE = /\\tag\{\d+\}[ \t]*$/;
+/** 앞 줄이 이미 줄을 끝냈거나(두 칸·`\\`·`<br>`) `$$`로 끝남(저장 정규화가 `\n\n`으로 가른다) */
+const BREAK_PREV_DONE_RE = /(?: {2,}|\\\\[ \t]*|<br\s*\/?>[ \t]*|\$\$[ \t]*)$/;
+const BREAK_PREV_BLOCK_RE = /^(?: {0,3}#{1,6}[ \t]|[ \t]*\|)/;
+/** 다음 줄이 스스로 문단을 끊는다(CommonMark — `2)`·`2.`는 못 끊으므로 넣지 않는다) */
+const BREAK_NEXT_BLOCK_RE = /^[ \t]*(?:\$\$|\\\[|#{1,6}[ \t]|>|\||[-*+][ \t]+\S|1[.)][ \t])/;
+
+/**
+ * `lines[i]`와 `lines[i+1]` 사이(i = 0..n-2)마다 필요한 줄 나눔. 순수 · 멱등 판정(이미 나뉜 경계는 none).
+ * 순서가 규칙이다(실행판 v3 G1): ① 빈 줄 → ② 앞 줄 끝이 수식 안 → ③ 코드펜스 → ④ 어느 쪽이든 수식 밖 `\tag{n}` 끝이면
+ * paragraph(⑤⑥보다 앞 — 앞 줄이 이미 두 칸이어도 번호 줄은 단독 문단) → ⑤ 앞 줄이 이미 끝남·제목·표 → ⑥ 다음 줄이 블록
+ * 시작·`MARKER_LINE_RE`(렌더가 가른다) → ⑦ spaces.
+ * 수식 영역은 편집창 스캐너(`scanMathRegions`) — 오판 비용이 비대칭이다(수식 안 공백은 KaTeX가 무시, 밖을 안으로 보면 오늘처럼 합쳐짐).
+ */
+export function hardBreakKinds(lines: string[]): BreakKind[] {
+  const kinds: BreakKind[] = new Array(Math.max(0, lines.length - 1)).fill('none');
+  if (lines.length < 2) return kinds;
+  const text = lines.join('\n');
+  const regions = scanMathRegions(text).filter((r) => r.closed && !r.empty);
+  const inMath = (pos: number) => regions.some((r) => pos > r.from && pos < r.to);
+  const starts: number[] = [];
+  const code: boolean[] = [];
+  /** 줄 끝이 `$$` display 안인가(`$$` 개수의 홀짝) — 스캐너는 `$$\begin{…}`(여는 `$$`와 내용이 같은 줄)을 빈 인라인 쌍으로 읽어
+   *  그 안을 수식 밖으로 판정한다(CLAUDE.md R10). 렌더는 display로 그리므로 홀짝으로 한 번 더 막는다 */
+  const ddOpen: boolean[] = [];
+  let dd = false;
+  let off = 0;
+  let fence: string | null = null;
+  for (const l of lines) {
+    starts.push(off);
+    off += l.length + 1;
+    const fm = l.match(BREAK_FENCE_RE);
+    if (fence !== null) {
+      code.push(true);
+      if (fm && fm[1][0] === fence[0] && fm[1].length >= fence.length && !l.slice(fm[0].length).trim()) fence = null;
+    } else if (fm) { code.push(true); fence = fm[1]; }
+    else {
+      code.push(false);
+      if ((l.match(/(?<!\\)\$\$/g) ?? []).length % 2 === 1) dd = !dd;
+    }
+    ddOpen.push(dd);
+  }
+  const tagEnd = (k: number) => {
+    const m = BREAK_TAG_END_RE.exec(lines[k]);
+    return !!m && !inMath(starts[k] + m.index);
+  };
+  for (let i = 0; i < kinds.length; i++) {
+    const a = lines[i], b = lines[i + 1];
+    if (!a.trim() || !b.trim()) continue;                                   // ①
+    if (ddOpen[i] || inMath(starts[i] + a.length)) continue;                // ②
+    if (code[i] || code[i + 1]) continue;                                   // ③
+    if (tagEnd(i) || tagEnd(i + 1)) { kinds[i] = 'paragraph'; continue; }   // ④
+    if (BREAK_PREV_DONE_RE.test(a) || BREAK_PREV_BLOCK_RE.test(a)) continue; // ⑤
+    if (BREAK_NEXT_BLOCK_RE.test(b) || MARKER_LINE_RE.test(b)) continue;    // ⑥
+    kinds[i] = 'spaces';                                                    // ⑦
+  }
+  return kinds;
+}
+
+/** `kinds`를 적용한 새 텍스트(새 배열을 앞에서부터 — paragraph의 빈 줄이 인덱스를 밀지 않게). `only`면 그 경계만 */
+export function applyBreakKinds(lines: string[], kinds: BreakKind[], only?: Set<number>): { text: string; count: number } {
+  const out: string[] = [];
+  let count = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const k = i < kinds.length && (!only || only.has(i)) ? kinds[i] : 'none';
+    if (k === 'spaces') { out.push(lines[i].replace(/[ \t]+$/, '') + '  '); count++; }
+    else if (k === 'paragraph') { out.push(lines[i], ''); count++; }
+    else out.push(lines[i]);
+  }
+  return { text: out.join('\n'), count };
+}
+
+/**
+ * Mathpix·시트가 남기는 LaTeX 목록 환경을 벗긴다(정돈 R0b — `blockTidy`가 R0 직후·분할 앞에서 부른다).
  * - `\begin{…}`·`\end{…}`(itemize·enumerate·description, 선택 인자 포함) → 줄째 삭제
- * - enumerate의 라벨 없는 `\item` → `1) `·`2) `…(환경마다 1부터 — M10 P25). ⚠ `1. `은 쓰지 않는다: 정돈 R2-Q·R2의
- *   문제번호 정규식(`^\d{1,2}\.`)이 첫 블록에서 지운다. `(1)` 꼴은 HWPX 해설의 `(n)` → ㉠ 변환에 걸린다
- * - 마커 라벨(`\item[(가)]`·`\item[ㄱ.]`·`\item[①]` — `MARKER_LINE_RE`) → `라벨 `
- * - 비마커 라벨(`\item[(1)]` 등) → `- 라벨 ` / 라벨 없음·빈 라벨: 내용이 마커로 시작하면 `\item`만 지우고 아니면 `- `(M10 P30)
- *   — 그냥 지우면 렌더에 `remark-breaks`가 없어 항목들이 한 문단으로 합쳐진다
+ * - `\item`·`\item[]`·`\item[라벨]` → 머리를 통째로 지우고 **내용만** 남긴다 — 번호(`1) `)·글머리(`- `)를 만들지 않고
+ *   라벨은 무엇이든 버린다(`(1)`·`-`·`$\bullet$`·`(가)`·description 용어 — 덕수 2026-11-05, M10 P16·P25·P30 폐지).
+ *   내용이 마커로 시작하면(`\item ㄱ. 첫째`) 그 마커는 내용이라 남는다
+ * - 지운 자리(환경 줄·`\item` 머리)의 앞 줄에 `hardBreakKinds` 줄 나눔 — 렌더에 `remark-breaks`가 없어 안 하면 항목이
+ *   한 문단으로 합쳐진다(P30의 근거는 그대로 유효). 일반 줄바꿈은 R6의 몫이라 지운 자리만
  * - 줄 중간 토큰(Mathpix 한 줄 출력 `\begin{itemize}\item a \item b\end{itemize}`)은 먼저 줄을 가른다
  * - 수식·코드 범위 안은 무접촉 · 결과는 평평하다(들여쓰기를 버린다 — 4칸 이상이면 코드 블록이 된다) · 멱등
  * ⚠ 결정적 세트(`autoFixDeterministicIssues`)에 넣지 말 것 — OCR(`lib/ocr.ts`)이 공유하고 P-2가 제어열 불변을 고정한다.
@@ -660,42 +742,29 @@ export function unwrapItemize(text: string): { fixed: string; count: number } {
   }
   src += text.slice(last);
 
-  // ② 줄 단위 — 환경 스택(enumerate 번호)과 함께
+  // ② 줄 단위 — 환경 줄 삭제 · `\item` 머리 제거. 지운 자리는 cuts에 표시(out[k] 앞 = 경계 k-1)
   const skip = [...collectMathRanges(src), ...collectCodeRanges(src)];
   const inSkip = (pos: number) => skip.some(([s, e]) => pos >= s && pos < e);
-  const stack: Array<{ kind: string; n: number }> = [];
   const out: string[] = [];
+  const cuts = new Set<number>();
   let count = 0;
   let offset = 0;
   for (const line of src.split('\n')) {
     const at = offset + (line.length - line.trimStart().length);
     offset += line.length + 1;
-    if (inSkip(at)) { out.push(line); continue; }
-    const env = line.match(ENV_LINE_RE);
-    if (env) {
-      if (env[1] === 'begin') stack.push({ kind: env[2], n: 0 });
-      else stack.pop();
-      count++;
-      continue;
-    }
+    if (inSkip(at)) { out.push(line); continue; }                     // 수식·코드 안 줄은 무접촉(v3 G2)
+    if (ENV_LINE_RE.test(line)) { cuts.add(out.length); count++; continue; }
     const item = line.match(ITEM_HEAD_RE);
     if (!item) { out.push(line); continue; }
     count++;
-    const label = item[1];
-    const rest = line.slice(item[0].length);
-    const top = stack[stack.length - 1];
-    let prefix: string;
-    if (label !== undefined && label.trim()) {
-      prefix = MARKER_LINE_RE.test(label.trim()) ? `${label.trim()} ` : `- ${label.trim()} `;
-    } else if (label === undefined && top?.kind === 'enumerate') {
-      prefix = `${++top.n}) `;
-    } else {
-      prefix = MARKER_LINE_RE.test(rest) ? '' : '- ';
-    }
-    if (!rest.trim() && (prefix === '' || prefix === '- ')) continue;   // 내용 없는 \item 줄
-    out.push(prefix + rest);
+    cuts.add(out.length);
+    const rest = line.slice(item[0].length);                          // 라벨은 무엇이든 버린다
+    if (!rest.trim()) continue;                                       // 내용 없는 \item 줄
+    out.push(rest);
   }
-  const fixed = out.join('\n');
+  // ③ 지운 자리에서만 줄 나눔(판정은 결과 줄 배열 기준 — 원문 오프셋은 어긋난다)
+  const marks = new Set([...cuts].filter((k) => k > 0 && k < out.length).map((k) => k - 1));
+  const { text: fixed } = applyBreakKinds(out, hardBreakKinds(out), marks);
   return { fixed, count: fixed === text ? 0 : count };
 }
 

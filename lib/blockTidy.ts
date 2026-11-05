@@ -8,6 +8,8 @@
  *
  * 규칙 순서(순서가 규칙이다 — 분할 뒤에 정형화해야 새 블록도 받는다):
  *   R0 (M9 D29) `\section*{…}` 계열 벗기기 — 분할 **앞**이라 `\section*{STEP1}`이 곧바로 제목 블록이 된다. autoFix 옵션 무관
+ *   R0b (M10 D24 · 2026-11-05 개정) itemize·enumerate·description 벗기기(`proofread.unwrapItemize`) — 라벨·번호·글머리 없이
+ *       내용만, 항목 경계는 hard break. R0처럼 분할 앞·autoFix 무관
  *   R1 분할  (text 계열만 · choices·image·svg·ggb 무접촉)
  *       ① `$$…$$` 독립 display 안에 `\begin{aligned|cases|array|matrix…}`이 있는 다행 덩어리 → 자기 블록(text)
  *          (한 줄짜리·`\begin` 없는 다행은 떼지 않는다 — P12)
@@ -23,6 +25,10 @@
  *   R5 (Phase 68 D17) 행 환경 레이아웃 = `layoutRowEnvs` — **펜스형 `$$`** 안의 aligned·cases·matrix… 를 `\begin`·`\end` 자기 줄 ·
  *       행마다 한 줄 · 들여쓰기 깊이×2칸으로. 렌더 동일(KaTeX는 공백·줄바꿈 무시) · 멱등 · autoFix 옵션 무관(내용 변화 0).
  *       한 줄 `$$…$$`(렌더가 인라인인 레거시)·인라인·(c) 형태는 무접촉. R3 뒤라 `\[..\]`→`$$` 변환분도 받는다
+ *   R6 (2026-11-05 정돈 소폭 개선) 원본 줄바꿈 → hard break(줄 끝 공백 2칸) · `\tag{n}` 줄은 빈 줄로 단독 문단.
+ *       렌더에 `remark-breaks`가 없어 한 줄 바꿈이 공백으로 합쳐지기 때문이다. 판정은 `proofread.hardBreakKinds`(R0b와 공용).
+ *       기본 켬 — 편집창 정돈·시트 가져오기. 시트의 AI풀이 탭만 `lineBreaks: false`. 정돈 끔 가져오기는 모달이
+ *       `preserveSourceLineBreaks`를 직접 부른다. 멱등(이미 나뉜 경계는 none)
  *   R4 trim = 저장 정규화(`toPersistedBlock`)와 같은 앞뒤 빈 줄 제거 — 정돈 직후 화면에서 보이게
  *   ⚠ 행 환경 이름의 단일 원천은 `lib/mathInput.ROW_ENV_RE`(Phase 68 D15 — R1 ①·R5·편집창 Tab/Enter가 같은 목록을 본다)
  *
@@ -31,19 +37,33 @@
  */
 
 import { scanMathRegions } from './mathRegions';
-import { autoFixDeterministicIssues, unwrapSectionCommands, unwrapItemize } from './proofread';
+import { autoFixDeterministicIssues, unwrapSectionCommands, unwrapItemize, hardBreakKinds, applyBreakKinds } from './proofread';
 import { stripInvisibles, isInvisibleTarget } from './invisibles';
 import { ROW_ENV_RE, layoutRowEnvs } from './mathInput';
 import { trimBlockEdges } from './blockEdges';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
-export interface TidyStats { split: number; fixed: number; removed: number; /** M9 Q16 — 식 번호 충돌로 ㉠→\tag 변환을 건너뛴 블록 수 */ tagConflict: number }
-export interface TidyOptions { tab: 'question' | 'solution' | 'extra'; autoFix?: boolean }
+export interface TidyStats { split: number; fixed: number; removed: number; /** M9 Q16 — 식 번호 충돌로 ㉠→\tag 변환을 건너뛴 블록 수 */ tagConflict: number; /** R6 — 줄 나눔을 넣은 경계 수 */ lineBreaks: number }
+export interface TidyOptions { tab: 'question' | 'solution' | 'extra'; autoFix?: boolean; /** R6 — 기본 켬. 시트 가져오기의 AI풀이 탭만 false */ lineBreaks?: boolean }
 
 /** EditorView.SPLITTABLE_TYPES와 같다(사본 — 그쪽은 컴포넌트 상수라 import 0 규약상 여기 다시 적는다) */
 const SPLITTABLE = new Set(['text', 'heading', 'list', 'callout', 'coach_important', 'coach_caution', 'case', 'subcase', 'gana', 'roman', 'box']);
 const NO_FIX = new Set(['image', 'svg', 'ggb']);
+/** R6 대상 — text 계열 + 경우. heading·choices·image·svg·ggb·gana·roman·list는 대상 밖(한 줄이거나 줄 단위로 그린다) */
+const R6_TYPES = new Set(['text', 'callout', 'coach_important', 'coach_caution', 'box', 'case', 'subcase']);
+
+/** R6 — 한 블록의 원본 줄바꿈을 hard break로(`\tag` 줄은 빈 줄). 멱등. 편집창 정돈·시트 가져오기(정돈 켬/끔) 공용 */
+export function preserveSourceLineBreaks(text: string, type: string): { fixed: string; count: number } {
+  if (!R6_TYPES.has(type) || !text.includes('\n')) return { fixed: text, count: 0 };
+  const lines = text.split('\n');
+  const kinds = hardBreakKinds(lines);
+  // case·subcase 제목 행(첫 줄)↔본문 경계는 건드리지 않는다 — injectCaseLabel이 빈 줄을 보장하고 제목 행에 공백을 붙이지 않는다.
+  //   이어짓기 case의 빈 첫 줄은 hardBreakKinds ①이 이미 none
+  if ((type === 'case' || type === 'subcase') && kinds.length) kinds[0] = 'none';
+  const r = applyBreakKinds(lines, kinds);
+  return { fixed: r.text, count: r.count };
+}
 
 /** 시트 가져오기의 CHOICE_FIG_RE — 그림 표기가 든 선택지는 정형화하지 않는다(61e 가드, 여기로 이전) */
 const CHOICE_FIG_RE = /\\includegraphics|!\[(?:[^\[\]\n]|\[[^\[\]\n]*\])*\]\([ \t]*https:\/\/drive\.google\.com\//;
@@ -116,7 +136,7 @@ function splitBlock(text: string): Piece[] | null {
 
 
 export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyOut[]; stats: TidyStats } {
-  const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0 };
+  const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0, lineBreaks: 0 };
   const out: TidyOut[] = [];
 
   // M9 D24-1′ — 비가시·단독 초성 정규화를 가장 먼저(분할·머리 정리 정규식이 깨끗한 글자를 보도록)
@@ -202,6 +222,10 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
     if (SPLITTABLE.has(o.type)) {
       const r5 = layoutRowEnvs(o.raw_text);                       // R5 (Phase 68 D17)
       if (r5.changed) { o.raw_text = r5.text; stats.fixed++; }
+      if (opts.lineBreaks !== false) {                              // R6 (2026-11-05)
+        const r6 = preserveSourceLineBreaks(o.raw_text, o.type);
+        o.raw_text = r6.fixed; stats.lineBreaks += r6.count;
+      }
       o.raw_text = trimBlockEdges(o.raw_text, o.type);              // R4 — M10: 타입을 넘긴다(case 이어짓기 보호 · lib/blockEdges)
     }
   }

@@ -1539,7 +1539,7 @@ export default function EditorView({ problemId, folders, onBack, onSaved }: Edit
     const { blocks: out, stats } = tidyBlocks(
       blocks.map((b) => ({ type: b.type, raw_text: b.raw_text, title: b.title })), { tab },
     );
-    if (!stats.split && !stats.fixed && !stats.removed) {
+    if (!stats.split && !stats.fixed && !stats.removed && !stats.lineBreaks) {
       setStatus('정돈할 것이 없습니다');
       setTimeout(() => setStatus(''), 2000);
       return;
@@ -1571,6 +1571,7 @@ export default function EditorView({ problemId, folders, onBack, onSaved }: Edit
     setCurrentBlocks(next);
     if (nextActive) setActiveBlockId(nextActive);
     setStatus(`정돈: 분할 ${stats.split} · 정형화 ${stats.fixed} · 제거 ${stats.removed}`
+      + (stats.lineBreaks ? ` · 줄바꿈 ${stats.lineBreaks}` : '')            // R6 — 원본 줄바꿈 → hard break(2026-11-05)
       + (stats.tagConflict ? ` · 식 번호 충돌로 ㉠→\\tag 변환 건너뜀 ${stats.tagConflict}블록` : ''));
     setTimeout(() => setStatus(''), 3000);
   }, [allBlocks, activeTab, activeBlockId, pushUndo, setCurrentBlocks]);

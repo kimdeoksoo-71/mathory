@@ -4,8 +4,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-const { tidyBlocks } = await import('../.test-build/lib/blockTidy.js');
+const { tidyBlocks, preserveSourceLineBreaks } = await import('../.test-build/lib/blockTidy.js');
+const { hardBreakKinds } = await import('../.test-build/lib/proofread.js');
+// R6(원본 줄바꿈, 2026-11-05)은 기본 켬 — 기존 회귀 표본은 R6을 끄고 본다. R6 표본은 T6(기본 = 켬)
 const T = (raw, tab = 'solution', type = 'text', autoFix = false) =>
+  tidyBlocks([{ type, raw_text: raw }], { tab, autoFix, lineBreaks: false });
+const T6 = (raw, tab = 'solution', type = 'text', autoFix = false) =>
   tidyBlocks([{ type, raw_text: raw }], { tab, autoFix });
 const shape = (r) => r.blocks.map((b) => `${b.type}:${JSON.stringify(b.raw_text)}`);
 
@@ -153,37 +157,109 @@ test('R4(M10 P26): case·subcase 이어짓기의 빈 첫 줄은 하나 남긴다
   assert.deepEqual(shape(T('조건\n본문\n\n', 'solution', 'case')), ['case:"조건\\n본문"']);
 });
 
-/* ═══ R0b itemize 벗기기 (M10 D24·P25·P30) ═══ */
-test('R0b: 환경 줄 삭제 · 마커로 시작하는 맨 \item은 \item만 · 비마커는 글머리', () => {
+/* ═══ R0b itemize 벗기기 (M10 D24 → 2026-11-05 개정: 라벨·번호·글머리 없이 내용만 · 항목 경계는 hard break) ═══ */
+test('R0b: 환경 줄 삭제 · 내용 앞 마커는 남는다(마커 줄 사이는 렌더가 가른다) · 비마커 항목은 글머리 없이 hard break', () => {
   assert.deepEqual(shape(T('\\begin{itemize}\n\\item ㄱ. 첫째\n\\item ㄴ. 둘째\n\\end{itemize}')), ['text:"ㄱ. 첫째\\nㄴ. 둘째"']);
-  assert.deepEqual(shape(T('\\begin{itemize}\n\\item 첫째 조건\n\\item 둘째 조건\n\\end{itemize}')), ['text:"- 첫째 조건\\n- 둘째 조건"']);
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item 첫째 조건\n\\item 둘째 조건\n\\end{itemize}')), ['text:"첫째 조건  \\n둘째 조건"']);
 });
-test('R0b: \item[] 빈 라벨은 맨 \item과 같이 · 마커 라벨은 라벨 · 비마커 라벨은 글머리 + 라벨', () => {
-  assert.deepEqual(shape(T('\\begin{itemize}\n\\item[] ① a\n\\item[(가)] b\n\\item[(1)] c\n\\end{itemize}')), ['text:"① a\\n(가) b\\n- (1) c"']);
+test('R0b: 라벨은 무엇이든 버린다 — \\item[] · (1) · - · $\\bullet$ · (가) · description 용어', () => {
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item[] ① a\n\\item[(가)] b\n\\item[(1)] c\n\\end{itemize}')), ['text:"① a  \\nb  \\nc"']);
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item[-] a\n\\item[$\\bullet$] b\n\\end{itemize}')), ['text:"a  \\nb"']);
+  assert.deepEqual(shape(T('\\begin{description}\n\\item[용어] 정의\n\\end{description}')), ['text:"정의"']);
 });
-test('R0b: enumerate 맨 \item → 1) 2) — 탭 첫 블록이어도 R2-Q·R2가 번호를 지우지 않는다', () => {
+test('R0b: enumerate도 번호를 만들지 않는다 — 문제·풀이 탭 모두', () => {
   for (const tab of ['question', 'solution']) {
-    assert.deepEqual(shape(T('\\begin{enumerate}\n\\item a\n\\item b\n\\end{enumerate}', tab)), ['text:"1) a\\n2) b"'], tab);
+    assert.deepEqual(shape(T('\\begin{enumerate}\n\\item a\n\\item b\n\\end{enumerate}', tab)), ['text:"a  \\nb"'], tab);
   }
-  assert.deepEqual(shape(T('\\begin{enumerate}[label=(\\arabic*)]\n\\item a\n\\end{enumerate}')), ['text:"1) a"']);
+  assert.deepEqual(shape(T('\\begin{enumerate}[label=(\\arabic*)]\n\\item a\n\\end{enumerate}')), ['text:"a"']);
+});
+test('R0b: 앞 문장↔첫 항목 · 마지막 항목↔뒤 문장도 가른다(환경 줄 삭제 자리) · R6을 꺼도 R0b는 가른다', () => {
+  assert.deepEqual(shape(T('다음 조건을 만족시킨다.\n\\begin{itemize}\n\\item[(가)] a\n\\item b\n\\end{itemize}\n그러므로')),
+    ['text:"다음 조건을 만족시킨다.  \\na  \\nb  \\n그러므로"']);
 });
 test('R0b: 한 줄 출력(Mathpix)도 줄을 갈라 처리 · 앞뒤 본문 보존', () => {
-  assert.deepEqual(shape(T('다음 중 옳은 것은? \\begin{itemize}\\item ㄱ. a \\item ㄴ. b\\end{itemize} 뒤')), ['text:"다음 중 옳은 것은?\\nㄱ. a\\nㄴ. b\\n뒤"']);
+  assert.deepEqual(shape(T('다음 중 옳은 것은? \\begin{itemize}\\item ㄱ. a \\item ㄴ. b\\end{itemize} 뒤')), ['text:"다음 중 옳은 것은?\\nㄱ. a\\nㄴ. b  \\n뒤"']);
 });
-test('R0b: 수식·코드 안은 무접촉 · \items 같은 매크로 무접촉 · stats.fixed · 멱등', () => {
+test('R0b: \\tag 줄은 빈 줄로 단독 문단 — 앞 줄이 이미 두 칸이어도(v3 G1)', () => {
+  assert.deepEqual(shape(T('\\begin{itemize}\n\\item a \\tag{1}\n\\item b\n\\end{itemize}')), ['text:"a \\\\tag{1}\\n\\nb"']);
+  assert.deepEqual(shape(T('앞  \n\\begin{itemize}\n\\item x \\tag{2}\n\\end{itemize}')), ['text:"앞  \\n\\nx \\\\tag{2}"']);
+});
+test('R0b: 수식·코드 안은 무접촉 · \\items 같은 매크로 무접촉 · stats.fixed · 멱등', () => {
   const keep = '$\\text{\\item}$ 와 `\\begin{itemize}` 그리고 \\itemsep';
   const r0 = T(keep);
   assert.deepEqual(shape(r0), [`text:${JSON.stringify(keep)}`]);
   assert.equal(r0.stats.fixed, 0);
-  const r = T('\\begin{itemize}\n\\item 첫째\n\\end{itemize}');
+  const fenced = '```\n\\begin{itemize}\n\\item a\n\\end{itemize}\n```';
+  assert.deepEqual(shape(T(fenced)), [`text:${JSON.stringify(fenced)}`]);
+  const r = T('\\begin{itemize}\n\\item 첫째\n\\item 둘째\n\\end{itemize}');
   assert.ok(r.stats.fixed > 0);
   const again = tidyBlocks(r.blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab: 'solution', autoFix: false });
   assert.deepEqual(shape(again), shape(r));
   assert.equal(again.stats.fixed, 0);
+  assert.equal(again.stats.lineBreaks, 0);
 });
 test('R0b: choices·image는 무접촉(SPLITTABLE 밖)', () => {
   const src = '\\begin{itemize}\n\\item a\n\\end{itemize}';
   assert.deepEqual(shape(T(src, 'solution', 'choices')), [`choices:${JSON.stringify(src)}`]);
+});
+
+/* ═══ R6 원본 줄바꿈 → hard break (2026-11-05 정돈 소폭 개선) ═══ */
+const same = (raw, tab, type) => assert.deepEqual(shape(T6(raw, tab, type)), [`${type ?? 'text'}:${JSON.stringify(raw)}`], raw);
+test('R6: 문단 안 줄바꿈마다 두 칸 · stats.lineBreaks · lineBreaks:false면 무발동', () => {
+  const r = T6('첫째 줄\n둘째 줄\n셋째 줄');
+  assert.deepEqual(shape(r), ['text:"첫째 줄  \\n둘째 줄  \\n셋째 줄"']);
+  assert.equal(r.stats.lineBreaks, 2);
+  assert.deepEqual(shape(T('첫째 줄\n둘째 줄')), ['text:"첫째 줄\\n둘째 줄"']);
+});
+test('R6: 수식 안·$$ 앞뒤·$$\\begin 같은 줄(R10)·코드펜스는 무접촉', () => {
+  same('앞\n$$\nx=1\n$$\n뒤');
+  same('$$\\begin{aligned}\na\\\\b\n\\end{aligned}$$');
+  same('```\na\nb\n```\n뒤');
+});
+test('R6: 스스로 문단을 끊는 줄 앞은 무접촉 — 표·제목·인용·글머리·1)·마커 / 2)는 두 칸', () => {
+  same('| a | b |\n| --- | --- |\n| 1 | 2 |');
+  same('## 제목\n본문');
+  same('설명\n- a\n- b');
+  same('설명\n1) a');
+  same('설명\n(가) 첫째\n(나) 둘째');
+  same('a \\\\\nb');
+  assert.deepEqual(shape(T6('이다.\n2) b')), ['text:"이다.  \\n2) b"']);
+  assert.deepEqual(shape(T6('(가) 첫째\n이어지는 설명')), ['text:"(가) 첫째  \\n이어지는 설명"']);
+});
+test('R6: \\tag 줄은 앞뒤 빈 줄로 단독 문단(N1)', () => {
+  const r = T6('설명 줄\n식 $a=1$ \\tag{1}\n다음 줄');
+  assert.deepEqual(shape(r), ['text:"설명 줄\\n\\n식 $a=1$ \\\\tag{1}\\n\\n다음 줄"']);
+  assert.equal(r.stats.lineBreaks, 2);
+});
+test('R6: case 제목 행↔본문은 무접촉 · 본문 줄 사이는 두 칸 · 이어짓기 빈 첫 줄 보존', () => {
+  assert.deepEqual(shape(T6('조건인 경우\n본문 하나\n본문 둘', 'solution', 'case')), ['case:"조건인 경우\\n본문 하나  \\n본문 둘"']);
+  assert.deepEqual(shape(T6('\n본문 하나\n본문 둘', 'solution', 'case')), ['case:"\\n본문 하나  \\n본문 둘"']);
+});
+test('R6: choices·list·gana·heading 무접촉', () => {
+  same('① a\n② b', 'solution', 'choices');
+  same('- a\n설명', 'solution', 'list');
+  same('(가) a\n설명', 'solution', 'gana');
+  assert.equal(preserveSourceLineBreaks('## a\nb', 'heading').count, 0);
+});
+test('R6: R0b가 붙인 두 칸에 이중으로 붙지 않는다 · 멱등(두 번째 정돈 stats 0)', () => {
+  const r = T6('\\begin{itemize}\n\\item a\n\\item b\n\\end{itemize}\n뒤 문장\n끝');
+  assert.deepEqual(shape(r), ['text:"a  \\nb  \\n뒤 문장  \\n끝"']);
+  const again = tidyBlocks(r.blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab: 'solution', autoFix: false });
+  assert.deepEqual(shape(again), shape(r));
+  assert.deepEqual([again.stats.split, again.stats.fixed, again.stats.removed, again.stats.lineBreaks], [0, 0, 0, 0]);
+  const t = T6('설명 줄\n식 \\tag{1}\n다음');
+  const t2 = tidyBlocks(t.blocks.map((b) => ({ type: b.type, raw_text: b.raw_text })), { tab: 'solution', autoFix: false });
+  assert.deepEqual(shape(t2), shape(t));
+  assert.equal(t2.stats.lineBreaks, 0);
+});
+test('hardBreakKinds: 경계 판정 단위', () => {
+  assert.deepEqual(hardBreakKinds(['a', 'b']), ['spaces']);
+  assert.deepEqual(hardBreakKinds(['a', '', 'b']), ['none', 'none']);
+  assert.deepEqual(hardBreakKinds(['a  ', 'b']), ['none']);
+  assert.deepEqual(hardBreakKinds(['$x', 'y$ 끝', 'z']), ['none', 'spaces']);   // 줄을 넘는 인라인 수식 안
+  assert.deepEqual(hardBreakKinds(['a $\\tag{1}$', 'b']), ['spaces']);            // 수식 안 \tag는 번호 줄이 아니다
+  assert.deepEqual(hardBreakKinds(['a', '* b', '+ c', '> d']), ['none', 'none', 'none']);
+  assert.deepEqual(hardBreakKinds(['a', '-']), ['spaces']);                        // 빈 글머리는 문단을 못 끊는다
 });
 
 test('origin: 여러 입력 블록의 조각이 각자 입력 인덱스를 가리킨다', () => {
