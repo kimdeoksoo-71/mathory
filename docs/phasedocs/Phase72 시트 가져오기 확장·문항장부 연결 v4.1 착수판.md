@@ -413,7 +413,7 @@ push는 덕수 허락(2026-11-05) 아래 CLI가 하고 보고에 push 사실을 
 
 | 단계 | 레포 | 커밋 | 내용 |
 |---|---|---|---|
-| A | `gas-project-latex-convert` | `57488dc` | `JangbuId.gs` 신규(§5-1 그대로 — `JB` 상수 · `jb_nfc_`·`jb_parseExam_`·`jb_makeCanon_`·`jb_canonKey_` 이식 · `jb_backfillFromLedger` ①~⑥ · `jb_notify_` S2) + `MainMenu.gs` 항목 1(`pipeline_sheetcheck_menu` 아래 구분선 전). GitHub push 완료. **clasp push는 덕수**(10-2 I2) |
+| A | `gas-project-latex-convert` | `57488dc` · `7136e38` | `JangbuId.gs` 신규(§5-1 그대로 — `JB` 상수 · `jb_nfc_`·`jb_parseExam_`·`jb_makeCanon_`·`jb_canonKey_` 이식 · `jb_backfillFromLedger` ①~⑥ · `jb_notify_` S2) + `MainMenu.gs` 항목 1(`pipeline_sheetcheck_menu` 아래 구분선 전). **clasp push 완료(2026-11-06 — 덕수가 스크립트 ID 제공, `.clasp.json` gitignore)** · 백필 V3·V3′·V4 통과 |
 | B | `gas-project-problem-ledger` | `b4413d4` → `b220051` | `search-check-reset.gs` 신규(부록 D 코드 그대로) → **라이브 재pull 반영**(10-2 I1) → `clasp push -f` 21파일 → 재pull로 라이브 = 레포 전 파일 일치 확인(`onEdit` 유일) |
 | C+D | `mathory` | `a13e0eb` | `route.ts`(SOURCES · `readEnv` sheetIds 선택 · `readSheet(sheet, sheetId, envId, env)` · body `source`·`jangbuIds` · latex 전용 400 · 500개 상한 400 · 합집합 · `unmatched` · 헤더 주석) · `lib/sheetImport.ts`(`SHEET_COL.answer_type/jangbu_id` · `EXPECTED_HEADERS_LATEX` · `HeaderProfile` · `checkHeaders(h, profile)` S1 · `JANGBU_ID_RE`·`JANGBU_ID_MAX`·`normalizeJangbuId`·`parseJangbuIds` · `ImportSourceShape`·`buildImportSource`) · `types/problem.ts`(`file?`·`jangbu_id?`) · 모달(§5-6 전부) · 테스트 J1·J2·HL1·HL2·I1 |
 | E | `mathory` | (docs 커밋) | CLAUDE.md(구조 3줄 · 핵심 패턴 Phase 72 절 · 환경변수 5종 · `test:sheet` 78 · 현재 Phase) · roadmap · 이 확정본 · 작업물 `_archive/Phase72/`(로컬) |
@@ -440,14 +440,14 @@ C와 D는 같은 파일(route·lib·모달·테스트)을 나눠 고치는 셈�
 |---|---|---|
 | V2 | **통과** | `test:sheet` 73 → **78**(J1·J2·HL1·HL2·I1) · `tsc --noEmit` 전체 통과 · 프로덕션 빌드(§10-4) |
 | V11′ | 코드 push 완료 · **실물 대기(덕수)** | `onEdit` 라이브 반영 확인(재pull). 체크 3개 → M1 변경 → U열 FALSE 확인은 덕수 |
-| V3 · V3′ · V4 | **대기** — A 단계 clasp push(덕수) 뒤 메뉴 1회·2회 | 기대값 §6 그대로(채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0) |
+| V3 · V3′ · V4 | **통과(2026-11-06, 덕수)** — latex-convert clasp push(CLI, 스크립트 ID 덕수 제공 · 라이브 대조 뒤 push · 재pull 30파일 일치) → 메뉴 1회 채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0 → 2회 채움 0 · 이미 있음 1,444 → 5786행 D5006 · 6043행 D4827 · 5686행 빈칸 | 백필 1층 완료 |
 | V11 | **대기(덕수)** — W1·X1·V1 노트·T2 삭제는 시트 수동 | D11′ 수식 그대로 |
 | V1′ · C3 · D10 | **대기(덕수)** — Vercel·`.env.local`·서비스 계정 뷰어 공유 | §5-7 |
 | V5~V10 · V12 · V14 · V15 | **대기** — 배포 뒤 실물 | V6a는 A 단계 없이도 가능(D10 뒤) |
 
 ### 10-4. 덕수 작업 체크리스트 (순서대로)
 
-1. **latex-convert clasp push**(`57488dc`) → Latex 변환 파일 열어 메뉴 '🔗 문항장부 ID 채우기 (Data_DS L열)' 1회 → 알림이 V3 기대값인지 → 2회차(V3′) → 5786행·6043행·5686행(V4).
+1. ~~latex-convert clasp push → 백필 1회·2회 → 표본 3행~~ **완료(2026-11-06 — 전항 기대값 일치)**.
 2. **문항장부 문제검색**: W1·X1 수식(D11′) · V1 라벨 `선택 ID →` + 노트 · T2 삭제 → 체크 3개 → W1·X1(V11) → M1 드롭다운 변경 → U열 전부 해제(V11′).
 3. **Latex 변환 파일에 서비스 계정 뷰어 공유** · Vercel(Production·Preview)·`.env.local` `LATEX_SPREADSHEET_ID` = `1wu8GdvmpyxCqSKS5RiSlRhWGH4B2OMoPN0TGP94ti54` · Vercel `AUDITION_FIG_FOLDER_ID`·`AUDITION_SPREADSHEET_ID` 값 확인(V1′·C3).
 4. 배포 뒤 실물 V5~V10 · V12 · V14 · V15.

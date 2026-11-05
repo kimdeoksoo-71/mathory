@@ -529,7 +529,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **Phase 72 — 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결** — **구현 완료(2026-11-05)** · mathory C+D 1커밋 + docs · latex-convert `57488dc`(JangbuId.gs — **clasp push는 덕수: 스크립트 ID가 로컬에 없다**) · problem-ledger `b220051`(onEdit, clasp push·재pull 검증 완료) · `test:sheet` 73 → **78** · `tsc` 통과 · **덕수 작업·검증 대기**
+## 현재 Phase: **Phase 72 — 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결** — **구현 완료(2026-11-05)** · mathory C+D 1커밋 + docs · latex-convert `57488dc`(JangbuId.gs — clasp push·**백필 V3·V3′·V4 통과 2026-11-06**) · problem-ledger `b220051`(onEdit, clasp push·재pull 검증 완료) · `test:sheet` 73 → **78** · `tsc` 통과 · **덕수 작업·검증 대기**
 
 문서: `docs/phasedocs/Phase72 시트 가져오기 확장·문항장부 연결 v4.1 착수판.md`(§10 구현 기록)
 (계보: 덕수 질문 1~3 → 연구 메모 → 결정 → v1 CLI → v2 web → v3 CLI(F1~F10·C1~C8·R1~R6) → v4 web 라이브 재현(G1~G4·H1~H6·S1~S5) → 덕수 "권장안대로" → **v4.1**(U열 자동 해제) → 구현)
@@ -537,7 +537,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 원본을 '문제 검토 : Data_DS' · '문제 검토 : Stack' · **'Latex 변환 : Data_DS'** 셋으로, Latex 변환 Data_DS **L열 `jangbu_id`**를 GAS 메뉴로 백필(색인 ✅ 1,444), 문항장부 문제검색에서 체크한 ID를 W1 한 셀로 모아 Mathory 모달 "문항장부 ID 목록"에 붙여 넣으면 L열로 행을 고른다(행 범위와 합집합). **서버는 읽기만 · Firestore 규칙 0 · 스키마 선택 필드 2(`file?`·`jangbu_id?`) · 중복 판정 0 · 그림 프록시 0.** 규약은 「핵심 패턴」 맨 앞 Phase 72 절이 소유한다.
 
 - **구현이 잡은 것(§10-2)**: 문항장부 라이브 스크립트가 로컬 pull 뒤 11파일 바뀌어 있었다(S#### 지원) — 레포에서 push했으면 덮어썼다 → 재pull·대조 뒤 얹어서 push · latex-convert에는 `.clasp.json`이 없다(덕수가 push해 온 레포) · `SHEET_COL.answer_type: 10` 추가(latex 프로파일 K 검사용, audition 무영향)
-- **덕수 작업(순서대로)**: ① latex-convert `clasp push`(또는 스크립트 ID를 주면 CLI) → 메뉴 '🔗 문항장부 ID 채우기' 1회 → 보고문이 **채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0**인지(V3) · 2회차 이미 있음 1,444(V3′) · 5786행 D5006 · 6043행 D4827 · 5686행 빈칸(V4) ② 문항장부 문제검색 **W1·X1 수식 + V1 라벨·노트 + T2 삭제**(확정본 D11′ 그대로) · 조건 바꾸면 U열이 풀리는지(V11′) ③ Latex 변환 파일에 서비스 계정 **뷰어 공유** + Vercel·`.env.local` `LATEX_SPREADSHEET_ID`(D10) · Vercel `AUDITION_FIG_FOLDER_ID`=`1C1_6NTRHUPR2W1BqN4OrqTNhntsaPixX` · `AUDITION_SPREADSHEET_ID`=`1hrvhHVRCqWHdoCUu6ECBoAWNmoDwDKbGMrpyeOa6XDk` 확인(V1′·C3) ④ 배포 뒤 실물 V5~V10·V12·V14·V15
+- **덕수 작업(순서대로)**: ① ~~백필~~ **완료(11/06 — 채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0 · 2회 이미 있음 1,444 · 표본 3/3)** ② 문항장부 문제검색 **W1·X1 수식 + V1 라벨·노트 + T2 삭제**(확정본 D11′ 그대로) · 조건 바꾸면 U열이 풀리는지(V11′) ③ Latex 변환 파일에 서비스 계정 **뷰어 공유** + Vercel·`.env.local` `LATEX_SPREADSHEET_ID`(D10) · Vercel `AUDITION_FIG_FOLDER_ID`=`1C1_6NTRHUPR2W1BqN4OrqTNhntsaPixX` · `AUDITION_SPREADSHEET_ID`=`1hrvhHVRCqWHdoCUu6ECBoAWNmoDwDKbGMrpyeOa6XDk` 확인(V1′·C3) ④ 배포 뒤 실물 V5~V10·V12·V14·V15
 - ⚠ **작업 종료 후 반드시**: 색인 누락 `25X모의12_1공통20` = D5008 보충 → 백필 재실행 · `S####` 등록 뒤 `cropBuildIndex` → 백필 재실행(§9-1)
 
 ### 이전: **정돈 소폭 개선 — itemize 라벨·글머리 폐지 · 원본 행나눔 보존** — **구현 완료(2026-11-05)** · Mathory `2d4f9ca` · GAS `9705cc3`(push·clasp는 덕수) · 단위 테스트 39종 전부 통과(`test:tidy` 28 → 38) · `tsc` · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · **실물 검수 대기**
