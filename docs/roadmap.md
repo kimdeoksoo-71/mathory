@@ -2171,6 +2171,22 @@ Agent 라벨 3곳 → `lego-smiley` · AIBrandIcon 폴백 → `robot`(+ ai-model
 
 ---
 
+## Phase 72: 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결 ✅ 구현 (2026-11-05) · mathory C+D · latex-convert `57488dc`(clasp push 덕수) · problem-ledger `b220051`(onEdit push 완료) · `test:sheet` 78 · `tsc` 통과 · **덕수 작업(백필·시트 수식·Vercel env)·실물 검증 대기**
+
+계획서: `docs/phasedocs/Phase72 시트 가져오기 확장·문항장부 연결 v4.1 착수판.md` (§10 구현 기록)
+(계보: 덕수 질문 1~3 → 연구 메모 → v1 CLI → v2 web → v3 CLI → v4 web 라이브 재현 → 덕수 "권장안대로" → v4.1 U열 자동 해제 → 구현)
+
+| 층 | 무엇 | 어디 |
+|---|---|---|
+| 원본 확장(안 (1)) | '문제 검토 : Data_DS' · '문제 검토 : Stack' · **'Latex 변환 : Data_DS'** — `source`+`sheet` 두 축, `LATEX_SPREADSHEET_ID` | `route.ts` · `SheetImportModal` · `ImportSource.file?` |
+| 1층 데이터 연결 | Latex 변환 Data_DS **L열 `jangbu_id`** 백필(문항장부 `_CroP색인` ✅ 1,444 · 표준 파일키 · 멱등) | latex-convert `JangbuId.gs` + 메뉴 |
+| 2층 선택 | 문제검색 W1 `TEXTJOIN` · X1 개수 경고 · 검색 조건 변경 시 U열 체크 자동 해제 `onEdit` | 문항장부 수식(덕수) · `search-check-reset.gs` |
+| 3층 전달 | 모달 "문항장부 ID 목록"(최대 500 · 행 범위와 합집합 · `unmatched` 경고) · `jangbu_id` 저장 · 배지 | `parseJangbuIds` · `buildImportSource` |
+
+**서버는 읽기만 · Firestore 규칙 0 · 스키마 선택 필드 2 · 중복 판정 0 · 그림 프록시 0.** 가장 값비싼 발견: 문항장부 라이브 스크립트가 로컬 pull 뒤 11파일 바뀌어 있었다(clasp push 전 라이브 대조 규약). ⚠ 종료 후 보충: 색인 누락 D5008 · `S####` 등록 뒤 백필 재실행.
+
+---
+
 ## 정돈 소폭 개선: itemize 라벨·글머리 폐지 · 원본 행나눔 보존 ✅ 구현 (2026-11-05) · Mathory `2d4f9ca` · GAS `9705cc3` · 단위 테스트 39종 통과(`test:tidy` 38) · 빌드 통과 · 실물 검수 대기
 
 계획서: `docs/phasedocs/정돈 소폭 개선 — itemize 글머리 폐지·시트 행나눔 보존 v3 실행판.md` (§9 구현 기록)

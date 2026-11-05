@@ -33,9 +33,9 @@ components/layout/
   FaviconController.tsx    — 탭 아이콘 맥박·완료 점(M10 — canvas 프레임 · Worker 박자)
   Sidebar.tsx              — 사이드바 (Phase 67: 자리·패널·콘텐츠 래퍼 세 겹 · 레일 hover peek)
 components/import/
-  SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a)
-lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수)
-app/api/sheet-import/      — 스프레드시트 읽기 프록시 (읽기 전용 스코프)
+  SheetImportModal.tsx     — 시트 가져오기 마법사 (Phase 61a · Phase 72 원본 3항목 '문제 검토 : Data_DS·Stack' · 'Latex 변환 : Data_DS' + 문항장부 ID 목록)
+lib/sheetImport.ts         — 시트 행 → 문항 초안 변환 (import 0, 순수 함수 · Phase 72 헤더 프로파일 2종 · parseJangbuIds · buildImportSource)
+app/api/sheet-import/      — 스프레드시트 읽기 프록시 (읽기 전용 스코프 · Phase 72 source(파일)+sheet 두 축 · jangbuIds 합집합)
 app/api/sheet-import/figure/ — Drive 그림 읽기 프록시 (Phase 61e, drive.readonly 단독 JWT)
 lib/verify/               — 정밀 검증 (Phase 61b, 전부 import 0 순수 모듈)
   prompts.ts               — 프롬프트 3세트 · 함수형 치환 · 블록 라벨링
@@ -194,6 +194,7 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 
 ## 핵심 패턴 & 주의사항
 
+- **시트 가져오기 원본은 파일 + 시트 두 축이고 문항장부 ID는 L열이다 (Phase 72)**: 원본 셋 — '문제 검토 : Data_DS' · '문제 검토 : Stack' · **'Latex 변환 : Data_DS'**(대량 변환 누적본). 서버 body `source`(`audition`|`latex`, 생략 = audition) + `sheet`, 스프레드시트 ID는 파일마다 환경변수(`AUDITION_SPREADSHEET_ID` · `LATEX_SPREADSHEET_ID` — `readEnv`에서 둘 다 **선택**, 요청한 파일 것이 없을 때만 500). **D4: 문항장부 A열 ID(`D####`·`S####`)는 Latex 변환 Data_DS L열 `jangbu_id`** — M은 `get`(문제 검토 체크박스), N은 `problem_verdict` 자리라 쓰지 않는다. L은 latex-convert GAS 메뉴 '🔗 문항장부 ID 채우기'(`JangbuId.gs` — 문항장부 `_CroP색인` ✅ 1,444행을 읽어 표준 파일키로 짝짓는다 · 2~4489행 옛 경로 4,488행은 "형식 아님"이 정상 · 멱등)가 채운다. **D3: 중복 키 `source_id|stem_hash`는 파일 무관** — 문제 검토 A~K는 Latex 변환 A~K의 복사본(`Pipelineverify.gs:794→:819`, Stack↔Latex 실측 4,918/4,953 동일 · 나머지 35는 `S팀.X05` 재정규화 꼬리, 알고 수용). ⚠ **`import_source` 조립은 `buildImportSource`(lib) 하나** — `file: undefined`·`jangbu_id: undefined`를 넣으면 `createProblem`이 최상위 undefined만 걸러 **중첩 undefined로 Firestore 저장이 실패한다**(E8) → audition은 키 자체가 없고 latex만 `file: 'latex'`(+ L이 형식에 맞을 때만 `jangbu_id`). `ImportSource`(types)와 `ImportSourceShape`(lib, import 0)는 같은 모양의 **의도적 이중** — 함께 고칠 것. latex 프로파일 `checkHeaders(h, 'latex')`는 A~K + L만 보고 L 누락은 전용 문구(S1 — "백필을 아직 안 돌렸을 수 있습니다", "구조가 바뀌었다"는 오진). 모달: latex면 M체크 UI를 숨기고 요청엔 **파생값** `effectivePreselected`(상태 불변 — S3) · "문항장부 ID 목록" textarea(`parseJangbuIds` — 쉼표·공백·줄바꿈·세미콜론 · 대문자 · NFC · 중복 제거 · 순서 유지 · 최대 500 · invalid는 버리고 알림) · 행 범위와 **합집합** · `unmatched`는 경고 1줄(색인 누락·미변환 S####). 서버는 `jangbuIds`를 latex 외에서 받으면 400, 매칭은 선택 여부 무관 전 행. 2층은 문항장부 문제검색 W1(`TEXTJOIN`)·X1(개수 경고)·`onEdit`(검색 조건 1행 B·C·E·I·L·M 변경 → U열 체크 전부 해제 — `search-check-reset.gs`, 프로젝트 유일 onEdit). ⚠ **clasp push 전에 라이브를 pull해 대조할 것** — 2026-11-05 문항장부 스크립트는 로컬 pull 뒤 11파일이 라이브에서 바뀌어 있었다(S#### 지원). 그림 프록시는 그대로(`IMAGE_FIG` 폴더 1개). **작업 종료 후 보충(§9-1)**: 색인 누락 `25X모의12_1공통20`=D5008(Data_DS 5686행) · `S####` 등록 뒤 백필 재실행
 - **문항 메타 저장은 `onSaved`로 AppShell 목록에 제자리 반영한다 (M10 A)**: 목록은 구독이 아니다(`getDocs` + `loadData`) — 옛 코드는 '보기' 경로만 `loadData`를 불러 사이드바로 나가면 저장이 끝나도 폴더뷰에 옛 제목이 남았다("몇 분 뒤 바뀐다" = 무관한 다음 동작이 `loadData`를 부른 시각). 이제 `handleSave`가 `commitProblemSave` 직후 `onSaved`(ref 경유 — 언마운트 뒤 저장에서도)를 부르고 AppShell `applySavedMeta`가 `allProblems`·`recentProblems`(재정렬·끼움)·`sentProblems`를 패치한다(폴더가 바뀌면 `loadData`). ⚠ 언마운트 뒤에 불리므로 클로저 state 금지 — `allProblemsRef`·`viewRef`. 제목을 그리는 배열을 늘리면 거기 함께. ⚠ **`handleSave`는 서버 블록 id·탭을 ref(`origBlockIdsRef`·`origTabsRef`)로 읽는다** — 저장을 기다렸다 다시 부르는 경로(언마운트·'보기'·AI 전 저장)가 재렌더 전·언마운트 뒤에 돌아, state 클로저면 옛 id를 지우고 블록이 **두 벌**이 된다(`commitProblemSave`는 `oldIds`만 지운다). state로 되돌리지 말 것. 언마운트 저장은 종전처럼 **무조건**이되 `waitSaveSettled` 뒤 · "대기 + 저장" 사슬 전체를 `lib/pendingSaves`에 등록하고 새 편집창 로드는 `whenIdle(problemId)`를 먼저 기다린다(같은 문항 재진입 경합). `handleSave` 구간도 등록(가드에서 즉시 반환한 호출은 등록하지 않는다 — 진행 중 등록을 끝난 Promise로 덮는다). ⚠ `dirtyRef`로 언마운트 저장을 거르지 말 것(렌더가 없어 갱신되지 않는다). ⚠ **`<EditorView key={problemId}>`를 지우지 말 것** — 없으면 편집창→편집창 전환(사이드바 '새 문제')이 같은 인스턴스로 새 문항을 로드하고 직전 문항을 저장 없이 버린다
 - **탭 아이콘의 원천은 `lib/activityStore` · 그리는 것은 `FaviconController` 하나다 (M10 B)**: 배선은 `runVerifyFlow`(일괄 안 문항 `batch`는 완료 점 없음)·`runBatchVerify` **둘뿐** — 호출부에 두지 말 것. busy는 카운터. 완료 점(#7A1F14 + 흰 테)은 **끝난 순간 탭이 비활성**일 때만(성공·실패·중단 모두), 돌아오면(visible + focus) 소멸. ⚠ Chrome은 SVG 파비콘 애니메이션을 재생하지 않는다 → canvas 프레임 → PNG data URL. ⚠ Next가 주입한 `link[rel=icon]`은 `type="image/svg+xml"` — **href·type 둘 다** 바꾸고 복원(link는 캐시하지 않고 매번 조회). ⚠ 프레임 박자는 **Worker** — 숨긴 탭에서 메인 setInterval은 1초로 묶이지만 Worker 타이머·메시지 수신은 100ms 그대로(M10 M3 headless 실측, 숨김 중 2초 16프레임). 다른 곳에서 파비콘 href를 만지지 말 것. `lib/activityStore`에 React import 금지(단독 tsc). 도안 상수 `lib/faviconGlyph`는 `app/icon.svg`와 일치를 `test:favicon`이 고정
 - **AI 완성은 없다 (M10 C)**: `/api/ai-complete`·`getAIProvider`·`resolveAIProviderModel`·⌘J·툴바 항목·`sparkle` 아이콘 전부 삭제(실효 없음 — 덕수). 되살리지 말 것. ⌘J는 재배정하지 않았다(Windows Ctrl+J는 브라우저 다운로드 창). `insertPlainText`는 OCR·61c·필기가 쓴다. Vercel `AI_PROVIDER`·`AI_MODEL`은 소비처 0
@@ -528,7 +529,18 @@ preventSetextHeadings → insertMarkerLineBreaks → preprocessLocale
 - **FolderView 카드는 rail·dot을 그리지 않는다 (Phase 59a Q5)**: 카드 본문 `.problem-content-scaled`가 `overflow:hidden` + 좌측 패딩 0이라 거터에 그린 것이 통째로 잘린다. 그 overflow는 잘림 연출·페이드의 기준이라 못 없애고, 패딩을 주면 경우 블록이 없는 절대다수 카드까지 밀린다 → `.problem-card` 스코프 3줄로 `content: none`. **5개 렌더 사이트 중 여기 하나만의 예외다 — 확대 적용 금지**
 - **상태를 나타내는 색은 3:1을 넘겨야 한다 (Phase 59 G1)**: 경우 dot은 `--case-dot`(= `--mathory-red-dark #BC5F3F`, 카드 배경 `#E8DFCE`에서 **3.28:1** — 여유 0.28). 로고 레드 `#D97757`은 미달이라 못 쓴다. 텍스트가 아니어도 상태 표시기면 이 기준이 걸린다
 
-## 현재 Phase: **정돈 소폭 개선 — itemize 라벨·글머리 폐지 · 원본 행나눔 보존** — **구현 완료(2026-11-05)** · Mathory `2d4f9ca` · GAS `9705cc3`(push·clasp는 덕수) · 단위 테스트 39종 전부 통과(`test:tidy` 28 → 38) · `tsc` · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · **실물 검수 대기**
+## 현재 Phase: **Phase 72 — 시트 가져오기 원본 확장('Latex 변환') + 문항장부 ID 연결** — **구현 완료(2026-11-05)** · mathory C+D 1커밋 + docs · latex-convert `57488dc`(JangbuId.gs — **clasp push는 덕수: 스크립트 ID가 로컬에 없다**) · problem-ledger `b220051`(onEdit, clasp push·재pull 검증 완료) · `test:sheet` 73 → **78** · `tsc` 통과 · **덕수 작업·검증 대기**
+
+문서: `docs/phasedocs/Phase72 시트 가져오기 확장·문항장부 연결 v4.1 착수판.md`(§10 구현 기록)
+(계보: 덕수 질문 1~3 → 연구 메모 → 결정 → v1 CLI → v2 web → v3 CLI(F1~F10·C1~C8·R1~R6) → v4 web 라이브 재현(G1~G4·H1~H6·S1~S5) → 덕수 "권장안대로" → **v4.1**(U열 자동 해제) → 구현)
+
+원본을 '문제 검토 : Data_DS' · '문제 검토 : Stack' · **'Latex 변환 : Data_DS'** 셋으로, Latex 변환 Data_DS **L열 `jangbu_id`**를 GAS 메뉴로 백필(색인 ✅ 1,444), 문항장부 문제검색에서 체크한 ID를 W1 한 셀로 모아 Mathory 모달 "문항장부 ID 목록"에 붙여 넣으면 L열로 행을 고른다(행 범위와 합집합). **서버는 읽기만 · Firestore 규칙 0 · 스키마 선택 필드 2(`file?`·`jangbu_id?`) · 중복 판정 0 · 그림 프록시 0.** 규약은 「핵심 패턴」 맨 앞 Phase 72 절이 소유한다.
+
+- **구현이 잡은 것(§10-2)**: 문항장부 라이브 스크립트가 로컬 pull 뒤 11파일 바뀌어 있었다(S#### 지원) — 레포에서 push했으면 덮어썼다 → 재pull·대조 뒤 얹어서 push · latex-convert에는 `.clasp.json`이 없다(덕수가 push해 온 레포) · `SHEET_COL.answer_type: 10` 추가(latex 프로파일 K 검사용, audition 무영향)
+- **덕수 작업(순서대로)**: ① latex-convert `clasp push`(또는 스크립트 ID를 주면 CLI) → 메뉴 '🔗 문항장부 ID 채우기' 1회 → 보고문이 **채움 1,444 · 형식 아님 4,488 · 색인에 없음 371 · 모호 0**인지(V3) · 2회차 이미 있음 1,444(V3′) · 5786행 D5006 · 6043행 D4827 · 5686행 빈칸(V4) ② 문항장부 문제검색 **W1·X1 수식 + V1 라벨·노트 + T2 삭제**(확정본 D11′ 그대로) · 조건 바꾸면 U열이 풀리는지(V11′) ③ Latex 변환 파일에 서비스 계정 **뷰어 공유** + Vercel·`.env.local` `LATEX_SPREADSHEET_ID`(D10) · Vercel `AUDITION_FIG_FOLDER_ID`=`1C1_6NTRHUPR2W1BqN4OrqTNhntsaPixX` · `AUDITION_SPREADSHEET_ID`=`1hrvhHVRCqWHdoCUu6ECBoAWNmoDwDKbGMrpyeOa6XDk` 확인(V1′·C3) ④ 배포 뒤 실물 V5~V10·V12·V14·V15
+- ⚠ **작업 종료 후 반드시**: 색인 누락 `25X모의12_1공통20` = D5008 보충 → 백필 재실행 · `S####` 등록 뒤 `cropBuildIndex` → 백필 재실행(§9-1)
+
+### 이전: **정돈 소폭 개선 — itemize 라벨·글머리 폐지 · 원본 행나눔 보존** — **구현 완료(2026-11-05)** · Mathory `2d4f9ca` · GAS `9705cc3`(push·clasp는 덕수) · 단위 테스트 39종 전부 통과(`test:tidy` 28 → 38) · `tsc` · 프로덕션 빌드 통과(`[icons:check] OK — 64종`) · **실물 검수 대기**
 
 문서: `docs/phasedocs/정돈 소폭 개선 — itemize 글머리 폐지·시트 행나눔 보존 v3 실행판.md`(§9 구현 기록)
 (계보: 덕수 요청 → v1 CLI(결정표) → 덕수 결정 D1~D7 → v2 web 검증(V1~V7 · 정정 E1~E6 · N1~N4) → **v3 CLI 실행판**(정정 G1~G6) → D5 GAS 범위 덕수 확정 → 구현)
@@ -1575,11 +1587,11 @@ gas-project-audition 시트(`Data_DS`/`Stack`) → Mathory 문항. **Firestore �
   되어 truthy 검사가 전부 참이 된다 → **원시값으로 판정할 것**
 - **GAS 코드 인용은 GitHub origin/main만을 원천으로 하고 커밋 해시를 남길 것** — `~/Documents`의
   로컬 사본이 stale해 같은 파일을 두고 숫자가 갈린 왕복이 있었다(2026-08-22 clone으로 교체 완료)
-- **환경변수 4종**(`GOOGLE_SA_EMAIL`·`GOOGLE_SA_PRIVATE_KEY`·`AUDITION_SPREADSHEET_ID`·`AUDITION_ALLOWED_UIDS`)은
+- **환경변수 5종**(`GOOGLE_SA_EMAIL`·`GOOGLE_SA_PRIVATE_KEY`·`AUDITION_SPREADSHEET_ID`·`AUDITION_ALLOWED_UIDS` + Phase 72 `LATEX_SPREADSHEET_ID`)은
   `.env.local`과 **Vercel(Production·Preview)에 등록 완료**. ⚠️ Vercel에는 private key의 **바깥 따옴표를 빼고**
   넣어야 한다 — 따옴표를 값의 일부로 저장하므로 PEM 파싱이 실패한다. 라우트는 `readEnv()`를 핸들러 안에서만
   호출하므로 변수가 없어도 **빌드는 깨지지 않고** 호출 시 500으로 어떤 변수가 없는지 이름만 알린다
-- 로직 검증: `npm run test:sheet` (35개). 프로덕션 빌드 통과 확인(`/api/sheet-import`는 `ƒ` Dynamic)
+- 로직 검증: `npm run test:sheet` (78개 — Phase 72에서 J1·J2·HL1·HL2·I1 추가). 프로덕션 빌드 통과 확인(`/api/sheet-import`는 `ƒ` Dynamic)
 
 ### Phase 60 — list 로케일 블록 개편 (완료 · 검증 통과)
 
