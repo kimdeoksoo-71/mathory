@@ -19,6 +19,7 @@
  *   node scripts/verifyProbe.mjs --file fixtures/a.md       # 로컬 파일 (--- 로 문제/풀이 구분)
  *   ... --kind problem|solution|both   (기본 both)
  *   ... --judge-code-exec              (2차에 code_execution 켜기 — F1 대조용)
+ *   ... --first-max 32768              (1차 출력 상한 비교용, 기본 8000)
  *   ... --json out.json                (결과 저장)
  *
  * 시트 대조군: N열(문제검증) · Q열(해설검증) · U열(STEP3 종합) · V열(확정 결함 리포트).
@@ -69,6 +70,7 @@ function parseArgs(argv) {
     else if (k === '--judge-code-exec') a.judgeCodeExec = true;
     else if (k === '--json') a.json = argv[++i];
     else if (k === '--sheet') a.sheet = argv[++i];
+    else if (k === '--first-max') a.firstMax = Number(argv[++i]);
   }
   return a;
 }
@@ -121,9 +123,13 @@ function toBlocks(text, prefix) {
 
 /* ═══ 모델 호출 (바디 조립은 라우트와 같은 순수 함수를 쓴다) ═══ */
 
+/** 1차 호출 기록 — 출력 상한(`--first-max`) 비교용. 사고 토큰은 상한을 함께 깎고 출력 단가로 청구된다. */
+const GEMINI_LOG = [];
+
 async function callGemini(system, user, model, cfg) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
             + `?key=${process.env.GEMINI_API_KEY}`;
+  const t0 = Date.now();
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -136,11 +142,14 @@ async function callGemini(system, user, model, cfg) {
   const j = await res.json();
   if (!res.ok) throw new Error(`Gemini ${res.status}: ${JSON.stringify(j).slice(0, 300)}`);
   const parts = j?.candidates?.[0]?.content?.parts ?? [];
-  return {
-    content: parts.map((p) => p.text || '').join(''),
-    inputTokens: j?.usageMetadata?.promptTokenCount ?? 0,
-    outputTokens: j?.usageMetadata?.candidatesTokenCount ?? 0,
-  };
+  const content = parts.map((p) => p.text || '').join('');
+  const um = j?.usageMetadata ?? {};
+  const outputTokens = (um.candidatesTokenCount ?? 0) + (um.thoughtsTokenCount ?? 0);   // 라우트 usage와 같은 셈
+  GEMINI_LOG.push({
+    finishReason: j?.candidates?.[0]?.finishReason ?? null,
+    empty: !content.trim(), outputTokens, thoughts: um.thoughtsTokenCount ?? 0, ms: Date.now() - t0,
+  });
+  return { content, inputTokens: um.promptTokenCount ?? 0, outputTokens };
 }
 
 async function callClaude(params) {
@@ -200,8 +209,8 @@ async function runOne({ kind, problemBlocks, solutionBlocks, answer, P, V, opts 
 
   const gs = await Promise.all(passes.map((pr) =>
     callGemini(pr.system, P.fillTemplate(pr.user, vars), opts.geminiModel,
-      // ⚠ 8000은 라우트 FIRST_MAX_TOKENS의 **사본**이다(61g에서 미통일). 한쪽만 바꾸면 측정이 갈린다.
-    V.buildGeminiConfig(8000, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
+      // ⚠ opts.firstMax 기본 8000은 라우트 FIRST_MAX_TOKENS의 **사본**이다(61g에서 미통일). 한쪽만 바꾸면 측정이 갈린다.
+    V.buildGeminiConfig(opts.firstMax, { geminiThinkingLevel: 'HIGH', geminiJsonMime: true }))));
   const gIn = gs.reduce((n, g) => n + g.inputTokens, 0);
   const gOut = gs.reduce((n, g) => n + g.outputTokens, 0);
 
@@ -409,9 +418,10 @@ function printResult(label, r, sheetRef) {
               ...(await import(path.join(buildDir, 'providerParams.js'))) };
 
   const opts = {
-    geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
-    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',   // 2026-09-10 라우트와 동일하게 Opus 5
+    geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-4-argon',    // ⚠ 라우트 DEFAULT_GEMINI_MODEL의 사본
+    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5-5',   // ⚠ 라우트 DEFAULT_CLAUDE_MODEL의 사본
     judgeCodeExec: args.judgeCodeExec,
+    firstMax: args.firstMax || 8000,
   };
 
   /* 대상 수집 */
@@ -582,13 +592,21 @@ function printResult(label, r, sheetRef) {
               + ` · 군더더기 최장 ${gms.length ? (Math.max(...gms) / 1000).toFixed(1) : '-'}s   (200s 문턱)`);
   }
 
+  if (GEMINI_LOG.length) {
+    const outs = GEMINI_LOG.map((g) => g.outputTokens);
+    console.log(`\n1차 호출 ${GEMINI_LOG.length}회 (상한 ${opts.firstMax}): MAX_TOKENS ${GEMINI_LOG.filter((g) => g.finishReason === 'MAX_TOKENS').length}`
+              + ` · 빈 응답 ${GEMINI_LOG.filter((g) => g.empty).length}`
+              + ` · 출력(사고 포함) 평균 ${Math.round(outs.reduce((a, b) => a + b, 0) / outs.length)} / 최대 ${Math.max(...outs)}`
+              + ` · 최장 ${(Math.max(...GEMINI_LOG.map((g) => g.ms)) / 1000).toFixed(1)}s`);
+  }
+
   const totalIn = out.reduce((n, o) => n + (o.result.tokens?.[0] || 0), 0);
   const totalOut = out.reduce((n, o) => n + (o.result.tokens?.[1] || 0), 0);
   const judged = out.filter((o) => o.result.judged).length;
   console.log(`\n토큰 합계: in ${totalIn.toLocaleString()} / out ${totalOut.toLocaleString()}`
             + `  (2차까지 간 건 ${judged}/${out.length})`);
-  // ⚠ 5/25는 lib/aiPricing.ts의 claude-opus-5 단가 사본이다(raw fetch 프로브라 TS 모듈을 못 읽는다) — 표를 바꾸면 함께(M9 D15′ ⑤)
-  console.log(`대략 비용: 최대 $${((totalIn / 1e6) * 5 + (totalOut / 1e6) * 25).toFixed(3)}`
+  // ⚠ 4/20은 lib/aiPricing.ts의 claude-opus-5-5 단가 사본이다(raw fetch 프로브라 TS 모듈을 못 읽는다) — 표를 바꾸면 함께(M9 D15′ ⑤)
+  console.log(`대략 비용: 최대 $${((totalIn / 1e6) * 4 + (totalOut / 1e6) * 20).toFixed(3)}`
             + ` — 전량을 Opus 단가로 계산한 상한이다(1차 Gemini분은 더 싸다)`);
 
   if (args.json) {

@@ -64,6 +64,10 @@ const MAX_INPUT_CHARS = 15_000;
  * 가설의 근거였던 "출력 10,713토큰"은 **1차 두 패스 + 2차 판정의 합계**를 개별 호출값으로
  * 잘못 읽은 것이었다 — 예산에 닿았다는 증거가 애초에 없었다.
  * thinking을 길게 준다고 후보가 좋아지지 않고, 오히려 후보를 덜 낸다.
+ *
+ * 2026-11-11 gemini-4-argon 재측정(같은 10행 × 문제·풀이, 상한별 40호출): 8,000과 32,768 모두
+ * MAX_TOKENS 0 · 빈 응답 0 · 출력 최대 5,835 / 5,523으로 차이가 없어 8,000을 유지한다.
+ * 상한에 닿으면 그 패스만 죽지만, 32,768까지 쓰면 약 90토큰/초 기준 300초를 넘겨 요청 전체가 죽을 수 있다.
  */
 const FIRST_MAX_TOKENS = 8_000;
 /** 시트 QCONFIG.CLAUDE_MAX_TOKENS는 16k였지만, 단계를 쪼개 300초를 온전히 받으므로
@@ -133,6 +137,10 @@ interface VerifyRequestBody {
 
 /* ═══ 환경변수 ═══ */
 
+/** ⚠ 사본: `scripts/verifyProbe.mjs`(raw fetch 프로브라 이 파일을 못 읽는다) — 바꿀 때 함께 */
+const DEFAULT_GEMINI_MODEL = 'gemini-4-argon';
+const DEFAULT_CLAUDE_MODEL = 'claude-opus-5-5';
+
 function readEnv() {
   const missing: string[] = [];
   const need = (name: string) => {
@@ -154,19 +162,20 @@ function readEnv() {
   return {
     apiKey, bucket,
     allowedUids: allowedRaw.split(',').map((s) => s.trim()).filter(Boolean),
-    geminiModel: process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
+    geminiModel: process.env.VERIFY_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     // 2026-09-10 Opus 4.8 → Opus 5 (같은 단가 $5/$25). 같은 행 10개 A/B: 4.8은 실재하는 표기 결함 4건(행 1543,
     // 기호가 깨져 흰 공·검은 공이 같은 ◯)을 전부 기각(기각률 92%)했고 Opus 5는 확정했다(기각률 50% = 베이스라인).
-    // 판정 최장 52.6s → 38.1s. ⚠ thinking은 Opus 5에서 기본 켜짐이지만 `thinking:'adaptive'` 명시는 그대로 둔다.
-    claudeModel: process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',
+    // 판정 최장 52.6s → 38.1s.
+    // 2026-11-11 Opus 5 → Opus 5.5 ($4/$20). ⚠ Opus 5.5의 effort 기본값은 medium이다 — 판정 호출의 `effort:'high'` 명시를 지우지 말 것.
+    claudeModel: process.env.VERIFY_CLAUDE_MODEL || DEFAULT_CLAUDE_MODEL,
     // F1: 2차 판정의 code_execution은 시트 STEP3에 전례가 없는 신규 요소다(그쪽 payload에는
     //     tools가 아예 없다). 기본 off로 두고 실측 후 켠다.
     judgeCodeExec: process.env.VERIFY_JUDGE_CODE_EXEC === '1',
     // M9 D15′ — 단가: env override(VERIFY_*_COST_IN/OUT) → lib/aiPricing 표 → warn + 0.
     //   옛 코드는 Claude 5/25 리터럴(모델을 바꿔도 남았다)과 Gemini env 기본 0이라 **운영의 1차 Gemini 비용이 $0**이었다(§1-C12).
     ...verifyPrices(
-      process.env.VERIFY_CLAUDE_MODEL || 'claude-opus-5',
-      process.env.VERIFY_GEMINI_MODEL || 'gemini-3.1-pro-preview',
+      process.env.VERIFY_CLAUDE_MODEL || DEFAULT_CLAUDE_MODEL,
+      process.env.VERIFY_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
     ),
   };
 }
@@ -453,7 +462,7 @@ async function runJudge(a: {
       solution: kind === 'problem' ? labelBlocks(problemBlocks) : labelBlocks(solutionBlocks),
     };
     const judgeOpts = {
-      // ⚠ Opus 4.8은 thinking을 생략하면 사고가 꺼진 채 돈다. 시트 STEP3와 같은 설정.
+      // 시트 STEP3와 같은 설정. Opus 5.5는 사고가 항상 켜져 있고 깊이는 effort가 정한다(기본 medium이라 high 명시 필수).
       thinking: 'adaptive' as const,
       effort: 'high' as const,
       // F1: 시트에 전례가 없는 신규 요소라 env로 켠다. tool_choice 강제는 절대 하지 않는다
