@@ -865,7 +865,147 @@ const backSpaces = (s: string, from: number, i: number) => { while (i > from && 
 const lineEndAt = (s: string, i: number) => { const n = s.indexOf('\n', i); return n === -1 ? s.length : n; };
 const onlySpaces = (s: string) => /^[ \t]*$/.test(s);
 
+/* ─── 규칙 ⑤ 보강(2026-11-17, Latex 변환 개선 v4 P2): 다행 수식 안 정의부 · 수식 안 인용 ─── */
+/**
+ * 본 규칙(`convertCircledLeaderTagsCore`)은 **수식 영역의 맨 끝**에 있는 라벨만 정의부로 본다. 그래서
+ *  (a) `aligned` 같은 행 환경의 행 끝 `… \quad \cdots \cdots \text{㉠} \\` (마지막 행 포함 — 뒤에 `\end{aligned}`가 있다)
+ *  (b) 수식 안 인용 `(\because \text{㉠})`
+ * 는 그대로 남고 본문의 `㉠`만 `(n)`이 되어 정의부와 인용이 어긋났다(Latex 변환이 식 번호를 원문자 정본으로 내기 시작하면 흔하다).
+ * 이 앞단이 둘을 먼저 처리한다.
+ *  - (b) 행 끝이 아닌 자리의 라벨 = 인용 → `\text{(n)}`(이미 `\text{…}` 안이면 `(n)`). display·인라인 모두.
+ *  - (a) display 안 행 환경의 **행 끝 + 리더가 앞선** 라벨 = 정의부.
+ *      · 그 수식에 1개 → 리더째 걷고 그 자리에 `\tag{n}`(KaTeX는 `aligned`·`cases`·`array` 안 `\tag` 하나를 받는다)
+ *      · 2개 이상이고 수식 전체가 `aligned`(→`align*`)·`gathered`(→`gather*`) 하나 → 환경을 바꾸고 행마다 `\tag{n}`
+ *        (`aligned` 안 `\tag` 둘은 "Multiple \tag" 오류, `align*`는 행마다 받는다 — KaTeX 0.16.28 실측)
+ *      · 그 밖(`array`·`cases`·중첩·이미 `\tag`가 있는 수식) → 리더는 두고 라벨만 `\text{(n)}`(말풍선은 뜨지 않는다 — textFallback으로 센다)
+ *  - 리더 없는 행 끝 라벨, 행 환경 밖의 행 끝 라벨은 건드리지 않는다(본 규칙의 몫 · `$$x=1 ㉠ \\ y=2 ㉡$$` 무변환 유지).
+ * 번호 충돌(Q16)은 본 규칙과 같다 — 만들 `\tag` 번호가 기존 `\tag{k}`·reserved와 겹치거나 서로 겹치면 conflict(호출부가 전체를 건너뛴다).
+ * 코드 안은 무접촉. 멱등(적용 뒤 수식 안에 원문자가 남지 않는다).
+ */
+const ENV_TOKEN_RE = /\\(begin|end)\s*\{([A-Za-z]+\*?)\}/g;
+const ENV_PROMOTE: Record<string, string> = { aligned: 'align*', gathered: 'gather*' };
+
+function convertCircledLabelsInMath(
+  text: string, reserved: number[],
+): { fixed: string; count: number; conflict: boolean; textFallback: number } {
+  const none = { fixed: text, count: 0, conflict: false, textFallback: 0 };
+  if (!/[㉠-㉭]/.test(text)) return none;
+  const code = collectCodeRanges(text);
+  const inCode = (p: number) => code.some(([s, e]) => p >= s && p < e);
+  const regions = scanMathRegions(text).filter((r) => r.closed && !r.empty);
+
+  type Edit = { from: number; to: number; insert: string };
+  const edits: Edit[] = [];
+  const planned: number[] = [];
+  let textFallback = 0;
+
+  for (const R of regions) {
+    if (inCode(R.from)) continue;
+    const inner = text.slice(R.innerFrom, R.innerTo);
+    if (!/[㉠-㉭]/.test(inner)) continue;
+
+    // 환경 토큰(영역 안 절대 위치)
+    const envs: Array<{ pos: number; end: number; open: boolean; name: string }> = [];
+    {
+      const re = new RegExp(ENV_TOKEN_RE.source, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(inner)) !== null) {
+        envs.push({ pos: R.innerFrom + m.index, end: R.innerFrom + m.index + m[0].length, open: m[1] === 'begin', name: m[2] });
+      }
+    }
+    const stackAt = (p: number): Array<{ pos: number; end: number; name: string }> => {
+      const st: Array<{ pos: number; end: number; name: string }> = [];
+      for (const e of envs) {
+        if (e.pos >= p) break;
+        if (e.open) st.push({ pos: e.pos, end: e.end, name: e.name }); else st.pop();
+      }
+      return st;
+    };
+
+    type Def = { from: number; to: number; n: number; leaderFrom: number; envPos: number; envName: string; depth: number };
+    const defs: Def[] = [];
+    let outsideRowEnd = false;   // 행 환경 밖의 행 끝 라벨(본 규칙 몫)이 같은 수식에 있다
+
+    const re = /\\text\s*\{\s*([㉠-㉭])\s*\}|([㉠-㉭])/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(inner)) !== null) {
+      const from = R.innerFrom + m.index, to = from + m[0].length;
+      const n = CIRCLED_JAMO.indexOf((m[1] ?? m[2])!) + 1;
+      const rest = text.slice(to, R.innerTo);
+      const after = rest.replace(/^[ \t\n]+/, '');
+      const rowEnd = after === '' || after.startsWith('\\\\') || /^\\end\s*\{/.test(after);
+      if (!rowEnd) {
+        // (b) 인용 — `\text{…}` 안의 맨 원문자는 괄호 숫자만
+        let insert = `\\text{(${n})}`;
+        if (m[2] !== undefined) {
+          const t = text.lastIndexOf('\\text', from);
+          if (t >= R.innerFrom) {
+            const open = text.indexOf('{', t);
+            if (open !== -1 && open < from && onlySpaces(text.slice(t + 5, open))) {
+              const close = readGroup(text, open);
+              if (close !== -1 && close >= to) insert = `(${n})`;
+            }
+          }
+        }
+        edits.push({ from, to, insert });
+        continue;
+      }
+      if (R.kind !== 'display') continue;
+      const st = stackAt(from);
+      if (st.length === 0) { outsideRowEnd = true; continue; }
+      const w = walkLeaderBack(text, st[st.length - 1].end, from);
+      if (!(w.tokens >= 1 || w.dots >= 3)) continue;   // 리더 없는 행 끝 라벨 — 무접촉
+      defs.push({ from, to, n, leaderFrom: backSpaces(text, st[st.length - 1].end, w.start), envPos: st[0].pos, envName: st[0].name, depth: st.length });
+    }
+    if (!defs.length) continue;
+
+    const hasTag = /\\tag\b/.test(inner);
+    const asText = () => { for (const d of defs) { edits.push({ from: d.from, to: d.to, insert: `\\text{(${d.n})}` }); textFallback++; } };
+    if (hasTag || outsideRowEnd) { asText(); continue; }
+    if (defs.length === 1) {
+      const d = defs[0];
+      edits.push({ from: d.leaderFrom, to: d.to, insert: ` \\tag{${d.n}}` });
+      planned.push(d.n);
+      continue;
+    }
+    // 2개 이상 — 수식 전체가 승격 가능한 환경 하나이고 모든 정의부가 그 환경의 행(깊이 1)일 때만 행마다 \tag
+    const first = envs[0], last = envs[envs.length - 1];
+    const whole = first && last && first.open && !last.open && first.name === last.name
+      && onlySpaces(text.slice(R.innerFrom, first.pos).replace(/\n/g, ''))
+      && onlySpaces(text.slice(last.end, R.innerTo).replace(/\n/g, ''));
+    const promote = whole ? ENV_PROMOTE[first.name] : undefined;
+    if (promote && defs.every((d) => d.depth === 1 && d.envPos === first.pos)) {
+      edits.push({ from: first.pos, to: first.end, insert: `\\begin{${promote}}` });
+      edits.push({ from: last.pos, to: last.end, insert: `\\end{${promote}}` });
+      for (const d of defs) { edits.push({ from: d.leaderFrom, to: d.to, insert: ` \\tag{${d.n}}` }); planned.push(d.n); }
+    } else {
+      asText();
+    }
+  }
+
+  if (!edits.length) return none;
+  const existing = new Set<number>([...reserved, ...[...text.matchAll(/\\tag\*?\{(\d+)\}/g)].map((x) => Number(x[1]))]);
+  if (planned.some((k) => existing.has(k)) || new Set(planned).size !== planned.length) {
+    return { fixed: text, count: 0, conflict: true, textFallback: 0 };
+  }
+  edits.sort((x, y) => y.from - x.from || y.to - x.to);
+  let fixed = text;
+  for (const e of edits) fixed = fixed.slice(0, e.from) + e.insert + fixed.slice(e.to);
+  return { fixed, count: edits.length, conflict: false, textFallback };
+}
+
 export function convertCircledLeaderTags(
+  text: string, reserved: number[] = [],
+): { fixed: string; count: number; conflict: boolean; textFallback?: number } {
+  // 앞단(다행 수식 안 정의부 · 수식 안 인용) → 본 규칙. 어느 쪽이든 충돌이면 **원문 그대로** 건너뛴다(반쯤 바뀐 글을 남기지 않는다)
+  const pre = convertCircledLabelsInMath(text, reserved);
+  if (pre.conflict) return { fixed: text, count: 0, conflict: true };
+  const core = convertCircledLeaderTagsCore(pre.fixed, reserved);
+  if (core.conflict) return { fixed: text, count: 0, conflict: true };
+  return { fixed: core.fixed, count: pre.count + core.count, conflict: false, ...(pre.textFallback ? { textFallback: pre.textFallback } : {}) };
+}
+
+function convertCircledLeaderTagsCore(
   text: string, reserved: number[] = [],
 ): { fixed: string; count: number; conflict: boolean } {
   if (!/[㉠-㉭]/.test(text) && !/\(\d{1,2}\)/.test(text)) return { fixed: text, count: 0, conflict: false };
@@ -1155,9 +1295,10 @@ export function convertTabularToMarkdown(text: string): { fixed: string; count: 
 export function autoFixDeterministicIssues(
   text: string,
   opts?: { skipJamoRefs?: boolean; reservedTagNumbers?: number[] },
-): { fixed: string; count: number; tagConflict?: boolean } {
+): { fixed: string; count: number; tagConflict?: boolean; /** 규칙 ⑤ 보강 — `\tag` 대신 `\text{(n)}`으로 둔 다행 수식 안 정의부 수(말풍선 없음) */ tagTextFallback?: number } {
   let count = 0;
   let tagConflict = false;
+  let tagTextFallback = 0;
 
   // Step 000 (M9 H 후속): 식 번호 라벨 정규화 — `\tag{$\cdots … ($ ㄱ}` 같은 OCR 잔재 → `\tag{1}`. 맨 앞(뒤 단계의
   //   수식 영역 판정이 태그 안의 `$`에 흔들리지 않게)
@@ -1202,6 +1343,7 @@ export function autoFixDeterministicIssues(
     text = r.fixed;
     count += r.count;
     if (r.conflict) tagConflict = true;
+    if (r.textFallback) tagTextFallback += r.textFallback;
   }
 
   // Step 0a: 텍스트 영역의 맨숫자를 $...$ 로 감싸 새로운 수식 영역 생성
@@ -1299,7 +1441,7 @@ export function autoFixDeterministicIssues(
     }
   }
 
-  return tagConflict ? { fixed, count, tagConflict } : { fixed, count };
+  return { fixed, count, ...(tagConflict ? { tagConflict } : {}), ...(tagTextFallback ? { tagTextFallback } : {}) };
 }
 
 /* ─── 블록 raw_text 정제: choices의 ① 라벨 등 제거 (필요 시) ─── */

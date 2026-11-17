@@ -188,3 +188,18 @@ test('Y12 compile.ts 상수 — wasm 버전 = 설치본 · 글꼴 해시 = 테�
   assert.ok(src.includes(NOTO_COMMIT));
   for (const h of Object.values(NOTO_FILES)) assert.ok(src.includes(h), h);
 });
+
+test('Y13 (2026-11-17 E1) 한 수식에 \\tag 둘 이상 — 번호가 행 끝 글자로 풀려 실제 컴파일을 통과하고 두 번호가 모두 나온다', { skip: skipNoFonts }, () => {
+  const src = typ({ title: 't', tabs: [{ id: 'solution', label: '풀이', blocks: [{ id: 'b', type: 'text', raw_text:
+    R`$$
+\begin{align*}
+a+b & =2 \tag{1} \\
+a-b & =0 \tag{2}
+\end{align*}
+$$
+(1), (2)를 연립하면 $a=1$이다.` }] }] }).source;
+  assert.ok(!src.includes('align*'), src);
+  assert.ok(src.includes(R`\text{(1)}`) && src.includes(R`\text{(2)}`), src);
+  const { errors } = compile(src);
+  assert.deepEqual(errors, []);
+});

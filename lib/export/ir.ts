@@ -278,7 +278,16 @@ class Builder {
       if (tag === undefined) tag = star ? x : `(${x})`;
       return '';
     });
-    if (tags > 1) this.warn('한 수식에 \\tag가 둘 이상 — 첫 번호만 내보낸다');
+    if (tags > 1) {
+      // 2026-11-17 (Latex 변환 개선 E1): 번호가 둘 이상이면 하나만 살릴 수 없다 — 각 번호를 **그 행 끝의 글자**로 풀어 낸다
+      //   (`a=1 \quad \cdots\cdots\ \text{(1)}` — 원고의 `⋯⋯ ㉠` 모양). 행마다 번호를 받는 `align*`·`gather*`는
+      //   내보내기 엔진(mitex·한글 수식·LaTeX `equation*`)이 다루지 못하므로 `aligned`·`gathered`로 되돌린다.
+      tag = undefined;
+      latex = value
+        .replace(DISPLAY_TAG_RE, (_, star: string, x: string) => `\\quad \\cdots\\cdots\\ \\text{${star ? x : `(${x})`}}`)
+        .replace(/\\(begin|end)\{align\*\}/g, '\\$1{aligned}')
+        .replace(/\\(begin|end)\{gather\*\}/g, '\\$1{gathered}');
+    }
     latex = latex.replace(MATH_REF_RE, (_, n: string) => `\\mathoryref{${n}}`).trim();
     const out: Flow = { t: 'display', latex, ...(tag !== undefined ? { tag } : {}) };
     if (HAS_LINE_BREAK_RE.test(latex) && !HAS_ENV_RE.test(latex)) {

@@ -44,7 +44,7 @@ import { trimBlockEdges } from './blockEdges';
 
 export interface TidyIn { type: string; raw_text: string; title?: string }
 export interface TidyOut { type: string; raw_text: string; title?: string; origin: number }
-export interface TidyStats { split: number; fixed: number; removed: number; /** M9 Q16 — 식 번호 충돌로 ㉠→\tag 변환을 건너뛴 블록 수 */ tagConflict: number; /** R6 — 줄 나눔을 넣은 경계 수 */ lineBreaks: number }
+export interface TidyStats { split: number; fixed: number; removed: number; /** M9 Q16 — 식 번호 충돌로 ㉠→\tag 변환을 건너뛴 블록 수 */ tagConflict: number; /** 규칙 ⑤ 보강(2026-11-17) — `\tag` 대신 `\text{(n)}`으로 둔 다행 수식 안 정의부 수 */ tagTextFallback: number; /** R6 — 줄 나눔을 넣은 경계 수 */ lineBreaks: number }
 export interface TidyOptions { tab: 'question' | 'solution' | 'extra'; autoFix?: boolean; /** R6 — 기본 켬. 시트 가져오기의 AI풀이 탭만 false */ lineBreaks?: boolean }
 
 /** EditorView.SPLITTABLE_TYPES와 같다(사본 — 그쪽은 컴포넌트 상수라 import 0 규약상 여기 다시 적는다) */
@@ -136,7 +136,7 @@ function splitBlock(text: string): Piece[] | null {
 
 
 export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyOut[]; stats: TidyStats } {
-  const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0, lineBreaks: 0 };
+  const stats: TidyStats = { split: 0, fixed: 0, removed: 0, tagConflict: 0, tagTextFallback: 0, lineBreaks: 0 };
   const out: TidyOut[] = [];
 
   // M9 D24-1′ — 비가시·단독 초성 정규화를 가장 먼저(분할·머리 정리 정규식이 깨끗한 글자를 보도록)
@@ -218,6 +218,7 @@ export function tidyBlocks(blocks: TidyIn[], opts: TidyOptions): { blocks: TidyO
       const r = autoFixDeterministicIssues(o.raw_text, { skipJamoRefs: o.type === 'roman' || o.type === 'choices', reservedTagNumbers });
       o.raw_text = r.fixed; stats.fixed += r.count;
       if (r.tagConflict) stats.tagConflict++;
+      if (r.tagTextFallback) stats.tagTextFallback += r.tagTextFallback;
     }
     if (SPLITTABLE.has(o.type)) {
       const r5 = layoutRowEnvs(o.raw_text);                       // R5 (Phase 68 D17)

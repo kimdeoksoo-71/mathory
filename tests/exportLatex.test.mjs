@@ -94,3 +94,14 @@ test('X10 결정성 + 표본 스냅샷', () => {
   }
   assert.equal(a, readFileSync(snap, 'utf8'), '스냅샷과 다르다 — 의도한 변경이면 EXPORT_SNAPSHOT_UPDATE=1로 갱신 후 diff를 읽을 것');
 });
+
+test('X-E1 (2026-11-17) 한 수식에 \\tag 둘 이상 — equation* 안에 align*·\\tag가 남지 않고 번호는 행 끝 글자', () => {
+  const out = one(R`$$
+\begin{align*}
+a+b & =2 \tag{1} \\
+a-b & =0 \tag{2}
+\end{align*}
+$$`);
+  assert.ok(!out.includes('align*') && !/\\tag\b/.test(out), out);
+  assert.ok(out.includes(R`\begin{aligned}`) && out.includes(R`\quad \cdots\cdots\ \text{(1)}`) && out.includes(R`\text{(2)}`), out);
+});

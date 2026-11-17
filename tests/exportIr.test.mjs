@@ -231,3 +231,29 @@ test('P0-9 렌더 경로와 mdast 구조 동치 — 표본 전 블록', () => {
     assert.deepEqual(mine, render, `구조가 갈렸다:\n${raw}`);
   }
 });
+
+/* ═══ 2026-11-17 (Latex 변환 개선 E1) — 한 수식에 \tag가 둘 이상 ═══ */
+test('I-E1 \\tag가 둘 이상 → 번호를 행 끝 글자로 풀고 align*·gather*는 aligned·gathered로(경고 없음 · tag 속성 없음)', () => {
+  const r = one(R`$$
+\begin{align*}
+a+b & =2 \tag{1} \\
+a-b & =0 \tag{2}
+\end{align*}
+$$`);
+  const d = r.block.body.find((f) => f.t === 'display');
+  assert.equal(d.tag, undefined);
+  assert.equal(d.latex, R`\begin{aligned}
+a+b & =2 \quad \cdots\cdots\ \text{(1)} \\
+a-b & =0 \quad \cdots\cdots\ \text{(2)}
+\end{aligned}`);
+  assert.ok(!r.warnings.some((w) => w.includes('tag')), r.warnings.join(' | '));
+  // 하나뿐이면 예전 그대로(tag 속성)
+  const d1 = body(R`$$
+\begin{aligned}
+a & =1 \tag{1} \\
+b & =2
+\end{aligned}
+$$`).find((f) => f.t === 'display');
+  assert.equal(d1.tag, '(1)');
+  assert.ok(!d1.latex.includes('\\tag'));
+});

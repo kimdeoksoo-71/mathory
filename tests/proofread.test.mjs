@@ -381,3 +381,146 @@ test('자동 수정은 alt에 대괄호가 든 이미지 링크를 건드리지 
     assert.equal(T('`\\tag{ㄱ}`').count, 0);   // 코드 안 무접촉
   });
 }
+
+/* ═══ 규칙 ⑤ 보강(2026-11-17) — 다행 수식 안 정의부 · 수식 안 인용 (Latex 변환 개선 v4 P2) ═══ */
+{
+  const { convertCircledLeaderTags: C, autoFixDeterministicIssues: fix } = await import('../.test-build/lib/proofread.js');
+  const eq = (src, out) => assert.equal(C(src).fixed, out, src);
+  const L = String.raw;
+
+  test('규칙⑤ 보강: aligned 안 정의부 1개 → 그 행에 \\tag{n}(마지막 행 끝 포함) · 본문 ㉠ → (n)', () => {
+    eq(L`$$
+\begin{aligned}
+a+b & =2 \quad \cdots \cdots \text{㉠} \\
+a-b & =0
+\end{aligned}
+$$
+㉠에서`, L`$$
+\begin{aligned}
+a+b & =2 \tag{1} \\
+a-b & =0
+\end{aligned}
+$$
+(1)에서`);
+    eq(L`$$
+\begin{aligned}
+a+b & =2 \\
+a-b & =0 \quad \cdots \cdots \text{㉠}
+\end{aligned}
+$$
+㉠에서`, L`$$
+\begin{aligned}
+a+b & =2 \\
+a-b & =0 \tag{1}
+\end{aligned}
+$$
+(1)에서`);
+  });
+
+  test('규칙⑤ 보강: aligned 안 정의부 2개 이상 → align* + 행마다 \\tag{n} · gathered → gather*', () => {
+    eq(L`$$
+\begin{aligned}
+a+b & =2 \quad \cdots \cdots \text{㉠} \\
+a-b & =0 \quad \cdots \cdots \text { ㉡ }
+\end{aligned}
+$$
+㉠, ㉡을 연립하면`, L`$$
+\begin{align*}
+a+b & =2 \tag{1} \\
+a-b & =0 \tag{2}
+\end{align*}
+$$
+(1), (2)을 연립하면`);
+    eq(L`$$\begin{gathered}x=1 \cdots\cdots ㉠ \\ y=2 \cdots\cdots ㉡\end{gathered}$$`,
+       L`$$\begin{gather*}x=1 \tag{1} \\ y=2 \tag{2}\end{gather*}$$`);
+  });
+
+  test('규칙⑤ 보강: array·cases·중첩·기존 \\tag가 있는 수식의 2개 이상 → 리더는 두고 \\text{(n)}(textFallback)', () => {
+    const r = C(L`$$
+\begin{array}{l}
+a=1 \quad \cdots \cdots \text{㉠} \\
+b=2 \quad \cdots \cdots \text{㉡}
+\end{array}
+$$`);
+    assert.equal(r.fixed, L`$$
+\begin{array}{l}
+a=1 \quad \cdots \cdots \text{(1)} \\
+b=2 \quad \cdots \cdots \text{(2)}
+\end{array}
+$$`);
+    assert.equal(r.textFallback, 2);
+    // 수식 전체가 aligned 하나가 아니면(앞에 다른 것이 있으면) 승격하지 않는다
+    eq(L`$$f(x)=\left\{\begin{aligned}a & =1 \cdots\cdots ㉠ \\ b & =2 \cdots\cdots ㉡\end{aligned}\right.$$`,
+       L`$$f(x)=\left\{\begin{aligned}a & =1 \cdots\cdots \text{(1)} \\ b & =2 \cdots\cdots \text{(2)}\end{aligned}\right.$$`);
+    // cases 안 1개는 \tag
+    eq(L`$$f=\begin{cases}a & (x>0) \quad \cdots\cdots \text{㉠} \\ b & (x \le 0)\end{cases}$$`,
+       L`$$f=\begin{cases}a & (x>0) \tag{1} \\ b & (x \le 0)\end{cases}$$`);
+  });
+
+  test('규칙⑤ 보강: 수식 안 인용(행 끝이 아닌 자리) → \\text{(n)} · \\text 안의 맨 원문자는 (n)', () => {
+    eq(L`$$
+f(t)=1 \quad(\because \text{㉠})
+$$`, L`$$
+f(t)=1 \quad(\because \text{(1)})
+$$`);
+    eq(L`$\therefore a=1(\because ㉡)$ 이다`, L`$\therefore a=1(\because \text{(2)})$ 이다`);
+    eq(L`$$x=1 \quad \text{(㉠에 의하여)}$$`, L`$$x=1 \quad \text{((1)에 의하여)}$$`);
+    eq(L`$\therefore a=1(\because$ ㉠ $)$`, L`$\therefore a=1(\because$ (1) $)$`);
+  });
+
+  test('규칙⑤ 보강: 무접촉 — 리더 없는 행 끝 라벨 · 행 환경 밖 두 라벨 · 한 줄 두 라벨의 끝 라벨만 본 규칙', () => {
+    eq(L`$$x=1 ㉠ \\ y=2 ㉡$$`, L`$$x=1 ㉠ \\ y=2 ㉡$$`);
+    eq(L`$$\begin{aligned}a & =1 \text{㉠} \\ b & =2\end{aligned}$$`, L`$$\begin{aligned}a & =1 \text{㉠} \\ b & =2\end{aligned}$$`);
+  });
+
+  test('규칙⑤ 보강: 번호 충돌이면 원문 그대로(conflict) · reserved · 멱등 · 지금 데이터 모양은 그대로', () => {
+    const src = L`$y$ \tag{1}
+$$
+\begin{aligned}
+a & =1 \cdots\cdots ㉠ \\
+b & =2
+\end{aligned}
+$$`;
+    const r = C(src);
+    assert.equal(r.conflict, true); assert.equal(r.fixed, src);
+    assert.equal(C(L`$$\begin{aligned}a & =1 \cdots\cdots ㉠ \\ b & =2\end{aligned}$$`, [1]).conflict, true);
+    const once = C(L`$$
+\begin{aligned}
+a+b & =2 \quad \cdots \cdots \text{㉠} \\
+a-b & =0 \quad \cdots \cdots \text{㉡}
+\end{aligned}
+$$
+㉠, ㉡에서 $x=1(\because \text{㉠})$`).fixed;
+    assert.equal(C(once).fixed, once);
+    // 9/19~ 변환분 모양: aligned 안 \tag{1} + 본문 (ㄱ) — autoFix 결과가 패치 전과 같다
+    assert.equal(fix(L`$$
+\begin{aligned}
+a+b & =2 \tag{1}\\
+a-b & =0
+\end{aligned}
+$$
+(ㄱ)에서`).fixed, L`$$
+\begin{aligned}
+a+b & =2 \tag{1}\\
+a-b & =0
+\end{aligned}
+$$
+(1)에서`);
+  });
+
+  test('규칙⑤ 보강: autoFix 경유 — \\[..\\] 정본 입력이 $$ + \\tag + (n)으로', () => {
+    assert.equal(fix(L`\[
+\begin{aligned}
+a+b & =2 \quad \cdots \cdots \text{㉠} \\
+a-b & =0 \quad \cdots \cdots \text{㉡}
+\end{aligned}
+\]
+㉠, ㉡을 연립하면`).fixed.replace(/[ \t]+$/gm, ''), L`$$
+\begin{align*}
+a+b & =2 \tag{1} \\
+a-b & =0 \tag{2}
+\end{align*}
+$$
+(1), (2)을 연립하면`);
+  });
+}

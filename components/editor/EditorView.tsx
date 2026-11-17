@@ -1572,7 +1572,8 @@ export default function EditorView({ problemId, folders, onBack, onSaved }: Edit
     if (nextActive) setActiveBlockId(nextActive);
     setStatus(`정돈: 분할 ${stats.split} · 정형화 ${stats.fixed} · 제거 ${stats.removed}`
       + (stats.lineBreaks ? ` · 줄바꿈 ${stats.lineBreaks}` : '')            // R6 — 원본 줄바꿈 → hard break(2026-11-05)
-      + (stats.tagConflict ? ` · 식 번호 충돌로 ㉠→\\tag 변환 건너뜀 ${stats.tagConflict}블록` : ''));
+      + (stats.tagConflict ? ` · 식 번호 충돌로 ㉠→\\tag 변환 건너뜀 ${stats.tagConflict}블록` : '')
+      + (stats.tagTextFallback ? ` · 다행 수식 안 식 번호 ${stats.tagTextFallback}개는 글자 (n)으로 둠` : ''));
     setTimeout(() => setStatus(''), 3000);
   }, [allBlocks, activeTab, activeBlockId, pushUndo, setCurrentBlocks]);
 
